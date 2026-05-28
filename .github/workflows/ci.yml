@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  # ─── TypeScript checks ──────────────────────────────────────
+  typescript:
+    name: TypeScript & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm type-check
+
+      - run: pnpm lint
+
+  # ─── Unit Tests ────────────────────────────────────────────
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test
+
+  # ─── Python OCR sidecar ────────────────────────────────────
+  python:
+    name: Python Sidecar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: packages/ocr-vision/requirements.txt
+
+      - working-directory: packages/ocr-vision
+        run: |
+          pip install -r requirements.txt
+          python -c "import sys; print(f'Python {sys.version}')"
+
+  # ─── Tauri Build (Windows only, on tags) ──────────────────
+  build-tauri:
+    name: Build Desktop App
+    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        platform: [windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: NeuroDesk ${{ github.ref_name }}
+          releaseBody: |
+            See [CHANGELOG.md](CHANGELOG.md) for changes.
+          releaseDraft: true
+          prerelease: false
+          projectPath: apps/desktop

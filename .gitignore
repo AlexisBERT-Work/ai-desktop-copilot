@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+out/
+build/
+target/
+.next/
+*.tsbuildinfo
+
+# Tauri
+apps/desktop/src-tauri/target/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+.env
+packages/ocr-vision/.venv/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+
+# Turbo
+.turbo/
+
+# LanceDB data (local only)
+packages/agent-runtime/data/
+*.lance
+
+# SQLite databases (local only)
+*.db
+*.sqlite
+*.sqlite3
+
+# Audit logs (local only)
+audit-logs/
+
+# OS
+Desktop.ini
+ehthumbs.db

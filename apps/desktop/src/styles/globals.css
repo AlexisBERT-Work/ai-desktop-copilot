@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+    --border: 0 0% 14%;
+    --input: 0 0% 10%;
+    --primary: 270 80% 60%;
+    --primary-foreground: 0 0% 100%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 50%;
+    --accent: 270 80% 60%;
+    --destructive: 0 72% 51%;
+    --ring: 270 80% 60%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    box-sizing: border-box;
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    margin: 0;
+    background: transparent;
+    color: hsl(var(--foreground));
+    font-family: 'Inter var', Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    user-select: none; /* Prevent text selection on UI chrome */
+  }
+
+  /* Allow text selection inside message content */
+  .selectable { user-select: text; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+}

@@ -1,0 +1,19 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Explicitly declare Windows-specific scripts as CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.ico binary
+*.icns binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.wasm binary
+*.db binary
+*.sqlite binary
