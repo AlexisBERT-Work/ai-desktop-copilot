@@ -83,7 +83,7 @@ export class PermissionEngine {
   resolvePermissionRequest(requestId: string, granted: boolean, remember?: boolean): void {
     const pending = this.pendingRequests.get(requestId);
     if (pending) {
-      pending.resolve({ granted, remember });
+      pending.resolve({ granted, ...(remember !== undefined ? { remember } : {}) });
       this.pendingRequests.delete(requestId);
     }
   }

@@ -1,63 +1,79 @@
-import Database from 'better-sqlite3';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { mkdirSync } from 'fs';
 import type { OllamaMessage, ConversationSummary } from '@neurodesk/shared-types';
 import { createLogger } from '../logger';
 
 const log = createLogger('memory:sqlite');
 
-export class ConversationStore {
-  private db!: Database.Database;
+// sql.js is loaded lazily (WASM module)
+let SQL: any = null;
 
-  async initialize(): Promise<void> {
+async function getSqlJs() {
+  if (!SQL) {
+    const sqljs = await import('sql.js');
+    SQL = await sqljs.default({ locateFile: () => require.resolve('sql.js/dist/sql-wasm.wasm') });
+  }
+  return SQL;
+}
+
+export class ConversationStore {
+  private db: any = null;
+  private dbPath: string;
+
+  constructor() {
     const dataDir = process.env['NEURODESK_DATA_DIR'] ?? join(process.cwd(), 'data');
     mkdirSync(dataDir, { recursive: true });
+    this.dbPath = join(dataDir, 'conversations.db');
+  }
 
-    this.db = new Database(join(dataDir, 'conversations.db'));
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
+  async initialize(): Promise<void> {
+    const SqlJs = await getSqlJs();
+
+    // Load existing DB from file, or create new
+    if (existsSync(this.dbPath)) {
+      const buffer = readFileSync(this.dbPath);
+      this.db = new SqlJs.Database(buffer);
+    } else {
+      this.db = new SqlJs.Database();
+    }
 
     this.migrate();
-    log.info('ConversationStore initialized');
+    log.info('ConversationStore initialized', { path: this.dbPath });
   }
 
   private migrate(): void {
-    this.db.exec(`
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS conversations (
         id TEXT PRIMARY KEY,
         title TEXT,
         model TEXT NOT NULL,
         created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        tags TEXT DEFAULT '[]'
+        updated_at INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS messages (
         id TEXT PRIMARY KEY,
-        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        conversation_id TEXT NOT NULL,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         tool_calls TEXT,
         tool_call_id TEXT,
-        created_at INTEGER NOT NULL,
-        metadata TEXT DEFAULT '{}'
+        created_at INTEGER NOT NULL
       );
 
       CREATE INDEX IF NOT EXISTS idx_messages_conversation
         ON messages(conversation_id, created_at);
-
-      -- Full-text search
-      CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts
-        USING fts5(content, conversation_id UNINDEXED);
     `);
+    this.persist();
   }
 
   createConversation(id: string, model: string, title?: string): void {
     const now = Date.now();
-    this.db.prepare(`
-      INSERT INTO conversations (id, title, model, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, title ?? null, model, now, now);
+    this.db.run(
+      `INSERT OR IGNORE INTO conversations (id, title, model, created_at, updated_at) VALUES (?,?,?,?,?)`,
+      [id, title ?? null, model, now, now],
+    );
+    this.persist();
   }
 
   addMessage(conversationId: string, msg: {
@@ -66,41 +82,35 @@ export class ConversationStore {
     content: string;
     toolCalls?: unknown;
     toolCallId?: string;
-    metadata?: unknown;
   }): void {
     const now = Date.now();
-
-    this.db.prepare(`
-      INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_call_id, created_at, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      msg.id, conversationId, msg.role, msg.content,
-      msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
-      msg.toolCallId ?? null,
-      now,
-      JSON.stringify(msg.metadata ?? {}),
+    this.db.run(
+      `INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_call_id, created_at)
+       VALUES (?,?,?,?,?,?,?)`,
+      [
+        msg.id, conversationId, msg.role, msg.content,
+        msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
+        msg.toolCallId ?? null,
+        now,
+      ],
     );
-
-    // Update conversation updated_at
-    this.db.prepare(`UPDATE conversations SET updated_at = ? WHERE id = ?`).run(now, conversationId);
-
-    // Update FTS
-    this.db.prepare(`INSERT INTO messages_fts (content, conversation_id) VALUES (?, ?)`).run(msg.content, conversationId);
+    this.db.run(`UPDATE conversations SET updated_at=? WHERE id=?`, [now, conversationId]);
+    this.persist();
   }
 
   getRecentMessages(conversationId: string, limit: number): OllamaMessage[] {
-    const rows = this.db.prepare(`
-      SELECT role, content, tool_calls, tool_call_id
-      FROM messages
-      WHERE conversation_id = ?
-      ORDER BY created_at DESC
-      LIMIT ?
-    `).all(conversationId, limit) as Array<{
-      role: string;
-      content: string;
-      tool_calls: string | null;
-      tool_call_id: string | null;
-    }>;
+    const stmt = this.db.prepare(
+      `SELECT role, content, tool_calls, tool_call_id FROM messages
+       WHERE conversation_id=? ORDER BY created_at DESC LIMIT ?`,
+    );
+    stmt.bind([conversationId, limit]);
+
+    const rows: Array<{ role: string; content: string; tool_calls: string | null; tool_call_id: string | null }> = [];
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as any;
+      rows.push(row);
+    }
+    stmt.free();
 
     return rows.reverse().map(row => ({
       role: row.role as OllamaMessage['role'],
@@ -111,17 +121,32 @@ export class ConversationStore {
   }
 
   listConversations(limit = 50): ConversationSummary[] {
-    return this.db.prepare(`
-      SELECT c.*,
-        (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count
-      FROM conversations c
-      ORDER BY c.updated_at DESC
-      LIMIT ?
-    `).all(limit) as ConversationSummary[];
+    const stmt = this.db.prepare(
+      `SELECT c.id, c.title, c.model, c.created_at as createdAt, c.updated_at as updatedAt,
+              (SELECT COUNT(*) FROM messages WHERE conversation_id=c.id) as messageCount
+       FROM conversations c ORDER BY c.updated_at DESC LIMIT ?`,
+    );
+    stmt.bind([limit]);
+    const rows: ConversationSummary[] = [];
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject() as any);
+    }
+    stmt.free();
+    return rows;
+  }
+
+  /** Write DB to disk (sql.js is in-memory, must be serialized) */
+  private persist(): void {
+    try {
+      const data = this.db.export();
+      writeFileSync(this.dbPath, Buffer.from(data));
+    } catch {
+      // Non-fatal
+    }
   }
 
   close(): void {
+    this.persist();
     this.db?.close();
   }
 }

@@ -1,4 +1,5 @@
-import type { Attachment, ToolCall } from './ipc';
+import type { Attachment } from './ipc';
+import type { ToolCall } from './agent';
 
 // ─── Conversation & Messages ───────────────────────────────────
 

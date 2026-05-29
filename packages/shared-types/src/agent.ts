@@ -81,12 +81,12 @@ export interface OllamaToolSchema {
 export interface JSONSchemaObject {
   type: 'object';
   properties?: Record<string, JSONSchemaProperty>;
-  required?: string[];
+  required?: readonly string[];
   additionalProperties?: boolean;
 }
 
 export type JSONSchemaProperty =
-  | { type: 'string'; description?: string; enum?: string[]; default?: string }
+  | { type: 'string'; description?: string; enum?: readonly string[]; default?: string }
   | { type: 'number'; description?: string; minimum?: number; maximum?: number; default?: number }
   | { type: 'boolean'; description?: string; default?: boolean }
   | { type: 'array'; items: JSONSchemaProperty; description?: string }

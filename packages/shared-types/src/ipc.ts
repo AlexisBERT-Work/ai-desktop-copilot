@@ -157,3 +157,4 @@ export type AgentMethod =
 // ─── Shared types ──────────────────────────────────────────────
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+

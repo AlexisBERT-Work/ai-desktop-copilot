@@ -30,10 +30,10 @@ export abstract class BaseTool implements RegisteredTool {
   }
 
   protected ok(data: unknown, metadata?: Record<string, unknown>): ToolResult {
-    return { success: true, data, metadata };
+    return { success: true, data, ...(metadata !== undefined ? { metadata } : {}) };
   }
 
   protected fail(error: string, metadata?: Record<string, unknown>): ToolResult {
-    return { success: false, error, metadata };
+    return { success: false, error, ...(metadata !== undefined ? { metadata } : {}) };
   }
 }

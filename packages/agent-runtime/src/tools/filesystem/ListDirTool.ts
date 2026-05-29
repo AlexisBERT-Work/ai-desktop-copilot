@@ -61,8 +61,8 @@ export class ListDirTool extends BaseTool {
         name,
         path: fullPath,
         type: isDir ? 'directory' : 'file',
-        size: isDir ? undefined : info.size,
-        extension: isDir ? undefined : extname(name).slice(1) || undefined,
+        ...(!isDir ? { size: info.size } : {}),
+        ...(!isDir && extname(name).length > 1 ? { extension: extname(name).slice(1) } : {}),
       };
 
       entries.push(entry);

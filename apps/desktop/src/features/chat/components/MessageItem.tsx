@@ -56,37 +56,38 @@ export function MessageItem({ message, isStreaming }: Props) {
 
 function MarkdownContent({ content }: { content: string }) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      className="prose prose-invert prose-sm max-w-none
-                 prose-p:leading-relaxed prose-p:my-1
-                 prose-pre:p-0 prose-pre:bg-transparent
-                 prose-code:text-brand-300 prose-code:bg-white/5
-                 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-                 prose-code:text-xs prose-code:font-mono
-                 prose-headings:text-white/90 prose-headings:font-semibold
-                 prose-a:text-brand-400 prose-a:no-underline hover:prose-a:underline
-                 prose-blockquote:border-brand-600 prose-blockquote:text-white/60"
-      components={{
-        // @ts-expect-error react-markdown inline prop
-        code({ inline, className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className ?? '');
-          const lang = match?.[1] ?? '';
-          const code = String(children).replace(/\n$/, '');
+    <div className="prose prose-invert prose-sm max-w-none
+                    prose-p:leading-relaxed prose-p:my-1
+                    prose-pre:p-0 prose-pre:bg-transparent
+                    prose-code:text-brand-300 prose-code:bg-white/5
+                    prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+                    prose-code:text-xs prose-code:font-mono
+                    prose-headings:text-white/90 prose-headings:font-semibold
+                    prose-a:text-brand-400 prose-a:no-underline hover:prose-a:underline
+                    prose-blockquote:border-brand-600 prose-blockquote:text-white/60">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className ?? '');
+            const lang = match?.[1] ?? '';
+            const code = String(children).replace(/\n$/, '');
+            const isBlock = code.includes('\n') || !!lang;
 
-          if (!inline && lang) {
-            return <CodeBlock code={code} lang={lang} />;
-          }
-          return (
-            <code className={className} {...props}>
-              {children}
-            </code>
-          );
-        },
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+            if (isBlock && lang) {
+              return <CodeBlock code={code} lang={lang} />;
+            }
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }
 

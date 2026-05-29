@@ -97,7 +97,7 @@ export class AgentOrchestrator {
         const permission = await this.permissions.check({
           tool: toolCall.name,
           args: toolCall.args,
-          context: { conversationId, activeWindow: ctx.activeWindow },
+          context: { conversationId, ...(ctx.activeWindow !== undefined ? { activeWindow: ctx.activeWindow } : {}) },
         });
 
         if (!permission.granted) {

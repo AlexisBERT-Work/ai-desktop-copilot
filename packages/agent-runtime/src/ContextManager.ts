@@ -46,7 +46,7 @@ export class ContextManager {
 
     return {
       messages: trimmed,
-      relevantMemories: memories.length > 0 ? memories : undefined,
+      ...(memories.length > 0 ? { relevantMemories: memories } : {}),
     };
   }
 
