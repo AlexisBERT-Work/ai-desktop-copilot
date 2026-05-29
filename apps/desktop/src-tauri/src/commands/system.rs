@@ -37,7 +37,7 @@ pub async fn system_run_command(
     };
 
     // Safety check
-    sandbox::check_command(&args.command)?;
+    sandbox::check_command(&args.command).map_err(|e| e.to_string())?;
 
     let timeout_ms = args.timeout_ms.unwrap_or(30_000).min(120_000);
     let started = std::time::Instant::now();

@@ -40,7 +40,7 @@ pub struct DirEntry {
 
 #[tauri::command]
 pub async fn file_read(args: FileReadArgs) -> Result<String, String> {
-    sandbox::check_path(&args.path)?;
+    sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
 
     let max = args.max_bytes.unwrap_or(1_000_000).min(5_000_000);
     let metadata = fs::metadata(&args.path).map_err(|e| e.to_string())?;
@@ -59,7 +59,7 @@ pub async fn file_read(args: FileReadArgs) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn file_write(args: FileWriteArgs) -> Result<(), String> {
-    sandbox::check_path(&args.path)?;
+    sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
 
     let path = Path::new(&args.path);
     if let Some(parent) = path.parent() {
@@ -83,7 +83,7 @@ pub async fn file_write(args: FileWriteArgs) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn dir_list(args: DirListArgs) -> Result<Vec<DirEntry>, String> {
-    sandbox::check_path(&args.path)?;
+    sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
 
     let include_hidden = args.include_hidden.unwrap_or(false);
     let mut entries = Vec::new();
