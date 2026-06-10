@@ -23,10 +23,21 @@ pub fn start_agent_sidecar(app: AppHandle) -> Result<()> {
 }
 
 async fn launch_sidecar(app: AppHandle) -> Result<()> {
+    // The agent runtime (and its local `tsx`) live in the workspace, not next to
+    // the Tauri binary. Resolve the package dir from this crate's compile-time
+    // location so `tsx` and the entry path resolve regardless of process cwd.
+    let agent_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("packages")
+        .join("agent-runtime");
+
     let mut child = tokio::process::Command::new("node")
+        .current_dir(&agent_dir)
         .arg("--import")
         .arg("tsx")
-        .arg("packages/agent-runtime/src/index.ts")
+        .arg("src/index.ts")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
