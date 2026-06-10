@@ -57,7 +57,7 @@ export function CommandPalette() {
       label: 'Open settings',
       description: 'Configure models, permissions, and hotkeys',
       icon: <Settings className="w-4 h-4" />,
-      action: () => setMode('chat'),
+      action: () => setMode('settings'),
     },
   ];
 

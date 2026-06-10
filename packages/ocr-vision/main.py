@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 # Lazy imports (loaded only when first used)
 _screenshot = None
 _ocr_engine = None
+_audio_transcriber = None
 _file_parsers = {}
 
 
@@ -38,6 +39,14 @@ def get_ocr_engine():
         from ocr.tesseract_engine import TesseractEngine
         _ocr_engine = TesseractEngine()
     return _ocr_engine
+
+
+def get_audio_transcriber():
+    global _audio_transcriber
+    if _audio_transcriber is None:
+        from audio.transcriber import AudioTranscriber
+        _audio_transcriber = AudioTranscriber()
+    return _audio_transcriber
 
 
 def handle_request(request: dict) -> dict:
@@ -75,6 +84,9 @@ def dispatch(method: str, params: dict) -> Any:
 
         case "screen.active_window":
             return get_active_window()
+
+        case "audio.transcribe":
+            return transcribe_audio(params)
 
         case "files.parse_pdf":
             return parse_pdf(params)
@@ -136,6 +148,16 @@ def get_active_window() -> dict:
         return {"title": title, "hwnd": hwnd}
     except ImportError:
         return {"title": "unknown", "hwnd": 0}
+
+
+def transcribe_audio(params: dict) -> dict:
+    transcriber = get_audio_transcriber()
+    return transcriber.transcribe(
+        path=params["path"],
+        model_size=params.get("model", "base"),
+        language=params.get("language"),
+        task=params.get("task", "transcribe"),
+    )
 
 
 def parse_pdf(params: dict) -> dict:

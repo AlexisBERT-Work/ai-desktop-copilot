@@ -279,64 +279,85 @@ Press `Ctrl+Space` anywhere to open the overlay.
 - [x] CI/CD pipeline
 - [x] Project structure
 
-### 🔨 Phase 1 — MVP Core (Weeks 3-6)
-- [ ] Ollama streaming client
-- [ ] Chat UI (messages, streaming, history)
-- [ ] Always-on-top window + global hotkey
-- [ ] Model selector
-- [ ] Agent ReAct loop
-- [ ] 5 core tools (read_file, list_dir, run_command, capture_screen, clipboard)
-- [ ] Permission dialog
-- [ ] Audit logging
+### ✅ Phase 1 — MVP Core (Weeks 3-6)
 
-### 🔨 Phase 2 — Features (Weeks 7-12)
-- [ ] OCR + screen context
-- [ ] Semantic memory (LanceDB RAG)
-- [ ] Document import (PDF, DOCX, CSV)
-- [ ] Command palette
-- [ ] Mini floating mode
-- [ ] System tray
+- [x] Ollama streaming client
+- [x] Chat UI (messages, streaming, history)
+- [x] Always-on-top window + global hotkey
+- [x] Model selector
+- [x] Agent ReAct loop
+- [x] Core tools: `read_file`, `list_directory`, `run_command`, `read_clipboard`, `search_memory`
+- [x] Permission engine (risk-gated, 4 levels)
+- [x] Audit logging
 
-### 🔨 Phase 3 — Polish & Automation (Weeks 13-18)
-- [ ] PowerShell workflow runner
+### ✅ Phase 2 — Developer Tools
+
+- [x] `analyze_stacktrace` — Node.js / Python / Rust / Java parser, root cause detection
+- [x] `generate_commit_message` — reads staged diff, infers Conventional Commits type + scope
+- [x] `generate_pr_description` — reads commits vs base branch, categorizes feat/fix/breaking
+- [x] `watch_ci` — polls GitHub Actions, surfaces failed jobs/steps with details
+- [x] `semantic_search` — keyword-scored local file search with snippet extraction
+- [x] `read_webpage` — fetch any URL, strip HTML, return clean text (with CSS selector support)
+
+### 🔨 Phase 3 — Connectors & Automation (current)
+
+- [x] `github_list_issues` — list/search GitHub issues with state, label and text filters
+- [x] `github_get_pr` — full PR details: files, comments, reviews, merge status, optional diff
+- [x] `capture_screen` + `ocr_region` — Python OCR sidecar (mss + Tesseract), lazy-spawn, JSON-RPC
+- [x] `transcribe_audio` — Whisper local via faster-whisper (int8 CPU), auto-detect langue, VAD silence filter
+- [x] `run_subagent` + `run_parallel_agents` — sous-agents isolés avec protection anti-récursion, `Promise.all` parallèle
+- [x] `schedule_task` + `list_scheduled_tasks` + `cancel_scheduled_task` — cron en arrière-plan (tick 60s), persistance SQLite, formats `"every 5m"` / `"hourly"` / `"daily"` / `"weekly"`
+- [x] `browser_navigate` + `browser_screenshot` + `browser_get_text` + `browser_click` + `browser_type` + `browser_close` — Playwright headless (playwright-core), auto-détection Chrome/Edge Windows, singleton lazy-launch
+
+### 🔨 Phase 4 — Polish & Settings
+
+- [x] Full settings panel — panneau tabulaire (Modèle / Sécurité / Raccourcis / À propos), persistance localStorage, hotkey `Ctrl+,`
+- [x] Safe mode toggle in UI — toggle dans l'onglet Sécurité, propagation JSON-RPC `settings.update` → agent runtime → `PermissionEngine`
 - [ ] Workflow builder UI
-- [ ] Full settings panel
-- [ ] Safe mode
 - [ ] Auto-updater
 - [ ] Performance optimization
 
 ### 🚀 V2 (Post-MVP)
+
 - [ ] Plugin/extension system
 - [ ] Voice input (Whisper local)
-- [ ] Multi-agent support
 - [ ] Optional OpenAI/Anthropic API
 - [ ] Linux / macOS support
-- [ ] Workflow marketplace
+- [ ] Self-evolving skills (DSPy + GEPA, inspired by Hermes Agent)
 
 ---
 
 ## Agent Tools Catalog
 
-| Tool | Category | Risk | Description |
-|------|----------|------|-------------|
-| `read_file` | filesystem | 🟢 Low | Read file content |
-| `list_directory` | filesystem | 🟢 Low | List directory contents |
-| `search_files` | filesystem | 🟢 Low | Search files by name/content |
-| `capture_screen` | screen | 🟢 Low | Full or partial screenshot |
-| `ocr_region` | screen | 🟢 Low | OCR text from screen region |
-| `get_active_window` | screen | 🟢 Low | Get active window info |
-| `read_clipboard` | clipboard | 🟢 Low | Read clipboard content |
-| `search_memory` | memory | 🟢 Low | Semantic memory search |
-| `write_file` | filesystem | 🟡 Medium | Write/create file |
-| `write_clipboard` | clipboard | 🟡 Medium | Write to clipboard |
-| `open_app` | system | 🟡 Medium | Open application |
-| `store_memory` | memory | 🟡 Medium | Store fact in memory |
-| `run_command` | system | 🟠 High | Execute PowerShell/CMD |
-| `close_window` | system | 🟠 High | Close application window |
-| `send_keys` | automation | 🟠 High | Send keyboard input |
-| `schedule_task` | automation | 🟠 High | Schedule system task |
-| `delete_file` | filesystem | 🔴 Critical | Delete file (disabled by default) |
-| `run_as_admin` | system | 🔴 Critical | Elevate privileges (disabled) |
+| Tool | Category | Risk | Status | Description |
+| :--- | :------- | :--- | :----: | :---------- |
+| `read_file` | filesystem | 🟢 Low | ✅ | Read file content |
+| `list_directory` | filesystem | 🟢 Low | ✅ | List directory contents |
+| `capture_screen` | screen | 🟢 Low | ✅ | Full or partial screenshot |
+| `ocr_region` | screen | 🟢 Low | ✅ | OCR text from screen region |
+| `read_clipboard` | clipboard | 🟢 Low | ✅ | Read clipboard content |
+| `search_memory` | memory | 🟢 Low | ✅ | Semantic memory search |
+| `analyze_stacktrace` | analysis | 🟢 Low | ✅ | Parse Node.js/Python/Rust/Java stacktraces, extract root cause |
+| `generate_commit_message` | analysis | 🟢 Low | ✅ | Read staged diff → Conventional Commits message |
+| `generate_pr_description` | analysis | 🟢 Low | ✅ | Read commits vs base branch → PR title + sections |
+| `watch_ci` | analysis | 🟢 Low | ✅ | Poll GitHub Actions, surface failed jobs/steps |
+| `semantic_search` | filesystem | 🟢 Low | ✅ | Keyword-scored local file search with snippet extraction |
+| `read_webpage` | web | 🟢 Low | ✅ | Fetch URL, strip HTML, return clean readable text |
+| `github_list_issues` | github | 🟢 Low | ✅ | List/search GitHub issues (state, labels, text query) |
+| `github_get_pr` | github | 🟢 Low | ✅ | Full PR details: files, comments, reviews, optional diff |
+| `transcribe_audio` | audio | 🟢 Low | ✅ | Local Whisper transcription (faster-whisper int8, VAD filter, auto-lang) |
+| `run_subagent` | automation | 🟡 Medium | ✅ | Spawn isolated sub-agent, returns structured result |
+| `run_parallel_agents` | automation | 🟡 Medium | ✅ | Spawn up to 8 sub-agents in parallel via Promise.all |
+| `write_file` | filesystem | 🟡 Medium | ✅ | Write/create file |
+| `write_clipboard` | clipboard | 🟡 Medium | ✅ | Write to clipboard |
+| `open_app` | system | 🟡 Medium | ✅ | Open application |
+| `store_memory` | memory | 🟡 Medium | ✅ | Store fact in memory |
+| `run_command` | system | 🟠 High | ✅ | Execute PowerShell/CMD |
+| `close_window` | system | 🟠 High | ⬜ | Close application window |
+| `send_keys` | automation | 🟠 High | ⬜ | Send keyboard input |
+| `schedule_task` | automation | 🟠 High | ⬜ | Schedule system task |
+| `delete_file` | filesystem | 🔴 Critical | ⬜ | Delete file (disabled by default) |
+| `run_as_admin` | system | 🔴 Critical | ⬜ | Elevate privileges (disabled) |
 
 ---
 

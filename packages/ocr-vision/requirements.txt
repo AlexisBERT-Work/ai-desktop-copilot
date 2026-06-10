@@ -14,6 +14,9 @@ chardet>=5.2.0
 # Vision / Image processing
 opencv-python-headless>=4.10.0
 
+# Audio transcription (local Whisper)
+faster-whisper>=1.0.0
+
 # Embeddings (Phase 2)
 # sentence-transformers>=3.0.0
 # torch>=2.3.0  # Heavy — optional

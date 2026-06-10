@@ -3,6 +3,20 @@ import { join } from 'path';
 import type { OllamaMessage, ConversationSummary } from '@neurodesk/shared-types';
 import { createLogger } from '../logger';
 
+export interface ScheduledJob {
+  id: string;
+  name: string;
+  task: string;
+  schedule: string;
+  enabled: boolean;
+  createdAt: number;
+  lastRunAt?: number;
+  nextRunAt: number;
+  lastResult?: string;
+  lastError?: string;
+  runCount: number;
+}
+
 const log = createLogger('memory:sqlite');
 
 // sql.js is loaded lazily (WASM module)
@@ -63,6 +77,20 @@ export class ConversationStore {
 
       CREATE INDEX IF NOT EXISTS idx_messages_conversation
         ON messages(conversation_id, created_at);
+
+      CREATE TABLE IF NOT EXISTS scheduled_tasks (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        task TEXT NOT NULL,
+        schedule TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        last_run_at INTEGER,
+        next_run_at INTEGER NOT NULL,
+        last_result TEXT,
+        last_error TEXT,
+        run_count INTEGER NOT NULL DEFAULT 0
+      );
     `);
     this.persist();
   }
@@ -133,6 +161,68 @@ export class ConversationStore {
     }
     stmt.free();
     return rows;
+  }
+
+  // ─── Scheduled Tasks ───────────────────────────────────────────
+
+  saveScheduledTask(job: ScheduledJob): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO scheduled_tasks
+       (id, name, task, schedule, enabled, created_at, last_run_at, next_run_at, last_result, last_error, run_count)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        job.id, job.name, job.task, job.schedule,
+        job.enabled ? 1 : 0,
+        job.createdAt,
+        job.lastRunAt ?? null,
+        job.nextRunAt,
+        job.lastResult ?? null,
+        job.lastError ?? null,
+        job.runCount,
+      ],
+    );
+    this.persist();
+  }
+
+  getScheduledTasks(): ScheduledJob[] {
+    const stmt = this.db.prepare(
+      `SELECT id, name, task, schedule, enabled, created_at, last_run_at, next_run_at, last_result, last_error, run_count
+       FROM scheduled_tasks ORDER BY created_at ASC`,
+    );
+    const rows: ScheduledJob[] = [];
+    while (stmt.step()) {
+      const r = stmt.getAsObject() as any;
+      rows.push({
+        id: r.id as string,
+        name: r.name as string,
+        task: r.task as string,
+        schedule: r.schedule as string,
+        enabled: (r.enabled as number) === 1,
+        createdAt: r.created_at as number,
+        ...(r.last_run_at !== null ? { lastRunAt: r.last_run_at as number } : {}),
+        nextRunAt: r.next_run_at as number,
+        ...(r.last_result !== null ? { lastResult: r.last_result as string } : {}),
+        ...(r.last_error !== null ? { lastError: r.last_error as string } : {}),
+        runCount: r.run_count as number,
+      });
+    }
+    stmt.free();
+    return rows;
+  }
+
+  deleteScheduledTask(id: string): void {
+    this.db.run(`DELETE FROM scheduled_tasks WHERE id=?`, [id]);
+    this.persist();
+  }
+
+  updateScheduledTaskRun(id: string, opts: { lastRunAt: number; nextRunAt: number; lastResult?: string; lastError?: string }): void {
+    this.db.run(
+      `UPDATE scheduled_tasks
+       SET last_run_at=?, next_run_at=?, last_result=?, last_error=?, run_count=run_count+1
+       WHERE id=?`,
+      [opts.lastRunAt, opts.nextRunAt, opts.lastResult ?? null, opts.lastError ?? null, id],
+    );
+    this.persist();
   }
 
   /** Write DB to disk (sql.js is in-memory, must be serialized) */

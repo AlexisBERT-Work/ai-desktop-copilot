@@ -15,6 +15,11 @@ export function useHotkeys() {
         e.preventDefault();
         setMode('command');
       }
+      // Ctrl+, → Settings
+      if (e.ctrlKey && e.key === ',') {
+        e.preventDefault();
+        setMode('settings');
+      }
       // Ctrl+N → New conversation
       if (e.ctrlKey && e.key === 'n') {
         e.preventDefault();

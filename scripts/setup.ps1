@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 # NeuroDesk — Full Windows Dev Environment Setup
 # Run: .\scripts\setup.ps1
 
@@ -16,26 +16,36 @@ Set-Location $projectRoot
 # ─── Check prerequisites ──────────────────────────────────────
 Write-Host "① Checking prerequisites..." -ForegroundColor Yellow
 
-$checks = @(
-    @{ Name = "Node.js ≥20"; Cmd = { node --version }; MinVersion = "v20" },
-    @{ Name = "pnpm ≥9";     Cmd = { pnpm --version }; MinVersion = "9" },
-    @{ Name = "Rust/cargo";  Cmd = { cargo --version }; Optional = $true },
-    @{ Name = "Python ≥3.11"; Cmd = { python --version }; MinVersion = "3.11" },
-    @{ Name = "Git";         Cmd = { git --version } }
-)
+function Test-Tool {
+    param($Exe, $ExeArgs)
+    if (-not (Get-Command $Exe -ErrorAction SilentlyContinue)) { return $null }
+    try {
+        $ErrorActionPreference = "SilentlyContinue"
+        $output = & $Exe @ExeArgs 2>$null | Out-String
+        $first = ($output -split "`n" | Where-Object { $_.Trim() } | Select-Object -First 1).Trim()
+        if (-not $first) { return $null }
+        return $first
+    } catch { return $null }
+}
 
 $allOk = $true
-foreach ($check in $checks) {
-    try {
-        $version = & $check.Cmd 2>&1 | Select-Object -First 1
+$toolChecks = @(
+    @{ Name = "Node.js ≥20";  Exe = "node";   ExeArgs = @("--version") },
+    @{ Name = "pnpm ≥9";      Exe = "pnpm";   ExeArgs = @("--version") },
+    @{ Name = "Rust/cargo";   Exe = "cargo";  ExeArgs = @("--version"); Optional = $true },
+    @{ Name = "Python ≥3.11"; Exe = "python"; ExeArgs = @("--version") },
+    @{ Name = "Git";          Exe = "git";    ExeArgs = @("--version") }
+)
+
+foreach ($check in $toolChecks) {
+    $version = Test-Tool -Exe $check.Exe -ExeArgs $check.ExeArgs
+    if ($version) {
         Write-Host "   ✅ $($check.Name): $version" -ForegroundColor Green
-    } catch {
-        if ($check.Optional) {
-            Write-Host "   ⚠️  $($check.Name): not found (optional)" -ForegroundColor Yellow
-        } else {
-            Write-Host "   ❌ $($check.Name): NOT FOUND" -ForegroundColor Red
-            $allOk = $false
-        }
+    } elseif ($check.Optional) {
+        Write-Host "   ⚠️  $($check.Name): not found (optional)" -ForegroundColor Yellow
+    } else {
+        Write-Host "   ❌ $($check.Name): NOT FOUND" -ForegroundColor Red
+        $allOk = $false
     }
 }
 

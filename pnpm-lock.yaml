@@ -114,6 +114,9 @@ importers:
       '@neurodesk/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+      playwright-core:
+        specifier: ^1.48.0
+        version: 1.60.0
       sql.js:
         specifier: ^1.12.0
         version: 1.14.1
@@ -2125,6 +2128,11 @@ packages:
   pidtree@0.6.0:
     resolution: {integrity: sha512-eG2dWTVw5bzqGRztnHExczNxt5VGsE6OwTeCG3fdUf9KBsZzO3R5OIIIzWR+iZA0NtZ+RDVdaoE2dK1cn6jH4g==}
     engines: {node: '>=0.10'}
+    hasBin: true
+
+  playwright-core@1.60.0:
+    resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
+    engines: {node: '>=18'}
     hasBin: true
 
   postcss-value-parser@4.2.0:
@@ -4456,6 +4464,8 @@ snapshots:
   picomatch@4.0.4: {}
 
   pidtree@0.6.0: {}
+
+  playwright-core@1.60.0: {}
 
   postcss-value-parser@4.2.0: {}
 

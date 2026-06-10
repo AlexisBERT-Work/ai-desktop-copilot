@@ -30,6 +30,7 @@ pub fn run() {
             commands::clipboard::clipboard_read,
             commands::clipboard::clipboard_write,
             commands::permissions::permission_respond,
+            commands::settings::update_settings,
         ])
         .setup(|app| {
             info!("NeuroDesk starting up");

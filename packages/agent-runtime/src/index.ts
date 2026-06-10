@@ -20,6 +20,32 @@ import { ListDirTool } from './tools/filesystem/ListDirTool';
 import { RunCommandTool } from './tools/system/RunCommandTool';
 import { ReadClipboardTool } from './tools/clipboard/ReadClipboardTool';
 import { SearchMemoryTool } from './tools/memory/SearchMemoryTool';
+import { AnalyzeStacktraceTool } from './tools/analysis/AnalyzeStacktraceTool';
+import { GitCommitTool } from './tools/git/GitCommitTool';
+import { GitPrTool } from './tools/git/GitPrTool';
+import { WatchCITool } from './tools/git/WatchCITool';
+import { SemanticSearchTool } from './tools/search/SemanticSearchTool';
+import { ReadWebpageTool } from './tools/web/ReadWebpageTool';
+import { GitHubIssuesTool } from './tools/github/GitHubIssuesTool';
+import { GitHubPRTool } from './tools/github/GitHubPRTool';
+import { CaptureScreenTool } from './tools/screen/CaptureScreenTool';
+import { OcrRegionTool } from './tools/screen/OcrRegionTool';
+import { TranscribeAudioTool } from './tools/audio/TranscribeAudioTool';
+import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
+import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
+import { ScheduleTaskTool } from './tools/automation/ScheduleTaskTool';
+import { ListScheduledTasksTool } from './tools/automation/ListScheduledTasksTool';
+import { CancelScheduledTaskTool } from './tools/automation/CancelScheduledTaskTool';
+import { BrowserNavigateTool } from './tools/browser/BrowserNavigateTool';
+import { BrowserScreenshotTool } from './tools/browser/BrowserScreenshotTool';
+import { BrowserGetTextTool } from './tools/browser/BrowserGetTextTool';
+import { BrowserClickTool } from './tools/browser/BrowserClickTool';
+import { BrowserTypeTool } from './tools/browser/BrowserTypeTool';
+import { BrowserCloseTool } from './tools/browser/BrowserCloseTool';
+import { SubAgentRunner } from './SubAgentRunner';
+import { CronScheduler } from './CronScheduler';
+import { BrowserManager } from './lib/browserManager';
+import { OcrSidecarClient } from './lib/ocrSidecar';
 
 const log = createLogger('runtime:main');
 
@@ -48,11 +74,43 @@ async function main() {
   tools.register(new RunCommandTool());
   tools.register(new ReadClipboardTool());
   tools.register(new SearchMemoryTool(vectorStore));
-
-  log.info('Tools registered', { tools: tools.listNames() });
+  tools.register(new AnalyzeStacktraceTool());
+  tools.register(new GitCommitTool());
+  tools.register(new GitPrTool());
+  tools.register(new WatchCITool());
+  tools.register(new SemanticSearchTool());
+  tools.register(new ReadWebpageTool());
+  tools.register(new GitHubIssuesTool());
+  tools.register(new GitHubPRTool());
+  tools.register(new CaptureScreenTool());
+  tools.register(new OcrRegionTool());
+  tools.register(new TranscribeAudioTool());
 
   // ─── Agent ─────────────────────────────────────────────────
   const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit);
+
+  // ─── Sub-agent tools (need orchestrator reference) ─────────
+  const defaultModel = process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b';
+  const subAgentRunner = new SubAgentRunner(orchestrator, tools, defaultModel);
+  tools.register(new RunSubAgentTool(subAgentRunner));
+  tools.register(new RunParallelAgentsTool(subAgentRunner));
+
+  // ─── Cron scheduler (needs SubAgentRunner) ─────────────────
+  const cron = new CronScheduler(db, subAgentRunner);
+  await cron.initialize();
+  tools.register(new ScheduleTaskTool(cron));
+  tools.register(new ListScheduledTasksTool(cron));
+  tools.register(new CancelScheduledTaskTool(cron));
+
+  // ─── Browser tools (playwright-core, lazy-launch) ──────────
+  tools.register(new BrowserNavigateTool());
+  tools.register(new BrowserScreenshotTool());
+  tools.register(new BrowserGetTextTool());
+  tools.register(new BrowserClickTool());
+  tools.register(new BrowserTypeTool());
+  tools.register(new BrowserCloseTool());
+
+  log.info('Tools registered', { tools: tools.listNames() });
 
   // ─── IPC Bridge ────────────────────────────────────────────
   const bridge = new StdinBridge(orchestrator);
@@ -63,6 +121,9 @@ async function main() {
   // ─── Graceful shutdown ─────────────────────────────────────
   process.on('SIGTERM', () => {
     log.info('SIGTERM received — shutting down');
+    cron.shutdown();
+    BrowserManager.get().shutdown();
+    OcrSidecarClient.get().shutdown();
     db.close();
     process.exit(0);
   });

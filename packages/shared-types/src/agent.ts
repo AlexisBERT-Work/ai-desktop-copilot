@@ -32,7 +32,11 @@ export type ToolCategory =
   | 'clipboard'
   | 'automation'
   | 'memory'
-  | 'web';
+  | 'web'
+  | 'analysis'
+  | 'github'
+  | 'audio'
+  | 'browser';
 
 export interface ToolDefinition {
   name: string;

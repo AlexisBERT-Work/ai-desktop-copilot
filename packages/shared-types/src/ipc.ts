@@ -152,7 +152,8 @@ export type AgentMethod =
   | 'memory.retrieve'
   | 'context.update'
   | 'models.list'
-  | 'health.check';
+  | 'health.check'
+  | 'settings.update';
 
 // ─── Shared types ──────────────────────────────────────────────
 

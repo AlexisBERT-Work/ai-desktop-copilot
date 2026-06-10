@@ -63,6 +63,15 @@ export class StdinBridge {
           this.sendResponse(request.id, { models: [] });
           break;
 
+        case 'settings.update': {
+          const params = request.params as { safeMode?: boolean };
+          this.orchestrator.updatePermissions({
+            ...(params.safeMode !== undefined ? { safeMode: params.safeMode } : {}),
+          });
+          this.sendResponse(request.id, { ok: true });
+          break;
+        }
+
         default:
           this.sendError(request.id, -32601, `Method not found: ${request.method}`);
       }

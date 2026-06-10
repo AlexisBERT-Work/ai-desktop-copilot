@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentStep, ToolCall } from '@neurodesk/shared-types';
+import type { AgentConfig, AgentStep, ToolCall, PermissionConfig } from '@neurodesk/shared-types';
 import type { OllamaClient } from './llm/OllamaClient';
 import type { ToolRegistry } from './ToolRegistry';
 import type { PermissionEngine } from './permissions/PermissionEngine';
@@ -9,7 +9,7 @@ import { createLogger } from './logger';
 const log = createLogger('agent:orchestrator');
 
 export class AgentOrchestrator {
-  private readonly maxIterations = 10;
+  private readonly defaultMaxIterations = 10;
 
   constructor(
     private llm: OllamaClient,
@@ -18,6 +18,10 @@ export class AgentOrchestrator {
     private context: ContextManager,
     private audit: AuditLogger,
   ) {}
+
+  updatePermissions(config: Partial<PermissionConfig>): void {
+    this.permissions.updateConfig(config);
+  }
 
   async *process(
     input: string,
@@ -36,9 +40,10 @@ export class AgentOrchestrator {
     // Add user message
     messages.push({ role: 'user', content: input });
 
+    const maxIterations = config.maxIterations ?? this.defaultMaxIterations;
     let iterations = 0;
 
-    while (iterations < this.maxIterations) {
+    while (iterations < maxIterations) {
       iterations++;
       log.debug('Iteration', { runId, iteration: iterations });
 
@@ -132,11 +137,11 @@ export class AgentOrchestrator {
     }
 
     // Max iterations reached
-    log.warn('Max iterations reached', { runId, maxIterations: this.maxIterations });
+    log.warn('Max iterations reached', { runId, maxIterations });
     this.audit.completeRun(runId, 'max_iterations');
     yield {
       type: 'error',
-      content: `Limite d'itérations atteinte (${this.maxIterations}). Réponse partielle disponible.`,
+      content: `Limite d'itérations atteinte (${maxIterations}). Réponse partielle disponible.`,
       code: 'MAX_ITERATIONS',
     };
   }
