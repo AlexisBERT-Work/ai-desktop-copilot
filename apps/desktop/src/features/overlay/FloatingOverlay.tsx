@@ -11,7 +11,7 @@ export function FloatingOverlay() {
   const { isVisible, mode } = useOverlayStore();
 
   return (
-    <div className="fixed inset-0 flex items-end justify-end p-5 pointer-events-none z-50">
+    <div className="fixed inset-0 flex items-center justify-center p-2 pointer-events-none z-50">
       <AnimatePresence mode="wait">
         {isVisible && (
           <motion.div
