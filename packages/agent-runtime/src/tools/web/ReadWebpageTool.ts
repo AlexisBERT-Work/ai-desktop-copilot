@@ -9,7 +9,7 @@ interface ReadWebpageArgs {
 }
 
 // Minimal HTML-to-text extractor — removes tags, scripts, styles, decodes entities
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -28,7 +28,7 @@ function htmlToText(html: string): string {
 }
 
 // Extract a named element from HTML (very naive CSS selector: tag, .class, #id)
-function extractBySelector(html: string, selector: string): string | null {
+export function extractBySelector(html: string, selector: string): string | null {
   // Support simple selectors: tag, #id, .class
   let pattern: RegExp | null = null;
   if (selector.startsWith('#')) {

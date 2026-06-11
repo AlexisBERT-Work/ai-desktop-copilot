@@ -12,7 +12,7 @@ interface GitCommitArgs {
 }
 
 // Conventional Commits type inference from diff content
-function inferCommitType(diff: string, stats: string): string {
+export function inferCommitType(diff: string, stats: string): string {
   const lower = diff.toLowerCase() + stats.toLowerCase();
 
   if (/test|spec|\.test\.|\.spec\./.test(lower)) return 'test';
@@ -25,7 +25,7 @@ function inferCommitType(diff: string, stats: string): string {
   return 'feat';
 }
 
-function inferScope(files: string[]): string | null {
+export function inferScope(files: string[]): string | null {
   if (files.length === 0) return null;
 
   // Group by top-level directory after packages/ or src/

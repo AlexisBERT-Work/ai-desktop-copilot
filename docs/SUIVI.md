@@ -57,9 +57,20 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
 
 **Total tests : 30 verts (4 fichiers).**
 
+## Extension des tests — git & web (2026-06-11)
+- [x] Exporté les helpers purs `inferCommitType` / `inferScope` (GitCommitTool)
+      et `htmlToText` / `extractBySelector` (ReadWebpageTool) pour les rendre
+      testables (aucun changement de comportement).
+- [x] `GitCommitTool.test.ts` (13) — inférence Conventional Commits (type + scope).
+- [x] `ReadWebpageTool.test.ts` (11) — htmlToText (entités, blocs, scripts),
+      sélecteur naïf, et garde-fous de `execute` (url invalide, protocole).
+- [~] Un test a révélé la limite assumée du sélecteur `#id` (s'arrête au 1er
+      `</`) → assertion ajustée + commentée (code laissé tel quel, naïveté voulue).
+
+**Total tests : 54 verts (6 fichiers).**
+
 ## Prochaines pistes (par valeur)
-1. ⬜ Étendre les tests aux autres outils purs (git, github, web parsing).
-2. ⬜ Boucle d'agent plan→exécute pour les recherches multi-étapes.
+1. ⬜ Boucle d'agent plan→exécute pour les recherches multi-étapes.
 3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
    tout passe par le sidecar Python.
 4. ⬜ Packaging / distribution.
