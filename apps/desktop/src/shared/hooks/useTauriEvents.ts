@@ -10,7 +10,7 @@ import type { TokenEvent, DoneEvent, ErrorEvent } from '@neurodesk/shared-types'
  * Called once at App root.
  */
 export function useTauriEvents() {
-  const { appendToken, finalizeMessage } = useChatStore();
+  const { appendToken, setPlan, finalizeMessage } = useChatStore();
   const { toggle } = useOverlayStore();
   const { syncToRuntime } = useSettingsStore();
 
@@ -32,6 +32,13 @@ export function useTauriEvents() {
       }),
     );
 
+    // Plan steps (planning enabled)
+    unlisteners.push(
+      listen<{ conversationId: string; messageId: string; steps: string[] }>('agent:plan', e => {
+        setPlan(e.payload.conversationId, e.payload.messageId, e.payload.steps);
+      }),
+    );
+
     // Response complete
     unlisteners.push(
       listen<DoneEvent>('chat:done', e => {
@@ -50,5 +57,5 @@ export function useTauriEvents() {
       clearTimeout(syncTimer);
       unlisteners.forEach(p => p.then(fn => fn()));
     };
-  }, [appendToken, finalizeMessage, syncToRuntime]);
+  }, [appendToken, setPlan, finalizeMessage, syncToRuntime]);
 }

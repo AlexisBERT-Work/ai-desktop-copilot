@@ -22,6 +22,7 @@ export interface AgentConfig {
 
 export type AgentStep =
   | { type: 'token'; content: string }
+  | { type: 'plan'; steps: string[] }
   | { type: 'tool_start'; toolName: string; args: Record<string, unknown> }
   | { type: 'tool_result'; toolName: string; result: ToolResult }
   | { type: 'tool_error'; toolName: string; error: string }

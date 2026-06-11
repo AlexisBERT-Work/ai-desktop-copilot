@@ -81,8 +81,20 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
 
 **Total tests : 61 verts (7 fichiers).**
 
+## Plan visible dans l'UI — 2026-06-11 (4 couches)
+- [x] Types : `{ type: 'plan'; steps: string[] }` ajouté à `AgentStep` ;
+      `plan?: string[]` ajouté au type `Message`.
+- [x] Orchestrateur : `yield { type: 'plan', steps }` quand un plan est généré.
+- [x] Bridge Rust : nouveau bras `"plan"` → émet l'event `agent:plan`
+      `{ conversationId, messageId, steps }`.
+- [x] React : `useTauriEvents` écoute `agent:plan` → `chatStore.setPlan`
+      (rattaché au message en cours de streaming, robuste au routage d'id) ;
+      `MessageItem` affiche un encart « 📋 Plan » au-dessus de la réponse.
+- [x] Type-check des 3 packages OK. (Rust non `cargo build` — ajout minimal
+      calqué sur les bras existants.)
+
 ## Prochaines pistes (par valeur)
-1. ⬜ Rendre le plan visible dans l'UI (nouveau type d'AgentStep + bridge Rust).
+1. ⬜ Sélecteur de modèle « léger ↔ heavy-code » + pull d'un gros modèle de code.
 3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
    tout passe par le sidecar Python.
 4. ⬜ Packaging / distribution.

@@ -36,6 +36,9 @@ export function MessageItem({ message, isStreaming }: Props) {
         ) : (
           /* Assistant markdown */
           <div className="space-y-1">
+            {message.plan && message.plan.length > 0 && (
+              <PlanBlock steps={message.plan} />
+            )}
             <MarkdownContent content={message.content} />
             {isStreaming && (
               <span className="inline-block w-1.5 h-4 bg-brand-400 animate-pulse ml-0.5 rounded-full" />
@@ -50,6 +53,19 @@ export function MessageItem({ message, isStreaming }: Props) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PlanBlock({ steps }: { steps: string[] }) {
+  return (
+    <div className="rounded-xl border border-brand-600/30 bg-brand-600/10 px-3 py-2 mb-1">
+      <div className="text-xs font-semibold text-brand-300 mb-1">📋 Plan</div>
+      <ol className="list-decimal list-inside space-y-0.5 text-xs text-white/70">
+        {steps.map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
     </div>
   );
 }

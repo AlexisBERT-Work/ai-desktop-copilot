@@ -19,6 +19,7 @@ interface ChatState {
   setModel: (model: string) => void;
   loadModels: () => Promise<void>;
   appendToken: (conversationId: string, messageId: string, token: string) => void;
+  setPlan: (conversationId: string, messageId: string, steps: string[]) => void;
   finalizeMessage: (conversationId: string, messageId: string) => void;
 }
 
@@ -98,6 +99,18 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         const msg = s.messages[conversationId]?.find(m => m.id === messageId);
         if (msg) msg.content += token;
+      });
+    },
+
+    setPlan: (conversationId, messageId, steps) => {
+      if (!Array.isArray(steps) || steps.length === 0) return;
+      set(s => {
+        // Le routage du messageId est peu fiable côté bridge : on rattache au
+        // message ciblé si trouvé, sinon au message en cours de streaming.
+        const msgs = s.messages[conversationId] ?? s.messages[s.activeConversationId];
+        const msg = msgs?.find(m => m.id === messageId)
+          ?? msgs?.find(m => m.id === s.streamingMessageId);
+        if (msg) msg.plan = steps;
       });
     },
 

@@ -13,6 +13,7 @@ export interface Message {
   attachments?: Attachment[];
   toolCalls?: ToolCall[];
   toolCallId?: string; // For tool result messages
+  plan?: string[]; // Plan steps when planning was enabled
   createdAt: number;
   metadata?: MessageMetadata;
 }

@@ -200,6 +200,16 @@ async fn dispatch_agent_step(
         "tool_start" | "tool_result" | "tool_error" | "tool_blocked" => {
             window.emit("agent:tool_call", step)?;
         }
+        "plan" => {
+            window.emit(
+                "agent:plan",
+                serde_json::json!({
+                    "conversationId": conv_id,
+                    "messageId": msg_id,
+                    "steps": step.get("steps").cloned().unwrap_or(Value::Null)
+                }),
+            )?;
+        }
         _ => {}
     }
 

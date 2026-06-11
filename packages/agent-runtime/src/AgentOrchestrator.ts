@@ -69,7 +69,10 @@ export class AgentOrchestrator {
     let plan: string[] = [];
     if (config.usePlanning && this.planner) {
       plan = await this.planner.plan(input, model);
-      if (plan.length > 0) log.info('Planning enabled', { runId, steps: plan.length });
+      if (plan.length > 0) {
+        log.info('Planning enabled', { runId, steps: plan.length });
+        yield { type: 'plan', steps: plan };
+      }
     }
 
     const systemPrompt = this.buildSystemPrompt(ctx, plan);
