@@ -84,15 +84,19 @@ export const useChatStore = create<ChatState>()(
 
       try {
         // Invoke Tauri — streaming tokens come via events
+        // La commande Rust prend un seul paramètre `args: ChatSendArgs`,
+        // donc Tauri exige d'envelopper les champs sous la clé `args`.
         await invoke('chat_send', {
-          conversationId,
-          message: content,
-          messageId: assistantMessageId,
-          modelId: selectedModel,
-          useTools: true,
-          modelMode,
-          lightModel,
-          codeModel,
+          args: {
+            conversationId,
+            message: content,
+            messageId: assistantMessageId,
+            modelId: selectedModel,
+            useTools: true,
+            modelMode,
+            lightModel,
+            codeModel,
+          },
         });
       } catch (err) {
         set(s => {
