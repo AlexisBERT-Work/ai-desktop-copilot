@@ -55,6 +55,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     list_directory: { name: 'list_directory', description: 'List directory', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     capture_screen: { name: 'capture_screen', description: 'Capture screen', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     ocr_region: { name: 'ocr_region', description: 'OCR screen region', riskLevel: 'low', enabled: true, requiresConfirmation: false },
+    describe_screen: { name: 'describe_screen', description: 'Describe the screen via a vision model', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     read_clipboard: { name: 'read_clipboard', description: 'Read clipboard', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     search_memory: { name: 'search_memory', description: 'Search memory', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     write_file: { name: 'write_file', description: 'Write file', riskLevel: 'medium', enabled: true, requiresConfirmation: true },

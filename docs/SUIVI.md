@@ -107,8 +107,23 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
       code=`qwen2.5-coder:14b`.
 - [x] Type-check 3 packages OK.
 
+## Vision / écran (a) — 2026-06-11
+- [x] **Environnement installé** : Python 3.12 (scope user), venv
+      `packages/ocr-vision/.venv` + deps capture/OCR (mss, pytesseract, Pillow,
+      pywin32, numpy), Tesseract 5.4 (winget). `fra` indispo en écriture dans
+      Program Files → dossier utilisateur `%LOCALAPPDATA%\nd-tessdata`
+      (eng+fra+osd) pointé par `TESSDATA_PREFIX`.
+- [x] `lib/ocrSidecar.ts` : passe `TESSDATA_PREFIX` au spawn du sidecar.
+- [x] **OCR testé live** : capture réelle + lecture du texte de l'écran à ~80 %
+      de confiance (FR+EN).
+- [x] `describe_screen` (vision) : capture + description via modèle multimodal
+      (`NEURODESK_VISION_MODEL`, défaut `llava:7b`), image jointe au message.
+      Schéma + permission + enregistrement. Type-check OK, 67 tests verts.
+- [~] `llava:7b` en cours de pull (~4,1 Go). Description visuelle testable à la fin.
+
 ## Prochaines pistes (par valeur)
-1. ⬜ Persister le mode/les modèles choisis (settings) entre sessions.
+1. ⬜ (b) Orienter l'agent vers les outils navigateur pour pages JS (SPA).
+2. ⬜ Persister le mode/les modèles choisis (settings) entre sessions.
 3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
    tout passe par le sidecar Python.
 4. ⬜ Packaging / distribution.

@@ -8,8 +8,10 @@
 - ✅ **Fichiers** : `read_file`, `list_directory`
 - ✅ **Presse-papier** : `read_clipboard`
 - ✅ **Pages web** : `read_webpage`
-- 🟡 **Écran (OCR)** : `capture_screen`, `ocr_region` *(câblés ; requièrent l'env
-  Python + Tesseract)*
+- ✅ **Écran — texte (OCR)** : `capture_screen`, `ocr_region` (Tesseract fra+eng).
+  Testé : lit le texte de l'écran à ~80 % de confiance.
+- 🟡 **Écran — vision** : `describe_screen` décrit visuellement l'écran via un
+  modèle multimodal (`llava:7b`). *(en place ; modèle en cours de téléchargement)*
 - 🟡 **Audio → texte** : `transcribe_audio`
 
 ## 2. Chercher & analyser

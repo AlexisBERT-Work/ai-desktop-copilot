@@ -31,6 +31,7 @@ import { GitHubIssuesTool } from './tools/github/GitHubIssuesTool';
 import { GitHubPRTool } from './tools/github/GitHubPRTool';
 import { CaptureScreenTool } from './tools/screen/CaptureScreenTool';
 import { OcrRegionTool } from './tools/screen/OcrRegionTool';
+import { DescribeScreenTool } from './tools/screen/DescribeScreenTool';
 import { TranscribeAudioTool } from './tools/audio/TranscribeAudioTool';
 import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
 import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
@@ -89,6 +90,7 @@ async function main() {
   tools.register(new GitHubPRTool());
   tools.register(new CaptureScreenTool());
   tools.register(new OcrRegionTool());
+  tools.register(new DescribeScreenTool(llm, process.env['NEURODESK_VISION_MODEL'] ?? 'llava:7b'));
   tools.register(new TranscribeAudioTool());
 
   // ─── Agent ─────────────────────────────────────────────────

@@ -66,6 +66,26 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  describe_screen: {
+    type: 'object' as const,
+    properties: {
+      prompt: {
+        type: 'string' as const,
+        description: "Question ou consigne sur ce qui est affiché (ex. 'Que montre cet écran ?')",
+      },
+      region: {
+        type: 'object' as const,
+        properties: {
+          x: { type: 'number' as const },
+          y: { type: 'number' as const },
+          width: { type: 'number' as const },
+          height: { type: 'number' as const },
+        },
+      },
+      activeWindowOnly: { type: 'boolean' as const, default: false },
+    },
+  },
+
   run_command: {
     type: 'object' as const,
     required: ['command'],

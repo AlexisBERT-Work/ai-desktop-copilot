@@ -62,11 +62,19 @@ export class OcrSidecarClient {
     const python = this.pythonPath();
     const script = this.scriptPath();
 
-    log.info('Starting OCR sidecar', { python, script });
+    // Tesseract trouve ses données de langue via TESSDATA_PREFIX. On pointe vers
+    // un dossier utilisateur (eng+fra+osd) car Program Files n'est pas accessible
+    // en écriture sans admin. Surchargeable via l'env système.
+    const tessdata =
+      process.env['TESSDATA_PREFIX'] ??
+      join(process.env['LOCALAPPDATA'] ?? '', 'nd-tessdata');
+
+    log.info('Starting OCR sidecar', { python, script, tessdata });
 
     this.proc = spawn(python, [script], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      env: { ...process.env, TESSDATA_PREFIX: tessdata },
     });
 
     this.proc.stderr?.on('data', (d: Buffer) => {
