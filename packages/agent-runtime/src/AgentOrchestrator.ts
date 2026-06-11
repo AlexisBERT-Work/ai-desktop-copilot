@@ -4,6 +4,7 @@ import type { ToolRegistry } from './ToolRegistry';
 import type { PermissionEngine } from './permissions/PermissionEngine';
 import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
+import { ModelRouter } from './llm/ModelRouter';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:orchestrator');
@@ -17,7 +18,24 @@ export class AgentOrchestrator {
     private permissions: PermissionEngine,
     private context: ContextManager,
     private audit: AuditLogger,
+    /**
+     * Modèle léger optionnel. S'il est fourni, l'orchestrateur peut rétrograder
+     * vers ce modèle pour les tâches triviales (gain ressources). Sinon, le
+     * modèle de la requête est toujours utilisé tel quel.
+     */
+    private smallModel?: string,
   ) {}
+
+  /** Décide du modèle effectif (downgrade-only : ne dépasse jamais config.model). */
+  private resolveModel(input: string, usesTools: boolean, requestedModel: string): string {
+    if (!this.smallModel || this.smallModel === requestedModel) return requestedModel;
+    const router = new ModelRouter({ small: this.smallModel, large: requestedModel });
+    const decision = router.route({ prompt: input, usesTools });
+    if (decision.model !== requestedModel) {
+      log.info('Model routing', { from: requestedModel, to: decision.model, reason: decision.reason });
+    }
+    return decision.model;
+  }
 
   updatePermissions(config: Partial<PermissionConfig>): void {
     this.permissions.updateConfig(config);
@@ -40,6 +58,9 @@ export class AgentOrchestrator {
     // Add user message
     messages.push({ role: 'user', content: input });
 
+    // Choix du modèle (routage downgrade-only une fois par run).
+    const model = this.resolveModel(input, availableTools.length > 0, config.model);
+
     const maxIterations = config.maxIterations ?? this.defaultMaxIterations;
     let iterations = 0;
 
@@ -49,7 +70,7 @@ export class AgentOrchestrator {
 
       // ─── LLM Call ───────────────────────────────────────────
       const stream = this.llm.streamChat({
-        model: config.model,
+        model,
         messages,
         tools: availableTools.map(t => t.toOllamaSchema()),
         system: this.buildSystemPrompt(ctx),

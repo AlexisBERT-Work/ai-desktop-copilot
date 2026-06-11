@@ -56,12 +56,16 @@ async function main() {
   const db = new ConversationStore();
   await db.initialize();
 
-  const vectorStore = new VectorStore();
-  await vectorStore.initialize();
-
-  const llm = new OllamaClient({ baseUrl: process.env['OLLAMA_URL'] ?? 'http://127.0.0.1:11434' });
+  const llm = new OllamaClient({
+    baseUrl: process.env['OLLAMA_URL'] ?? 'http://127.0.0.1:11434',
+    keepAlive: process.env['OLLAMA_KEEP_ALIVE'] ?? '10m',
+  });
   const ollamaOk = await llm.isAvailable();
   log.info('Ollama status', { available: ollamaOk });
+
+  // VectorStore uses Ollama (nomic-embed-text) for embeddings when available.
+  const vectorStore = new VectorStore(llm);
+  await vectorStore.initialize();
 
   const audit = new AuditLogger();
   const permissions = new PermissionEngine();
@@ -87,7 +91,10 @@ async function main() {
   tools.register(new TranscribeAudioTool());
 
   // ─── Agent ─────────────────────────────────────────────────
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit);
+  // NEURODESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
+  // pour les tâches triviales (gain ressources). Absent => pas de routage.
+  const smallModel = process.env['NEURODESK_MODEL_SMALL'];
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel);
 
   // ─── Sub-agent tools (need orchestrator reference) ─────────
   const defaultModel = process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b';

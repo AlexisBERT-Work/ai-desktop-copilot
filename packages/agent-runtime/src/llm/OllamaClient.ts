@@ -7,6 +7,12 @@ export interface OllamaConfig {
   baseUrl: string;
   defaultModel?: string;
   requestTimeout?: number;
+  /**
+   * Durée pendant laquelle Ollama garde le modèle chargé en RAM après une
+   * requête (ex. '10m', '1h', '-1' = jamais décharger, '0' = décharger aussitôt).
+   * Garder le modèle chaud évite un rechargement coûteux à chaque appel.
+   */
+  keepAlive?: string;
 }
 
 export interface ChatParams {
@@ -16,6 +22,10 @@ export interface ChatParams {
   system?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Surcharge ponctuelle du keep_alive (voir OllamaConfig.keepAlive). */
+  keepAlive?: string;
+  /** Taille de la fenêtre de contexte (num_ctx). Plus petit = moins de RAM. */
+  numCtx?: number;
 }
 
 export interface OllamaModel {
@@ -35,6 +45,9 @@ export class OllamaClient {
   async *streamChat(params: ChatParams): AsyncGenerator<StreamChunk> {
     const url = `${this.config.baseUrl}/api/chat`;
 
+    // keep_alive : garde le modèle chaud en RAM entre les requêtes (gain latence).
+    const keepAlive = params.keepAlive ?? this.config.keepAlive ?? '10m';
+
     const body = {
       model: params.model,
       messages: [
@@ -43,13 +56,15 @@ export class OllamaClient {
       ],
       stream: true,
       tools: params.tools,
+      keep_alive: keepAlive,
       options: {
         temperature: params.temperature ?? 0.7,
         ...(params.maxTokens ? { num_predict: params.maxTokens } : {}),
+        ...(params.numCtx ? { num_ctx: params.numCtx } : {}),
       },
     };
 
-    log.debug('Chat request', { model: params.model, messageCount: body.messages.length });
+    log.debug('Chat request', { model: params.model, messageCount: body.messages.length, keepAlive });
 
     let response: Response;
     try {
