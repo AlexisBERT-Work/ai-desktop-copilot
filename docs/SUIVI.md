@@ -121,9 +121,20 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
       Schéma + permission + enregistrement. Type-check OK, 67 tests verts.
 - [~] `llava:7b` en cours de pull (~4,1 Go). Description visuelle testable à la fin.
 
+## Navigateur pour pages JS (b) — 2026-06-11
+- Prérequis OK : `playwright-core` installé + Chrome/Edge système détectés
+  (`browserManager` lance le navigateur système, pas de Chromium à télécharger).
+- [x] `read_webpage` : détecte une **SPA** (HTML volumineux, texte quasi nul) et
+      renvoie `likelySpa: true` + un `hint` orientant vers `browser_navigate` +
+      `browser_get_text`. Description mise à jour (HTTP simple, sans JS).
+- [x] Descriptions `browser_navigate` / `browser_get_text` clarifiées (pages
+      JS/SPA, astuce `wait_until="networkidle"`).
+- Résultat : sur une page comme gameslantern (SPA), l'agent reçoit un signal
+  explicite pour basculer sur le navigateur qui exécute le JS.
+
 ## Prochaines pistes (par valeur)
-1. ⬜ (b) Orienter l'agent vers les outils navigateur pour pages JS (SPA).
-2. ⬜ Persister le mode/les modèles choisis (settings) entre sessions.
+1. ⬜ Persister le mode/les modèles choisis (settings) entre sessions.
+2. ⬜ Réduire la friction : `browser_navigate` est en risk `high` (confirmation).
 3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
    tout passe par le sidecar Python.
 4. ⬜ Packaging / distribution.

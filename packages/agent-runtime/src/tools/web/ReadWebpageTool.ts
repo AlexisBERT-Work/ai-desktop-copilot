@@ -92,7 +92,7 @@ async function fetchUrl(url: string, timeoutMs = 15_000): Promise<{ body: string
 
 export class ReadWebpageTool extends BaseTool {
   readonly name = 'read_webpage';
-  readonly description = "Récupère une page web et en extrait le contenu textuel lisible. Utile pour lire de la documentation, des articles ou des issues GitHub sans quitter NeuroDesk.";
+  readonly description = "Récupère une page web et en extrait le texte (HTTP simple, sans exécuter le JavaScript). Idéal pour doc, articles, README, issues GitHub. Si la page est une application JavaScript (SPA) ou renvoie peu de texte, utilise plutôt browser_navigate + browser_get_text.";
   readonly category = 'web' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
@@ -146,6 +146,10 @@ export class ReadWebpageTool extends BaseTool {
     const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(body);
     const title = titleMatch?.[1]?.trim() ?? null;
 
+    // Heuristique SPA : page HTML volumineuse mais quasi sans texte extrait
+    // => contenu rendu côté client (JavaScript). On oriente vers le navigateur.
+    const likelySpa = isHtml && finalText.length < 300 && body.length > 3000;
+
     return this.ok({
       url,
       title,
@@ -155,6 +159,12 @@ export class ReadWebpageTool extends BaseTool {
       charCount: finalText.length,
       truncated,
       ...(selector ? { selector } : {}),
+      ...(likelySpa
+        ? {
+            likelySpa: true,
+            hint: 'Page probablement rendue en JavaScript (SPA) : peu de texte extractible en HTTP simple. Réessaie avec browser_navigate (wait_until="networkidle") puis browser_get_text.',
+          }
+        : {}),
     });
   }
 }

@@ -7,7 +7,10 @@
 ## 1. Lire ce qui est devant toi
 - ✅ **Fichiers** : `read_file`, `list_directory`
 - ✅ **Presse-papier** : `read_clipboard`
-- ✅ **Pages web** : `read_webpage`
+- ✅ **Pages web** : `read_webpage` (HTTP simple). Détecte les **SPA** et oriente
+  vers le navigateur si la page est rendue en JavaScript.
+- ✅ **Pages JS / sites interactifs** : outils navigateur Playwright
+  (`browser_navigate` + `browser_get_text`, via Chrome/Edge système)
 - ✅ **Écran — texte (OCR)** : `capture_screen`, `ocr_region` (Tesseract fra+eng).
   Testé : lit le texte de l'écran à ~80 % de confiance.
 - 🟡 **Écran — vision** : `describe_screen` décrit visuellement l'écran via un

@@ -11,7 +11,7 @@ interface BrowserNavigateArgs {
 
 export class BrowserNavigateTool extends BaseTool {
   readonly name = 'browser_navigate';
-  readonly description = 'Ouvre ou navigue vers une URL dans le navigateur headless. Retourne le titre, l\'URL finale et le status HTTP.';
+  readonly description = 'Ouvre une URL dans un vrai navigateur (exécute le JavaScript). À utiliser pour les pages JS/SPA que read_webpage ne peut pas lire, ou les sites interactifs. Astuce : wait_until="networkidle" pour laisser le contenu dynamique se charger. Puis appelle browser_get_text. Retourne titre, URL finale, status HTTP.';
   readonly category = 'browser' as const;
   readonly riskLevel = 'high' as const;
   readonly requiresConfirmation = true;

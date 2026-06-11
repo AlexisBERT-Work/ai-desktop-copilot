@@ -10,7 +10,7 @@ interface BrowserGetTextArgs {
 
 export class BrowserGetTextTool extends BaseTool {
   readonly name = 'browser_get_text';
-  readonly description = 'Extrait le texte visible de la page actuelle (ou d\'un élément ciblé par CSS selector). Utile pour lire le contenu d\'une page après navigation.';
+  readonly description = 'Extrait le texte visible de la page courante (rendu JS inclus), ou d\'un élément ciblé par CSS selector. À appeler après browser_navigate pour lire une page JS/SPA que read_webpage n\'a pas pu lire.';
   readonly category = 'browser' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
