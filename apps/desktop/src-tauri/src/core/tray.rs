@@ -12,7 +12,13 @@ pub fn setup_tray(app: &mut App) -> anyhow::Result<()> {
 
     let menu = Menu::with_items(app, &[&toggle, &separator, &quit])?;
 
+    // Embed the tray icon at compile time so it always shows, regardless of the
+    // process working directory or whether the app was bundled.
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))?;
+
     let tray = TrayIconBuilder::new()
+        .icon(icon)
+        .tooltip("NeuroDesk — clic pour ouvrir (Ctrl+Shift+Space)")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {

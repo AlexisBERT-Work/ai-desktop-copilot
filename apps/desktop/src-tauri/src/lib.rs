@@ -2,7 +2,7 @@ mod commands;
 mod core;
 mod ipc;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tracing::info;
 
 pub fn run() {
@@ -13,6 +13,16 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
+        // Must be the first plugin: ensures only one NeuroDesk runs. A second
+        // launch (e.g. autostart firing while it's already open) hands off to the
+        // running instance — which reveals its bubble — then exits, instead of
+        // spawning a duplicate that can't grab the Ctrl+Space hotkey.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            info!("Second instance launched; revealing existing window");
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.emit("ui:overlay-toggle", ());
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())

@@ -33,14 +33,25 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
         .join("packages")
         .join("agent-runtime");
 
-    let mut child = tokio::process::Command::new("node")
-        .current_dir(&agent_dir)
+    let mut cmd = tokio::process::Command::new("node");
+    cmd.current_dir(&agent_dir)
         .arg("--import")
         .arg("tsx")
         .arg("src/index.ts")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    // On Windows, prevent the spawned `node` process from popping a console
+    // window (the app runs in the GUI subsystem, so a child console subprocess
+    // would otherwise allocate a visible terminal the user could close).
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd
         .spawn()
         .context("Failed to start agent runtime (dev mode)")?;
 
