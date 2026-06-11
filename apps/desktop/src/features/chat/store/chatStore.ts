@@ -111,7 +111,11 @@ export const useChatStore = create<ChatState>()(
 
     appendToken: (conversationId, messageId, token) => {
       set(s => {
-        const msg = s.messages[conversationId]?.find(m => m.id === messageId);
+        // Repli robuste si le routage d'id est imprécis : conversation active
+        // + message en cours de streaming.
+        const msgs = s.messages[conversationId] ?? s.messages[s.activeConversationId];
+        const msg = msgs?.find(m => m.id === messageId)
+          ?? msgs?.find(m => m.id === s.streamingMessageId);
         if (msg) msg.content += token;
       });
     },

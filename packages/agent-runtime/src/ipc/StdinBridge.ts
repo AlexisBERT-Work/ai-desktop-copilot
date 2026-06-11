@@ -84,6 +84,7 @@ export class StdinBridge {
     const params = request.params as {
       input: string;
       conversationId: string;
+      messageId?: string;
       config: Parameters<AgentOrchestrator['process']>[2];
     };
 
@@ -93,8 +94,12 @@ export class StdinBridge {
         params.conversationId,
         params.config,
       )) {
-        // Stream each step back to Tauri
-        this.sendNotification('agent.step', { id: request.id, step });
+        // Inject conversation/message ids so Tauri can route the event to the
+        // right message (the orchestrator steps don't carry them).
+        this.sendNotification('agent.step', {
+          id: request.id,
+          step: { ...step, conversationId: params.conversationId, messageId: params.messageId },
+        });
       }
 
       // Final response

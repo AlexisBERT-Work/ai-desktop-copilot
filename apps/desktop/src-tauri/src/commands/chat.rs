@@ -80,6 +80,7 @@ pub async fn chat_send(
         "params": {
             "input": args.message,
             "conversationId": args.conversation_id,
+            "messageId": args.message_id,
             "config": config
         }
     });
