@@ -11,12 +11,16 @@ interface ChatState {
   streamingMessageId: string | null;
   selectedModel: string;
   availableModels: string[];
+  modelMode: 'auto' | 'light' | 'code';
+  lightModel: string;
+  codeModel: string;
 
   // Actions
   sendMessage: (content: string, conversationId: string) => Promise<void>;
   newConversation: () => void;
   selectConversation: (id: string) => void;
   setModel: (model: string) => void;
+  setModelMode: (mode: 'auto' | 'light' | 'code') => void;
   loadModels: () => Promise<void>;
   appendToken: (conversationId: string, messageId: string, token: string) => void;
   setPlan: (conversationId: string, messageId: string, steps: string[]) => void;
@@ -43,9 +47,12 @@ export const useChatStore = create<ChatState>()(
     streamingMessageId: null,
     selectedModel: 'qwen2.5:7b',
     availableModels: ['qwen2.5:7b', 'llama3.2:3b', 'deepseek-r1:7b'],
+    modelMode: 'auto',
+    lightModel: 'qwen2.5:7b',
+    codeModel: 'qwen2.5-coder:14b',
 
     sendMessage: async (content, conversationId) => {
-      const { selectedModel } = get();
+      const { selectedModel, modelMode, lightModel, codeModel } = get();
       const userMessageId = crypto.randomUUID();
       const assistantMessageId = crypto.randomUUID();
 
@@ -83,6 +90,9 @@ export const useChatStore = create<ChatState>()(
           messageId: assistantMessageId,
           modelId: selectedModel,
           useTools: true,
+          modelMode,
+          lightModel,
+          codeModel,
         });
       } catch (err) {
         set(s => {
@@ -148,6 +158,10 @@ export const useChatStore = create<ChatState>()(
 
     setModel: model => {
       set(s => { s.selectedModel = model; });
+    },
+
+    setModelMode: mode => {
+      set(s => { s.modelMode = mode; });
     },
 
     loadModels: async () => {

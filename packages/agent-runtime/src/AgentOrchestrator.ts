@@ -4,7 +4,7 @@ import type { ToolRegistry } from './ToolRegistry';
 import type { PermissionEngine } from './permissions/PermissionEngine';
 import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
-import { ModelRouter } from './llm/ModelRouter';
+import { resolveModel } from './llm/ModelRouter';
 import type { Planner } from './llm/Planner';
 import { createLogger } from './logger';
 
@@ -29,13 +29,19 @@ export class AgentOrchestrator {
     private planner?: Planner,
   ) {}
 
-  /** Décide du modèle effectif (downgrade-only : ne dépasse jamais config.model). */
-  private resolveModel(input: string, usesTools: boolean, requestedModel: string): string {
-    if (!this.smallModel || this.smallModel === requestedModel) return requestedModel;
-    const router = new ModelRouter({ small: this.smallModel, large: requestedModel });
-    const decision = router.route({ prompt: input, usesTools });
-    if (decision.model !== requestedModel) {
-      log.info('Model routing', { from: requestedModel, to: decision.model, reason: decision.reason });
+  /** Décide du modèle effectif selon le mode (auto/light/code). */
+  private pickModel(input: string, usesTools: boolean, config: AgentConfig): string {
+    const light = config.lightModel ?? this.smallModel;
+    const decision = resolveModel({
+      mode: config.modelMode ?? 'auto',
+      requested: config.model,
+      ...(light ? { light } : {}),
+      ...(config.codeModel ? { code: config.codeModel } : {}),
+      input,
+      usesTools,
+    });
+    if (decision.model !== config.model) {
+      log.info('Model selection', { mode: config.modelMode ?? 'auto', model: decision.model, reason: decision.reason });
     }
     return decision.model;
   }
@@ -61,8 +67,8 @@ export class AgentOrchestrator {
     // Add user message
     messages.push({ role: 'user', content: input });
 
-    // Choix du modèle (routage downgrade-only une fois par run).
-    const model = this.resolveModel(input, availableTools.length > 0, config.model);
+    // Choix du modèle (auto/light/code) une fois par run.
+    const model = this.pickModel(input, availableTools.length > 0, config);
 
     // Phase de planification optionnelle (opt-in). Le plan est généré une fois
     // puis injecté comme guidage dans le system prompt.

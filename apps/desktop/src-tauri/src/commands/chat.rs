@@ -12,6 +12,18 @@ pub struct ChatSendArgs {
     pub message_id: String,
     pub model_id: String,
     pub use_tools: bool,
+    /// Mode de sélection du modèle : "auto" | "light" | "code". Défaut "auto".
+    #[serde(default)]
+    pub model_mode: Option<String>,
+    /// Modèle léger (mode light / borne basse de auto).
+    #[serde(default)]
+    pub light_model: Option<String>,
+    /// Modèle de code/heavy (mode code / borne haute de auto).
+    #[serde(default)]
+    pub code_model: Option<String>,
+    /// Active la phase de planification.
+    #[serde(default)]
+    pub use_planning: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,6 +56,23 @@ pub async fn chat_send(
         "chat_send"
     );
 
+    let mut config = serde_json::json!({
+        "model": args.model_id,
+        "useTools": args.use_tools,
+        "useMemory": true,
+        "useScreenContext": false,
+        "modelMode": args.model_mode.as_deref().unwrap_or("auto"),
+    });
+    if let Some(light) = &args.light_model {
+        config["lightModel"] = serde_json::json!(light);
+    }
+    if let Some(code) = &args.code_model {
+        config["codeModel"] = serde_json::json!(code);
+    }
+    if let Some(planning) = args.use_planning {
+        config["usePlanning"] = serde_json::json!(planning);
+    }
+
     let payload = serde_json::json!({
         "jsonrpc": "2.0",
         "id": uuid::Uuid::new_v4().to_string(),
@@ -51,12 +80,7 @@ pub async fn chat_send(
         "params": {
             "input": args.message,
             "conversationId": args.conversation_id,
-            "config": {
-                "model": args.model_id,
-                "useTools": args.use_tools,
-                "useMemory": true,
-                "useScreenContext": false
-            }
+            "config": config
         }
     });
 

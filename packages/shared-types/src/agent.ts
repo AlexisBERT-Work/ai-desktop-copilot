@@ -16,6 +16,19 @@ export interface AgentConfig {
    * multi-étapes (recherches longues). Opt-in, désactivé par défaut.
    */
   usePlanning?: boolean;
+
+  /**
+   * Mode de sélection du modèle :
+   * - 'auto'  : le routeur choisit (léger pour le trivial, code/heavy sinon)
+   * - 'light' : force le modèle léger
+   * - 'code'  : force le modèle de code (heavy)
+   * Défaut : 'auto'.
+   */
+  modelMode?: 'auto' | 'light' | 'code';
+  /** Modèle léger (mode 'light' et borne basse de 'auto'). */
+  lightModel?: string;
+  /** Modèle de code/heavy (mode 'code' et borne haute de 'auto'). */
+  codeModel?: string;
 }
 
 // ─── Agent Execution Steps ─────────────────────────────────────

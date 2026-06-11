@@ -41,8 +41,10 @@
 ## 7. Efficience ressources
 - ✅ **`keep_alive`** Ollama (modèle gardé chaud, défaut 10 min, `OLLAMA_KEEP_ALIVE`)
 - ✅ **`num_ctx`** réglable par requête
-- ✅ **Routage petit/gros modèle** : rétrograde vers un modèle léger pour les
-  tâches triviales. Activer avec `NEURODESK_MODEL_SMALL` (ex. `qwen2.5:3b`).
+- ✅ **Swap de modèles (Auto / Léger / Code)** : sélecteur dans le chat.
+  *Auto* route (léger pour le trivial, code/heavy sinon), *Léger* économise,
+  *Code* force le gros modèle de code (`qwen2.5-coder:14b`). Aussi pilotable
+  par env `NEURODESK_MODEL_SMALL`.
 
 ## 8. Ce qui reste à durcir
 - ⬜ Capture écran côté Rust (`screen.rs` est un stub)

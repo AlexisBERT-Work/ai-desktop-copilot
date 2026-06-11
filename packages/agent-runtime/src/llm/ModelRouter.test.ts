@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ModelRouter } from './ModelRouter';
+import { ModelRouter, resolveModel } from './ModelRouter';
 
 const router = new ModelRouter({ small: 'small-model', large: 'large-model' });
 
@@ -43,5 +43,35 @@ describe('ModelRouter', () => {
     const tight = new ModelRouter({ small: 's', large: 'l', lengthThreshold: 5 });
     expect(tight.route({ prompt: 'court' }).model).toBe('s'); // 5 chars, pas > 5
     expect(tight.route({ prompt: 'un peu plus long' }).model).toBe('l');
+  });
+});
+
+describe('resolveModel (modes auto/light/code)', () => {
+  const base = { requested: 'default', light: 'light-m', code: 'code-m', usesTools: false };
+
+  it('mode light force le modèle léger', () => {
+    expect(resolveModel({ ...base, mode: 'light', input: 'analyse complexe' }).model).toBe('light-m');
+  });
+
+  it('mode code force le modèle heavy', () => {
+    expect(resolveModel({ ...base, mode: 'code', input: 'salut' }).model).toBe('code-m');
+  });
+
+  it('mode auto : trivial → léger', () => {
+    expect(resolveModel({ ...base, mode: 'auto', input: 'bonjour' }).model).toBe('light-m');
+  });
+
+  it('mode auto : code/complexe → heavy', () => {
+    expect(resolveModel({ ...base, mode: 'auto', input: 'refactor ce module' }).model).toBe('code-m');
+    expect(resolveModel({ ...base, mode: 'auto', input: 'salut', usesTools: true }).model).toBe('code-m');
+  });
+
+  it('repli sur requested quand un modèle manque', () => {
+    expect(resolveModel({ mode: 'light', requested: 'default', input: 'x', usesTools: false }).model).toBe('default');
+    expect(resolveModel({ mode: 'code', requested: 'default', input: 'x', usesTools: false }).model).toBe('default');
+  });
+
+  it('auto sans modèle léger distinct → requested', () => {
+    expect(resolveModel({ mode: 'auto', requested: 'default', input: 'bonjour', usesTools: false }).model).toBe('default');
   });
 });

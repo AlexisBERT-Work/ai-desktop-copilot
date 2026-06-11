@@ -70,3 +70,37 @@ export class ModelRouter {
     return { model: this.small, tier: 'small', reason: 'Tâche simple/courte → modèle rapide' };
   }
 }
+
+export type ModelMode = 'auto' | 'light' | 'code';
+
+export interface ResolveModelInput {
+  mode: ModelMode;
+  /** Modèle demandé/par défaut (fallback). */
+  requested: string;
+  /** Modèle léger (mode 'light' + borne basse de 'auto'). */
+  light?: string;
+  /** Modèle de code/heavy (mode 'code' + borne haute de 'auto'). */
+  code?: string;
+  input: string;
+  usesTools: boolean;
+}
+
+/**
+ * Résout le modèle effectif selon le mode :
+ * - 'light' / 'code' : forçage explicite (avec repli sur `requested`)
+ * - 'auto' : routage `small=light` / `large=code|requested` via ModelRouter.
+ */
+export function resolveModel(i: ResolveModelInput): RouteDecision {
+  if (i.mode === 'light') {
+    return { model: i.light ?? i.requested, tier: i.light ? 'small' : 'forced', reason: 'Mode léger forcé' };
+  }
+  if (i.mode === 'code') {
+    return { model: i.code ?? i.requested, tier: i.code ? 'large' : 'forced', reason: 'Mode code (heavy) forcé' };
+  }
+  // auto
+  const large = i.code ?? i.requested;
+  if (!i.light || i.light === large) {
+    return { model: large, tier: 'large', reason: 'Auto : pas de modèle léger distinct' };
+  }
+  return new ModelRouter({ small: i.light, large }).route({ prompt: i.input, usesTools: i.usesTools });
+}

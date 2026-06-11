@@ -93,8 +93,22 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
 - [x] Type-check des 3 packages OK. (Rust non `cargo build` — ajout minimal
       calqué sur les bras existants.)
 
+## Swap de modèles léger ↔ heavy-code — 2026-06-11
+- [x] `AgentConfig` : `modelMode` ('auto'|'light'|'code') + `lightModel` + `codeModel`.
+- [x] `resolveModel()` (pur, dans ModelRouter) : light/code forcent ; auto route
+      via `ModelRouter` (small=light, large=code). +6 tests (67 au total).
+- [x] `AgentOrchestrator.pickModel()` utilise `resolveModel`.
+- [x] Rust : `ChatSendArgs` + payload transmettent mode/light/code/planning.
+- [x] React : store (`modelMode`/`lightModel`/`codeModel` + `setModelMode`),
+      `ModeSelector` (Auto / Léger / Code) dans le header du chat, transmis au
+      `chat_send`.
+- [~] Pull `qwen2.5-coder:14b` lancé en arrière-plan (~9 Go, lent). « Code »
+      l'utilisera dès qu'il sera disponible. Défauts : light=`qwen2.5:7b`,
+      code=`qwen2.5-coder:14b`.
+- [x] Type-check 3 packages OK.
+
 ## Prochaines pistes (par valeur)
-1. ⬜ Sélecteur de modèle « léger ↔ heavy-code » + pull d'un gros modèle de code.
+1. ⬜ Persister le mode/les modèles choisis (settings) entre sessions.
 3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
    tout passe par le sidecar Python.
 4. ⬜ Packaging / distribution.
