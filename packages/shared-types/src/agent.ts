@@ -10,6 +10,12 @@ export interface AgentConfig {
   useScreenContext?: boolean;
   useMemory?: boolean;
   safeMode?: boolean;
+  /**
+   * Active une phase de planification avant l'exécution : l'agent établit
+   * d'abord un plan d'étapes, injecté comme guidage. Utile pour les tâches
+   * multi-étapes (recherches longues). Opt-in, désactivé par défaut.
+   */
+  usePlanning?: boolean;
 }
 
 // ─── Agent Execution Steps ─────────────────────────────────────

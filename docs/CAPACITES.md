@@ -29,6 +29,8 @@
 - ✅ **GitHub** : `github_issues`, `github_pr`
 
 ## 5. Orchestration & autonomie
+- ✅ **Planification (opt-in)** : pour les tâches multi-étapes, l'agent établit
+  d'abord un plan puis le suit. Activer avec `usePlanning: true` dans la config.
 - ✅ **Sous-agents** : `run_subagent`, `run_parallel_agents`
 - ✅ **Tâches planifiées (cron)** : `schedule_task`, `list_scheduled_tasks`,
   `cancel_scheduled_task`

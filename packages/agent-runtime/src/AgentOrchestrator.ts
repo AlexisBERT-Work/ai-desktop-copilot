@@ -5,6 +5,7 @@ import type { PermissionEngine } from './permissions/PermissionEngine';
 import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
 import { ModelRouter } from './llm/ModelRouter';
+import type { Planner } from './llm/Planner';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:orchestrator');
@@ -24,6 +25,8 @@ export class AgentOrchestrator {
      * modèle de la requête est toujours utilisé tel quel.
      */
     private smallModel?: string,
+    /** Planificateur optionnel (utilisé seulement si config.usePlanning). */
+    private planner?: Planner,
   ) {}
 
   /** Décide du modèle effectif (downgrade-only : ne dépasse jamais config.model). */
@@ -61,6 +64,16 @@ export class AgentOrchestrator {
     // Choix du modèle (routage downgrade-only une fois par run).
     const model = this.resolveModel(input, availableTools.length > 0, config.model);
 
+    // Phase de planification optionnelle (opt-in). Le plan est généré une fois
+    // puis injecté comme guidage dans le system prompt.
+    let plan: string[] = [];
+    if (config.usePlanning && this.planner) {
+      plan = await this.planner.plan(input, model);
+      if (plan.length > 0) log.info('Planning enabled', { runId, steps: plan.length });
+    }
+
+    const systemPrompt = this.buildSystemPrompt(ctx, plan);
+
     const maxIterations = config.maxIterations ?? this.defaultMaxIterations;
     let iterations = 0;
 
@@ -73,7 +86,7 @@ export class AgentOrchestrator {
         model,
         messages,
         tools: availableTools.map(t => t.toOllamaSchema()),
-        system: this.buildSystemPrompt(ctx),
+        system: systemPrompt,
         temperature: config.temperature ?? 0.7,
       });
 
@@ -171,13 +184,18 @@ export class AgentOrchestrator {
     activeWindow?: string;
     screenText?: string;
     relevantMemories?: string[];
-  }): string {
+  }, plan: string[] = []): string {
     const parts = [
       `Tu es NeuroDesk, un assistant IA desktop local tournant sur la machine de l'utilisateur.`,
       `Tu as accès à des outils pour interagir avec le système.`,
       `Date et heure actuelles : ${new Date().toLocaleString('fr-FR')}`,
       `Système : Windows 11`,
     ];
+
+    if (plan.length > 0) {
+      const numbered = plan.map((s, i) => `${i + 1}. ${s}`).join('\n');
+      parts.push(`\nPlan à suivre pour accomplir la tâche :\n${numbered}\n(Suis ce plan étape par étape, en utilisant les outils au besoin.)`);
+    }
 
     if (ctx.activeWindow) {
       parts.push(`Fenêtre active : ${ctx.activeWindow}`);

@@ -69,8 +69,20 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
 
 **Total tests : 54 verts (6 fichiers).**
 
+## Boucle plan→exécute (opt-in) — 2026-06-11
+- [x] `AgentConfig.usePlanning?: boolean` (opt-in, défaut off).
+- [x] `llm/Planner.ts` : `parsePlan` (pur) + `Planner.plan()` (réutilise
+      `streamChat`, sans nouvel endpoint, échec silencieux → plan vide).
+- [x] Câblé dans `AgentOrchestrator` : si `usePlanning`, génère le plan une fois
+      et l'injecte comme guidage dans le system prompt. **Aucun nouveau type
+      d'AgentStep → zéro changement Rust**, totalement non-breaking.
+- [x] `Planner.test.ts` (7) : parsing listes numérotées/puces, préambule ignoré,
+      repli lignes, plafond 8 étapes.
+
+**Total tests : 61 verts (7 fichiers).**
+
 ## Prochaines pistes (par valeur)
-1. ⬜ Boucle d'agent plan→exécute pour les recherches multi-étapes.
+1. ⬜ Rendre le plan visible dans l'UI (nouveau type d'AgentStep + bridge Rust).
 3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
    tout passe par le sidecar Python.
 4. ⬜ Packaging / distribution.

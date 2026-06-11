@@ -10,6 +10,7 @@ import { PermissionEngine } from './permissions/PermissionEngine';
 import { ContextManager } from './ContextManager';
 import { AuditLogger } from './AuditLogger';
 import { OllamaClient } from './llm/OllamaClient';
+import { Planner } from './llm/Planner';
 import { ConversationStore } from './memory/ConversationStore';
 import { VectorStore } from './memory/VectorStore';
 import { createLogger } from './logger';
@@ -94,7 +95,9 @@ async function main() {
   // NEURODESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
   // pour les tâches triviales (gain ressources). Absent => pas de routage.
   const smallModel = process.env['NEURODESK_MODEL_SMALL'];
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel);
+  // Planificateur opt-in (utilisé seulement si la requête a usePlanning=true).
+  const planner = new Planner(llm);
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner);
 
   // ─── Sub-agent tools (need orchestrator reference) ─────────
   const defaultModel = process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b';
