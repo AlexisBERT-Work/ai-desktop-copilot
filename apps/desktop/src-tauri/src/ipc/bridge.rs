@@ -140,6 +140,12 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                     window.emit("permission:request", params)?;
                 }
             }
+            "proactive.suggestion" => {
+                // Agent-initiated nudge (e.g. spiral detection). Surface it in the UI.
+                if let Some(window) = app.get_webview_window("main") {
+                    window.emit("proactive:suggestion", params)?;
+                }
+            }
             _ => {
                 warn!("Unknown agent notification: {method}");
             }

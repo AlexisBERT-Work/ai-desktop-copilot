@@ -11,6 +11,9 @@ import { ContextManager } from './ContextManager';
 import { AuditLogger } from './AuditLogger';
 import { OllamaClient } from './llm/OllamaClient';
 import { Planner } from './llm/Planner';
+import { ActivityTracker } from './ActivityTracker';
+import { SpiralMonitor } from './SpiralMonitor';
+import { stdoutNotifier } from './ipc/Notifier';
 import { ConversationStore } from './memory/ConversationStore';
 import { VectorStore } from './memory/VectorStore';
 import { createLogger } from './logger';
@@ -141,7 +144,17 @@ async function main() {
   const smallModel = process.env['NEURODESK_MODEL_SMALL'];
   // Planificateur opt-in (utilisé seulement si la requête a usePlanning=true).
   const planner = new Planner(llm);
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner);
+  // Suivi d'activité → alimente la détection de spirale en arrière-plan.
+  const activity = new ActivityTracker();
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity);
+
+  // ─── Spiral monitor (proactive nudge) ──────────────────────
+  // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur
+  // boucle sur le même problème. Le bridge Rust la transforme en event Tauri.
+  const spiralMonitor = new SpiralMonitor(activity, stdoutNotifier, {
+    thresholdMinutes: Number(process.env['NEURODESK_SPIRAL_THRESHOLD_MIN'] ?? 45),
+  });
+  spiralMonitor.start();
 
   // ─── Sub-agent tools (need orchestrator reference) ─────────
   const defaultModel = process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b';

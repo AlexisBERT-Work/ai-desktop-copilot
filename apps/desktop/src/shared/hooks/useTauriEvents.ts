@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useChatStore } from '../../features/chat/store/chatStore';
 import { useOverlayStore } from '../../features/overlay/overlayStore';
 import { useSettingsStore } from '../../features/settings/settingsStore';
+import { useProactiveStore, type ProactiveSuggestion } from '../../features/proactive/proactiveStore';
 import type { TokenEvent, DoneEvent, ErrorEvent } from '@neurodesk/shared-types';
 
 /**
@@ -13,6 +14,7 @@ export function useTauriEvents() {
   const { appendToken, setPlan, finalizeMessage } = useChatStore();
   const { toggle } = useOverlayStore();
   const { syncToRuntime } = useSettingsStore();
+  const showSuggestion = useProactiveStore(s => s.show);
 
   useEffect(() => {
     // Push persisted settings (e.g. safeMode) to the agent runtime once it's ready
@@ -53,9 +55,16 @@ export function useTauriEvents() {
       }),
     );
 
+    // Proactive suggestion (e.g. spiral detection)
+    unlisteners.push(
+      listen<ProactiveSuggestion>('proactive:suggestion', e => {
+        showSuggestion(e.payload);
+      }),
+    );
+
     return () => {
       clearTimeout(syncTimer);
       unlisteners.forEach(p => p.then(fn => fn()));
     };
-  }, [appendToken, setPlan, finalizeMessage, syncToRuntime]);
+  }, [appendToken, setPlan, finalizeMessage, syncToRuntime, showSuggestion]);
 }

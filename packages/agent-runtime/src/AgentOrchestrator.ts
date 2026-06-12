@@ -6,6 +6,7 @@ import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
 import { resolveModel } from './llm/ModelRouter';
 import type { Planner } from './llm/Planner';
+import type { ActivityTracker } from './ActivityTracker';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:orchestrator');
@@ -27,6 +28,8 @@ export class AgentOrchestrator {
     private smallModel?: string,
     /** Planificateur optionnel (utilisé seulement si config.usePlanning). */
     private planner?: Planner,
+    /** Suivi d'activité optionnel (alimente la détection de spirale). */
+    private activity?: ActivityTracker,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -159,6 +162,7 @@ export class AgentOrchestrator {
         try {
           const result = await this.tools.execute(toolCall.name, toolCall.args);
           this.audit.logToolCall(runId, toolCall.name, toolCall.args, result);
+          this.activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
 
           yield { type: 'tool_result', toolName: toolCall.name, result };
           messages.push({
@@ -169,6 +173,7 @@ export class AgentOrchestrator {
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           log.error('Tool execution failed', { tool: toolCall.name, error });
+          this.activity?.recordToolCall(toolCall.name, toolCall.args, false);
           yield { type: 'tool_error', toolName: toolCall.name, error };
           messages.push({
             role: 'tool',

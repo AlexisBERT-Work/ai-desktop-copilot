@@ -61,7 +61,7 @@
 - Cron natif : planifier / lister / annuler des tâches — `schedule_task`, `list_scheduled_tasks`, `cancel_scheduled_task`
 
 **Productivité & apprentissage**
-- Détection de spirale (boucle sur le même problème) — `detect_spiral`
+- Détection de spirale en arrière-plan (ActivityTracker → SpiralMonitor → bannière proactive) — `detect_spiral`
 - Résumé de standup (hier/aujourd'hui/blocages) — `generate_standup`
 - Profil de style de code du projet — `analyze_code_style`
 - Mémoire de projet (contexte à l'ouverture) — `load_project_context`
@@ -169,7 +169,7 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Feature | Statut | Priorité | Notes |
 |---|---|---|---|
 | Transcription de réunion | 🟡 partiel | 🔥 #4 | `transcribe_audio` (Whisper local) dispo ; capture micro live + action items à venir |
-| Détection de spirale | ✅ dispo | — | `detect_spiral` — heuristique (même signature > seuil + échecs → pause/autre approche). L'app desktop alimente les événements |
+| Détection de spirale | ✅ branché | — | `detect_spiral` + boucle live : `ActivityTracker` (observe les outils) → `SpiralMonitor` (timer/cooldown) → event Tauri `proactive:suggestion` → bannière React |
 | Pomodoro intelligent | ⬜ app | moyenne | Boucle d'arrière-plan de l'app (pas un outil d'agent) |
 | Time tracking auto | ⬜ app | moyenne | Boucle d'arrière-plan de l'app (déduit depuis fichiers ouverts) |
 | Résumé de standup | ✅ dispo | — | `generate_standup` — hier/aujourd'hui/blocages depuis l'activité git |
@@ -180,7 +180,7 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Feature | Statut | Priorité | Notes |
 |---|---|---|---|
 | Recherche sémantique locale | ✅ dispo | — | `semantic_search` dans le code du projet |
-| Tip contextuel | ⬜ app | 🔥 #8 | Détection de patterns répétitifs (boucle app + `detect_spiral` comme brique) |
+| Tip contextuel | 🟡 amorcé | 🔥 #8 | Boucle proactive en place (`SpiralMonitor` → bannière) ; reste à étendre aux patterns répétitifs hors spirale |
 | Mémoire vectorielle | ✅ dispo | — | Préférences + projets inter-sessions |
 | Profil de style de code | ✅ dispo | — | `analyze_code_style` — indentation, guillemets, point-virgules, camel/snake, longueur de ligne |
 | Mémoire de projet | ✅ dispo | — | `load_project_context` — stack, scripts, structure, points d'entrée, résumé README |
