@@ -32,7 +32,8 @@ export const useSettingsStore = create<SettingsState>()(
 
       setSafeMode: (enabled) => {
         set({ safeMode: enabled });
-        void invoke('update_settings', { safeMode: enabled }).catch(() => {
+        // La commande Rust prend `args: UpdateSettingsArgs` → envelopper sous `args`.
+        void invoke('update_settings', { args: { safeMode: enabled } }).catch(() => {
           // Agent not yet running — will sync on next start via syncToRuntime
         });
       },
@@ -41,7 +42,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       syncToRuntime: () => {
         const { safeMode } = get();
-        void invoke('update_settings', { safeMode }).catch(() => {});
+        void invoke('update_settings', { args: { safeMode } }).catch(() => {});
       },
     }),
     { name: 'neurodesk-settings' },
