@@ -163,6 +163,42 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  generate_unit_tests: {
+    type: 'object' as const,
+    required: ['path'],
+    properties: {
+      path: { type: 'string' as const, description: 'Absolute path to the source file to generate tests for' },
+      framework: { type: 'string' as const, enum: ['auto', 'vitest', 'jest', 'pytest', 'cargo', 'go'] as const, default: 'auto', description: 'Test framework to target — "auto" detects from the project' },
+      symbol: { type: 'string' as const, description: 'Only scaffold tests for this exported function/class (optional)' },
+    },
+  },
+
+  suggest_refactor: {
+    type: 'object' as const,
+    required: ['path'],
+    properties: {
+      path: { type: 'string' as const, description: 'Absolute path to the source file to analyze for refactoring opportunities' },
+      max_findings: { type: 'number' as const, default: 12, description: 'Max number of refactoring findings to return' },
+    },
+  },
+
+  review_diff: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
+      base_branch: { type: 'string' as const, description: 'Review committed changes vs this branch (e.g. "main"). If omitted, reviews uncommitted working-tree changes' },
+      staged_only: { type: 'boolean' as const, default: false, description: 'When reviewing the working tree, look only at staged changes' },
+    },
+  },
+
+  analyze_dependencies: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Project root containing package.json / Cargo.toml / requirements.txt (defaults to current directory)' },
+      manifest: { type: 'string' as const, description: 'Specific manifest file to analyze (optional, auto-detected otherwise)' },
+    },
+  },
+
   watch_ci: {
     type: 'object' as const,
     required: ['repo'],
@@ -171,6 +207,37 @@ export const TOOL_SCHEMAS = {
       branch: { type: 'string' as const, description: 'Branch to watch (defaults to current git branch)' },
       token: { type: 'string' as const, description: 'GitHub personal access token (falls back to GITHUB_TOKEN env var)' },
       limit: { type: 'number' as const, default: 5, description: 'Number of recent workflow runs to fetch' },
+    },
+  },
+
+  bisect_guided: {
+    type: 'object' as const,
+    required: ['good'],
+    properties: {
+      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
+      good: { type: 'string' as const, description: 'Last known-good commit/ref (where the bug is absent)' },
+      bad: { type: 'string' as const, default: 'HEAD', description: 'Known-bad commit/ref (where the bug is present)' },
+      path: { type: 'string' as const, description: 'Limit the suspect range to commits touching this file/dir (optional)' },
+      test_command: { type: 'string' as const, description: 'Command that exits 0 when good, non-zero when bad — enables a `git bisect run` one-liner (optional)' },
+    },
+  },
+
+  summarize_git_log: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
+      since: { type: 'string' as const, description: 'Time window, e.g. "1 week ago", "2024-01-01" (optional)' },
+      path: { type: 'string' as const, description: 'Limit to commits touching this file or directory (optional)' },
+      author: { type: 'string' as const, description: 'Filter by author name/email substring (optional)' },
+      max: { type: 'number' as const, default: 100, description: 'Max commits to analyze' },
+    },
+  },
+
+  resolve_conflicts: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
+      path: { type: 'string' as const, description: 'Analyze only this conflicted file (optional, defaults to all)' },
     },
   },
 
@@ -183,6 +250,52 @@ export const TOOL_SCHEMAS = {
       extensions: { type: 'array' as const, items: { type: 'string' as const }, description: 'File extensions to include, e.g. [".ts", ".md"] (defaults to common text/code types)' },
       limit: { type: 'number' as const, default: 10, description: 'Max results to return' },
       max_file_size: { type: 'number' as const, default: 500000, description: 'Skip files larger than this size in bytes' },
+    },
+  },
+
+  obsidian_notes: {
+    type: 'object' as const,
+    properties: {
+      vault: { type: 'string' as const, description: 'Path to the Obsidian vault folder (falls back to OBSIDIAN_VAULT env var)' },
+      query: { type: 'string' as const, description: 'Text to search across note titles and content (optional)' },
+      note: { type: 'string' as const, description: 'Read a specific note in full by relative path or title (optional)' },
+      tag: { type: 'string' as const, description: 'Filter to notes carrying this tag (frontmatter or #inline), without the leading #' },
+      limit: { type: 'number' as const, default: 15, description: 'Max notes to return when searching' },
+    },
+  },
+
+  call_api: {
+    type: 'object' as const,
+    required: ['url'],
+    properties: {
+      url: { type: 'string' as const, description: 'Full URL. https:// anywhere, or http:// only for localhost/127.0.0.1 (local MCP/API servers)' },
+      method: { type: 'string' as const, enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const, default: 'GET', description: 'HTTP method' },
+      headers: { type: 'object' as const, description: 'Extra request headers as a string→string map (optional)' },
+      body: { type: 'string' as const, description: 'Request body for POST/PUT/PATCH. JSON string unless a Content-Type header says otherwise (optional)' },
+      token: { type: 'string' as const, description: 'Bearer token added as Authorization header (optional)' },
+      timeout_ms: { type: 'number' as const, default: 15000, maximum: 60000, description: 'Request timeout' },
+    },
+  },
+
+  send_webhook_message: {
+    type: 'object' as const,
+    required: ['message'],
+    properties: {
+      message: { type: 'string' as const, description: 'Message text to post to the channel' },
+      platform: { type: 'string' as const, enum: ['discord', 'slack'] as const, default: 'discord', description: 'Which incoming-webhook format to use' },
+      webhook_url: { type: 'string' as const, description: 'Incoming webhook URL (falls back to DISCORD_WEBHOOK_URL / SLACK_WEBHOOK_URL by platform)' },
+      username: { type: 'string' as const, description: 'Override the displayed sender name (Discord only)' },
+    },
+  },
+
+  notion_search: {
+    type: 'object' as const,
+    properties: {
+      query: { type: 'string' as const, description: 'Text to search across Notion pages and databases (empty returns recently edited)' },
+      token: { type: 'string' as const, description: 'Notion integration token (falls back to NOTION_TOKEN env var)' },
+      page_id: { type: 'string' as const, description: 'Read a specific page\'s text content instead of searching (optional)' },
+      filter: { type: 'string' as const, enum: ['page', 'database', 'all'] as const, default: 'all', description: 'Restrict results to pages, databases, or both' },
+      limit: { type: 'number' as const, default: 15, description: 'Max results to return' },
     },
   },
 
