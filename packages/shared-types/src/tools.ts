@@ -86,6 +86,60 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  docker_ps: {
+    type: 'object' as const,
+    properties: {
+      all: { type: 'boolean' as const, default: false, description: 'Include stopped containers (docker ps -a)' },
+      logs_for: { type: 'string' as const, description: 'Also fetch recent logs for this container name/id (optional)' },
+      tail: { type: 'number' as const, default: 50, description: 'Number of log lines when logs_for is set' },
+    },
+  },
+
+  docker_control: {
+    type: 'object' as const,
+    required: ['action'],
+    properties: {
+      action: { type: 'string' as const, enum: ['start', 'stop', 'restart', 'up', 'down'] as const, description: 'start/stop/restart a container, or compose up/down a project' },
+      target: { type: 'string' as const, description: 'Container name/id (start/stop/restart) or compose file path (up/down, defaults to ./docker-compose.yml)' },
+      workdir: { type: 'string' as const, description: 'Working directory for compose commands (defaults to current directory)' },
+    },
+  },
+
+  run_sqlite: {
+    type: 'object' as const,
+    required: ['db_path', 'query'],
+    properties: {
+      db_path: { type: 'string' as const, description: 'Path to the SQLite database file' },
+      query: { type: 'string' as const, description: 'SQL to execute' },
+      read_only: { type: 'boolean' as const, default: true, description: 'Reject anything but SELECT/PRAGMA/EXPLAIN when true' },
+    },
+  },
+
+  audit_env: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Project root containing the env files (defaults to current directory)' },
+      env_file: { type: 'string' as const, default: '.env', description: 'Env file to audit, relative to workdir' },
+      example_file: { type: 'string' as const, default: '.env.example', description: 'Template file to compare against, relative to workdir' },
+    },
+  },
+
+  inspect_port: {
+    type: 'object' as const,
+    properties: {
+      port: { type: 'number' as const, description: 'TCP port to inspect (optional — lists all listening ports if omitted)' },
+    },
+  },
+
+  kill_process: {
+    type: 'object' as const,
+    required: ['pid'],
+    properties: {
+      pid: { type: 'number' as const, description: 'Process ID to terminate' },
+      force: { type: 'boolean' as const, default: false, description: 'Force kill (taskkill /F) instead of a graceful stop' },
+    },
+  },
+
   run_command: {
     type: 'object' as const,
     required: ['command'],

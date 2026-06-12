@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 39 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 45 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
@@ -48,8 +48,12 @@
 - Client REST/JSON générique (sites perso, API, MCP local) — `call_api`
 - Browser automation (Chrome) : navigate, click, type, get_text, screenshot, close — 6 outils `browser_*`
 
-**Système & exécution**
+**Système & infra**
 - Lancement de commandes PowerShell/cmd avec sandbox Rust — `run_command`
+- Audit des variables d'environnement (.env vs .env.example) — `audit_env`
+- Monitoring de ports + kill de process — `inspect_port`, `kill_process`
+- Docker : liste/logs + start/stop/compose — `docker_ps`, `docker_control`
+- Base SQLite locale (lecture seule par défaut) — `run_sqlite`
 - Mémoire vectorielle inter-sessions (VectorStore réel) — `search_memory`
 
 **Agents & automatisation**
@@ -140,10 +144,10 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 
 | Feature | Statut | Priorité | Notes |
 |---|---|---|---|
-| Docker / Compose | ⬜ prévu | moyenne | Lire yml, lancer/arrêter, inspecter logs |
-| Monitoring de ports | ⬜ prévu | moyenne | « Qui tourne sur 3000 ? » → kill/relance |
-| Variables d'environnement | ⬜ prévu | moyenne | .env vs .env.example + détection secrets |
-| Base de données locale | ⬜ prévu | moyenne | SQL en sandbox (SQLite/Postgres local) |
+| Docker / Compose | ✅ dispo | — | `docker_ps` (liste + logs) + `docker_control` (start/stop/restart, compose up/down) |
+| Monitoring de ports | ✅ dispo | — | `inspect_port` (qui écoute sur un port + process) + `kill_process` (libère le port) |
+| Variables d'environnement | ✅ dispo | — | `audit_env` — .env vs .env.example, secrets, valeurs vides, alerte gitignore |
+| Base de données locale | ✅ dispo | — | `run_sqlite` — SQL sur SQLite local, lecture seule par défaut (garde anti-écriture + multi-statement) |
 
 ### 06 — Agents & automatisations
 
