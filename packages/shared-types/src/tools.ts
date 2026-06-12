@@ -276,6 +276,37 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  detect_spiral: {
+    type: 'object' as const,
+    required: ['events'],
+    properties: {
+      events: {
+        type: 'array' as const,
+        description: 'Recent activity events, oldest first',
+        items: {
+          type: 'object' as const,
+          required: ['at', 'signature'],
+          properties: {
+            at: { type: 'string' as const, description: 'ISO timestamp or epoch ms of the event' },
+            kind: { type: 'string' as const, description: 'Event kind, e.g. "edit", "run", "test_fail", "error" (optional)' },
+            signature: { type: 'string' as const, description: 'What the event is about — same file path, error message, or task. Repetition of this is the spiral signal.' },
+          },
+        },
+      },
+      threshold_minutes: { type: 'number' as const, default: 45, description: 'Minutes on the same signature before flagging a spiral' },
+    },
+  },
+
+  generate_standup: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
+      since: { type: 'string' as const, default: '1 day ago', description: 'How far back "yesterday" reaches' },
+      author: { type: 'string' as const, description: 'Filter to one author (defaults to the git user)' },
+      blockers: { type: 'string' as const, description: 'Free-text blockers to include (optional)' },
+    },
+  },
+
   summarize_git_log: {
     type: 'object' as const,
     properties: {
@@ -292,6 +323,22 @@ export const TOOL_SCHEMAS = {
     properties: {
       workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
       path: { type: 'string' as const, description: 'Analyze only this conflicted file (optional, defaults to all)' },
+    },
+  },
+
+  load_project_context: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Project root to profile (defaults to current directory)' },
+    },
+  },
+
+  analyze_code_style: {
+    type: 'object' as const,
+    properties: {
+      workdir: { type: 'string' as const, description: 'Directory to sample source files from (defaults to current directory)' },
+      extensions: { type: 'array' as const, items: { type: 'string' as const }, description: 'File extensions to sample, e.g. [".ts", ".py"] (defaults to common code types)' },
+      max_files: { type: 'number' as const, default: 40, description: 'Max files to sample' },
     },
   },
 

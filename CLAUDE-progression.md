@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 45 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 49 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
@@ -59,6 +59,12 @@
 **Agents & automatisation**
 - Sous-agents (isolés) + sous-agents parallèles — `run_subagent`, `run_parallel_agents`
 - Cron natif : planifier / lister / annuler des tâches — `schedule_task`, `list_scheduled_tasks`, `cancel_scheduled_task`
+
+**Productivité & apprentissage**
+- Détection de spirale (boucle sur le même problème) — `detect_spiral`
+- Résumé de standup (hier/aujourd'hui/blocages) — `generate_standup`
+- Profil de style de code du projet — `analyze_code_style`
+- Mémoire de projet (contexte à l'ouverture) — `load_project_context`
 
 **Orchestration**
 - Boucle plan-then-execute (Planner) avec affichage du plan dans le chat
@@ -163,22 +169,22 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Feature | Statut | Priorité | Notes |
 |---|---|---|---|
 | Transcription de réunion | 🟡 partiel | 🔥 #4 | `transcribe_audio` (Whisper local) dispo ; capture micro live + action items à venir |
-| Détection de spirale | ⬜ prévu | 🔥 #5 | 45 min sur même bug → suggère pause/autre approche |
-| Pomodoro intelligent | ⬜ prévu | moyenne | Focus sessions, n'interrompt que si critique |
-| Time tracking auto | ⬜ prévu | moyenne | Déduit activité depuis fichiers ouverts |
-| Résumé de standup | ⬜ prévu | moyenne | Synthèse depuis commits + commandes lancées |
-| Rappels ergonomie | ⬜ prévu | basse | 20-20-20, détection fatigue, bilan journée |
+| Détection de spirale | ✅ dispo | — | `detect_spiral` — heuristique (même signature > seuil + échecs → pause/autre approche). L'app desktop alimente les événements |
+| Pomodoro intelligent | ⬜ app | moyenne | Boucle d'arrière-plan de l'app (pas un outil d'agent) |
+| Time tracking auto | ⬜ app | moyenne | Boucle d'arrière-plan de l'app (déduit depuis fichiers ouverts) |
+| Résumé de standup | ✅ dispo | — | `generate_standup` — hier/aujourd'hui/blocages depuis l'activité git |
+| Rappels ergonomie | ⬜ app | basse | Boucle d'arrière-plan de l'app (20-20-20, fatigue) |
 
 ### 08 — Apprentissage & personnalisation
 
 | Feature | Statut | Priorité | Notes |
 |---|---|---|---|
 | Recherche sémantique locale | ✅ dispo | — | `semantic_search` dans le code du projet |
-| Tip contextuel | ⬜ prévu | 🔥 #8 | Détecte patterns répétitifs → suggère une fois |
+| Tip contextuel | ⬜ app | 🔥 #8 | Détection de patterns répétitifs (boucle app + `detect_spiral` comme brique) |
 | Mémoire vectorielle | ✅ dispo | — | Préférences + projets inter-sessions |
-| Profil de style de code | ⬜ prévu | moyenne | Apprend conventions naming/structure |
-| Mémoire de projet | ⬜ prévu | moyenne | Charge contexte stack+conventions à l'ouverture |
-| Feedback loop | ⬜ prévu | basse | 👍/👎 → ajuste prompts internes |
+| Profil de style de code | ✅ dispo | — | `analyze_code_style` — indentation, guillemets, point-virgules, camel/snake, longueur de ligne |
+| Mémoire de projet | ✅ dispo | — | `load_project_context` — stack, scripts, structure, points d'entrée, résumé README |
+| Feedback loop | ⬜ app | basse | 👍/👎 → ajuste prompts (intégration UI app) |
 
 ---
 
@@ -190,12 +196,12 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | 2 | Génération commit/PR | ✅ fait | Friction quotidienne la plus visible | ~1j, git diff |
 | 3 | Agent de CI | ✅ fait | Élimine context-switch navigateur/IDE | ~3j, MCP |
 | 4 | Transcription de réunion | 🟡 partiel | Corvée réelle + 100% privé (Whisper local) | ~4j, Whisper |
-| 5 | Détection de spirale | ⬜ à faire | Différenciateur unique, personne d'autre ne fait ça | ~2j, heuristique |
+| 5 | Détection de spirale | ✅ fait | Différenciateur unique, personne d'autre ne fait ça | ~2j, heuristique |
 | 6 | GitHub connector | ✅ fait (API directe) | Débloque issues/PRs sans quitter NeuroDesk | ~2j, FastMCP |
 | 7 | Sous-agents parallèles | ✅ fait | Vrai saut architectural | ~1 sem, design |
-| 8 | Tip contextuel | ⬜ à faire | Apprentissage passif, très fidélisant | ~2j, patterns |
+| 8 | Tip contextuel | 🟡 brique | `detect_spiral` fournit le cerveau ; déclenchement = boucle app | ~2j, patterns |
 
-**Bilan : 5/8 livrés, 1 partiel, 2 restants** (détection de spirale + tip contextuel — les deux différenciateurs « bien-être dev »).
+**Bilan : 7/8 livrés, 1 partiel** (transcription) — le tip contextuel a sa brique (`detect_spiral`), reste son intégration dans la boucle d'arrière-plan de l'app.
 
 ---
 
