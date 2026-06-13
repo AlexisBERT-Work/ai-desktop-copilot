@@ -27,6 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::chat::chat_send,
             commands::chat::get_ollama_models,
@@ -45,8 +46,17 @@ pub fn run() {
         .setup(|app| {
             info!("NeuroDesk starting up");
 
+            // Start the embedded Ollama server first (no-op in dev, where the
+            // developer runs their own). The agent connects to it lazily, so a
+            // brief startup race is fine.
+            core::ollama::ensure_ollama_running(app.handle());
+
             // Start Node.js agent sidecar
             ipc::bridge::start_agent_sidecar(app.handle().clone())?;
+
+            // Check GitHub Releases for a newer signed build and self-update
+            // silently. No-op in dev / offline.
+            core::updater::spawn_update_check(app.handle().clone());
 
             // Register global hotkey: Ctrl+Space → toggle overlay
             core::hotkeys::register_global_hotkeys(app)?;

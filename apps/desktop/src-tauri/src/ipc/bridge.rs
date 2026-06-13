@@ -22,25 +22,98 @@ pub fn start_agent_sidecar(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
-async fn launch_sidecar(app: AppHandle) -> Result<()> {
-    // The agent runtime (and its local `tsx`) live in the workspace, not next to
-    // the Tauri binary. Resolve the package dir from this crate's compile-time
-    // location so `tsx` and the entry path resolve regardless of process cwd.
+/// Resolved launch parameters for the Node.js agent runtime.
+struct AgentLaunch {
+    program: std::path::PathBuf,
+    args: Vec<String>,
+    work_dir: std::path::PathBuf,
+    /// Extra environment variables to inject (paths to bundled binaries, data dir…).
+    env: Vec<(String, String)>,
+}
+
+/// Decide how to launch the agent runtime depending on whether we run from a
+/// packaged install (bundled `node.exe` + compiled `dist/`) or from the dev
+/// workspace (`node --import tsx src/index.ts`).
+///
+/// Production layout, relative to the Tauri resource dir:
+///   resources/agent/node.exe        ← portable Node runtime
+///   resources/agent/dist/index.js   ← compiled agent entry
+///   resources/agent/node_modules/   ← production dependencies
+///   resources/ocr/ocr-sidecar.exe   ← PyInstaller-packaged OCR sidecar (optional)
+fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
+    use crate::core::resources::resource_subdir;
+    let bundled_agent = resource_subdir(app, "agent");
+
+    // Per-user writable data dir (the resource dir lives in Program Files and is
+    // read-only). The agent persists conversations / vector store here.
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map(|d| d.join("agent-data"))
+        .unwrap_or_else(|_| std::path::PathBuf::from("data"));
+    let _ = std::fs::create_dir_all(&data_dir);
+
+    let mut env: Vec<(String, String)> = vec![
+        ("NEURODESK_DATA_DIR".into(), data_dir.to_string_lossy().into_owned()),
+        ("OLLAMA_URL".into(), "http://127.0.0.1:11434".into()),
+    ];
+
+    // Point the agent at the bundled OCR sidecar exe when present.
+    if let Some(ocr) = resource_subdir(app, "ocr") {
+        let ocr_bin = ocr.join("ocr-sidecar.exe");
+        if ocr_bin.exists() {
+            env.push(("OCR_SIDECAR_BIN".into(), ocr_bin.to_string_lossy().into_owned()));
+        }
+        let tessdata = ocr.join("tessdata");
+        if tessdata.exists() {
+            env.push(("TESSDATA_PREFIX".into(), tessdata.to_string_lossy().into_owned()));
+        }
+    }
+
+    // Production: bundled node + compiled dist exist.
+    if let Some(agent) = bundled_agent {
+        let node = agent.join("node.exe");
+        let entry = agent.join("dist").join("index.js");
+        if node.exists() && entry.exists() {
+            info!("Launching bundled agent runtime");
+            return Ok(AgentLaunch {
+                program: node,
+                args: vec![entry.to_string_lossy().into_owned()],
+                work_dir: agent,
+                env,
+            });
+        }
+    }
+
+    // Dev fallback: run TypeScript source through tsx from the workspace.
     let agent_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
         .join("..")
         .join("packages")
         .join("agent-runtime");
+    info!("Launching dev agent runtime (tsx) from {}", agent_dir.display());
+    Ok(AgentLaunch {
+        program: std::path::PathBuf::from("node"),
+        args: vec!["--import".into(), "tsx".into(), "src/index.ts".into()],
+        work_dir: agent_dir,
+        env,
+    })
+}
 
-    let mut cmd = tokio::process::Command::new("node");
-    cmd.current_dir(&agent_dir)
-        .arg("--import")
-        .arg("tsx")
-        .arg("src/index.ts")
+async fn launch_sidecar(app: AppHandle) -> Result<()> {
+    let launch = resolve_agent_launch(&app)?;
+
+    let mut cmd = tokio::process::Command::new(&launch.program);
+    cmd.current_dir(&launch.work_dir)
+        .args(&launch.args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+
+    for (key, value) in &launch.env {
+        cmd.env(key, value);
+    }
 
     // On Windows, prevent the spawned `node` process from popping a console
     // window (the app runs in the GUI subsystem, so a child console subprocess
@@ -53,7 +126,7 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
 
     let mut child = cmd
         .spawn()
-        .context("Failed to start agent runtime (dev mode)")?;
+        .context("Failed to start agent runtime")?;
 
     let stdin = child.stdin.take().expect("agent stdin");
     let stdout = child.stdout.take().expect("agent stdout");

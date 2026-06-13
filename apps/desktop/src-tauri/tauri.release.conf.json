@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "resources": {
+      "resources/agent": "agent",
+      "resources/ollama": "ollama",
+      "resources/ocr": "ocr"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "languages": ["French", "English"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/AlexisBERT-Work/ai-desktop-copilot/releases/latest/download/latest.json"
+      ],
+      "pubkey": "PASTE_YOUR_TAURI_UPDATER_PUBLIC_KEY_HERE"
+    }
+  }
+}

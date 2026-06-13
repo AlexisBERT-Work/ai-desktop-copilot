@@ -59,8 +59,13 @@ export class OcrSidecarClient {
   }
 
   private async _start(): Promise<void> {
-    const python = this.pythonPath();
-    const script = this.scriptPath();
+    // In a packaged install the OCR sidecar ships as a self-contained
+    // PyInstaller exe (no Python / venv on the target machine). When
+    // OCR_SIDECAR_BIN is set we launch it directly; otherwise we fall back to
+    // running main.py through the dev venv interpreter.
+    const bundledBin = process.env['OCR_SIDECAR_BIN'];
+    const command = bundledBin ?? this.pythonPath();
+    const args = bundledBin ? [] : [this.scriptPath()];
 
     // Tesseract trouve ses données de langue via TESSDATA_PREFIX. On pointe vers
     // un dossier utilisateur (eng+fra+osd) car Program Files n'est pas accessible
@@ -69,9 +74,9 @@ export class OcrSidecarClient {
       process.env['TESSDATA_PREFIX'] ??
       join(process.env['LOCALAPPDATA'] ?? '', 'nd-tessdata');
 
-    log.info('Starting OCR sidecar', { python, script, tessdata });
+    log.info('Starting OCR sidecar', { command, args, tessdata });
 
-    this.proc = spawn(python, [script], {
+    this.proc = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       env: { ...process.env, TESSDATA_PREFIX: tessdata },
