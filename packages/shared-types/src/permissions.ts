@@ -79,6 +79,8 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     analyze_code_style: { name: 'analyze_code_style', description: 'Infer code-style conventions (indentation, quotes, semicolons, naming) from sampled files', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     semantic_search: { name: 'semantic_search', description: 'Search local files by keyword/semantic content similarity', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     read_webpage: { name: 'read_webpage', description: 'Fetch a URL and extract readable text content', riskLevel: 'low', enabled: true, requiresConfirmation: false },
+    fetch_tech_news: { name: 'fetch_tech_news', description: 'Aggregate daily tech headlines from Hacker News, The Verge, TechCrunch, DEV.to and more', riskLevel: 'low', enabled: true, requiresConfirmation: false },
+    post_tech_news_discord: { name: 'post_tech_news_discord', description: 'Fetch the daily tech news and post them as rich embeds to a pre-configured Discord webhook', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     obsidian_notes: { name: 'obsidian_notes', description: 'Search and read notes in a local Obsidian vault', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     notion_search: { name: 'notion_search', description: 'Search Notion pages/databases and read page content via the Notion API', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     send_webhook_message: { name: 'send_webhook_message', description: 'Post a message to a Discord/Slack incoming webhook (outward-facing)', riskLevel: 'high', enabled: true, requiresConfirmation: true },

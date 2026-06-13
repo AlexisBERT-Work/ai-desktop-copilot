@@ -47,6 +47,8 @@ import { LoadProjectContextTool } from './tools/productivity/LoadProjectContextT
 import { WatchCITool } from './tools/git/WatchCITool';
 import { SemanticSearchTool } from './tools/search/SemanticSearchTool';
 import { ReadWebpageTool } from './tools/web/ReadWebpageTool';
+import { FetchTechNewsTool } from './tools/web/FetchTechNewsTool';
+import { PostTechNewsDiscordTool } from './tools/web/PostTechNewsDiscordTool';
 import { ObsidianNotesTool } from './tools/connectors/ObsidianNotesTool';
 import { NotionSearchTool } from './tools/connectors/NotionSearchTool';
 import { SendWebhookMessageTool } from './tools/connectors/SendWebhookMessageTool';
@@ -76,6 +78,13 @@ import { OcrSidecarClient } from './lib/ocrSidecar';
 const log = createLogger('runtime:main');
 
 async function main() {
+  // Load a local .env (gitignored) for connector secrets — DISCORD_WEBHOOK_URL,
+  // GITHUB_TOKEN, NOTION_TOKEN, etc. Falls back silently to the inherited
+  // environment when no file is present. loadEnvFile exists on Node ≥20.12.
+  try {
+    (process as { loadEnvFile?: (path?: string) => void }).loadEnvFile?.();
+  } catch { /* no .env file — rely on the inherited environment */ }
+
   log.info('NeuroDesk Agent Runtime starting', { pid: process.pid, node: process.version });
 
   // ─── Services ──────────────────────────────────────────────
@@ -127,6 +136,8 @@ async function main() {
   tools.register(new WatchCITool());
   tools.register(new SemanticSearchTool());
   tools.register(new ReadWebpageTool());
+  tools.register(new FetchTechNewsTool());
+  tools.register(new PostTechNewsDiscordTool(llm, process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b'));
   tools.register(new ObsidianNotesTool());
   tools.register(new NotionSearchTool());
   tools.register(new SendWebhookMessageTool());

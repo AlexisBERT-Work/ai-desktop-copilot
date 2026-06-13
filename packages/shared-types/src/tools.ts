@@ -410,6 +410,57 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  fetch_tech_news: {
+    type: 'object' as const,
+    properties: {
+      sources: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Source ids to query (defaults to a balanced mix). Available: hackernews, devto, theverge, arstechnica, techcrunch, hackernoon, numerama, nextinpact, lesnumeriques',
+      },
+      feeds: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]. Added on top of (or instead of) the predefined sources',
+      },
+      topics: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Keywords to filter by (matches title or excerpt), e.g. ["AI", "rust", "react"] (optional — no filter if omitted)',
+      },
+      since_hours: { type: 'number' as const, default: 24, description: 'Only keep articles published within this many hours (0 = no limit)' },
+      limit: { type: 'number' as const, default: 15, description: 'Max number of articles to return (1-50)' },
+      lang: { type: 'string' as const, enum: ['fr', 'en', 'all'] as const, default: 'all', description: 'Restrict predefined sources to a language (custom feeds are always included)' },
+    },
+  },
+
+  post_tech_news_discord: {
+    type: 'object' as const,
+    properties: {
+      sources: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Source ids (defaults to a balanced mix). Same ids as fetch_tech_news',
+      },
+      feeds: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]',
+      },
+      topics: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Keywords to filter by (matches title or excerpt) (optional)',
+      },
+      since_hours: { type: 'number' as const, default: 24, description: 'Only keep articles published within this many hours (0 = no limit)' },
+      limit: { type: 'number' as const, default: 8, description: 'Number of articles to post as Discord embeds (1-10)' },
+      lang: { type: 'string' as const, enum: ['fr', 'en', 'all'] as const, default: 'all', description: 'Restrict sources to a language' },
+      intro: { type: 'string' as const, description: 'Short intro line posted above the articles (optional — a default header is used otherwise)' },
+      webhook_url: { type: 'string' as const, description: 'Discord incoming webhook URL (falls back to DISCORD_WEBHOOK_URL env var)' },
+      username: { type: 'string' as const, description: 'Override the displayed sender name (optional)' },
+    },
+  },
+
   github_list_issues: {
     type: 'object' as const,
     required: ['repo'],
