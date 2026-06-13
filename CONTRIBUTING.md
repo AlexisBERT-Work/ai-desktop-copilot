@@ -1,4 +1,4 @@
-# Contributing to NeuroDesk
+# Contributing to CatDesk
 
 Thank you for your interest in contributing! This document explains the development workflow and conventions.
 

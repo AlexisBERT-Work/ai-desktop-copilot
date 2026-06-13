@@ -11,7 +11,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {
-      "@neurodesk/shared-types": ["../../packages/shared-types/src/index.ts"]
+      "@catdesk/shared-types": ["../../packages/shared-types/src/index.ts"]
     }
   },
   "include": ["src"]

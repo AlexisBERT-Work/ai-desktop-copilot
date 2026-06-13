@@ -6,7 +6,7 @@ import {
   currentMonitor,
 } from '@tauri-apps/api/window';
 import { useOverlayStore } from '../../features/overlay/overlayStore';
-import type { OverlayMode } from '@neurodesk/shared-types';
+import type { OverlayMode } from '@catdesk/shared-types';
 
 /**
  * Logical (CSS px) size the OS window takes for each panel, including a small

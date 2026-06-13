@@ -23,7 +23,7 @@ export function createLogger(namespace: string): Logger {
     warn: (msg, meta) => log('WARN', msg, meta),
     error: (msg, meta) => log('ERROR', msg, meta),
     debug: (msg, meta) => {
-      if (process.env['NEURODESK_DEBUG']) log('DEBUG', msg, meta);
+      if (process.env['CATDESK_DEBUG']) log('DEBUG', msg, meta);
     },
   };
 }

@@ -32,7 +32,7 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@neurodesk/shared-types':
+      '@catdesk/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       '@tailwindcss/postcss':
@@ -111,7 +111,7 @@ importers:
 
   packages/agent-runtime:
     dependencies:
-      '@neurodesk/shared-types':
+      '@catdesk/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       playwright-core:

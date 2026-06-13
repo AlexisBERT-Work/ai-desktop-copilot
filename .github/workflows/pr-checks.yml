@@ -18,7 +18,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build --filter=@neurodesk/shared-types
+      - run: pnpm build --filter=@catdesk/shared-types
 
   security-audit:
     name: Security Audit

@@ -54,7 +54,7 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
     let _ = std::fs::create_dir_all(&data_dir);
 
     let mut env: Vec<(String, String)> = vec![
-        ("NEURODESK_DATA_DIR".into(), data_dir.to_string_lossy().into_owned()),
+        ("CATDESK_DATA_DIR".into(), data_dir.to_string_lossy().into_owned()),
         ("OLLAMA_URL".into(), "http://127.0.0.1:11434".into()),
     ];
 

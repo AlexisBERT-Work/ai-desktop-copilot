@@ -1,4 +1,4 @@
-# Distribuer NeuroDesk — installeur hors-ligne + mises à jour auto
+# Distribuer CatDesk — installeur hors-ligne + mises à jour auto
 
 Ce guide explique :
 1. comment produire un **installeur Windows `.exe` 100 % autonome** (aucun Node,
@@ -20,7 +20,7 @@ Ce guide explique :
 |---|---|---|
 | Agent IA (Node) | `node.exe` + agent compilé (`dist/index.js`) + `node_modules` | dans l'app (mis à jour) |
 | Ollama | `ollama.exe` (+ DLLs GPU/CPU) | dans l'app (mis à jour) |
-| **Modèle LLM** | blobs des modèles | **dossier persistant** `%LOCALAPPDATA%\com.neurodesk.app\ollama-models` |
+| **Modèle LLM** | blobs des modèles | **dossier persistant** `%LOCALAPPDATA%\com.catdesk.app\ollama-models` |
 | OCR / vision | sidecar Python (PyInstaller) + données Tesseract | dans l'app (mis à jour) |
 
 **Idée clé :** le modèle (lourd, immuable) est *séparé* du code. Le gros
@@ -46,7 +46,7 @@ capacités que toi, pulle-les **avant** de builder (le build copie tout
 `~/.ollama/models`) :
 
 ```powershell
-ollama pull qwen2.5:7b        # principal (NEURODESK_MODEL) — déjà présent
+ollama pull qwen2.5:7b        # principal (CATDESK_MODEL) — déjà présent
 ollama pull llava:7b          # vision / "décris mon écran"
 ollama pull nomic-embed-text  # mémoire sémantique / recherche
 ```
@@ -77,10 +77,10 @@ ollama rm qwen2.5-coder:14b   # ex. retirer 9 Go inutiles pour tes proches
 L'auto-update n'accepte que des builds **signés**. Génère une paire de clés :
 
 ```powershell
-pnpm --filter @neurodesk/desktop exec tauri signer generate -w "$HOME\.tauri\neurodesk.key"
+pnpm --filter @catdesk/desktop exec tauri signer generate -w "$HOME\.tauri\catdesk.key"
 ```
 
-Cela crée `neurodesk.key` (privée, **à garder secrète**) + affiche la **clé
+Cela crée `catdesk.key` (privée, **à garder secrète**) + affiche la **clé
 publique**. Colle la clé publique dans
 [tauri.release.conf.json](../apps/desktop/src-tauri/tauri.release.conf.json),
 champ `plugins.updater.pubkey`, à la place de `PASTE_YOUR_TAURI_UPDATER_PUBLIC_KEY_HERE`.
@@ -105,7 +105,7 @@ pwsh -File scripts/build-release.ps1 -ModelsPath "D:\mes-modeles-ollama"
 
 Résultat :
 ```
-apps/desktop/src-tauri/target/release/bundle/nsis/NeuroDesk_<version>_x64-setup.exe
+apps/desktop/src-tauri/target/release/bundle/nsis/CatDesk_<version>_x64-setup.exe
 ```
 
 C'est CE fichier que tu donnes à tes proches (USB / Drive). Installation **par
@@ -122,7 +122,7 @@ Une fois la clé en place (§2.1) et la clé privée dans l'environnement :
 
 ```powershell
 # Charger la clé privée + son mot de passe dans le shell courant
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\neurodesk.key" -Raw
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<mot de passe de la clé>"
 
 # Publier la version 0.1.1
@@ -157,7 +157,7 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 ## 6. Limites & notes
 
 - **RAM.** `qwen2.5:7b` ≈ 6–8 Go libres. Machine 8 Go → préfère un modèle plus
-  petit (ex. `qwen2.5:3b`) et mets-le en `NEURODESK_MODEL`.
+  petit (ex. `qwen2.5:3b`) et mets-le en `CATDESK_MODEL`.
 - **GPU.** Ollama utilise le GPU si présent, sinon CPU (plus lent, mais marche
   partout). Les DLLs bundlées viennent de ton PC ; le repli CPU fonctionne.
 - **Signature SmartScreen.** Pour supprimer l'avertissement « éditeur inconnu »,
@@ -174,7 +174,7 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 | Symptôme | Cause probable | Fix |
 |---|---|---|
 | `pnpm deploy` échoue | workspace non résolu | le script retente avec `--legacy` ; sinon `pnpm install` puis relancer |
-| L'IA ne répond pas chez le proche | modèle absent / mauvais nom | vérifier que `%LOCALAPPDATA%\com.neurodesk.app\ollama-models` contient le modèle de `NEURODESK_MODEL` |
+| L'IA ne répond pas chez le proche | modèle absent / mauvais nom | vérifier que `%LOCALAPPDATA%\com.catdesk.app\ollama-models` contient le modèle de `CATDESK_MODEL` |
 | Vision / "décris l'écran" muet | `llava:7b` pas pullé au build | `ollama pull llava:7b` puis rebuild installeur |
 | Les updates ne s'installent pas | version non incrémentée, ou pubkey/clé qui ne correspondent pas | bumper la version ; vérifier que la pubkey du conf vient de la même clé que celle de signature |
 | `.sig` manquant au build update | env de signature absent | définir `TAURI_SIGNING_PRIVATE_KEY` + `..._PASSWORD` avant `publish-update.ps1` |

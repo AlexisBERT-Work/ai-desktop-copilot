@@ -45,6 +45,6 @@ export const useSettingsStore = create<SettingsState>()(
         void invoke('update_settings', { args: { safeMode } }).catch(() => {});
       },
     }),
-    { name: 'neurodesk-settings' },
+    { name: 'catdesk-settings' },
   ),
 );

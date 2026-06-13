@@ -1,5 +1,5 @@
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 
 type Platform = 'discord' | 'slack';
@@ -41,7 +41,7 @@ async function postJson(url: string, body: unknown): Promise<{ status: number; t
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': String(Buffer.byteLength(payload)),
-          'User-Agent': 'neurodesk-agent/1.0',
+          'User-Agent': 'catdesk-agent/1.0',
         },
       },
       (res) => {

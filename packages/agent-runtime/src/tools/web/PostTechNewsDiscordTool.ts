@@ -1,5 +1,5 @@
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { aggregateNews, httpGet, toExcerpt, type NewsItem } from './FetchTechNewsTool';
 import { htmlToText } from './ReadWebpageTool';
@@ -121,7 +121,7 @@ async function postToDiscord(url: string, payload: unknown): Promise<{ status: n
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': String(Buffer.byteLength(body)),
-          'User-Agent': 'neurodesk-agent/1.0',
+          'User-Agent': 'catdesk-agent/1.0',
         },
       },
       (res) => {

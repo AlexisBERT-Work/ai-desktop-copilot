@@ -5,7 +5,7 @@
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
-Write-Host "🚀 Starting NeuroDesk dev environment..." -ForegroundColor Cyan
+Write-Host "🚀 Starting CatDesk dev environment..." -ForegroundColor Cyan
 
 # Check Ollama
 try {

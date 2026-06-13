@@ -11,7 +11,7 @@ const root = join(__dir, '..');
 
 const proc = spawn('npx tsx src/index.ts', [], {
   cwd: root,
-  env: { ...process.env, NEURODESK_DATA_DIR: join(root, 'data') },
+  env: { ...process.env, CATDESK_DATA_DIR: join(root, 'data') },
   stdio: ['pipe', 'pipe', 'pipe'],
   shell: true,
 });

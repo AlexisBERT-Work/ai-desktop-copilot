@@ -1,5 +1,5 @@
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 
 interface ReadWebpageArgs {
@@ -57,7 +57,7 @@ async function fetchUrl(url: string, timeoutMs = 15_000): Promise<{ body: string
         port: parsedUrl.port || (isHttps ? 443 : 80),
         path: parsedUrl.pathname + parsedUrl.search,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; NeuroDesk-Agent/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; CatDesk-Agent/1.0)',
           'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9',
           'Accept-Language': 'fr,en;q=0.8',
         },

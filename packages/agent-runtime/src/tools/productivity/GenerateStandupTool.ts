@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { parseLog, type Commit } from '../git/SummarizeGitLogTool';
 

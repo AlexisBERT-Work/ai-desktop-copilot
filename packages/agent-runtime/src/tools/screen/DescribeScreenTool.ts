@@ -1,5 +1,5 @@
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 import type { OllamaClient } from '../../llm/OllamaClient';

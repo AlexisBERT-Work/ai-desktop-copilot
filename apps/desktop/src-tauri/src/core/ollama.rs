@@ -1,6 +1,6 @@
 //! Embedded Ollama lifecycle.
 //!
-//! A packaged NeuroDesk install ships its own `ollama.exe` and (in the big
+//! A packaged CatDesk install ships its own `ollama.exe` and (in the big
 //! initial installer) the model blobs, so the app works offline on a machine
 //! that has never seen Ollama. On startup we:
 //!   1. seed the persistent per-user models dir from the bundled models the

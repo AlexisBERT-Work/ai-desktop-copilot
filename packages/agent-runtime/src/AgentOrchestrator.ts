@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentStep, ToolCall, PermissionConfig } from '@neurodesk/shared-types';
+import type { AgentConfig, AgentStep, ToolCall, PermissionConfig } from '@catdesk/shared-types';
 import type { OllamaClient } from './llm/OllamaClient';
 import type { ToolRegistry } from './ToolRegistry';
 import type { PermissionEngine } from './permissions/PermissionEngine';
@@ -200,7 +200,7 @@ export class AgentOrchestrator {
     relevantMemories?: string[];
   }, plan: string[] = []): string {
     const parts = [
-      `Tu es NeuroDesk, un assistant IA desktop local tournant sur la machine de l'utilisateur.`,
+      `Tu es CatDesk, un assistant IA desktop local tournant sur la machine de l'utilisateur.`,
       `Tu as accès à des outils pour interagir avec le système.`,
       `Date et heure actuelles : ${new Date().toLocaleString('fr-FR')}`,
       `Système : Windows 11`,

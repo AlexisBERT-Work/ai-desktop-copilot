@@ -96,7 +96,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: NeuroDesk ${{ github.ref_name }}
+          releaseName: CatDesk ${{ github.ref_name }}
           releaseBody: |
             See [CHANGELOG.md](CHANGELOG.md) for changes.
           releaseDraft: true

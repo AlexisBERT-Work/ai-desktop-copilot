@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import type { OllamaMessage, ConversationSummary } from '@neurodesk/shared-types';
+import type { OllamaMessage, ConversationSummary } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
 
 export interface ScheduledJob {
@@ -35,7 +35,7 @@ export class ConversationStore {
   private dbPath: string;
 
   constructor() {
-    const dataDir = process.env['NEURODESK_DATA_DIR'] ?? join(process.cwd(), 'data');
+    const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
     mkdirSync(dataDir, { recursive: true });
     this.dbPath = join(dataDir, 'conversations.db');
   }

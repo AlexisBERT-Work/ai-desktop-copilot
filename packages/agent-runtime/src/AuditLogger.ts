@@ -1,12 +1,12 @@
 import { appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import type { ToolResult } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
 
 export class AuditLogger {
   private logPath: string;
 
   constructor() {
-    const dataDir = process.env['NEURODESK_DATA_DIR'] ?? join(process.cwd(), 'data');
+    const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
     const auditDir = join(dataDir, 'audit');
     mkdirSync(auditDir, { recursive: true });
 

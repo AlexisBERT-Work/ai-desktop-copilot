@@ -79,7 +79,7 @@ export function InputArea({ conversationId }: Props) {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Message NeuroDesk... (Shift+Enter for newline)"
+            placeholder="Message CatDesk... (Shift+Enter for newline)"
             rows={1}
             className="w-full bg-transparent text-sm text-white placeholder-white/30
                        outline-none resize-none leading-relaxed selectable"
@@ -113,7 +113,7 @@ export function InputArea({ conversationId }: Props) {
       </div>
 
       <p className="text-center text-xs text-white/15 mt-2">
-        NeuroDesk uses local AI — your data never leaves this machine.
+        CatDesk uses local AI — your data never leaves this machine.
       </p>
     </div>
   );

@@ -4,7 +4,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
-import type { Message } from '@neurodesk/shared-types';
+import type { Message } from '@catdesk/shared-types';
 import { ToolCallBadge } from '../../agent/ToolCallBadge';
 
 interface Props {

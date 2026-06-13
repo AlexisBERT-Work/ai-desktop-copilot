@@ -19,7 +19,7 @@ export async function notionFetch(
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
       'Notion-Version': NOTION_VERSION,
-      'User-Agent': 'neurodesk-agent/1.0',
+      'User-Agent': 'catdesk-agent/1.0',
     };
     if (payload !== undefined) {
       headers['Content-Type'] = 'application/json';

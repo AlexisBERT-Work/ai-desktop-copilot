@@ -1,4 +1,4 @@
-import type { AgentConfig } from '@neurodesk/shared-types';
+import type { AgentConfig } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from './AgentOrchestrator';
 import type { ToolRegistry } from './ToolRegistry';
 import { createLogger } from './logger';

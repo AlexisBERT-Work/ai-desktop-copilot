@@ -19,7 +19,7 @@ export async function ghFetch(path: string, token: string): Promise<unknown> {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github+json',
-          'User-Agent': 'neurodesk-agent/1.0',
+          'User-Agent': 'catdesk-agent/1.0',
           'X-GitHub-Api-Version': '2022-11-28',
         },
       },
@@ -49,7 +49,7 @@ export async function ghFetchText(path: string, token: string, accept: string): 
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': accept,
-          'User-Agent': 'neurodesk-agent/1.0',
+          'User-Agent': 'catdesk-agent/1.0',
           'X-GitHub-Api-Version': '2022-11-28',
         },
       },

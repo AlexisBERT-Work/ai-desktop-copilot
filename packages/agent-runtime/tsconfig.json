@@ -10,7 +10,7 @@
     "sourceMap": true,
     "skipLibCheck": true,
     "paths": {
-      "@neurodesk/shared-types": ["../shared-types/src/index.ts"]
+      "@catdesk/shared-types": ["../shared-types/src/index.ts"]
     }
   },
   "include": ["src/**/*"],

@@ -1,5 +1,5 @@
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -36,7 +36,7 @@ export function buildHeaders(
   token: string | undefined,
   hasBody: boolean,
 ): Record<string, string> {
-  const headers: Record<string, string> = { 'User-Agent': 'neurodesk-agent/1.0', 'Accept': 'application/json' };
+  const headers: Record<string, string> = { 'User-Agent': 'catdesk-agent/1.0', 'Accept': 'application/json' };
   for (const [k, v] of Object.entries(base ?? {})) headers[k] = v;
   if (typeof token === 'string' && token.length > 0 && !('Authorization' in headers)) {
     headers['Authorization'] = `Bearer ${token}`;

@@ -1,8 +1,8 @@
-# NeuroDesk — AI Desktop Copilot
+# CatDesk — AI Desktop Copilot
 
 <div align="center">
 
-![NeuroDesk Banner](docs/assets/banner.png)
+![CatDesk Banner](docs/assets/banner.png)
 
 **Local-first AI desktop copilot. Powerful. Private. Extensible.**
 
@@ -19,9 +19,9 @@
 
 ---
 
-## What is NeuroDesk?
+## What is CatDesk?
 
-NeuroDesk is a **local AI desktop copilot** that runs entirely on your machine — no cloud, no data sent anywhere, no subscriptions. It provides a floating AI assistant that can see your screen, analyze files, run commands, and automate tasks, all powered by local LLMs via [Ollama](https://ollama.com/).
+CatDesk is a **local AI desktop copilot** that runs entirely on your machine — no cloud, no data sent anywhere, no subscriptions. It provides a floating AI assistant that can see your screen, analyze files, run commands, and automate tasks, all powered by local LLMs via [Ollama](https://ollama.com/).
 
 > **"Powerful locally, private by design, extensible by nature"**
 
@@ -82,7 +82,7 @@ NeuroDesk is a **local AI desktop copilot** that runs entirely on your machine �
 
 ```
 ┌══════════════════════════════════════════════════════════════════╗
-║                    NEURODESK ARCHITECTURE                        ║
+║                    CATDESK ARCHITECTURE                        ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
 ║  ┌──────────────────────────────────────────────────────────┐   ║
@@ -264,7 +264,7 @@ This starts:
 - Python OCR service (sidecar)
 - Ollama (must be running separately)
 
-### 4. Open NeuroDesk
+### 4. Open CatDesk
 
 Press `Ctrl+Space` anywhere to open the overlay.
 
@@ -363,7 +363,7 @@ Press `Ctrl+Space` anywhere to open the overlay.
 
 ## Security
 
-NeuroDesk is designed with **local security** as a first-class concern:
+CatDesk is designed with **local security** as a first-class concern:
 
 1. **No network egress** — All LLM inference is local via Ollama
 2. **Capability-based model** — Tauri 2 granular capability declarations
@@ -390,7 +390,7 @@ PR flow      : feat/* → dev → main (with review)
 
 ## License
 
-MIT © 2026 NeuroDesk Contributors
+MIT © 2026 CatDesk Contributors
 
 ---
 

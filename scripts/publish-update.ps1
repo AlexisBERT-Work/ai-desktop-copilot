@@ -1,9 +1,9 @@
 ﻿<#
 .SYNOPSIS
-  Publish a NeuroDesk auto-update to GitHub Releases.
+  Publish a CatDesk auto-update to GitHub Releases.
 
 .DESCRIPTION
-  One command to ship a code update to everyone who installed NeuroDesk:
+  One command to ship a code update to everyone who installed CatDesk:
     1. bumps the version in tauri.conf.json,
     2. builds a lightweight signed UPDATE artifact (no model — see build-release.ps1 -Update),
     3. assembles the Tauri `latest.json` manifest,
@@ -20,22 +20,25 @@
   Release notes shown on GitHub (optional).
 
 .PREREQUISITES
-  - One-time: generate a signing key →  pnpm exec tauri signer generate -w "$HOME\.tauri\neurodesk.key"
+  - One-time: generate a signing key →  pnpm exec tauri signer generate -w "$HOME\.tauri\catdesk.key"
     then paste the PUBLIC key into apps/desktop/src-tauri/tauri.release.conf.json (plugins.updater.pubkey).
   - These env vars set in the current shell (the PRIVATE key + its password):
-      $env:TAURI_SIGNING_PRIVATE_KEY          = Get-Content "$HOME\.tauri\neurodesk.key" -Raw
+      $env:TAURI_SIGNING_PRIVATE_KEY          = Get-Content "$HOME\.tauri\catdesk.key" -Raw
       $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<your key password>"
   - gh CLI authenticated (gh auth status).
 
 .EXAMPLE
-  $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\neurodesk.key" -Raw
+  $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "secret"
   pwsh -File scripts/publish-update.ps1 -Version 0.1.1 -Notes "Nouveau: outil X"
 #>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$Version,
-  [string]$Notes = ""
+  [string]$Notes = "",
+  # Releases are published to the dedicated CatDesk repo, not the dev repo this
+  # source lives in. Override only if you move the release repo.
+  [string]$Repo = "AlexisBERT-Work/CatDesk"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,9 +55,11 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
   throw "TAURI_SIGNING_PRIVATE_KEY is not set. See the .PREREQUISITES section of this script."
 }
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh CLI not found." }
-$repo = (& gh repo view --json nameWithOwner --jq .nameWithOwner)
-if (-not $repo) { throw "Could not resolve GitHub repo via gh." }
-Write-Host "repo: $repo   version: $Version"
+$repo = $Repo
+# Confirm the release repo exists / is reachable before doing the heavy build.
+& gh repo view $repo --json nameWithOwner | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Release repo '$repo' not reachable via gh (does it exist? are you authed?)." }
+Write-Host "release repo: $repo   version: $Version"
 
 # ── 1. Bump version in tauri.conf.json (surgical, preserves formatting) ──
 Step "Bumping version → $Version"
@@ -99,9 +104,9 @@ $manifest | ConvertTo-Json -Depth 10 | Set-Content $latestPath -Encoding utf8
 # ── 5. Create the GitHub Release ─────────────────────────────────
 Step "Publishing GitHub release v$Version"
 $tag = "v$Version"
-$relNotes = if ($Notes) { $Notes } else { "NeuroDesk $Version" }
+$relNotes = if ($Notes) { $Notes } else { "CatDesk $Version" }
 & gh release create $tag $setup.FullName $latestPath `
-  --repo $repo --title "NeuroDesk $Version" --notes $relNotes --latest
+  --repo $repo --title "CatDesk $Version" --notes $relNotes --latest
 
 Step "Done"
 Write-Host "Published $tag. Installed apps will self-update on next launch." -ForegroundColor Green

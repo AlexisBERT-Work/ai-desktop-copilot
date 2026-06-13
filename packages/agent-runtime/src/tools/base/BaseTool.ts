@@ -4,8 +4,8 @@ import type {
   ToolCategory,
   OllamaToolSchema,
   JSONSchemaObject,
-} from '@neurodesk/shared-types';
-import type { RiskLevel } from '@neurodesk/shared-types';
+} from '@catdesk/shared-types';
+import type { RiskLevel } from '@catdesk/shared-types';
 import type { RegisteredTool } from '../../ToolRegistry';
 
 export abstract class BaseTool implements RegisteredTool {

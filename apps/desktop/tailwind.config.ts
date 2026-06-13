@@ -6,7 +6,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // NeuroDesk brand palette
+        // CatDesk brand palette
         brand: {
           50: '#f5f0ff',
           100: '#ede0ff',

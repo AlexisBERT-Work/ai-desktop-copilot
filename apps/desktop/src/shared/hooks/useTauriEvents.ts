@@ -4,7 +4,7 @@ import { useChatStore } from '../../features/chat/store/chatStore';
 import { useOverlayStore } from '../../features/overlay/overlayStore';
 import { useSettingsStore } from '../../features/settings/settingsStore';
 import { useProactiveStore, type ProactiveSuggestion } from '../../features/proactive/proactiveStore';
-import type { TokenEvent, DoneEvent, ErrorEvent } from '@neurodesk/shared-types';
+import type { TokenEvent, DoneEvent, ErrorEvent } from '@catdesk/shared-types';
 
 /**
  * Wires Tauri backend events into Zustand stores.

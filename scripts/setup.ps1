@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env pwsh
-# NeuroDesk — Full Windows Dev Environment Setup
+# CatDesk — Full Windows Dev Environment Setup
 # Run: .\scripts\setup.ps1
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +7,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║   NeuroDesk — Dev Environment Setup          ║" -ForegroundColor Cyan
+Write-Host "║   CatDesk — Dev Environment Setup          ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 

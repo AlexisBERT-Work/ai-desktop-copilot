@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, ShieldCheck, ShieldX, Terminal, FileText, Camera } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import type { PermissionRequestEvent } from '@neurodesk/shared-types';
+import type { PermissionRequestEvent } from '@catdesk/shared-types';
 
 const RISK_CONFIG = {
   low:      { color: 'text-green-400',  bg: 'bg-green-400/10',  border: 'border-green-400/20',  Icon: ShieldCheck },

@@ -1,4 +1,4 @@
-import type { OllamaMessage, OllamaToolSchema, StreamChunk } from '@neurodesk/shared-types';
+import type { OllamaMessage, OllamaToolSchema, StreamChunk } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
 
 const log = createLogger('llm:ollama');

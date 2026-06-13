@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuroDesk OCR/Vision Sidecar
+CatDesk OCR/Vision Sidecar
 JSON-RPC 2.0 over stdin/stdout
 """
 
@@ -176,7 +176,7 @@ def parse_csv(params: dict) -> dict:
 
 
 def main():
-    log.info("NeuroDesk OCR sidecar started")
+    log.info("CatDesk OCR sidecar started")
 
     for line in sys.stdin:
         line = line.strip()

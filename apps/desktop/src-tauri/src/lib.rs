@@ -8,12 +8,12 @@ use tracing::info;
 pub fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "neurodesk=info".to_string()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "catdesk=info".to_string()),
         )
         .init();
 
     tauri::Builder::default()
-        // Must be the first plugin: ensures only one NeuroDesk runs. A second
+        // Must be the first plugin: ensures only one CatDesk runs. A second
         // launch (e.g. autostart firing while it's already open) hands off to the
         // running instance — which reveals its bubble — then exits, instead of
         // spawning a duplicate that can't grab the Ctrl+Space hotkey.
@@ -44,7 +44,7 @@ pub fn run() {
             commands::settings::update_settings,
         ])
         .setup(|app| {
-            info!("NeuroDesk starting up");
+            info!("CatDesk starting up");
 
             // Start the embedded Ollama server first (no-op in dev, where the
             // developer runs their own). The agent connects to it lazily, so a
@@ -68,9 +68,9 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             window.set_always_on_top(true)?;
 
-            info!("NeuroDesk ready");
+            info!("CatDesk ready");
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error running NeuroDesk");
+        .expect("error running CatDesk");
 }

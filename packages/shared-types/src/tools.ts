@@ -257,7 +257,7 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['repo'],
     properties: {
-      repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format (e.g. "alexis/neurodesk")' },
+      repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format (e.g. "alexis/catdesk")' },
       branch: { type: 'string' as const, description: 'Branch to watch (defaults to current git branch)' },
       token: { type: 'string' as const, description: 'GitHub personal access token (falls back to GITHUB_TOKEN env var)' },
       limit: { type: 'number' as const, default: 5, description: 'Number of recent workflow runs to fetch' },

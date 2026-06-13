@@ -1,13 +1,13 @@
 [package]
-name = "neurodesk"
+name = "catdesk"
 version = "0.1.0"
-description = "NeuroDesk — Local AI Desktop Copilot"
+description = "CatDesk — Local AI Desktop Copilot"
 authors = ["alexis.bert1412"]
 edition = "2021"
 rust-version = "1.78"
 
 [lib]
-name = "neurodesk_lib"
+name = "catdesk_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

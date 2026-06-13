@@ -1,7 +1,7 @@
 import { readFile, access } from 'fs/promises';
 import { dirname, basename, extname, join } from 'path';
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 
 type Framework = 'vitest' | 'jest' | 'pytest' | 'cargo' | 'go';

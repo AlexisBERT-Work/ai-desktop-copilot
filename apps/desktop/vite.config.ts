@@ -8,7 +8,7 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@neurodesk/shared-types': path.resolve(__dirname, '../../packages/shared-types/src/index.ts'),
+      '@catdesk/shared-types': path.resolve(__dirname, '../../packages/shared-types/src/index.ts'),
     },
   },
   // Tauri expects a fixed port; fail if it's not available

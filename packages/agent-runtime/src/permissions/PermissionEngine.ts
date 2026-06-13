@@ -1,5 +1,5 @@
-import type { PermissionRequest, PermissionResult, PermissionConfig, PermissionGrant } from '@neurodesk/shared-types';
-import { DEFAULT_PERMISSION_CONFIG } from '@neurodesk/shared-types';
+import type { PermissionRequest, PermissionResult, PermissionConfig, PermissionGrant } from '@catdesk/shared-types';
+import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
 
 const log = createLogger('security:permissions');

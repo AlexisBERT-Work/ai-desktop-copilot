@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolResult, OllamaToolSchema } from '@neurodesk/shared-types';
+import type { ToolDefinition, ToolResult, OllamaToolSchema } from '@catdesk/shared-types';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:tools');

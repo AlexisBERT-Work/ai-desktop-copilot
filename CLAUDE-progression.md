@@ -1,4 +1,4 @@
-# NeuroDesk — Contexte projet pour Claude Code
+# CatDesk — Contexte projet pour Claude Code
 
 > Copilote desktop local 100% on-device · Ollama · Rust · Windows
 
@@ -76,7 +76,7 @@
 
 ### Hermes Agent (NousResearch)
 Repo : `github.com/NousResearch/hermes-agent` — v0.16 "The Surface Release" (juin 2026)
-Agent open-source le plus proche de NeuroDesk en esprit. À éplucher pour :
+Agent open-source le plus proche de CatDesk en esprit. À éplucher pour :
 - **Skills System** : documents de connaissance chargés à la demande, compatible `agentskills.io`
 - **Browser automation** : Chrome local via CDP, ou cloud Browserbase
 - **Sous-agents parallèles** : spawn d'instances isolées pour workstreams parallèles
@@ -197,7 +197,7 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | 3 | Agent de CI | ✅ fait | Élimine context-switch navigateur/IDE | ~3j, MCP |
 | 4 | Transcription de réunion | 🟡 partiel | Corvée réelle + 100% privé (Whisper local) | ~4j, Whisper |
 | 5 | Détection de spirale | ✅ fait | Différenciateur unique, personne d'autre ne fait ça | ~2j, heuristique |
-| 6 | GitHub connector | ✅ fait (API directe) | Débloque issues/PRs sans quitter NeuroDesk | ~2j, FastMCP |
+| 6 | GitHub connector | ✅ fait (API directe) | Débloque issues/PRs sans quitter CatDesk | ~2j, FastMCP |
 | 7 | Sous-agents parallèles | ✅ fait | Vrai saut architectural | ~1 sem, design |
 | 8 | Tip contextuel | 🟡 brique | `detect_spiral` fournit le cerveau ; déclenchement = boucle app | ~2j, patterns |
 
@@ -215,13 +215,13 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 
 ---
 
-## Skills NeuroDesk
+## Skills CatDesk
 
 > Un skill = un document de connaissance chargé à la demande par l'agent, uniquement quand le contexte l'exige.
 > Pattern : progressive disclosure — le skill ne charge que ce dont le tour courant a besoin.
 > Compatible avec le standard `agentskills.io` (ref: Hermes Agent).
 >
-> Format recommandé : `~/.neurodesk/skills/<nom>/SKILL.md`
+> Format recommandé : `~/.catdesk/skills/<nom>/SKILL.md`
 
 ---
 
@@ -422,10 +422,10 @@ Contenu :
 
 ---
 
-### Format d'un skill NeuroDesk
+### Format d'un skill CatDesk
 
 ```
-~/.neurodesk/skills/
+~/.catdesk/skills/
 ├── debug-rust/
 │   └── SKILL.md          # Contenu du skill
 ├── git-advanced/

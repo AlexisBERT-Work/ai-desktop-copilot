@@ -18,7 +18,7 @@ function findingTypes(data: any): string[] {
 }
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'neurodesk-refactor-'));
+  dir = await mkdtemp(join(tmpdir(), 'catdesk-refactor-'));
 });
 
 afterAll(async () => {

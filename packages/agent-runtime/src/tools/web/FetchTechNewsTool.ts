@@ -1,5 +1,5 @@
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ export async function httpGet(rawUrl: string, timeoutMs = 12_000, redirects = 3)
         port: url.port || (isHttps ? 443 : 80),
         path: url.pathname + url.search,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; NeuroDesk-Agent/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; CatDesk-Agent/1.0)',
           Accept: 'application/json, application/rss+xml, application/atom+xml, text/xml;q=0.9, */*;q=0.8',
           'Accept-Language': 'fr,en;q=0.8',
         },

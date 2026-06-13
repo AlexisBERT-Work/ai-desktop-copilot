@@ -45,7 +45,7 @@ export class VectorStore {
   private embeddingsDisabled = false;
 
   constructor(private embedder?: Embedder, dataDir?: string) {
-    const dir = dataDir ?? process.env['NEURODESK_DATA_DIR'] ?? join(process.cwd(), 'data');
+    const dir = dataDir ?? process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
     mkdirSync(dir, { recursive: true });
     this.filePath = join(dir, 'vectors.json');
   }

@@ -23,7 +23,7 @@ export function ChatWindow() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-white/80">
-            {activeConv?.title ?? 'NeuroDesk'}
+            {activeConv?.title ?? 'CatDesk'}
           </span>
           <ModelSelector />
           <ModeSelector />

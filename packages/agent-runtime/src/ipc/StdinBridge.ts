@@ -1,4 +1,4 @@
-import type { JsonRpcRequest, JsonRpcResponse, AgentMethod } from '@neurodesk/shared-types';
+import type { JsonRpcRequest, JsonRpcResponse, AgentMethod } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
 import { createLogger } from '../logger';
 

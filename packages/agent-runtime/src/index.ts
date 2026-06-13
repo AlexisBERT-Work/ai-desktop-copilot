@@ -1,5 +1,5 @@
 /**
- * NeuroDesk — Agent Runtime Sidecar
+ * CatDesk — Agent Runtime Sidecar
  * Communicates with Tauri Rust core via JSON-RPC 2.0 over stdin/stdout.
  */
 
@@ -85,7 +85,7 @@ async function main() {
     (process as { loadEnvFile?: (path?: string) => void }).loadEnvFile?.();
   } catch { /* no .env file — rely on the inherited environment */ }
 
-  log.info('NeuroDesk Agent Runtime starting', { pid: process.pid, node: process.version });
+  log.info('CatDesk Agent Runtime starting', { pid: process.pid, node: process.version });
 
   // ─── Services ──────────────────────────────────────────────
   const db = new ConversationStore();
@@ -137,7 +137,7 @@ async function main() {
   tools.register(new SemanticSearchTool());
   tools.register(new ReadWebpageTool());
   tools.register(new FetchTechNewsTool());
-  tools.register(new PostTechNewsDiscordTool(llm, process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b'));
+  tools.register(new PostTechNewsDiscordTool(llm, process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b'));
   tools.register(new ObsidianNotesTool());
   tools.register(new NotionSearchTool());
   tools.register(new SendWebhookMessageTool());
@@ -146,13 +146,13 @@ async function main() {
   tools.register(new GitHubPRTool());
   tools.register(new CaptureScreenTool());
   tools.register(new OcrRegionTool());
-  tools.register(new DescribeScreenTool(llm, process.env['NEURODESK_VISION_MODEL'] ?? 'llava:7b'));
+  tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'llava:7b'));
   tools.register(new TranscribeAudioTool());
 
   // ─── Agent ─────────────────────────────────────────────────
-  // NEURODESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
+  // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
   // pour les tâches triviales (gain ressources). Absent => pas de routage.
-  const smallModel = process.env['NEURODESK_MODEL_SMALL'];
+  const smallModel = process.env['CATDESK_MODEL_SMALL'];
   // Planificateur opt-in (utilisé seulement si la requête a usePlanning=true).
   const planner = new Planner(llm);
   // Suivi d'activité → alimente la détection de spirale en arrière-plan.
@@ -163,12 +163,12 @@ async function main() {
   // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur
   // boucle sur le même problème. Le bridge Rust la transforme en event Tauri.
   const spiralMonitor = new SpiralMonitor(activity, stdoutNotifier, {
-    thresholdMinutes: Number(process.env['NEURODESK_SPIRAL_THRESHOLD_MIN'] ?? 45),
+    thresholdMinutes: Number(process.env['CATDESK_SPIRAL_THRESHOLD_MIN'] ?? 45),
   });
   spiralMonitor.start();
 
   // ─── Sub-agent tools (need orchestrator reference) ─────────
-  const defaultModel = process.env['NEURODESK_MODEL'] ?? 'qwen2.5:7b';
+  const defaultModel = process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b';
   const subAgentRunner = new SubAgentRunner(orchestrator, tools, defaultModel);
   tools.register(new RunSubAgentTool(subAgentRunner));
   tools.register(new RunParallelAgentsTool(subAgentRunner));

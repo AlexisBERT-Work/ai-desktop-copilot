@@ -1,4 +1,4 @@
-import type { OllamaMessage } from '@neurodesk/shared-types';
+import type { OllamaMessage } from '@catdesk/shared-types';
 import type { ConversationStore } from './memory/ConversationStore';
 import type { VectorStore } from './memory/VectorStore';
 import { createLogger } from './logger';

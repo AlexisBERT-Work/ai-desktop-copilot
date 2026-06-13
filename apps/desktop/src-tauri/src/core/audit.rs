@@ -10,11 +10,11 @@ fn audit_log_path() -> PathBuf {
 }
 
 fn dirs_next() -> PathBuf {
-    let base = std::env::var("NEURODESK_DATA_DIR")
+    let base = std::env::var("CATDESK_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
             std::env::var("APPDATA")
-                .map(|p| PathBuf::from(p).join("NeuroDesk").join("data"))
+                .map(|p| PathBuf::from(p).join("CatDesk").join("data"))
                 .unwrap_or_else(|_| PathBuf::from("data"))
         });
 

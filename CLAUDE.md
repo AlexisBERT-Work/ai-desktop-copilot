@@ -1,4 +1,4 @@
-# NeuroDesk — CLAUDE.md
+# CatDesk — CLAUDE.md
 
 ## Project Overview
 Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtime + Python OCR sidecar.

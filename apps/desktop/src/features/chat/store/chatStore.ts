@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { invoke } from '@tauri-apps/api/core';
-import type { Message, Conversation } from '@neurodesk/shared-types';
+import type { Message, Conversation } from '@catdesk/shared-types';
 
 interface ChatState {
   conversations: Conversation[];

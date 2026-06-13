@@ -1,6 +1,6 @@
-// Production bundler for the NeuroDesk agent runtime.
+// Production bundler for the CatDesk agent runtime.
 //
-// We bundle the TypeScript entry (resolving the `@neurodesk/shared-types`
+// We bundle the TypeScript entry (resolving the `@catdesk/shared-types`
 // path alias and inlining first-party code + light deps like zod) into a
 // single CommonJS file that a portable `node.exe` can run directly.
 //

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  Build a fully self-contained, offline NeuroDesk installer (.exe) for Windows.
+  Build a fully self-contained, offline CatDesk installer (.exe) for Windows.
 
 .DESCRIPTION
   Stages every runtime dependency into apps/desktop/src-tauri/resources/ then
@@ -87,7 +87,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ocr") | Out-Null
 Step "Building agent runtime (esbuild)"
 Push-Location $root
 pnpm install --frozen-lockfile=false
-pnpm --filter "@neurodesk/agent-runtime" build      # esbuild → dist/index.js
+pnpm --filter "@catdesk/agent-runtime" build      # esbuild → dist/index.js
 Pop-Location
 
 $agentSrc = Join-Path $root "packages\agent-runtime"
@@ -100,10 +100,10 @@ $deployDir = Join-Path $env:TEMP "nd-agent-deploy"
 if (Test-Path $deployDir) { Remove-Item -Recurse -Force $deployDir }
 Push-Location $root
 try {
-  pnpm --filter "@neurodesk/agent-runtime" deploy --prod $deployDir
+  pnpm --filter "@catdesk/agent-runtime" deploy --prod $deployDir
 } catch {
   Write-Warning "pnpm deploy failed, retrying with --legacy"
-  pnpm --filter "@neurodesk/agent-runtime" deploy --prod --legacy $deployDir
+  pnpm --filter "@catdesk/agent-runtime" deploy --prod --legacy $deployDir
 }
 Pop-Location
 

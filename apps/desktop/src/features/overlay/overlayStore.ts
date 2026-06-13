@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { OverlayMode } from '@neurodesk/shared-types';
+import type { OverlayMode } from '@catdesk/shared-types';
 
 interface OverlayState {
   mode: OverlayMode;

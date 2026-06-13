@@ -3,8 +3,8 @@ import { X, Cpu, Shield, Keyboard, Info, AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from './settingsStore';
 import { useOverlayStore } from '../overlay/overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
-import { DEFAULT_PERMISSION_CONFIG } from '@neurodesk/shared-types';
-import type { RiskLevel } from '@neurodesk/shared-types';
+import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
+import type { RiskLevel } from '@catdesk/shared-types';
 
 type SettingsTab = 'model' | 'security' | 'hotkeys' | 'about';
 
@@ -215,7 +215,7 @@ function SecurityTab() {
 
 function HotkeysTab() {
   const global = [
-    { keys: 'Ctrl+Space', action: 'Ouvrir / fermer NeuroDesk' },
+    { keys: 'Ctrl+Space', action: 'Ouvrir / fermer CatDesk' },
   ];
   const local = [
     { keys: 'Ctrl+K', action: 'Palette de commandes' },
@@ -295,7 +295,7 @@ function AboutTab() {
           <span className="text-2xl">🧠</span>
         </div>
         <div>
-          <h3 className="text-base font-semibold text-white/90">NeuroDesk</h3>
+          <h3 className="text-base font-semibold text-white/90">CatDesk</h3>
           <p className="text-xs text-white/40 mt-0.5">Version 0.1.0 — Local-first AI Desktop Copilot</p>
         </div>
       </div>
@@ -314,7 +314,7 @@ function AboutTab() {
 
       <div className="pt-1 border-t border-white/5">
         <p className="text-xs text-white/25">
-          MIT © 2026 NeuroDesk Contributors · 100% local, 0% cloud
+          MIT © 2026 CatDesk Contributors · 100% local, 0% cloud
         </p>
       </div>
     </div>

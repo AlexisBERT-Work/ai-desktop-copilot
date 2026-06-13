@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to NeuroDesk will be documented here.
+All notable changes to CatDesk will be documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/)
@@ -11,7 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ### Added
 - Initial project structure and monorepo setup
-- Shared TypeScript types package (`@neurodesk/shared-types`)
+- Shared TypeScript types package (`@catdesk/shared-types`)
 - Agent runtime scaffold with Ollama client and streaming
 - Permission engine with risk-level gating
 - Conversation store (SQLite)

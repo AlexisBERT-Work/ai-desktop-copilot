@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import type { ToolResult } from '@neurodesk/shared-types';
-import { TOOL_SCHEMAS } from '@neurodesk/shared-types';
+import type { ToolResult } from '@catdesk/shared-types';
+import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 
 const exec = promisify(execFile);
@@ -50,7 +50,7 @@ async function ghFetch(path: string, token: string): Promise<unknown> {
       { hostname: url.hostname, path: url.pathname + url.search, headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'neurodesk-agent/1.0',
+        'User-Agent': 'catdesk-agent/1.0',
         'X-GitHub-Api-Version': '2022-11-28',
       }},
       res => {
@@ -111,7 +111,7 @@ export class WatchCITool extends BaseTool {
     const { repo, branch, token: argToken, limit = 5 } = args as WatchCIArgs;
 
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
-      return this.fail('Format repo invalide. Utilise "owner/nom-du-repo" (ex: "alexis/neurodesk").');
+      return this.fail('Format repo invalide. Utilise "owner/nom-du-repo" (ex: "alexis/catdesk").');
     }
 
     const token = argToken ?? process.env['GITHUB_TOKEN'] ?? '';

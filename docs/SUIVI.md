@@ -1,4 +1,4 @@
-# SUIVI — Évolution de NeuroDesk
+# SUIVI — Évolution de CatDesk
 
 > Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
 > Dernière mise à jour : 2026-06-11.
@@ -43,7 +43,7 @@ Le projet n'avait **aucun test**. Socle vitest posé (3 fichiers, **23 tests ver
 - [x] `CronScheduler.test.ts` (9) — `parseScheduleMs` (alias, "every N u",
       casse, invalides) + validation `addJob`/`cancelJob`.
 
-Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
+Lancer : `pnpm --filter @catdesk/agent-runtime test`.
 
 ## Routeur de modèles — câblé (2026-06-11)
 - [x] `llm/ModelRouter.ts` recréé (heuristique simple, testable).
@@ -51,7 +51,7 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
       choisi par l'UI, rétrograde vers `small` seulement pour les tâches triviales
       (sans outils, courtes, sans indice de complexité). Décision prise une fois
       par run, journalisée.
-- [x] Activé via `NEURODESK_MODEL_SMALL` (absent => aucun routage, comportement
+- [x] Activé via `CATDESK_MODEL_SMALL` (absent => aucun routage, comportement
       inchangé). Non-breaking.
 - [x] `llm/ModelRouter.test.ts` (7 tests).
 
@@ -117,7 +117,7 @@ Lancer : `pnpm --filter @neurodesk/agent-runtime test`.
 - [x] **OCR testé live** : capture réelle + lecture du texte de l'écran à ~80 %
       de confiance (FR+EN).
 - [x] `describe_screen` (vision) : capture + description via modèle multimodal
-      (`NEURODESK_VISION_MODEL`, défaut `llava:7b`), image jointe au message.
+      (`CATDESK_VISION_MODEL`, défaut `llava:7b`), image jointe au message.
       Schéma + permission + enregistrement. Type-check OK, 67 tests verts.
 - [~] `llava:7b` en cours de pull (~4,1 Go). Description visuelle testable à la fin.
 

@@ -6,7 +6,7 @@ use tauri::{
 use tracing::info;
 
 pub fn setup_tray(app: &mut App) -> anyhow::Result<()> {
-    let toggle = MenuItem::with_id(app, "toggle", "Show/Hide NeuroDesk", true, None::<&str>)?;
+    let toggle = MenuItem::with_id(app, "toggle", "Show/Hide CatDesk", true, None::<&str>)?;
     let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
@@ -18,7 +18,7 @@ pub fn setup_tray(app: &mut App) -> anyhow::Result<()> {
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
-        .tooltip("NeuroDesk — clic pour ouvrir (Ctrl+Shift+Space)")
+        .tooltip("CatDesk — clic pour ouvrir (Ctrl+Shift+Space)")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {

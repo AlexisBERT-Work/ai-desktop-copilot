@@ -1,4 +1,4 @@
-# CAPACITÉS — Tout ce que NeuroDesk sait (ou saura) faire
+# CAPACITÉS — Tout ce que CatDesk sait (ou saura) faire
 
 > Carte de vision, à jour au 2026-06-11. ✅ fonctionne · 🟡 câblé/partiel · ⬜ prévu.
 > Inventaire basé sur les outils réellement enregistrés dans
@@ -49,7 +49,7 @@
 - ✅ **Swap de modèles (Auto / Léger / Code)** : sélecteur dans le chat.
   *Auto* route (léger pour le trivial, code/heavy sinon), *Léger* économise,
   *Code* force le gros modèle de code (`qwen2.5-coder:14b`). Aussi pilotable
-  par env `NEURODESK_MODEL_SMALL`.
+  par env `CATDESK_MODEL_SMALL`.
 
 ## 8. Ce qui reste à durcir
 - ⬜ Capture écran côté Rust (`screen.rs` est un stub)

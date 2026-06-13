@@ -15,7 +15,7 @@ async function gen(file: string, content: string, extra: Record<string, unknown>
 }
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'neurodesk-tests-'));
+  dir = await mkdtemp(join(tmpdir(), 'catdesk-tests-'));
   // No package.json => JS/TS defaults to vitest.
 });
 

@@ -77,13 +77,13 @@ describe('VectorStore', () => {
     it('écrit un fichier et recharge les vecteurs', async () => {
       const vs = new VectorStore(undefined, dir);
       await vs.initialize();
-      await vs.store('projet neurodesk tauri', { tags: ['projet'] });
+      await vs.store('projet catdesk tauri', { tags: ['projet'] });
       expect(existsSync(join(dir, 'vectors.json'))).toBe(true);
 
       const reloaded = new VectorStore(undefined, dir);
       await reloaded.initialize();
       const results = await reloaded.search('tauri', { minScore: 0.01 });
-      expect(results.map(r => r.content)).toContain('projet neurodesk tauri');
+      expect(results.map(r => r.content)).toContain('projet catdesk tauri');
     });
   });
 

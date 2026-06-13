@@ -1,4 +1,4 @@
-# Setup Progress — NeuroDesk
+# Setup Progress — CatDesk
 
 Started: 2026-05-28
 

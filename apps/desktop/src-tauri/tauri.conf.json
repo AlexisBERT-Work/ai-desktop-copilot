@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "NeuroDesk",
+  "productName": "CatDesk",
   "version": "0.1.0",
-  "identifier": "com.neurodesk.app",
+  "identifier": "com.catdesk.app",
   "build": {
     "beforeDevCommand": "pnpm vite:dev",
     "beforeBuildCommand": "pnpm vite:build",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "NeuroDesk",
+        "title": "CatDesk",
         "width": 600,
         "height": 170,
         "resizable": false,
