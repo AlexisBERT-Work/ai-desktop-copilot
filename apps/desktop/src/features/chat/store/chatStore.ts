@@ -25,6 +25,10 @@ interface ChatState {
   modelMode: 'auto' | 'light' | 'code';
   lightModel: string;
   codeModel: string;
+  /** On-disk size (bytes) per installed model, from Ollama. Drives the VRAM warning. */
+  modelSizes: Record<string, number>;
+  /** Detected GPU VRAM in bytes, or null when undetectable (then: no warning). */
+  vramBytes: number | null;
 
   // Actions
   sendMessage: (content: string, conversationId: string) => Promise<void>;
@@ -64,8 +68,12 @@ export const useChatStore = create<ChatState>()(
     selectedModel: 'qwen2.5:7b',
     availableModels: ['qwen2.5:7b', 'llama3.2:3b', 'deepseek-r1:7b'],
     modelMode: 'auto',
-    lightModel: 'qwen2.5:7b',
+    // Tier léger distinct du main (3B ~2 GB) : rend le mode « Léger » et la
+    // rétrogradation auto réellement utiles. Tient large dans 10 GB de VRAM.
+    lightModel: 'qwen2.5:3b',
     codeModel: 'qwen2.5-coder:14b',
+    modelSizes: {},
+    vramBytes: null,
 
     sendMessage: async (content, conversationId) => {
       const { selectedModel, modelMode, lightModel, codeModel } = get();
@@ -240,11 +248,36 @@ export const useChatStore = create<ChatState>()(
 
     loadModels: async () => {
       try {
-        const models = await invoke<string[]>('get_ollama_models');
-        set(s => { s.availableModels = models; });
+        const info = await invoke<{ name: string; sizeBytes: number }[]>('get_ollama_models_info');
+        set(s => {
+          s.availableModels = info.map(m => m.name);
+          s.modelSizes = Object.fromEntries(info.map(m => [m.name, m.sizeBytes]));
+        });
       } catch {
         // Keep defaults if Ollama not available
+      }
+      try {
+        const vram = await invoke<number | null>('get_gpu_vram_bytes');
+        set(s => { s.vramBytes = vram; });
+      } catch {
+        // VRAM undetectable → leave null, warnings stay off.
       }
     },
   })),
 );
+
+/**
+ * Warn when a model's weights are likely to exceed available VRAM and spill to
+ * system RAM (5-10x slower). Returns null when there's nothing to flag or when
+ * VRAM is unknown. The 0.85 factor leaves headroom for the KV cache, context
+ * and compute buffers that load alongside the weights.
+ */
+export function modelVramWarning(
+  sizeBytes: number | undefined,
+  vramBytes: number | null,
+): { modelGb: number; vramGb: number } | null {
+  if (!sizeBytes || !vramBytes) return null;
+  if (sizeBytes <= vramBytes * 0.85) return null;
+  const gb = (b: number) => Math.round((b / 1e9) * 10) / 10;
+  return { modelGb: gb(sizeBytes), vramGb: gb(vramBytes) };
+}

@@ -40,6 +40,8 @@ pub fn run() {
             commands::chat::chat_send,
             commands::chat::chat_cancel,
             commands::chat::get_ollama_models,
+            commands::chat::get_ollama_models_info,
+            commands::chat::get_gpu_vram_bytes,
             commands::screen::screen_capture,
             commands::screen::screen_capture_active_window,
             commands::filesystem::file_read,
