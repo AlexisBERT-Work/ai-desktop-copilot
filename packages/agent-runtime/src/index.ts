@@ -17,6 +17,8 @@ import { SpiralMonitor } from './SpiralMonitor';
 import { stdoutNotifier } from './ipc/Notifier';
 import { ConversationStore } from './memory/ConversationStore';
 import { VectorStore } from './memory/VectorStore';
+import { WarmMemoryStore } from './memory/WarmMemoryStore';
+import { FactExtractor } from './memory/FactExtractor';
 import { createLogger } from './logger';
 
 // ─── Tools ────────────────────────────────────────────────────
@@ -103,9 +105,16 @@ async function main() {
   const vectorStore = new VectorStore(llm);
   await vectorStore.initialize();
 
+  // Warm memory : faits/préférences structurés sur l'utilisateur, instantanés
+  // à interroger, alimentés en tâche de fond par le petit modèle. Désactivable
+  // via CATDESK_WARM_MEMORY=0.
+  const warmEnabled = process.env['CATDESK_WARM_MEMORY'] !== '0';
+  const warmStore = new WarmMemoryStore();
+  if (warmEnabled) await warmStore.initialize();
+
   const audit = new AuditLogger();
   const permissions = new PermissionEngine();
-  const context = new ContextManager(db, vectorStore);
+  const context = new ContextManager(db, vectorStore, warmEnabled ? warmStore : undefined);
 
   // ─── Tool Registry ─────────────────────────────────────────
   const tools = new ToolRegistry();
@@ -165,7 +174,13 @@ async function main() {
     enabled: process.env['CATDESK_PASSIVE_MODE'] !== '0',
     idleMs: Number(process.env['CATDESK_IDLE_UNLOAD_MS'] ?? 5 * 60 * 1000),
   });
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader);
+  // Extraction des faits warm. NB : un 3B est trop faible pour cette tâche
+  // (testé : il renvoie []), donc on extrait avec le modèle PRINCIPAL par
+  // défaut, indépendamment du petit modèle de routage. Surchargeable via
+  // CATDESK_EXTRACT_MODEL (ex. un 14B dédié sur une grosse machine).
+  const extractModel = process.env['CATDESK_EXTRACT_MODEL'] ?? process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b';
+  const factExtractor = warmEnabled ? new FactExtractor(llm, extractModel, warmStore) : undefined;
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor);
 
   // ─── Spiral monitor (proactive nudge) ──────────────────────
   // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur

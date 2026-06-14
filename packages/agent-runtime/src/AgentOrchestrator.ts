@@ -10,6 +10,7 @@ import { selectTools } from './llm/selectTools';
 import type { Planner } from './llm/Planner';
 import type { ActivityTracker } from './ActivityTracker';
 import type { IdleUnloader } from './llm/IdleUnloader';
+import type { FactExtractor } from './memory/FactExtractor';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:orchestrator');
@@ -50,6 +51,12 @@ export class AgentOrchestrator {
      * décharge de la VRAM après une fenêtre d'inactivité (libère le GPU).
      */
     private idleUnloader?: IdleUnloader,
+    /**
+     * Extracteur de faits warm optionnel : après une réponse réussie, mine la
+     * conversation (en tâche de fond) pour mémoriser les faits durables sur
+     * l'utilisateur. Voir CATDESK-CONCEPTS-AVANCES §3.
+     */
+    private factExtractor?: FactExtractor,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -196,6 +203,14 @@ export class AgentOrchestrator {
           yield { type: 'token', content: fullResponse };
         }
         this.audit.completeRun(runId, 'success', fullResponse);
+        // Mine durable facts from this exchange in the background (warm memory).
+        // Fire-and-forget: never block or fail the user's response.
+        if (this.factExtractor) {
+          const transcript = [...messages, { role: 'assistant' as const, content: fullResponse }];
+          void this.factExtractor
+            .extractAndStore(transcript, conversationId)
+            .catch(err => log.debug('Fact extraction failed', { error: String(err) }));
+        }
         yield { type: 'done', content: fullResponse };
         return;
       }
@@ -275,6 +290,7 @@ export class AgentOrchestrator {
     activeWindow?: string;
     screenText?: string;
     relevantMemories?: string[];
+    warmFacts?: string[];
   }, plan: string[] = []): string {
     const parts = [
       `Tu es CatDesk, un assistant IA desktop local tournant sur la machine de l'utilisateur.`,
@@ -294,6 +310,10 @@ export class AgentOrchestrator {
 
     if (ctx.screenText) {
       parts.push(`\nContenu visible à l'écran :\n${ctx.screenText.slice(0, 1500)}`);
+    }
+
+    if (ctx.warmFacts && ctx.warmFacts.length > 0) {
+      parts.push(`\nCe que tu sais de l'utilisateur (mémoire long terme) :\n${ctx.warmFacts.join('\n')}`);
     }
 
     if (ctx.relevantMemories && ctx.relevantMemories.length > 0) {
