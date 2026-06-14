@@ -22,6 +22,7 @@ import { FactExtractor } from './memory/FactExtractor';
 import { MemoryConsolidator } from './memory/MemoryConsolidator';
 import { ConversationSummarizer } from './memory/ConversationSummarizer';
 import { Compactor } from './memory/Compactor';
+import { PlaybookStore } from './playbook/PlaybookStore';
 import { createLogger } from './logger';
 
 // ─── Tools ────────────────────────────────────────────────────
@@ -188,7 +189,12 @@ async function main() {
   const compactor = process.env['CATDESK_COMPACTION'] !== '0'
     ? new Compactor(db, new ConversationSummarizer(llm, extractModel))
     : undefined;
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor, compactor);
+  // Playbook : mémoire de stratégie (quelle approche marche par type de tâche).
+  // Désactivable via CATDESK_PLAYBOOK=0.
+  const playbookEnabled = process.env['CATDESK_PLAYBOOK'] !== '0';
+  const playbook = playbookEnabled ? new PlaybookStore() : undefined;
+  if (playbook) await playbook.initialize();
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor, compactor, playbook);
 
   // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
   // doublons inter-clés, purge des faits périmés et peu fiables). Déterministe,

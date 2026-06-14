@@ -12,6 +12,9 @@ import type { ActivityTracker } from './ActivityTracker';
 import type { IdleUnloader } from './llm/IdleUnloader';
 import type { FactExtractor } from './memory/FactExtractor';
 import type { Compactor } from './memory/Compactor';
+import type { PlaybookStore } from './playbook/PlaybookStore';
+import { approachSignature } from './playbook/PlaybookStore';
+import { classifyTask } from './playbook/classifyTask';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
 import { createLogger } from './logger';
 
@@ -64,6 +67,11 @@ export class AgentOrchestrator {
      * résumé glissant quand il devient long (CATDESK-CONCEPTS-AVANCES §2A).
      */
     private compactor?: Compactor,
+    /**
+     * Playbook optionnel : consulte avant la tâche l'approche qui a marché pour
+     * ce type de tâche, et enregistre l'issue après (CATDESK-CONCEPTS-AVANCES §8).
+     */
+    private playbook?: PlaybookStore,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -104,6 +112,16 @@ export class AgentOrchestrator {
     const enabledTools = this.tools.getEnabled(config.enabledTools);
     const availableTools = selectTools(enabledTools, input, TOOL_LIMIT);
 
+    // Playbook (§8): classify the task and pull the approach that worked before.
+    const taskType = classifyTask(input);
+    const best = this.playbook?.bestApproach(taskType);
+    const playbookHint = best
+      ? `Type de tâche : « ${taskType} ». Approche qui a réussi par le passé : ${best.approach} `
+        + `(${Math.round(best.successRate * 100)}% de succès sur ${best.attempts} essais). Inspire-t'en si pertinent.`
+      : undefined;
+    // Tools actually executed this run → the "approach" we record at the end.
+    const usedTools: string[] = [];
+
     let messages = [...ctx.messages];
     // Add user message
     messages.push({ role: 'user', content: input });
@@ -128,7 +146,7 @@ export class AgentOrchestrator {
       }
     }
 
-    const systemPrompt = this.buildSystemPrompt(ctx, plan);
+    const systemPrompt = this.buildSystemPrompt({ ...ctx, ...(playbookHint ? { playbookHint } : {}) }, plan);
 
     const maxIterations = config.maxIterations ?? this.defaultMaxIterations;
     let iterations = 0;
@@ -212,6 +230,8 @@ export class AgentOrchestrator {
         this.audit.completeRun(runId, 'success', fullResponse);
         // Persist the exchange so the next turn has conversational memory.
         this.context.recordTurn(conversationId, model, input, fullResponse);
+        // Playbook (§8): this approach worked for this task type.
+        this.playbook?.record(taskType, approachSignature(usedTools), true);
         // Compact older history into a rolling summary if it's grown long.
         if (this.compactor) {
           void this.compactor.maybeCompact(conversationId)
@@ -261,6 +281,7 @@ export class AgentOrchestrator {
 
         // Execute tool
         try {
+          usedTools.push(toolCall.name); // record the approach for the playbook
           const result = await this.tools.execute(toolCall.name, toolCall.args);
           this.audit.logToolCall(runId, toolCall.name, toolCall.args, result);
           this.activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
@@ -299,6 +320,8 @@ export class AgentOrchestrator {
     // Max iterations reached
     log.warn('Max iterations reached', { runId, maxIterations });
     this.audit.completeRun(runId, 'max_iterations');
+    // Playbook (§8): this approach did not converge for this task type.
+    this.playbook?.record(taskType, approachSignature(usedTools), false);
     yield {
       type: 'error',
       content: `Limite d'itérations atteinte (${maxIterations}). Réponse partielle disponible.`,
@@ -317,6 +340,7 @@ export class AgentOrchestrator {
     relevantMemories?: string[];
     warmFacts?: string[];
     conversationSummary?: string;
+    playbookHint?: string;
   }, plan: string[] = []): string {
     const parts = [
       `Tu es CatDesk, un assistant IA desktop local tournant sur la machine de l'utilisateur.`,
@@ -340,6 +364,10 @@ export class AgentOrchestrator {
 
     if (ctx.conversationSummary) {
       parts.push(`\nRésumé de la conversation jusqu'ici :\n${ctx.conversationSummary}`);
+    }
+
+    if (ctx.playbookHint) {
+      parts.push(`\nMémoire de stratégie : ${ctx.playbookHint}`);
     }
 
     if (ctx.warmFacts && ctx.warmFacts.length > 0) {
