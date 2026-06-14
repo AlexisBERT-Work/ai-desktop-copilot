@@ -38,6 +38,21 @@ describe('EvolutionDaemon', () => {
     expect(onDisk.proposals).toHaveLength(report.proposals.length);
   });
 
+  it('drafts a SKILL.md for a strong tool-based winner', () => {
+    for (let i = 0; i < 8; i++) store.record('debug', 'analyze_stacktrace>read_file', true);
+    store.record('debug', 'analyze_stacktrace>read_file', false);
+
+    const daemon = new EvolutionDaemon(store, { dataDir: dir });
+    const report = daemon.runOnce();
+
+    expect(report.skillDrafts).toContain('auto-debug');
+    const draftPath = join(dir, 'skill-drafts', 'auto-debug.md');
+    expect(existsSync(draftPath)).toBe(true);
+    const md = readFileSync(draftPath, 'utf-8');
+    expect(md).toContain('name: auto-debug');
+    expect(md).toContain('analyze_stacktrace');
+  });
+
   it('writes an empty report when there is no actionable signal', () => {
     store.record('git', 'git_commit', true); // single attempt → below minAttempts
     const daemon = new EvolutionDaemon(store, { dataDir: dir });
