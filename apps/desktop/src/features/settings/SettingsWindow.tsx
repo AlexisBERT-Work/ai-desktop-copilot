@@ -111,7 +111,8 @@ function KvCacheCard() {
       {optimal ? (
         <div className="flex items-center gap-2 text-xs text-green-400">
           <Check className="w-3.5 h-3.5" />
-          Réglage optimal pour ce PC : <span className="font-medium">{KV_LABEL[current]}</span>
+          {managed ? 'Réglé automatiquement pour ce PC' : 'Réglage optimal pour ce PC'} :
+          <span className="font-medium">{KV_LABEL[current]}</span>
         </div>
       ) : (
         <p className="text-xs text-white/55 leading-relaxed">

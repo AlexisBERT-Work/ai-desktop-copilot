@@ -75,6 +75,55 @@ pub async fn get_kv_cache_status(app: AppHandle) -> Result<KvCacheStatus, String
     })
 }
 
+/// Poll Ollama until it answers or `max_secs` elapses. Returns readiness.
+async fn wait_until_ready(max_secs: u64) -> bool {
+    for _ in 0..(max_secs * 2) {
+        let ok = reqwest::get("http://127.0.0.1:11434/api/tags")
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
+        if ok {
+            return true;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    false
+}
+
+/// Full-auto tuning: on a managed Ollama's FIRST run (no choice made yet), wait
+/// until it's ready, then apply the recommended KV-cache type once — restarting
+/// Ollama only if the recommendation differs from the f16 it spawned with.
+///
+/// No-op when a choice already exists (auto or manual) or when Ollama is external
+/// (`is_managed` false) — we never silently override a user's own setup. Runs in
+/// the background so it never blocks startup.
+pub fn spawn_auto_tune(app: AppHandle) {
+    if ollama::kv_cache_decided(&app) {
+        return; // already decided — respect it
+    }
+    tauri::async_runtime::spawn(async move {
+        if !wait_until_ready(30).await {
+            return; // Ollama never came up — try again next launch
+        }
+        if !ollama::is_managed() {
+            return; // external Ollama — never touch it
+        }
+        let vram = detect_vram_bytes().await;
+        let model_bytes = heaviest_model().await.map(|m| m.size_bytes).unwrap_or(0);
+        let rec = recommend_kv_cache(vram, model_bytes);
+        if ollama::set_kv_cache_setting(&app, rec).is_err() {
+            return;
+        }
+        info!(recommended = rec, vram_bytes = ?vram, model_bytes, "auto-tune: KV cache decided");
+        if rec != "f16" {
+            // Spawned with the f16 default → restart to apply. Cheap this early:
+            // no model is loaded yet.
+            let app2 = app.clone();
+            let _ = tauri::async_runtime::spawn_blocking(move || ollama::restart(&app2)).await;
+        }
+    });
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplyResult {

@@ -64,6 +64,11 @@ pub fn run() {
             // brief startup race is fine.
             core::ollama::ensure_ollama_running(app.handle());
 
+            // First-run GPU auto-tune: once the managed Ollama is up, pick the
+            // KV-cache type that fits this machine's VRAM and apply it silently.
+            // No-op after the first decision, or with an external Ollama.
+            commands::tuning::spawn_auto_tune(app.handle().clone());
+
             // Start Node.js agent sidecar
             ipc::bridge::start_agent_sidecar(app.handle().clone())?;
 

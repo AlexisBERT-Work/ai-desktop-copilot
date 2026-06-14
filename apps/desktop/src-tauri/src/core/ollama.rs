@@ -60,6 +60,13 @@ pub fn kv_cache_setting(app: &AppHandle) -> String {
         .unwrap_or_else(|| "f16".to_string())
 }
 
+/// Whether a KV-cache choice has ever been made (auto-tuned or set by hand).
+/// While false on a managed Ollama, auto-tune may pick a value; once true, the
+/// choice is respected and never silently overridden.
+pub fn kv_cache_decided(app: &AppHandle) -> bool {
+    kv_cache_file(app).map(|p| p.exists()).unwrap_or(false)
+}
+
 /// Persist the KV-cache setting. Validates the value. Caller restarts Ollama
 /// (managed only) for it to take effect now; otherwise it applies next launch.
 pub fn set_kv_cache_setting(app: &AppHandle, value: &str) -> std::io::Result<()> {
