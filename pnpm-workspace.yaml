@@ -2,6 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Don't auto-install before running a script. pnpm v10+ otherwise tries to purge
+# and reinstall node_modules before `pnpm <script>`, which aborts with no TTY in
+# automation (the release build's `tauri build` → `pnpm vite:build`) and can even
+# prune devDependencies mid-build. Deps are managed explicitly via `pnpm install`.
+verifyDepsBeforeRun: false
+
 allowBuilds:
   better-sqlite3: true
   esbuild: true
