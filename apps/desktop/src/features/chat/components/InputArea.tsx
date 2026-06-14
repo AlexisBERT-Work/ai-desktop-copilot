@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { ArrowUp, Paperclip, Camera, Square } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { ArrowUp, Camera, Square } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 
 interface Props {
@@ -54,7 +53,9 @@ export function InputArea({ conversationId }: Props) {
   const captureScreen = async () => {
     try {
       await sendMessage('Capture mon écran et décris ce que tu vois.', conversationId);
-    } catch {}
+    } catch {
+      /* échec de capture — déjà remonté dans le fil de discussion */
+    }
   };
 
   return (

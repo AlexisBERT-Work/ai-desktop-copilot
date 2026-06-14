@@ -1,6 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Minimize2, Plus, ChevronDown } from 'lucide-react';
+import { X, Minimize2, Plus } from 'lucide-react';
 import { useOverlayStore } from '../../overlay/overlayStore';
 import { useChatStore } from '../store/chatStore';
 import { MessageList } from './MessageList';

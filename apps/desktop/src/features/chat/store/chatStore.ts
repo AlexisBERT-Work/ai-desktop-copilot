@@ -195,7 +195,7 @@ export const useChatStore = create<ChatState>()(
       });
     },
 
-    finalizeMessage: (conversationId, messageId) => {
+    finalizeMessage: (conversationId, _messageId) => {
       set(s => {
         s.isStreaming = false;
         s.streamingMessageId = null;

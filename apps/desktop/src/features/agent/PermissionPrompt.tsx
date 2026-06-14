@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, ShieldCheck, ShieldX, Terminal, FileText, Camera } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import type { PermissionRequestEvent } from '@catdesk/shared-types';
