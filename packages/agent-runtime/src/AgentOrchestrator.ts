@@ -12,6 +12,7 @@ import type { ActivityTracker } from './ActivityTracker';
 import type { IdleUnloader } from './llm/IdleUnloader';
 import type { FactExtractor } from './memory/FactExtractor';
 import type { Compactor } from './memory/Compactor';
+import type { SemanticCache } from './memory/SemanticCache';
 import type { PlaybookStore } from './playbook/PlaybookStore';
 import { approachSignature } from './playbook/PlaybookStore';
 import { classifyTask } from './playbook/classifyTask';
@@ -72,6 +73,12 @@ export class AgentOrchestrator {
      * ce type de tâche, et enregistre l'issue après (CATDESK-CONCEPTS-AVANCES §8).
      */
     private playbook?: PlaybookStore,
+    /**
+     * Cache sémantique optionnel : pour une requête autonome (sans historique),
+     * sert une réponse déjà calculée pour une question équivalente sans appeler
+     * le LLM (CATDESK-CONCEPTS-AVANCES §E). Désactivable via CATDESK_SEMANTIC_CACHE=0.
+     */
+    private cache?: SemanticCache,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -107,6 +114,28 @@ export class AgentOrchestrator {
 
     // Build context (messages + memories + screen context)
     const ctx = await this.context.buildContext(conversationId, input);
+
+    // A query is "standalone" when the conversation has no prior turns: its
+    // answer can't depend on earlier context, so it's safe to serve/store in the
+    // semantic cache (§E). Context-dependent follow-ups bypass the cache.
+    const standalone = ctx.messages.length === 0;
+
+    // ─── Semantic cache consult ──────────────────────────────
+    // On a hit we skip the LLM entirely (big latency win on slow first-token
+    // local hardware). Only for standalone queries — see `standalone` above.
+    if (this.cache && standalone) {
+      const hit = await this.cache.lookup(input).catch(() => null);
+      if (hit) {
+        log.info('Semantic cache hit — skipping LLM', { runId, similarity: Number(hit.similarity.toFixed(3)), exact: hit.exact });
+        this.audit.completeRun(runId, 'success', hit.answer);
+        // Record the turn so follow-ups keep conversational memory.
+        this.context.recordTurn(conversationId, config.model, input, hit.answer);
+        yield { type: 'token', content: hit.answer };
+        yield { type: 'done', content: hit.answer };
+        return;
+      }
+    }
+
     // Only expose a small, query-relevant subset to keep the prompt small and
     // fast (the full ~50-tool schema set dominates local-model latency).
     const enabledTools = this.tools.getEnabled(config.enabledTools);
@@ -233,6 +262,13 @@ export class AgentOrchestrator {
         // Index it for cross-conversation semantic recall (fire-and-forget).
         void this.context.rememberExchange(conversationId, input, fullResponse)
           .catch(err => log.debug('rememberExchange failed', { error: String(err) }));
+        // Semantic cache (§E): only cache tool-free answers to a standalone
+        // query — a tool result reflects mutable world state, and a follow-up
+        // answer depends on context that won't be present next time.
+        if (this.cache && standalone && usedTools.length === 0) {
+          void this.cache.put(input, fullResponse)
+            .catch(err => log.debug('Semantic cache put failed', { error: String(err) }));
+        }
         // Playbook (§8): this approach worked for this task type.
         this.playbook?.record(taskType, approachSignature(usedTools), true);
         // Compact older history into a rolling summary if it's grown long.

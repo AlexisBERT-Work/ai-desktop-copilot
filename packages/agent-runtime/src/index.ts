@@ -22,6 +22,7 @@ import { FactExtractor } from './memory/FactExtractor';
 import { MemoryConsolidator } from './memory/MemoryConsolidator';
 import { ConversationSummarizer } from './memory/ConversationSummarizer';
 import { Compactor } from './memory/Compactor';
+import { SemanticCache } from './memory/SemanticCache';
 import { PlaybookStore } from './playbook/PlaybookStore';
 import { createLogger } from './logger';
 
@@ -194,7 +195,17 @@ async function main() {
   const playbookEnabled = process.env['CATDESK_PLAYBOOK'] !== '0';
   const playbook = playbookEnabled ? new PlaybookStore() : undefined;
   if (playbook) await playbook.initialize();
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor, compactor, playbook);
+  // Cache sémantique : sert sans LLM une réponse déjà calculée pour une question
+  // équivalente (gros gain de latence). Désactivable via CATDESK_SEMANTIC_CACHE=0.
+  // Seuil/TTL réglables via CATDESK_CACHE_THRESHOLD / CATDESK_CACHE_TTL_MS.
+  const cache = process.env['CATDESK_SEMANTIC_CACHE'] !== '0'
+    ? new SemanticCache(llm, {
+        threshold: Number(process.env['CATDESK_CACHE_THRESHOLD'] ?? 0.95),
+        ttlMs: Number(process.env['CATDESK_CACHE_TTL_MS'] ?? 24 * 60 * 60 * 1000),
+      })
+    : undefined;
+  if (cache) cache.initialize();
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor, compactor, playbook, cache);
 
   // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
   // doublons inter-clés, purge des faits périmés et peu fiables). Déterministe,
