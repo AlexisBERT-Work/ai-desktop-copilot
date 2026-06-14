@@ -99,12 +99,14 @@ Step "Staging agent (dist + production node_modules + node.exe)"
 $deployDir = Join-Path $env:TEMP "nd-agent-deploy"
 if (Test-Path $deployDir) { Remove-Item -Recurse -Force $deployDir }
 Push-Location $root
-try {
-  pnpm --filter "@catdesk/agent-runtime" deploy --prod $deployDir
-} catch {
-  Write-Warning "pnpm deploy failed, retrying with --legacy"
-  pnpm --filter "@catdesk/agent-runtime" deploy --prod --legacy $deployDir
-}
+# pnpm v10+ refuses a non-injected workspace deploy unless --legacy is passed
+# (this repo doesn't inject), so deploy with --legacy directly. A failing pnpm
+# sets $LASTEXITCODE but does NOT throw, so check it explicitly. pnpm also refuses
+# a non-empty target, so ensure the dir is clean first (a prior failed attempt may
+# have left a partial tree).
+if (Test-Path $deployDir) { Remove-Item -Recurse -Force $deployDir }
+pnpm --filter "@catdesk/agent-runtime" deploy --prod --legacy $deployDir
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw "pnpm deploy failed (exit $LASTEXITCODE)" }
 Pop-Location
 
 Copy-Item -Recurse -Force (Join-Path $deployDir "node_modules") (Join-Path $agentOut "node_modules")
@@ -170,7 +172,9 @@ if ($SkipOcr) {
 Step "Building Tauri NSIS installer (this is the long part)"
 Push-Location (Join-Path $root "apps\desktop")
 pnpm exec tauri build --config $releaseConf
+$tauriExit = $LASTEXITCODE
 Pop-Location
+if ($tauriExit -ne 0) { throw "tauri build failed (exit $tauriExit)" }
 
 Step "Done"
 $bundleDir = Join-Path $tauriDir "target\release\bundle\nsis"
