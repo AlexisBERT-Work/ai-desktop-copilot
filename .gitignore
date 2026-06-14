@@ -14,6 +14,13 @@ target/
 # Tauri
 apps/desktop/src-tauri/target/
 
+# Release build artifacts (multi-GB: staged runtime, bundled models, installer)
+apps/desktop/src-tauri/resources/
+dist-installer/
+packages/ocr-vision/build-dist/
+packages/ocr-vision/build-work/
+packages/ocr-vision/*.spec
+
 # Python
 __pycache__/
 *.py[cod]

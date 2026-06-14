@@ -171,16 +171,20 @@ if ($SkipOcr) {
   Write-Host "OCR staged → $(Join-Path $resDir 'ocr')"
 }
 
-# ── 5. Build the installer ───────────────────────────────────────
-Step "Building Tauri NSIS installer (this is the long part)"
+# ── 5. Build the app (no bundling) ───────────────────────────────
+# NSIS (Tauri's Windows bundler) caps near 2 GB and cannot package CatDesk's GPU
+# runtime + multi-GB models, so build the exe WITHOUT bundling and package it
+# with Inno Setup below (no size limit; disk-spanned for the >4 GB payload).
+Step "Building Windows app (tauri build --no-bundle)"
 Push-Location (Join-Path $root "apps\desktop")
-pnpm exec tauri build --config $releaseConf
+pnpm exec tauri build --config $releaseConf --no-bundle
 $tauriExit = $LASTEXITCODE
 Pop-Location
 if ($tauriExit -ne 0) { throw "tauri build failed (exit $tauriExit)" }
 
+# ── 6. Package the offline installer (Inno Setup) ────────────────
+Step "Packaging offline installer (Inno Setup)"
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-inno.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Inno packaging failed (exit $LASTEXITCODE)" }
+
 Step "Done"
-$bundleDir = Join-Path $tauriDir "target\release\bundle\nsis"
-Write-Host "Installer(s) in: $bundleDir" -ForegroundColor Green
-Get-ChildItem $bundleDir -Filter *.exe -ErrorAction SilentlyContinue |
-  ForEach-Object { Write-Host ("  {0}  ({1:N0} MB)" -f $_.Name, ($_.Length/1MB)) }
