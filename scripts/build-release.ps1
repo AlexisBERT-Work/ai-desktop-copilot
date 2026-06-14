@@ -118,9 +118,12 @@ Write-Host "Agent staged → $agentOut"
 # ── 3. Ollama binary (+ models, full build only) ─────────────────
 Step "Staging Ollama runtime"
 Copy-Item -Force $ollamaExe (Join-Path $resDir "ollama\ollama.exe")
-# Bundle the Ollama runtime DLLs that sit next to ollama.exe (GPU/CPU libs).
+# DLLs that sit DIRECTLY next to ollama.exe (base runtime). NOT recursive: the
+# GPU backend DLLs (cuda_v*, rocm_v*) live under lib/ and are copied below with
+# their structure. A recursive flatten would also dump them at the root, copying
+# every multi-hundred-MB backend twice (~2.7 GB of pure duplication).
 $ollamaSrcDir = Split-Path -Parent $ollamaExe
-Get-ChildItem -Path $ollamaSrcDir -Include *.dll -Recurse -ErrorAction SilentlyContinue |
+Get-ChildItem -Path (Join-Path $ollamaSrcDir '*.dll') -File -ErrorAction SilentlyContinue |
   ForEach-Object { Copy-Item -Force $_.FullName (Join-Path $resDir "ollama\$($_.Name)") }
 $libDir = Join-Path $ollamaSrcDir "lib"
 if (Test-Path $libDir) { Copy-Item -Recurse -Force $libDir (Join-Path $resDir "ollama\lib") }
