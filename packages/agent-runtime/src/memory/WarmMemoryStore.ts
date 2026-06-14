@@ -150,6 +150,51 @@ export class WarmMemoryStore {
     return n;
   }
 
+  /**
+   * Retire the lower-quality duplicates when several active facts carry the
+   * same value under different subjects (e.g. "editeur" and "editeur_prefere"
+   * both = "préfère VS Code"). Keeps the strongest of each group (highest
+   * confidence, then most recent). Returns how many rows were retired.
+   */
+  dedupeByValue(now = Date.now()): number {
+    const groups = new Map<string, WarmFact[]>();
+    for (const f of this.getActiveFacts(1000)) {
+      const key = f.value.trim().toLowerCase().replace(/\s+/g, ' ');
+      (groups.get(key) ?? groups.set(key, []).get(key)!).push(f);
+    }
+
+    let retired = 0;
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      // Best first: higher confidence, then newer.
+      group.sort((a, b) => b.confidence - a.confidence || b.updatedAt - a.updatedAt);
+      for (const f of group.slice(1)) {
+        this.db.run(`UPDATE warm_facts SET active=0, updated_at=? WHERE id=?`, [now, f.id]);
+        retired++;
+      }
+    }
+    if (retired > 0) this.persist();
+    return retired;
+  }
+
+  /**
+   * Retire stale, low-confidence facts: active rows not refreshed for
+   * `maxAgeMs` whose confidence is below `minConfidence`. High-confidence facts
+   * never expire on age alone. Returns how many rows were retired.
+   */
+  prune(opts: { maxAgeMs: number; minConfidence: number }, now = Date.now()): number {
+    const cutoff = now - opts.maxAgeMs;
+    let retired = 0;
+    for (const f of this.getActiveFacts(1000)) {
+      if (f.updatedAt < cutoff && f.confidence < opts.minConfidence) {
+        this.db.run(`UPDATE warm_facts SET active=0, updated_at=? WHERE id=?`, [now, f.id]);
+        retired++;
+      }
+    }
+    if (retired > 0) this.persist();
+    return retired;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private rowToFact(row: any): WarmFact {
     return {

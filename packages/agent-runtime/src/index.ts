@@ -19,6 +19,7 @@ import { ConversationStore } from './memory/ConversationStore';
 import { VectorStore } from './memory/VectorStore';
 import { WarmMemoryStore } from './memory/WarmMemoryStore';
 import { FactExtractor } from './memory/FactExtractor';
+import { MemoryConsolidator } from './memory/MemoryConsolidator';
 import { createLogger } from './logger';
 
 // ─── Tools ────────────────────────────────────────────────────
@@ -182,6 +183,12 @@ async function main() {
   const factExtractor = warmEnabled ? new FactExtractor(llm, extractModel, warmStore) : undefined;
   const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor);
 
+  // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
+  // doublons inter-clés, purge des faits périmés et peu fiables). Déterministe,
+  // sans LLM — tourne en fond sans déranger.
+  const consolidator = warmEnabled ? new MemoryConsolidator(warmStore) : undefined;
+  consolidator?.start();
+
   // ─── Spiral monitor (proactive nudge) ──────────────────────
   // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur
   // boucle sur le même problème. Le bridge Rust la transforme en event Tauri.
@@ -222,6 +229,7 @@ async function main() {
   // ─── Graceful shutdown ─────────────────────────────────────
   process.on('SIGTERM', () => {
     log.info('SIGTERM received — shutting down');
+    consolidator?.stop();
     cron.shutdown();
     BrowserManager.get().shutdown();
     OcrSidecarClient.get().shutdown();
