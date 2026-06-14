@@ -5,11 +5,26 @@ import type { PermissionEngine } from './permissions/PermissionEngine';
 import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
 import { resolveModel } from './llm/ModelRouter';
+import { recoverToolCalls, looksLikeToolCallStart } from './llm/recoverToolCalls';
+import { selectTools } from './llm/selectTools';
 import type { Planner } from './llm/Planner';
 import type { ActivityTracker } from './ActivityTracker';
+import type { IdleUnloader } from './llm/IdleUnloader';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:orchestrator');
+
+// Avec ~50 outils exposés, le prompt (schémas + system + historique) dépasse
+// largement 4096 tokens. Sans une fenêtre assez grande, Ollama tronque le
+// contexte : le modèle perd les définitions d'outils et le system prompt, puis
+// déraille (réponses hors-sujet, en anglais, JSON recraché) et part en
+// génération interminable. On élargit donc num_ctx et on borne num_predict.
+const NUM_CTX = Number(process.env['CATDESK_NUM_CTX'] ?? 8192);
+const MAX_TOKENS = Number(process.env['CATDESK_MAX_TOKENS'] ?? 1024);
+// Max number of tools sent to the model per call. ~50 tools ≈ several thousand
+// prompt tokens → slow prompt eval on local models. We send only the relevant
+// subset (see selectTools). Set to 0 to disable the filter and send all.
+const TOOL_LIMIT = Number(process.env['CATDESK_TOOL_LIMIT'] ?? 14);
 
 export class AgentOrchestrator {
   private readonly defaultMaxIterations = 10;
@@ -30,6 +45,11 @@ export class AgentOrchestrator {
     private planner?: Planner,
     /** Suivi d'activité optionnel (alimente la détection de spirale). */
     private activity?: ActivityTracker,
+    /**
+     * Mode passif optionnel : garde le modèle chaud pendant un run, puis le
+     * décharge de la VRAM après une fenêtre d'inactivité (libère le GPU).
+     */
+    private idleUnloader?: IdleUnloader,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -57,6 +77,7 @@ export class AgentOrchestrator {
     input: string,
     conversationId: string,
     config: AgentConfig,
+    signal?: AbortSignal,
   ): AsyncGenerator<AgentStep> {
     const runId = crypto.randomUUID();
     log.info('Run started', { runId, conversationId, model: config.model });
@@ -64,7 +85,10 @@ export class AgentOrchestrator {
 
     // Build context (messages + memories + screen context)
     const ctx = await this.context.buildContext(conversationId, input);
-    const availableTools = this.tools.getEnabled(config.enabledTools);
+    // Only expose a small, query-relevant subset to keep the prompt small and
+    // fast (the full ~50-tool schema set dominates local-model latency).
+    const enabledTools = this.tools.getEnabled(config.enabledTools);
+    const availableTools = selectTools(enabledTools, input, TOOL_LIMIT);
 
     let messages = [...ctx.messages];
     // Add user message
@@ -72,6 +96,12 @@ export class AgentOrchestrator {
 
     // Choix du modèle (auto/light/code) une fois par run.
     const model = this.pickModel(input, availableTools.length > 0, config);
+
+    // Mode passif : garder le modèle chaud pendant ce run. Le `finally` plus bas
+    // réarme le minuteur d'inactivité quel que soit le chemin de sortie
+    // (succès, erreur, interruption, abandon du consommateur).
+    this.idleUnloader?.begin(model);
+    try {
 
     // Phase de planification optionnelle (opt-in). Le plan est généré une fois
     // puis injecté comme guidage dans le system prompt.
@@ -90,6 +120,12 @@ export class AgentOrchestrator {
     let iterations = 0;
 
     while (iterations < maxIterations) {
+      // Interruption (bouton Stop) : on s'arrête net entre deux étapes.
+      if (signal?.aborted) {
+        log.info('Run interrupted', { runId, iteration: iterations });
+        this.audit.completeRun(runId, 'interrupted');
+        return;
+      }
       iterations++;
       log.debug('Iteration', { runId, iteration: iterations });
 
@@ -100,21 +136,37 @@ export class AgentOrchestrator {
         tools: availableTools.map(t => t.toOllamaSchema()),
         system: systemPrompt,
         temperature: config.temperature ?? 0.7,
+        numCtx: NUM_CTX,
+        maxTokens: MAX_TOKENS,
+        ...(signal ? { signal } : {}),
       });
 
       let fullResponse = '';
+      let streamedToUser = false;
+      let withholding = false;
       const toolCalls: ToolCall[] = [];
 
       for await (const chunk of stream) {
         if (chunk.type === 'token') {
           fullResponse += chunk.content;
-          yield { type: 'token', content: chunk.content };
+          // Withhold from the live UI if the response opens like a tool call
+          // emitted as text (raw JSON / <tool_call> tags) — we may recover and
+          // execute it below instead of flashing a JSON blob at the user.
+          if (!streamedToUser && !withholding && looksLikeToolCallStart(fullResponse)) {
+            withholding = true;
+          }
+          if (!withholding) {
+            streamedToUser = true;
+            yield { type: 'token', content: chunk.content };
+          }
         } else if (chunk.type === 'tool_call') {
           // Tool calls come at end of stream
           toolCalls.push({
             id: chunk.toolCall.id,
             name: chunk.toolCall.function.name,
-            args: JSON.parse(chunk.toolCall.function.arguments),
+            args: typeof chunk.toolCall.function.arguments === 'string'
+              ? JSON.parse(chunk.toolCall.function.arguments)
+              : chunk.toolCall.function.arguments,
           });
         } else if (chunk.type === 'error') {
           yield { type: 'error', content: chunk.error };
@@ -123,8 +175,26 @@ export class AgentOrchestrator {
         }
       }
 
+      // ─── Recover text-emitted tool calls ──────────────────
+      // Small local models sometimes print the tool call as JSON / inside
+      // <tool_call> tags instead of using Ollama's native tool-calling. Run
+      // those for real so the user gets an answer, not a JSON blob.
+      if (toolCalls.length === 0) {
+        const recovered = recoverToolCalls(fullResponse, new Set(availableTools.map(t => t.name)));
+        if (recovered.calls.length > 0) {
+          log.info('Recovered text-emitted tool calls', { runId, count: recovered.calls.length });
+          toolCalls.push(...recovered.calls);
+          fullResponse = recovered.cleanedText;
+        }
+      }
+
       // ─── No tool calls → final answer ─────────────────────
       if (toolCalls.length === 0) {
+        // False alarm: we withheld content that turned out to be a genuine
+        // answer, not a tool call. Surface it now so the UI isn't left blank.
+        if (!streamedToUser && fullResponse.trim().length > 0) {
+          yield { type: 'token', content: fullResponse };
+        }
         this.audit.completeRun(runId, 'success', fullResponse);
         yield { type: 'done', content: fullResponse };
         return;
@@ -137,7 +207,9 @@ export class AgentOrchestrator {
         tool_calls: toolCalls.map(tc => ({
           id: tc.id,
           type: 'function' as const,
-          function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+          // Pass arguments as an OBJECT — Ollama rejects a JSON string here
+          // (400) when this assistant message is replayed next iteration.
+          function: { name: tc.name, arguments: tc.args },
         })),
       });
 
@@ -192,6 +264,11 @@ export class AgentOrchestrator {
       content: `Limite d'itérations atteinte (${maxIterations}). Réponse partielle disponible.`,
       code: 'MAX_ITERATIONS',
     };
+
+    } finally {
+      // Run terminé (ou interrompu) : (re)programme le déchargement du modèle.
+      this.idleUnloader?.end();
+    }
   }
 
   private buildSystemPrompt(ctx: {
@@ -224,10 +301,20 @@ export class AgentOrchestrator {
     }
 
     parts.push(
+      `\nChoix des outils (préfère TOUJOURS l'outil dédié plutôt que run_subagent) :`,
+      `- Voir / lister les tâches récurrentes déjà planifiées ("mes dailys", "tâches planifiées") → list_scheduled_tasks`,
+      `- Créer une tâche récurrente (quotidienne, etc.) → schedule_task (schedule "daily", "every 6h"… + une description de tâche)`,
+      `- Revue de presse tech à publier (récup + résumés + envoi Discord, tout-en-un) → post_tech_news_discord`,
+      `- Récupérer les actus tech sans publier → fetch_tech_news`,
+      `- run_subagent UNIQUEMENT pour déléguer une tâche complexe et ponctuelle qu'aucun outil dédié ne couvre — jamais pour planifier ou lister des tâches.`,
+    );
+
+    parts.push(
       `\nRègles importantes :`,
-      `- Utilise les outils avec parcimonie et seulement si nécessaire`,
+      `- Quand un outil peut répondre, APPELLE-le directement. N'écris jamais l'appel en texte/JSON et ne décris pas comment l'utiliser.`,
+      `- Après le résultat d'un outil, donne une réponse courte en langage naturel (1-3 phrases). Pas de JSON, pas de bloc de code sauf si on te le demande.`,
       `- Demande confirmation avant les actions irréversibles`,
-      `- Réponds en français sauf instruction contraire`,
+      `- Réponds TOUJOURS en français sauf instruction contraire`,
       `- Sois concis et précis`,
     );
 

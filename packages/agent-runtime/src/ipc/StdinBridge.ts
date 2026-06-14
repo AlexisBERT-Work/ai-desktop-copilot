@@ -10,6 +10,8 @@ const log = createLogger('ipc:bridge');
  */
 export class StdinBridge {
   private buffer = '';
+  /** Abort controller for the run in progress, used by the Stop button. */
+  private currentAbort: AbortController | null = null;
 
   constructor(private orchestrator: AgentOrchestrator) {}
 
@@ -47,6 +49,14 @@ export class StdinBridge {
 
   private async handleRequest(request: JsonRpcRequest): Promise<void> {
     log.debug('Request received', { id: request.id, method: request.method });
+
+    // Interruption: stop the in-flight run (Stop button). Handled before the
+    // typed switch since it's a control signal, not an AgentMethod.
+    if (request.method === 'agent.cancel') {
+      this.currentAbort?.abort();
+      this.sendResponse(request.id, { ok: true });
+      return;
+    }
 
     try {
       switch (request.method as AgentMethod) {
@@ -88,11 +98,16 @@ export class StdinBridge {
       config: Parameters<AgentOrchestrator['process']>[2];
     };
 
+    // Fresh abort controller for this run so a later `agent.cancel` can stop it.
+    const abort = new AbortController();
+    this.currentAbort = abort;
+
     try {
       for await (const step of this.orchestrator.process(
         params.input,
         params.conversationId,
         params.config,
+        abort.signal,
       )) {
         // Inject conversation/message ids so Tauri can route the event to the
         // right message (the orchestrator steps don't carry them).
@@ -106,6 +121,8 @@ export class StdinBridge {
       this.sendResponse(request.id, { done: true });
     } catch (err) {
       this.sendError(request.id, -32603, String(err));
+    } finally {
+      if (this.currentAbort === abort) this.currentAbort = null;
     }
   }
 

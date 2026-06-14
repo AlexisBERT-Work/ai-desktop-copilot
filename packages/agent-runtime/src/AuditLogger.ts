@@ -18,7 +18,7 @@ export class AuditLogger {
     this.write('RUN_START', { runId, conversationId, inputLength: input.length });
   }
 
-  completeRun(runId: string, status: 'success' | 'error' | 'max_iterations', output?: string): void {
+  completeRun(runId: string, status: 'success' | 'error' | 'max_iterations' | 'interrupted', output?: string): void {
     this.write('RUN_END', { runId, status, outputLength: output?.length ?? 0 });
   }
 

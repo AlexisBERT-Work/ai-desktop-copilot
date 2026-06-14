@@ -10,10 +10,10 @@ describe('ModelRouter', () => {
     expect(d.tier).toBe('small');
   });
 
-  it('utilise le gros modèle quand des outils sont impliqués', () => {
+  it("n'escalade PAS sur la simple présence d'outils (une tâche triviale reste petite)", () => {
     const d = router.route({ prompt: 'quelle heure est-il ?', usesTools: true });
-    expect(d.model).toBe('large-model');
-    expect(d.tier).toBe('large');
+    expect(d.model).toBe('small-model');
+    expect(d.tier).toBe('small');
   });
 
   it('utilise le gros modèle sur indices de complexité', () => {
@@ -61,9 +61,14 @@ describe('resolveModel (modes auto/light/code)', () => {
     expect(resolveModel({ ...base, mode: 'auto', input: 'bonjour' }).model).toBe('light-m');
   });
 
-  it('mode auto : code/complexe → heavy', () => {
-    expect(resolveModel({ ...base, mode: 'auto', input: 'refactor ce module' }).model).toBe('code-m');
-    expect(resolveModel({ ...base, mode: 'auto', input: 'salut', usesTools: true }).model).toBe('code-m');
+  it('mode auto : complexe → modèle principal demandé (pas le code lourd)', () => {
+    // En auto, la borne haute est `requested`; le modèle de code ne sert qu'en
+    // mode 'code' explicite (le 14B est trop lent en auto sur cette machine).
+    expect(resolveModel({ ...base, mode: 'auto', input: 'refactor ce module' }).model).toBe('default');
+  });
+
+  it("mode auto : la présence d'outils seule n'escalade pas (trivial → léger)", () => {
+    expect(resolveModel({ ...base, mode: 'auto', input: 'salut', usesTools: true }).model).toBe('light-m');
   });
 
   it('repli sur requested quand un modèle manque', () => {

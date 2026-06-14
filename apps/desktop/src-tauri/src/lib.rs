@@ -12,7 +12,7 @@ pub fn run() {
         )
         .init();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // Must be the first plugin: ensures only one CatDesk runs. A second
         // launch (e.g. autostart firing while it's already open) hands off to the
         // running instance — which reveals its bubble — then exits, instead of
@@ -26,10 +26,19 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init());
+
+    // The updater plugin requires a `plugins.updater` config block, which only
+    // exists in the release config (tauri.release.conf.json). Registering it in
+    // a dev build (plain tauri.conf.json) panics at startup, and a dev build
+    // should never self-update anyway — so it is release-only.
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    builder
         .invoke_handler(tauri::generate_handler![
             commands::chat::chat_send,
+            commands::chat::chat_cancel,
             commands::chat::get_ollama_models,
             commands::screen::screen_capture,
             commands::screen::screen_capture_active_window,
@@ -55,7 +64,9 @@ pub fn run() {
             ipc::bridge::start_agent_sidecar(app.handle().clone())?;
 
             // Check GitHub Releases for a newer signed build and self-update
-            // silently. No-op in dev / offline.
+            // silently. Release-only (needs plugins.updater config); a dev build
+            // must not self-update.
+            #[cfg(not(debug_assertions))]
             core::updater::spawn_update_check(app.handle().clone());
 
             // Register global hotkey: Ctrl+Space → toggle overlay

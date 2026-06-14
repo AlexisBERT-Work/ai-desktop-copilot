@@ -54,7 +54,12 @@ export interface OllamaToolCall {
   type: 'function';
   function: {
     name: string;
-    arguments: string; // JSON string
+    // Ollama returns arguments as an object and, crucially, expects them back
+    // as an OBJECT when the assistant message is replayed in a follow-up
+    // request. Sending a JSON *string* triggers a 400 ("Value looks like object,
+    // but can't find closing '}' symbol"). We allow both but normalise to an
+    // object before sending (see OllamaClient).
+    arguments: string | Record<string, unknown>;
   };
 }
 

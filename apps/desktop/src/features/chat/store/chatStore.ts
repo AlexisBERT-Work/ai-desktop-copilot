@@ -3,12 +3,23 @@ import { immer } from 'zustand/middleware/immer';
 import { invoke } from '@tauri-apps/api/core';
 import type { Message, Conversation } from '@catdesk/shared-types';
 
+/** État courant de l'agent, affiché comme petit texte sous le chat. */
+export type AgentStatus =
+  | 'idle'
+  | 'thinking'    // requête envoyée, en attente du LLM
+  | 'responding'  // tokens en cours de streaming
+  | 'tool'        // un outil s'exécute (voir activeTool)
+  | 'interrupted' // arrêté par l'utilisateur
+  | 'error';
+
 interface ChatState {
   conversations: Conversation[];
   messages: Record<string, Message[]>;
   activeConversationId: string;
   isStreaming: boolean;
   streamingMessageId: string | null;
+  status: AgentStatus;
+  activeTool: string | null;
   selectedModel: string;
   availableModels: string[];
   modelMode: 'auto' | 'light' | 'code';
@@ -24,6 +35,9 @@ interface ChatState {
   loadModels: () => Promise<void>;
   appendToken: (conversationId: string, messageId: string, token: string) => void;
   setPlan: (conversationId: string, messageId: string, steps: string[]) => void;
+  setToolActivity: (tool: string | null) => void;
+  setError: () => void;
+  interrupt: () => Promise<void>;
   finalizeMessage: (conversationId: string, messageId: string) => void;
 }
 
@@ -45,6 +59,8 @@ export const useChatStore = create<ChatState>()(
     activeConversationId: DEFAULT_CONVERSATION_ID,
     isStreaming: false,
     streamingMessageId: null,
+    status: 'idle',
+    activeTool: null,
     selectedModel: 'qwen2.5:7b',
     availableModels: ['qwen2.5:7b', 'llama3.2:3b', 'deepseek-r1:7b'],
     modelMode: 'auto',
@@ -69,6 +85,8 @@ export const useChatStore = create<ChatState>()(
         s.messages[conversationId] = msgs;
         s.isStreaming = true;
         s.streamingMessageId = assistantMessageId;
+        s.status = 'thinking';
+        s.activeTool = null;
       });
 
       // Add placeholder assistant message
@@ -105,19 +123,64 @@ export const useChatStore = create<ChatState>()(
           if (msg) msg.content = `❌ Erreur: ${String(err)}`;
           s.isStreaming = false;
           s.streamingMessageId = null;
+          s.status = 'error';
+          s.activeTool = null;
         });
       }
     },
 
     appendToken: (conversationId, messageId, token) => {
       set(s => {
+        // Ignore les tokens tardifs après une interruption / fin.
+        if (!s.isStreaming) return;
         // Repli robuste si le routage d'id est imprécis : conversation active
         // + message en cours de streaming.
         const msgs = s.messages[conversationId] ?? s.messages[s.activeConversationId];
         const msg = msgs?.find(m => m.id === messageId)
           ?? msgs?.find(m => m.id === s.streamingMessageId);
-        if (msg) msg.content += token;
+        if (msg) {
+          msg.content += token;
+          // Premier token reçu → on passe de « réfléchit » à « écrit ».
+          s.status = 'responding';
+          s.activeTool = null;
+        }
       });
+    },
+
+    setToolActivity: tool => {
+      set(s => {
+        if (!s.isStreaming) return;
+        if (tool) {
+          s.status = 'tool';
+          s.activeTool = tool;
+        } else {
+          // Outil terminé → l'agent repart vers le LLM.
+          s.status = 'thinking';
+          s.activeTool = null;
+        }
+      });
+    },
+
+    setError: () => {
+      set(s => {
+        s.isStreaming = false;
+        s.streamingMessageId = null;
+        s.status = 'error';
+        s.activeTool = null;
+      });
+    },
+
+    interrupt: async () => {
+      const { isStreaming } = get();
+      if (!isStreaming) return;
+      set(s => {
+        s.isStreaming = false;
+        s.streamingMessageId = null;
+        s.status = 'interrupted';
+        s.activeTool = null;
+      });
+      // Demande au backend d'arrêter réellement la génération en cours.
+      try { await invoke('chat_cancel'); } catch { /* best-effort */ }
     },
 
     setPlan: (conversationId, messageId, steps) => {
@@ -136,6 +199,9 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         s.isStreaming = false;
         s.streamingMessageId = null;
+        // Conserve un état terminal explicite (interrompu/erreur) ; sinon repos.
+        if (s.status !== 'interrupted' && s.status !== 'error') s.status = 'idle';
+        s.activeTool = null;
         const conv = s.conversations.find(c => c.id === conversationId);
         if (conv) {
           conv.updatedAt = Date.now();

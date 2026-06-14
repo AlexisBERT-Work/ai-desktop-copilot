@@ -3,6 +3,26 @@ import { createLogger } from '../logger';
 
 const log = createLogger('llm:ollama');
 
+/**
+ * Ollama expects `tool_calls[].function.arguments` as an OBJECT in request
+ * messages. A JSON string causes a 400 ("Value looks like object, but can't
+ * find closing '}' symbol"). Normalise any stringified arguments back to an
+ * object before sending.
+ */
+function normalizeToolCallArgs(m: OllamaMessage): OllamaMessage {
+  if (!m.tool_calls?.length) return m;
+  return {
+    ...m,
+    tool_calls: m.tool_calls.map((tc) => {
+      const args = tc.function.arguments;
+      if (typeof args !== 'string') return tc;
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(args) as Record<string, unknown>; } catch { /* keep {} */ }
+      return { ...tc, function: { ...tc.function, arguments: parsed } };
+    }),
+  };
+}
+
 export interface OllamaConfig {
   baseUrl: string;
   defaultModel?: string;
@@ -26,6 +46,8 @@ export interface ChatParams {
   keepAlive?: string;
   /** Taille de la fenêtre de contexte (num_ctx). Plus petit = moins de RAM. */
   numCtx?: number;
+  /** Signal d'abandon : interrompt la génération en cours (bouton Stop). */
+  signal?: AbortSignal;
 }
 
 export interface OllamaModel {
@@ -52,7 +74,7 @@ export class OllamaClient {
       model: params.model,
       messages: [
         ...(params.system ? [{ role: 'system', content: params.system }] : []),
-        ...params.messages,
+        ...params.messages.map(normalizeToolCallArgs),
       ],
       stream: true,
       tools: params.tools,
@@ -66,15 +88,22 @@ export class OllamaClient {
 
     log.debug('Chat request', { model: params.model, messageCount: body.messages.length, keepAlive });
 
+    // Abort on either the request timeout or the caller's signal (Stop button).
+    const timeoutSignal = AbortSignal.timeout(this.config.requestTimeout ?? 120_000);
+    const signal = params.signal
+      ? AbortSignal.any([timeoutSignal, params.signal])
+      : timeoutSignal;
+
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(this.config.requestTimeout ?? 120_000),
+        signal,
       });
     } catch (err) {
+      if (params.signal?.aborted) { return; } // interrupted by the user — stay silent
       const error = err instanceof Error ? err.message : 'Network error';
       log.error('Ollama connection failed', { error, url });
       yield { type: 'error', error: `Ollama non disponible: ${error}. Assurez-vous qu'Ollama tourne sur le port 11434.` };
@@ -99,6 +128,7 @@ export class OllamaClient {
 
     try {
       while (true) {
+        if (params.signal?.aborted) return; // Stop pressed — stop streaming silently
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -148,6 +178,12 @@ export class OllamaClient {
           }
         }
       }
+    } catch (err) {
+      // An abort (Stop button / timeout) rejects reader.read(); stay silent so
+      // the run ends cleanly instead of surfacing a scary error.
+      if (!params.signal?.aborted) {
+        yield { type: 'error', error: err instanceof Error ? err.message : String(err) };
+      }
     } finally {
       reader.releaseLock();
     }
@@ -172,6 +208,25 @@ export class OllamaClient {
       return response.ok;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Décharge immédiatement un modèle de la VRAM/RAM (mode passif). Ollama
+   * libère le modèle quand on lui envoie `keep_alive: 0` sans prompt. Best-effort :
+   * ne lève jamais — si Ollama est absent ou le modèle déjà déchargé, on ignore.
+   */
+  async unload(model: string): Promise<void> {
+    try {
+      await fetch(`${this.config.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, keep_alive: 0 }),
+        signal: AbortSignal.timeout(5000),
+      });
+      log.info('Model unloaded (passive mode)', { model });
+    } catch (err) {
+      log.debug('Unload failed (ignored)', { model, error: err instanceof Error ? err.message : String(err) });
     }
   }
 

@@ -90,6 +90,21 @@ pub async fn chat_send(
         .map_err(|e| e.to_string())
 }
 
+/// Interrupt the run currently in progress (Stop button).
+#[tauri::command]
+pub async fn chat_cancel(app: AppHandle) -> Result<(), String> {
+    info!("chat_cancel");
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "agent.cancel",
+        "params": {}
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// List locally available Ollama models.
 #[tauri::command]
 pub async fn get_ollama_models() -> Result<Vec<String>, String> {

@@ -4,6 +4,7 @@ import { X, Minimize2, Plus, ChevronDown } from 'lucide-react';
 import { useOverlayStore } from '../../overlay/overlayStore';
 import { useChatStore } from '../store/chatStore';
 import { MessageList } from './MessageList';
+import { StatusIndicator } from './StatusIndicator';
 import { InputArea } from './InputArea';
 import { ModelSelector } from './ModelSelector';
 import { ModeSelector } from './ModeSelector';
@@ -55,6 +56,9 @@ export function ChatWindow() {
 
       {/* Messages */}
       <MessageList conversationId={activeConversationId} />
+
+      {/* État de l'agent (réfléchit / écrit / outil / interrompu…) */}
+      <StatusIndicator />
 
       {/* Input */}
       <InputArea conversationId={activeConversationId} />

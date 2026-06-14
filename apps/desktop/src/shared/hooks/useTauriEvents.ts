@@ -11,7 +11,7 @@ import type { TokenEvent, DoneEvent, ErrorEvent } from '@catdesk/shared-types';
  * Called once at App root.
  */
 export function useTauriEvents() {
-  const { appendToken, setPlan, finalizeMessage } = useChatStore();
+  const { appendToken, setPlan, finalizeMessage, setToolActivity, setError } = useChatStore();
   const { toggle } = useOverlayStore();
   const { syncToRuntime } = useSettingsStore();
   const showSuggestion = useProactiveStore(s => s.show);
@@ -41,6 +41,15 @@ export function useTauriEvents() {
       }),
     );
 
+    // Tool activity → drives the "utilise un outil…" status
+    unlisteners.push(
+      listen<{ type?: string; toolName?: string }>('agent:tool_call', e => {
+        const { type, toolName } = e.payload;
+        if (type === 'tool_start') setToolActivity(toolName ?? null);
+        else setToolActivity(null); // tool_result / tool_error / tool_blocked → back to thinking
+      }),
+    );
+
     // Response complete
     unlisteners.push(
       listen<DoneEvent>('chat:done', e => {
@@ -51,6 +60,7 @@ export function useTauriEvents() {
     // Error
     unlisteners.push(
       listen<ErrorEvent>('chat:error', e => {
+        setError();
         finalizeMessage(e.payload.conversationId, e.payload.messageId ?? '');
       }),
     );
@@ -66,5 +76,5 @@ export function useTauriEvents() {
       clearTimeout(syncTimer);
       unlisteners.forEach(p => p.then(fn => fn()));
     };
-  }, [appendToken, setPlan, finalizeMessage, syncToRuntime, showSuggestion]);
+  }, [appendToken, setPlan, finalizeMessage, setToolActivity, setError, syncToRuntime, showSuggestion]);
 }

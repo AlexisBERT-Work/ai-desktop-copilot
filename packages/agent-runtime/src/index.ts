@@ -10,6 +10,7 @@ import { PermissionEngine } from './permissions/PermissionEngine';
 import { ContextManager } from './ContextManager';
 import { AuditLogger } from './AuditLogger';
 import { OllamaClient } from './llm/OllamaClient';
+import { IdleUnloader } from './llm/IdleUnloader';
 import { Planner } from './llm/Planner';
 import { ActivityTracker } from './ActivityTracker';
 import { SpiralMonitor } from './SpiralMonitor';
@@ -157,7 +158,14 @@ async function main() {
   const planner = new Planner(llm);
   // Suivi d'activité → alimente la détection de spirale en arrière-plan.
   const activity = new ActivityTracker();
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity);
+  // Mode passif : décharge le modèle de la VRAM après une période d'inactivité
+  // pour rendre le GPU aux autres applis (jeux, etc.). Désactivable via
+  // CATDESK_PASSIVE_MODE=0 ; fenêtre réglable via CATDESK_IDLE_UNLOAD_MS.
+  const idleUnloader = new IdleUnloader(llm, {
+    enabled: process.env['CATDESK_PASSIVE_MODE'] !== '0',
+    idleMs: Number(process.env['CATDESK_IDLE_UNLOAD_MS'] ?? 5 * 60 * 1000),
+  });
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader);
 
   // ─── Spiral monitor (proactive nudge) ──────────────────────
   // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur
@@ -203,7 +211,9 @@ async function main() {
     BrowserManager.get().shutdown();
     OcrSidecarClient.get().shutdown();
     db.close();
-    process.exit(0);
+    // Mode passif : libère la VRAM en quittant (best-effort, ne bloque pas l'arrêt).
+    void idleUnloader.unloadNow().finally(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5500).unref();
   });
 
   process.on('uncaughtException', err => {

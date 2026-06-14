@@ -57,9 +57,10 @@ export class ModelRouter {
 
     const prompt = input.prompt ?? '';
 
-    if (input.usesTools) {
-      return { model: this.large, tier: 'large', reason: 'Tâche avec outils (multi-étapes)' };
-    }
+    // NB : la simple disponibilité d'outils ne justifie PAS le gros modèle —
+    // les outils sont toujours exposés, donc escalader là-dessus enverrait
+    // chaque requête (même triviale) sur le modèle lourd. On route uniquement
+    // sur la complexité réelle du prompt.
     if (prompt.length > this.lengthThreshold) {
       return { model: this.large, tier: 'large', reason: `Requête longue (>${this.lengthThreshold} car.)` };
     }
@@ -97,10 +98,14 @@ export function resolveModel(i: ResolveModelInput): RouteDecision {
   if (i.mode === 'code') {
     return { model: i.code ?? i.requested, tier: i.code ? 'large' : 'forced', reason: 'Mode code (heavy) forcé' };
   }
-  // auto
-  const large = i.code ?? i.requested;
+  // auto : la borne haute est le modèle principal demandé (ex. qwen2.5:7b),
+  // PAS le modèle de code lourd — celui-ci ne sert qu'en mode 'code' explicite.
+  // Escalader vers le 14B en auto rendait chaque requête lente (il déborde de
+  // la VRAM). On ne fait donc plus que de l'éventuelle rétrogradation vers
+  // `light` pour les tâches triviales.
+  const large = i.requested;
   if (!i.light || i.light === large) {
-    return { model: large, tier: 'large', reason: 'Auto : pas de modèle léger distinct' };
+    return { model: large, tier: 'large', reason: 'Auto : modèle principal' };
   }
   return new ModelRouter({ small: i.light, large }).route({ prompt: i.input, usesTools: i.usesTools });
 }

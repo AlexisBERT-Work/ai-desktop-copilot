@@ -11,7 +11,7 @@ export function InputArea({ conversationId }: Props) {
   const [input, setInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { sendMessage, isStreaming } = useChatStore();
+  const { sendMessage, isStreaming, interrupt } = useChatStore();
 
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
@@ -96,19 +96,27 @@ export function InputArea({ conversationId }: Props) {
           >
             <Camera className="w-4 h-4" />
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!input.trim() || isStreaming}
-            className="p-2 rounded-lg bg-brand-600 text-white
-                       hover:bg-brand-500 disabled:opacity-30 disabled:cursor-not-allowed
-                       transition-colors"
-          >
-            {isStreaming ? (
+          {isStreaming ? (
+            <button
+              onClick={interrupt}
+              title="Interrompre"
+              className="p-2 rounded-lg bg-white/10 text-white
+                         hover:bg-white/20 transition-colors"
+            >
               <Square className="w-4 h-4" />
-            ) : (
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={!input.trim()}
+              title="Envoyer"
+              className="p-2 rounded-lg bg-brand-600 text-white
+                         hover:bg-brand-500 disabled:opacity-30 disabled:cursor-not-allowed
+                         transition-colors"
+            >
               <ArrowUp className="w-4 h-4" />
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </div>
 
