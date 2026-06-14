@@ -20,6 +20,8 @@ import { VectorStore } from './memory/VectorStore';
 import { WarmMemoryStore } from './memory/WarmMemoryStore';
 import { FactExtractor } from './memory/FactExtractor';
 import { MemoryConsolidator } from './memory/MemoryConsolidator';
+import { ConversationSummarizer } from './memory/ConversationSummarizer';
+import { Compactor } from './memory/Compactor';
 import { createLogger } from './logger';
 
 // ─── Tools ────────────────────────────────────────────────────
@@ -181,7 +183,12 @@ async function main() {
   // CATDESK_EXTRACT_MODEL (ex. un 14B dédié sur une grosse machine).
   const extractModel = process.env['CATDESK_EXTRACT_MODEL'] ?? process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b';
   const factExtractor = warmEnabled ? new FactExtractor(llm, extractModel, warmStore) : undefined;
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor);
+  // Compaction : replie l'historique ancien en résumé glissant (long sessions).
+  // Utilise le modèle d'extraction (capable) ; désactivable via CATDESK_COMPACTION=0.
+  const compactor = process.env['CATDESK_COMPACTION'] !== '0'
+    ? new Compactor(db, new ConversationSummarizer(llm, extractModel))
+    : undefined;
+  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor, compactor);
 
   // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
   // doublons inter-clés, purge des faits périmés et peu fiables). Déterministe,

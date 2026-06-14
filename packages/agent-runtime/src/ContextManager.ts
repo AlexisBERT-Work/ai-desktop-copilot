@@ -17,6 +17,8 @@ export interface AgentContext {
   relevantMemories?: string[];
   /** Durable user facts/preferences from the warm memory layer. */
   warmFacts?: string[];
+  /** Rolling summary of the older part of the conversation (compaction). */
+  conversationSummary?: string;
 }
 
 export class ContextManager {
@@ -27,13 +29,20 @@ export class ContextManager {
   ) {}
 
   async buildContext(conversationId: string, userInput: string): Promise<AgentContext> {
+    // If older turns were compacted, load only the messages after the marker
+    // and surface the rolling summary instead of the dropped history.
+    const summaryRow = this.db.getSummary(conversationId);
+    const sinceTs = summaryRow?.throughTs ?? 0;
+
     const [recentMessages, relevantMemories] = await Promise.allSettled([
-      this.db.getRecentMessages(conversationId, RECENT_MESSAGES_LIMIT),
+      Promise.resolve(this.db.getMessagesSince(conversationId, sinceTs, RECENT_MESSAGES_LIMIT * 2)),
       this.vectorStore.search(userInput, { limit: 5, minScore: 0.65 }),
     ]);
 
     const messages: OllamaMessage[] =
-      recentMessages.status === 'fulfilled' ? recentMessages.value : [];
+      recentMessages.status === 'fulfilled'
+        ? recentMessages.value.map(m => ({ role: m.role as OllamaMessage['role'], content: m.content }))
+        : [];
 
     const memories: string[] =
       relevantMemories.status === 'fulfilled'
@@ -62,6 +71,7 @@ export class ContextManager {
       messages: trimmed,
       ...(memories.length > 0 ? { relevantMemories: memories } : {}),
       ...(warmFacts.length > 0 ? { warmFacts } : {}),
+      ...(summaryRow?.summary ? { conversationSummary: summaryRow.summary } : {}),
     };
   }
 

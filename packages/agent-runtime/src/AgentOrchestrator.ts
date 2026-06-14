@@ -11,6 +11,7 @@ import type { Planner } from './llm/Planner';
 import type { ActivityTracker } from './ActivityTracker';
 import type { IdleUnloader } from './llm/IdleUnloader';
 import type { FactExtractor } from './memory/FactExtractor';
+import type { Compactor } from './memory/Compactor';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
 import { createLogger } from './logger';
 
@@ -58,6 +59,11 @@ export class AgentOrchestrator {
      * l'utilisateur. Voir CATDESK-CONCEPTS-AVANCES §3.
      */
     private factExtractor?: FactExtractor,
+    /**
+     * Compaction optionnelle : après un tour, replie l'historique ancien en un
+     * résumé glissant quand il devient long (CATDESK-CONCEPTS-AVANCES §2A).
+     */
+    private compactor?: Compactor,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -206,6 +212,11 @@ export class AgentOrchestrator {
         this.audit.completeRun(runId, 'success', fullResponse);
         // Persist the exchange so the next turn has conversational memory.
         this.context.recordTurn(conversationId, model, input, fullResponse);
+        // Compact older history into a rolling summary if it's grown long.
+        if (this.compactor) {
+          void this.compactor.maybeCompact(conversationId)
+            .catch(err => log.debug('Compaction failed', { error: String(err) }));
+        }
         // Mine durable facts from this exchange in the background (warm memory).
         // Fire-and-forget: never block or fail the user's response.
         if (this.factExtractor) {
@@ -305,6 +316,7 @@ export class AgentOrchestrator {
     screenText?: string;
     relevantMemories?: string[];
     warmFacts?: string[];
+    conversationSummary?: string;
   }, plan: string[] = []): string {
     const parts = [
       `Tu es CatDesk, un assistant IA desktop local tournant sur la machine de l'utilisateur.`,
@@ -324,6 +336,10 @@ export class AgentOrchestrator {
 
     if (ctx.screenText) {
       parts.push(`\nContenu visible à l'écran :\n${ctx.screenText.slice(0, 1500)}`);
+    }
+
+    if (ctx.conversationSummary) {
+      parts.push(`\nRésumé de la conversation jusqu'ici :\n${ctx.conversationSummary}`);
     }
 
     if (ctx.warmFacts && ctx.warmFacts.length > 0) {

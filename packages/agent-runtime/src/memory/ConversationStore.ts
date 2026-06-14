@@ -78,6 +78,13 @@ export class ConversationStore {
       CREATE INDEX IF NOT EXISTS idx_messages_conversation
         ON messages(conversation_id, created_at);
 
+      CREATE TABLE IF NOT EXISTS conversation_summaries (
+        conversation_id TEXT PRIMARY KEY,
+        summary TEXT NOT NULL,
+        through_ts INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS scheduled_tasks (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -221,6 +228,43 @@ export class ConversationStore {
        SET last_run_at=?, next_run_at=?, last_result=?, last_error=?, run_count=run_count+1
        WHERE id=?`,
       [opts.lastRunAt, opts.nextRunAt, opts.lastResult ?? null, opts.lastError ?? null, id],
+    );
+    this.persist();
+  }
+
+  // ─── Conversation compaction (rolling summary) ─────────────────
+
+  /** Messages created strictly after `sinceTs`, oldest first, with timestamps. */
+  getMessagesSince(conversationId: string, sinceTs: number, limit = 100): Array<{ role: string; content: string; createdAt: number }> {
+    const stmt = this.db.prepare(
+      `SELECT role, content, created_at FROM messages
+       WHERE conversation_id=? AND created_at > ? ORDER BY created_at ASC LIMIT ?`,
+    );
+    stmt.bind([conversationId, sinceTs, limit]);
+    const rows: Array<{ role: string; content: string; createdAt: number }> = [];
+    while (stmt.step()) {
+      const r = stmt.getAsObject() as { role: string; content: string; created_at: number };
+      rows.push({ role: r.role, content: r.content, createdAt: r.created_at });
+    }
+    stmt.free();
+    return rows;
+  }
+
+  getSummary(conversationId: string): { summary: string; throughTs: number } | null {
+    const stmt = this.db.prepare(
+      `SELECT summary, through_ts FROM conversation_summaries WHERE conversation_id=?`,
+    );
+    stmt.bind([conversationId]);
+    const row = stmt.step() ? (stmt.getAsObject() as { summary: string; through_ts: number }) : null;
+    stmt.free();
+    return row ? { summary: row.summary, throughTs: row.through_ts } : null;
+  }
+
+  setSummary(conversationId: string, summary: string, throughTs: number): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO conversation_summaries (conversation_id, summary, through_ts, updated_at)
+       VALUES (?,?,?,?)`,
+      [conversationId, summary, throughTs, Date.now()],
     );
     this.persist();
   }
