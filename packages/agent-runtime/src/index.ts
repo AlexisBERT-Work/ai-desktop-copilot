@@ -24,6 +24,7 @@ import { ConversationSummarizer } from './memory/ConversationSummarizer';
 import { Compactor } from './memory/Compactor';
 import { SemanticCache } from './memory/SemanticCache';
 import { PlaybookStore } from './playbook/PlaybookStore';
+import { EvolutionDaemon } from './playbook/EvolutionDaemon';
 import { createLogger } from './logger';
 
 // ─── Tools ────────────────────────────────────────────────────
@@ -212,6 +213,15 @@ async function main() {
   // sans LLM — tourne en fond sans déranger.
   const consolidator = warmEnabled ? new MemoryConsolidator(warmStore) : undefined;
   consolidator?.start();
+
+  // Daemon d'évolution (§8) : analyse périodiquement les traces du playbook,
+  // repère les échecs récurrents et les approches gagnantes, et écrit un rapport
+  // de PROPOSITIONS (evolution-proposals.json) — jamais appliquées d'office :
+  // l'humain reste dans la boucle. Désactivable via CATDESK_EVOLUTION=0.
+  const evolution = playbook && process.env['CATDESK_EVOLUTION'] !== '0'
+    ? new EvolutionDaemon(playbook)
+    : undefined;
+  evolution?.start();
 
   // ─── Spiral monitor (proactive nudge) ──────────────────────
   // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur

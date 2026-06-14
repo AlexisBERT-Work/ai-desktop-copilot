@@ -18,6 +18,15 @@ export interface BestApproach {
   attempts: number;
 }
 
+/** One row of the strategy table — the raw trace the evolution daemon reads. */
+export interface StrategyRow {
+  taskType: string;
+  approach: string;
+  successes: number;
+  failures: number;
+  updatedAt: number;
+}
+
 // sql.js (WASM), loaded lazily — mirrors the other stores.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let SQL: any = null;
@@ -93,6 +102,28 @@ export class PlaybookStore {
     }
     stmt.free();
     return result;
+  }
+
+  /** All recorded strategies — the trace set the evolution daemon analyzes. */
+  allStrategies(): StrategyRow[] {
+    const stmt = this.db.prepare(
+      `SELECT task_type, approach, successes, failures, updated_at FROM strategies`,
+    );
+    const rows: StrategyRow[] = [];
+    while (stmt.step()) {
+      const r = stmt.getAsObject() as {
+        task_type: string; approach: string; successes: number; failures: number; updated_at: number;
+      };
+      rows.push({
+        taskType: r.task_type,
+        approach: r.approach,
+        successes: r.successes,
+        failures: r.failures,
+        updatedAt: r.updated_at,
+      });
+    }
+    stmt.free();
+    return rows;
   }
 
   private persist(): void {
