@@ -5,3 +5,4 @@ pub mod permissions;
 pub mod screen;
 pub mod settings;
 pub mod system;
+pub mod tuning;

@@ -176,7 +176,25 @@ pub async fn get_gpu_vram_bytes() -> Result<Option<u64>, String> {
     Ok(detect_vram_bytes().await)
 }
 
-async fn detect_vram_bytes() -> Option<u64> {
+/// The heaviest locally-installed model (largest on-disk size), ignoring
+/// embedding models — a good proxy for the model whose VRAM fit actually
+/// matters. `None` when Ollama is unreachable or has no non-embedding model.
+pub(crate) async fn heaviest_model() -> Option<ModelInfo> {
+    let response = reqwest::get("http://127.0.0.1:11434/api/tags").await.ok()?;
+    let json: serde_json::Value = response.json().await.ok()?;
+    json["models"].as_array()?.iter()
+        .filter_map(|m| {
+            let name = m["name"].as_str()?.to_string();
+            // Embedding models never dominate VRAM; skip them.
+            if name.contains("embed") {
+                return None;
+            }
+            Some(ModelInfo { name, size_bytes: m["size"].as_u64().unwrap_or(0) })
+        })
+        .max_by_key(|m| m.size_bytes)
+}
+
+pub(crate) async fn detect_vram_bytes() -> Option<u64> {
     if let Some(v) = nvidia_vram().await {
         return Some(v);
     }

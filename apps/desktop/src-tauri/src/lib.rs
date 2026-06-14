@@ -53,6 +53,8 @@ pub fn run() {
             commands::clipboard::clipboard_write,
             commands::permissions::permission_respond,
             commands::settings::update_settings,
+            commands::tuning::get_kv_cache_status,
+            commands::tuning::set_kv_cache_type,
         ])
         .setup(|app| {
             info!("CatDesk starting up");
