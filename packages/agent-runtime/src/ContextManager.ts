@@ -65,6 +65,26 @@ export class ContextManager {
     };
   }
 
+  /**
+   * Persist a completed exchange so the next turn has conversational memory.
+   * Until this was wired, messages were never stored and every turn started
+   * blind (only warm facts + vector memories survived). Best-effort: never
+   * throws into the run path.
+   */
+  recordTurn(conversationId: string, model: string, userText: string, assistantText: string): void {
+    try {
+      this.db.createConversation(conversationId, model);
+      if (userText.trim()) {
+        this.db.addMessage(conversationId, { id: crypto.randomUUID(), role: 'user', content: userText });
+      }
+      if (assistantText.trim()) {
+        this.db.addMessage(conversationId, { id: crypto.randomUUID(), role: 'assistant', content: assistantText });
+      }
+    } catch (err) {
+      log.warn('recordTurn failed', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
   private trimMessages(messages: OllamaMessage[], maxChars: number): OllamaMessage[] {
     let totalChars = 0;
     const result: OllamaMessage[] = [];

@@ -204,6 +204,8 @@ export class AgentOrchestrator {
           yield { type: 'token', content: fullResponse };
         }
         this.audit.completeRun(runId, 'success', fullResponse);
+        // Persist the exchange so the next turn has conversational memory.
+        this.context.recordTurn(conversationId, model, input, fullResponse);
         // Mine durable facts from this exchange in the background (warm memory).
         // Fire-and-forget: never block or fail the user's response.
         if (this.factExtractor) {
