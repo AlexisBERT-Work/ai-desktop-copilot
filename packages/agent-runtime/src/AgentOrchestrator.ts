@@ -230,6 +230,9 @@ export class AgentOrchestrator {
         this.audit.completeRun(runId, 'success', fullResponse);
         // Persist the exchange so the next turn has conversational memory.
         this.context.recordTurn(conversationId, model, input, fullResponse);
+        // Index it for cross-conversation semantic recall (fire-and-forget).
+        void this.context.rememberExchange(conversationId, input, fullResponse)
+          .catch(err => log.debug('rememberExchange failed', { error: String(err) }));
         // Playbook (§8): this approach worked for this task type.
         this.playbook?.record(taskType, approachSignature(usedTools), true);
         // Compact older history into a rolling summary if it's grown long.

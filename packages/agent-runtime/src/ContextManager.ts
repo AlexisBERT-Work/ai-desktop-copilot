@@ -95,6 +95,21 @@ export class ContextManager {
     }
   }
 
+  /**
+   * Index a completed exchange into the semantic store for cross-conversation
+   * recall (the vector layer was never populated before this). Async: embeds via
+   * Ollama, so the orchestrator calls it fire-and-forget.
+   */
+  async rememberExchange(conversationId: string, userText: string, assistantText: string): Promise<void> {
+    const content = `Utilisateur : ${userText.trim()}\nAssistant : ${assistantText.trim()}`.trim();
+    if (content.length < 16) return; // nothing worth indexing
+    try {
+      await this.vectorStore.store(content, { conversationId, kind: 'exchange', ts: Date.now() });
+    } catch (err) {
+      log.warn('rememberExchange failed', { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
   private trimMessages(messages: OllamaMessage[], maxChars: number): OllamaMessage[] {
     let totalChars = 0;
     const result: OllamaMessage[] = [];

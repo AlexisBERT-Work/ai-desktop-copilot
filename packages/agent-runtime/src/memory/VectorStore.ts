@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { bm25Scores } from './bm25';
 import { createLogger } from '../logger';
 
 const log = createLogger('memory:vector');
@@ -77,28 +78,28 @@ export class VectorStore {
     if (candidates.length === 0) return [];
 
     const queryEmbedding = await this.tryEmbed(query);
+    const denseOk = !!queryEmbedding && candidates.some(v => v.embedding.length === queryEmbedding.length);
 
-    let scored: VectorSearchResult[];
-    if (queryEmbedding && candidates.some(v => v.embedding.length > 0)) {
-      // Recherche sémantique (cosinus)
-      scored = candidates
-        .filter(v => v.embedding.length === queryEmbedding.length)
-        .map(v => ({
-          id: v.id,
-          content: v.content,
-          score: cosineSimilarity(queryEmbedding, v.embedding),
-          ...(v.metadata ? { metadata: v.metadata } : {}),
-        }));
-    } else {
-      // Repli mots-clés
-      const terms = tokenize(query);
-      scored = candidates.map(v => ({
+    // Sparse signal: real BM25 (good at exact keywords / identifiers), normalized.
+    const bm25 = bm25Scores(query, candidates.map(v => ({ id: v.id, content: v.content })));
+    const maxBm = Math.max(0, ...bm25.values());
+
+    // Hybrid fusion via a soft-OR: a strong single signal stays high (so existing
+    // cosine thresholds keep working) while agreement between dense and sparse
+    // boosts the score. dense defaults to 0 when embeddings are unavailable.
+    const scored: VectorSearchResult[] = candidates.map(v => {
+      const dense = denseOk && v.embedding.length === queryEmbedding!.length
+        ? Math.max(0, cosineSimilarity(queryEmbedding!, v.embedding))
+        : 0;
+      const sparse = maxBm > 0 ? (bm25.get(v.id) ?? 0) / maxBm : 0;
+      const score = 1 - (1 - dense) * (1 - sparse);
+      return {
         id: v.id,
         content: v.content,
-        score: keywordScore(terms, v.content),
+        score,
         ...(v.metadata ? { metadata: v.metadata } : {}),
-      }));
-    }
+      };
+    });
 
     return scored
       .filter(r => r.score >= minScore)
@@ -168,21 +169,6 @@ function cosineSimilarity(a: number[], b: number[]): number {
   }
   if (normA === 0 || normB === 0) return 0;
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-zà-ÿ0-9]+/i)
-    .filter(t => t.length > 2);
-}
-
-/** Score mots-clés normalisé [0,1] : proportion des termes de la requête présents. */
-function keywordScore(queryTerms: string[], content: string): number {
-  if (queryTerms.length === 0) return 0;
-  const contentLower = content.toLowerCase();
-  const hits = queryTerms.filter(t => contentLower.includes(t)).length;
-  return hits / queryTerms.length;
 }
 
 function matchesFilter(metadata: Record<string, unknown> | undefined, filter: Record<string, unknown>): boolean {
