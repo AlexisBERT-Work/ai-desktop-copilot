@@ -11,6 +11,7 @@ import type { Planner } from './llm/Planner';
 import type { ActivityTracker } from './ActivityTracker';
 import type { IdleUnloader } from './llm/IdleUnloader';
 import type { FactExtractor } from './memory/FactExtractor';
+import { sanitizeToolOutput } from './security/sanitizeToolOutput';
 import { createLogger } from './logger';
 
 const log = createLogger('agent:orchestrator');
@@ -252,11 +253,22 @@ export class AgentOrchestrator {
           this.activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
 
           yield { type: 'tool_result', toolName: toolCall.name, result };
-          messages.push({
-            role: 'tool',
-            content: JSON.stringify(result.success ? result.data : { error: result.error }),
-            tool_call_id: toolCall.id,
-          });
+          // Post-execution safety scan (§7): a tool output becomes LLM context,
+          // so redact secrets and neutralize injection BEFORE it gets there.
+          let content = JSON.stringify(result.success ? result.data : { error: result.error });
+          if (result.success) {
+            const scan = sanitizeToolOutput(content);
+            content = scan.text;
+            if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {
+              log.warn('Tool output sanitized', {
+                runId,
+                tool: toolCall.name,
+                redactions: scan.redactions,
+                injection: scan.injectionFlags,
+              });
+            }
+          }
+          messages.push({ role: 'tool', content, tool_call_id: toolCall.id });
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           log.error('Tool execution failed', { tool: toolCall.name, error });
