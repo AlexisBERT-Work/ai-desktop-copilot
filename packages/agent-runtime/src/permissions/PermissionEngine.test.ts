@@ -1,0 +1,48 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { join } from 'path';
+import { PermissionEngine } from './PermissionEngine';
+
+const req = (path: string) => ({
+  tool: 'read_file',
+  args: { path },
+  context: { conversationId: 'c' },
+});
+
+// Same env vars the engine expands, so the test is machine-independent.
+const HOME = process.env['USERPROFILE'] ?? 'C:/Users/user';
+const TEMP = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
+
+describe('PermissionEngine path whitelist', () => {
+  let engine: PermissionEngine;
+  beforeEach(() => { engine = new PermissionEngine(); });
+
+  it('allows a path under %USERPROFILE%\\Documents (backslashes)', async () => {
+    const r = await engine.check(req(join(HOME, 'Documents', 'notes.txt')));
+    expect(r.granted).toBe(true);
+  });
+
+  it('allows the same path written with forward slashes and lowercased', async () => {
+    // This is exactly the shape the whitelist failed to match before the fix:
+    // the candidate is normalized to lowercase/forward-slash, the whitelist was not.
+    const lower = join(HOME, 'Documents', 'notes.txt').replace(/\\/g, '/').toLowerCase();
+    const r = await engine.check(req(lower));
+    expect(r.granted).toBe(true);
+  });
+
+  it('allows a path under %TEMP%', async () => {
+    const r = await engine.check(req(join(TEMP, 'catdesk', 'x.txt')));
+    expect(r.granted).toBe(true);
+  });
+
+  it('denies a path outside the whitelist', async () => {
+    const r = await engine.check(req('C:/Windows/System32/drivers/etc/hosts'));
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('Chemin non autorisé');
+  });
+
+  it('allows everything when the whitelist is empty', async () => {
+    engine.updateConfig({ pathWhitelist: [] });
+    const r = await engine.check(req('C:/Windows/System32/config/SAM'));
+    expect(r.granted).toBe(true);
+  });
+});

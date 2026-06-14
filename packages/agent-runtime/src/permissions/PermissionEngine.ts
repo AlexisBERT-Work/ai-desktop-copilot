@@ -124,13 +124,19 @@ export class PermissionEngine {
   private isPathAllowed(path: string): boolean {
     if (this.config.pathWhitelist.length === 0) return true;
 
-    const normalized = path.toLowerCase().replace(/\\/g, '/');
+    // Normalize the same way on both sides: lowercase + forward slashes. This
+    // MUST be applied AFTER env-var expansion so the expanded values (which keep
+    // their original casing and backslashes) are normalized too — otherwise a
+    // whitelist entry like "%USERPROFILE%\Documents" expands to
+    // "C:/Users/Name\Documents" and never matches a lowercased "/documents/…".
+    const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();
 
-    // Expand Windows env vars for comparison
+    const userProfile = process.env['USERPROFILE'] ?? 'C:/Users/user';
+    const temp = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
+
+    const normalized = norm(path);
     const expandedWhitelist = this.config.pathWhitelist.map(p =>
-      p.toLowerCase()
-        .replace('%userprofile%', (process.env['USERPROFILE'] ?? 'C:/Users/user').replace(/\\/g, '/'))
-        .replace('%temp%', (process.env['TEMP'] ?? 'C:/Temp').replace(/\\/g, '/')),
+      norm(p.replace(/%userprofile%/gi, userProfile).replace(/%temp%/gi, temp)),
     );
 
     return expandedWhitelist.some(allowed => normalized.startsWith(allowed));
