@@ -479,6 +479,7 @@ export const TOOL_SCHEMAS = {
     required: ['task'],
     properties: {
       task: { type: 'string' as const, description: 'Task description for the sub-agent to complete autonomously' },
+      context: { type: 'string' as const, description: 'Curated background the sub-agent needs (relevant facts, file paths, prior findings) — pass exactly what it needs to act, not your whole conversation. The sub-agent starts fresh and only sees this.' },
       max_iterations: { type: 'number' as const, default: 5, description: 'Max ReAct iterations for the sub-agent (1-8)' },
     },
   },

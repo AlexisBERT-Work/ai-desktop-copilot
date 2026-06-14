@@ -21,6 +21,13 @@ export interface SubAgentOptions {
   maxIterations?: number;
   temperature?: number;
   enabledTools?: string[];
+  /**
+   * Curated context the orchestrator chooses to hand down (§6). A sub-agent
+   * runs in an isolated window with a fresh conversation, so without this it
+   * only sees the bare task. The research is clear: no-context fails for lack
+   * of critical detail, full-context dilutes — curated wins.
+   */
+  context?: string;
 }
 
 /**
@@ -43,7 +50,13 @@ export class SubAgentRunner {
       maxIterations = 5,
       temperature = 0.3,
       enabledTools = this.subAgentToolList(),
+      context,
     } = opts;
+
+    // Curated context first, then the task — the sub-agent has nothing else.
+    const input = context?.trim()
+      ? `Contexte fourni par l'agent principal (utilise-le, ne redemande pas ces infos) :\n${context.trim()}\n\n---\n\nTâche à accomplir :\n${task}`
+      : task;
 
     const conversationId = `sub-${crypto.randomUUID()}`;
     const config: AgentConfig = {
@@ -62,7 +75,7 @@ export class SubAgentRunner {
     let error: string | undefined;
     let iterations = 0;
 
-    for await (const step of this.orchestrator.process(task, conversationId, config)) {
+    for await (const step of this.orchestrator.process(input, conversationId, config)) {
       if (step.type === 'done') {
         output = step.content;
         success = true;

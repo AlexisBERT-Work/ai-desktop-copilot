@@ -5,6 +5,7 @@ import type { SubAgentRunner } from '../../SubAgentRunner';
 
 interface RunSubAgentArgs {
   task: string;
+  context?: string;
   max_iterations?: number;
 }
 
@@ -21,12 +22,15 @@ export class RunSubAgentTool extends BaseTool {
   }
 
   async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { task, max_iterations = 5 } = rawArgs as RunSubAgentArgs;
+    const { task, context, max_iterations = 5 } = rawArgs as RunSubAgentArgs;
 
     if (!task?.trim()) return this.fail('task est requis');
     const capped = Math.min(Math.max(1, max_iterations), 8);
 
-    const result = await this.runner.run(task, { maxIterations: capped });
+    const result = await this.runner.run(task, {
+      maxIterations: capped,
+      ...(context?.trim() ? { context } : {}),
+    });
 
     return this.ok({
       task,
