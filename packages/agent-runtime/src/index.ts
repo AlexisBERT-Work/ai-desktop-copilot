@@ -162,7 +162,11 @@ async function main() {
   tools.register(new GitHubPRTool());
   tools.register(new CaptureScreenTool());
   tools.register(new OcrRegionTool());
-  tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'llava:7b'));
+  // Vision model for describe_screen. Its output is shown to the user verbatim,
+  // so French quality matters: llama3.2-vision:11b reads UIs/charts well and
+  // speaks coherent French, and fits a ~10 GiB GPU in q4 (the old llava:7b
+  // default produced weak French). Override via CATDESK_VISION_MODEL.
+  tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'llama3.2-vision:11b'));
   tools.register(new TranscribeAudioTool());
 
   // ─── Agent ─────────────────────────────────────────────────
