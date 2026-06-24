@@ -1,7 +1,8 @@
 import { spawn } from 'child_process';
 import type { ChildProcess } from 'child_process';
 import { createInterface } from 'readline';
-import { join } from 'path';
+import { existsSync } from 'fs';
+import { join, dirname, parse } from 'path';
 import { createLogger } from '../logger';
 
 const log = createLogger('ocr:client');
@@ -31,17 +32,39 @@ export class OcrSidecarClient {
     return OcrSidecarClient._instance;
   }
 
+  private _repoRoot: string | null = null;
+
+  /**
+   * Locate the monorepo root that holds `packages/ocr-vision`. We can't rely on
+   * `process.cwd()`: in dev the agent runs with its cwd set to
+   * `packages/agent-runtime`, so `join(cwd, 'packages/ocr-vision/…')` doubled
+   * the path (`…/agent-runtime/packages/ocr-vision`) and spawn ENOENT'd. Walk up
+   * from cwd until we find the OCR sidecar; fall back to cwd if not found.
+   */
+  private repoRoot(): string {
+    if (this._repoRoot) return this._repoRoot;
+    let dir = process.cwd();
+    const { root } = parse(dir);
+    for (;;) {
+      if (existsSync(join(dir, 'packages', 'ocr-vision', 'main.py'))) break;
+      if (dir === root) { dir = process.cwd(); break; }
+      dir = dirname(dir);
+    }
+    this._repoRoot = dir;
+    return dir;
+  }
+
   private pythonPath(): string {
     return (
       process.env['OCR_PYTHON'] ??
-      join(process.cwd(), 'packages/ocr-vision/.venv/Scripts/python.exe')
+      join(this.repoRoot(), 'packages/ocr-vision/.venv/Scripts/python.exe')
     );
   }
 
   private scriptPath(): string {
     return (
       process.env['OCR_SCRIPT'] ??
-      join(process.cwd(), 'packages/ocr-vision/main.py')
+      join(this.repoRoot(), 'packages/ocr-vision/main.py')
     );
   }
 
@@ -85,6 +108,18 @@ export class OcrSidecarClient {
     this.proc.stderr?.on('data', (d: Buffer) => {
       const line = d.toString().trim();
       if (line) log.debug('OCR sidecar', { msg: line });
+    });
+
+    // spawn() emits 'error' (e.g. ENOENT when the venv/exe is missing) instead
+    // of throwing. Without this handler the event is unhandled and crashes the
+    // whole agent as an uncaught exception; here we fail the start gracefully so
+    // the calling tool just reports the OCR sidecar is unavailable.
+    this.proc.on('error', err => {
+      log.error('OCR sidecar failed to start', { command, message: err.message });
+      this.proc = null;
+      this.startPromise = null;
+      for (const [, handler] of this.pending) handler.reject(err);
+      this.pending.clear();
     });
 
     this.proc.on('exit', code => {
