@@ -55,6 +55,7 @@ pub fn run() {
             commands::settings::update_settings,
             commands::tuning::get_kv_cache_status,
             commands::tuning::set_kv_cache_type,
+            commands::tuning::get_recommended_model,
         ])
         .setup(|app| {
             info!("CatDesk starting up");

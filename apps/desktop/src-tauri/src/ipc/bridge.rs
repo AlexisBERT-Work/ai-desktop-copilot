@@ -102,7 +102,17 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
 }
 
 async fn launch_sidecar(app: AppHandle) -> Result<()> {
-    let launch = resolve_agent_launch(&app)?;
+    let mut launch = resolve_agent_launch(&app)?;
+
+    // Default the agent's model to what this machine can run well — the same
+    // VRAM-based rule the chat UI uses. Without this the agent falls back to a
+    // hard-coded model that may not even be installed (tools, sub-agents, fact
+    // extraction). CATDESK_MODEL_SMALL is the light tier it can downgrade to.
+    let model = crate::commands::tuning::recommend_default_model(
+        crate::commands::chat::detect_vram_bytes().await,
+    );
+    launch.env.push(("CATDESK_MODEL".into(), model.into()));
+    launch.env.push(("CATDESK_MODEL_SMALL".into(), "qwen2.5:7b".into()));
 
     let mut cmd = tokio::process::Command::new(&launch.program);
     cmd.current_dir(&launch.work_dir)

@@ -5,7 +5,7 @@ import type { PermissionEngine } from './permissions/PermissionEngine';
 import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
 import { resolveModel } from './llm/ModelRouter';
-import { recoverToolCalls, looksLikeToolCallStart } from './llm/recoverToolCalls';
+import { recoverToolCalls, looksLikeToolCallStart, looksLikePreamble } from './llm/recoverToolCalls';
 import { selectTools } from './llm/selectTools';
 import type { Planner } from './llm/Planner';
 import type { ActivityTracker } from './ActivityTracker';
@@ -210,10 +210,14 @@ export class AgentOrchestrator {
       for await (const chunk of stream) {
         if (chunk.type === 'token') {
           fullResponse += chunk.content;
-          // Withhold from the live UI if the response opens like a tool call
+          // Withhold from the live UI if the response opens like (a) a tool call
           // emitted as text (raw JSON / <tool_call> tags) — we may recover and
-          // execute it below instead of flashing a JSON blob at the user.
-          if (!streamedToUser && !withholding && looksLikeToolCallStart(fullResponse)) {
+          // execute it below instead of flashing a JSON blob — or (b) a "je vais
+          // faire X, attends…" preamble that precedes a tool call. In both cases
+          // we decide at end-of-turn: drop it if a tool call follows, flush it as
+          // the genuine answer otherwise.
+          if (!streamedToUser && !withholding
+              && (looksLikeToolCallStart(fullResponse) || looksLikePreamble(fullResponse))) {
             withholding = true;
           }
           if (!withholding) {
@@ -429,6 +433,7 @@ export class AgentOrchestrator {
     parts.push(
       `\nRègles importantes :`,
       `- Quand un outil peut répondre, APPELLE-le directement. N'écris jamais l'appel en texte/JSON et ne décris pas comment l'utiliser.`,
+      `- N'annonce JAMAIS ce que tu vas faire avant de le faire (pas de « Je vais capturer l'écran… », « Attends une seconde… », « Laisse-moi… »). Appelle l'outil tout de suite, en silence, puis commente seulement le résultat.`,
       `- Après le résultat d'un outil, donne une réponse courte en langage naturel (1-3 phrases). Pas de JSON, pas de bloc de code sauf si on te le demande.`,
       `- Demande confirmation avant les actions irréversibles`,
       `- Réponds TOUJOURS en français sauf instruction contraire`,

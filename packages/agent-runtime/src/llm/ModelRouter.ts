@@ -9,7 +9,7 @@
  */
 
 export interface ModelRouterConfig {
-  /** Modèle léger/rapide (ex. 'qwen2.5:3b'). */
+  /** Modèle léger/rapide (ex. 'qwen2.5:7b'). */
   small: string;
   /** Modèle principal/puissant (ex. 'qwen2.5:14b'). */
   large: string;
@@ -39,6 +39,20 @@ const COMPLEX_HINTS = [
   /```/, // contient un bloc de code
 ];
 
+// Indices d'une requête d'ACTION (impératif orienté-outil) : capturer l'écran,
+// ouvrir/lire un fichier, cliquer, envoyer un message… Même courtes, ces tâches
+// déclenchent un outil et exigent (a) un appel d'outil fiable et (b) une narration
+// correcte — deux choses que le petit modèle rate (français cassé, outil annoncé
+// en texte au lieu d'être appelé). On les garde donc sur le gros modèle plutôt que
+// de les rétrograder comme de simples « tâches courtes ».
+const ACTION_HINTS = [
+  /\b(captur|screenshot|d[ée]cri|montre|affiche|vois[ -]?tu|que vois|[àa] l.?[ée]cran|screen)/i,
+  /\b(ouvr|lance|d[ée]marr|ex[ée]cut|ferme|clique|tape|saisi|appuie)/i,
+  /\b(lis|lire|[ée]cri|r[ée]dige|envoi|envoy|publi|poste|partage|transcri)/i,
+  /\b(cherch|recherch|trouve|t[ée]l[ée]charg|enregistre|sauvegarde|supprim|d[ée]plac|renomme|cr[ée]e)/i,
+  /\b(open|launch|run|click|read|write|send|search|download|delete|describe|show|capture)\b/i,
+];
+
 export class ModelRouter {
   private readonly small: string;
   private readonly large: string;
@@ -66,6 +80,9 @@ export class ModelRouter {
     }
     if (COMPLEX_HINTS.some(re => re.test(prompt))) {
       return { model: this.large, tier: 'large', reason: 'Indices de tâche complexe détectés' };
+    }
+    if (ACTION_HINTS.some(re => re.test(prompt))) {
+      return { model: this.large, tier: 'large', reason: "Requête d'action orientée-outil (pas de rétrogradation)" };
     }
 
     return { model: this.small, tier: 'small', reason: 'Tâche simple/courte → modèle rapide' };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recoverToolCalls, looksLikeToolCallStart } from './recoverToolCalls';
+import { recoverToolCalls, looksLikeToolCallStart, looksLikePreamble } from './recoverToolCalls';
 
 const known = new Set(['run_subagent', 'list_scheduled_tasks', 'schedule_task']);
 
@@ -64,5 +64,24 @@ describe('looksLikeToolCallStart', () => {
   it('does not flag prose', () => {
     expect(looksLikeToolCallStart('Bonjour, voici')).toBe(false);
     expect(looksLikeToolCallStart('Tu as 0 tâche')).toBe(false);
+  });
+});
+
+describe('looksLikePreamble', () => {
+  it('flags "I will do X / hang on" preambles before a tool call', () => {
+    expect(looksLikePreamble('Je vais capturer l’écran actuel et te dire ce que je vois.')).toBe(true);
+    expect(looksLikePreamble('Ok, je vais ouvrir le fichier.')).toBe(true);
+    expect(looksLikePreamble('Attends une seconde, je prépare la capture.')).toBe(true);
+    expect(looksLikePreamble('Laisse-moi regarder ça.')).toBe(true);
+    expect(looksLikePreamble('Un instant…')).toBe(true);
+    // The garbled real example: cue appears after a leading interjection.
+    expect(looksLikePreamble('O faire ça, je vais capturer l’écran actuelel.')).toBe(true);
+  });
+
+  it('does not flag a genuine answer', () => {
+    expect(looksLikePreamble('Tu as actuellement 0 tâche planifiée.')).toBe(false);
+    expect(looksLikePreamble('Je vais bien, merci !')).toBe(false);
+    expect(looksLikePreamble('Sur ton écran, je vois un éditeur de code.')).toBe(false);
+    expect(looksLikePreamble('Voici le résumé de la page.')).toBe(false);
   });
 });

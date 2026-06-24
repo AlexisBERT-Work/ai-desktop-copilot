@@ -20,7 +20,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
-      defaultModel: 'qwen2.5:7b',
+      defaultModel: 'qwen3:14b',
       temperature: 0.7,
       maxIterations: 10,
       safeMode: false,

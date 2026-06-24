@@ -33,6 +33,21 @@ describe('ModelRouter', () => {
     expect(d.model).toBe('large-model');
   });
 
+  it("ne rétrograde PAS une requête d'action courte (capture écran, ouvre, envoie…)", () => {
+    // Régression : « Capture mon écran et décris ce que tu vois » partait sur le
+    // 3B (court + sans mot-clé complexe) qui sortait un français cassé.
+    expect(router.route({ prompt: 'Capture mon écran et décris ce que tu vois' }).model).toBe('large-model');
+    expect(router.route({ prompt: 'ouvre le fichier rapport.pdf' }).model).toBe('large-model');
+    expect(router.route({ prompt: 'envoie un message sur Discord' }).model).toBe('large-model');
+    expect(router.route({ prompt: 'que vois-tu à l’écran ?' }).model).toBe('large-model');
+  });
+
+  it('garde le petit modèle pour une vraie trivialité conversationnelle', () => {
+    expect(router.route({ prompt: 'bonjour' }).model).toBe('small-model');
+    expect(router.route({ prompt: 'quelle heure est-il ?' }).model).toBe('small-model');
+    expect(router.route({ prompt: 'merci beaucoup' }).model).toBe('small-model');
+  });
+
   it('respecte forceModel', () => {
     const d = router.route({ prompt: 'bonjour', forceModel: 'pinned-model' });
     expect(d.model).toBe('pinned-model');

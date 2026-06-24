@@ -1,58 +1,188 @@
-# CAPACITÉS — Tout ce que CatDesk sait (ou saura) faire
+# CE QUE CATDESK SAIT FAIRE
 
-> Carte de vision, à jour au 2026-06-11. ✅ fonctionne · 🟡 câblé/partiel · ⬜ prévu.
-> Inventaire basé sur les outils réellement enregistrés dans
-> `packages/agent-runtime/src/index.ts`.
+> Document unique de référence sur les capacités de CatDesk.
+> À jour au **2026-06-15**. Inventaire basé sur les **51 outils réellement
+> enregistrés** dans [index.ts](../packages/agent-runtime/src/index.ts) et leurs
+> niveaux de risque dans
+> [permissions.ts](../packages/shared-types/src/permissions.ts).
+>
+> Pour ce que CatDesk **ne sait pas (encore) faire**, voir [LIMITES.md](LIMITES.md).
+> Pour les détails techniques : [README](../README.md) ·
+> [DISTRIBUTION](DISTRIBUTION.md) · [Modèle LLM](../CATDESK-MODELE-LLM.md) ·
+> [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md).
 
-## 1. Lire ce qui est devant toi
-- ✅ **Fichiers** : `read_file`, `list_directory`
-- ✅ **Presse-papier** : `read_clipboard`
-- ✅ **Pages web** : `read_webpage` (HTTP simple). Détecte les **SPA** et oriente
-  vers le navigateur si la page est rendue en JavaScript.
-- ✅ **Pages JS / sites interactifs** : outils navigateur Playwright
-  (`browser_navigate` + `browser_get_text`, via Chrome/Edge système)
-- ✅ **Écran — texte (OCR)** : `capture_screen`, `ocr_region` (Tesseract fra+eng).
-  Testé : lit le texte de l'écran à ~80 % de confiance.
-- 🟡 **Écran — vision** : `describe_screen` décrit visuellement l'écran via un
-  modèle multimodal (`llava:7b`). *(en place ; modèle en cours de téléchargement)*
-- 🟡 **Audio → texte** : `transcribe_audio`
+---
 
-## 2. Chercher & analyser
-- 🟡 **Mémoire sémantique** : `search_memory`, `store_memory`, `semantic_search`
-  *(VectorStore réel depuis cette session ; sémantique complète dès
-  `ollama pull nomic-embed-text`, sinon repli mots-clés)*
-- ✅ **Analyse de stacktrace** : `analyze_stacktrace`
+## En une phrase
 
-## 3. Agir sur le PC
-- ✅ **Commandes système** : `run_command` (sandbox + confirmation)
-- ✅ **Navigateur automatisé (Playwright)** : `browser_navigate`,
-  `browser_screenshot`, `browser_get_text`, `browser_click`, `browser_type`,
-  `browser_close`
+CatDesk est un **copilote IA de bureau 100 % local** (Tauri 2 + React + agent
+Node + sidecar Python OCR) : une bulle flottante (`Ctrl+Espace`) qui voit ton
+écran, lit tes fichiers, exécute des commandes et automatise des tâches, le tout
+via des LLM locaux servis par **Ollama** — aucune donnée n'est envoyée dans le
+cloud.
 
-## 4. Git & GitHub
-- ✅ **Git** : `git_commit`, `git_pr`, `watch_ci`
-- ✅ **GitHub** : `github_issues`, `github_pr`
+```
+React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
+   → agent Node (boucle ReAct + 51 outils) → Ollama (LLM local) + sidecar Python (OCR)
+```
 
-## 5. Orchestration & autonomie
-- ✅ **Planification (opt-in)** : pour les tâches multi-étapes, l'agent établit
-  d'abord un plan puis le suit. Activer avec `usePlanning: true` dans la config.
-- ✅ **Sous-agents** : `run_subagent`, `run_parallel_agents`
-- ✅ **Tâches planifiées (cron)** : `schedule_task`, `list_scheduled_tasks`,
-  `cancel_scheduled_task`
+---
 
-## 6. Garde-fous
-- ✅ Sandbox Rust, permissions risk-gated, audit, 100 % local (Ollama).
+## Légende des niveaux de risque
 
-## 7. Efficience ressources
-- ✅ **`keep_alive`** Ollama (modèle gardé chaud, défaut 10 min, `OLLAMA_KEEP_ALIVE`)
-- ✅ **`num_ctx`** réglable par requête
-- ✅ **Swap de modèles (Auto / Léger / Code)** : sélecteur dans le chat.
-  *Auto* route (léger pour le trivial, code/heavy sinon), *Léger* économise,
-  *Code* force le gros modèle de code (`qwen2.5-coder:14b`). Aussi pilotable
-  par env `CATDESK_MODEL_SMALL`.
+| Risque | Comportement | |
+|---|---|---|
+| 🟢 **Low** | Exécution automatique, journalisée | lecture, analyse |
+| 🟡 **Medium** | Confirmation une fois par session | écriture, sous-agents |
+| 🟠 **High** | Confirmation à chaque appel | commandes, navigateur actif, réseau sortant |
+| 🔴 **Critical** | Désactivé par défaut | suppression, élévation de privilèges |
 
-## 8. Ce qui reste à durcir
-- ⬜ Capture écran côté Rust (`screen.rs` est un stub)
-- ⬜ Couverture de tests automatisés
-- ⬜ Boucle d'agent plan→exécute pour recherches longues
-- ⬜ Packaging / signature / mises à jour
+---
+
+## 1. Voir & lire ce qui est devant toi
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Lire un fichier | `read_file` | 🟢 |
+| Lister un dossier | `list_directory` | 🟢 |
+| Lire le presse-papier | `read_clipboard` | 🟢 |
+| Capturer l'écran (total/partiel) | `capture_screen` | 🟢 |
+| Lire le **texte de l'écran (OCR)** Tesseract fra+eng | `ocr_region` | 🟢 |
+| **Décrire visuellement** l'écran (modèle multimodal `llava:7b`) | `describe_screen` | 🟢 |
+| **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD) | `transcribe_audio` | 🟢 |
+
+OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
+
+## 2. Web & navigateur
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Récupérer une page web (HTTP simple, détecte les SPA) | `read_webpage` | 🟢 |
+| Naviguer une page JS/SPA (Playwright, Chrome/Edge système) | `browser_navigate` | 🟠 |
+| Extraire le texte visible d'une page | `browser_get_text` | 🟢 |
+| Capture d'écran de la page | `browser_screenshot` | 🟢 |
+| Cliquer sur un élément | `browser_click` | 🟠 |
+| Saisir du texte dans un champ | `browser_type` | 🟠 |
+| Fermer le navigateur | `browser_close` | 🟢 |
+| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…) | `fetch_tech_news` | 🟢 |
+
+`read_webpage` détecte une SPA (HTML lourd, texte quasi nul) et oriente
+automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
+
+## 3. Connecteurs externes
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Chercher/lire des notes dans un vault **Obsidian** local | `obsidian_notes` | 🟢 |
+| Chercher/lire des pages **Notion** (API) | `notion_search` | 🟢 |
+| Appeler une **API REST** (GET auto ; écriture confirmée) | `call_api` | 🟠 |
+| Poster sur un **webhook Discord/Slack** | `send_webhook_message` | 🟠 |
+| Publier l'actu tech sur un webhook Discord (embeds) | `post_tech_news_discord` | 🟡 |
+
+## 4. Développement & analyse de code
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Analyser une **stacktrace** (Node/TS/Python/Rust/Java + cause racine) | `analyze_stacktrace` | 🟢 |
+| Générer des **tests unitaires** (détecte le framework) | `generate_unit_tests` | 🟢 |
+| Repérer des **refactos** (fonctions longues, duplication, complexité) | `suggest_refactor` | 🟢 |
+| Analyser les **dépendances** (package.json / Cargo.toml / requirements.txt) | `analyze_dependencies` | 🟢 |
+| **Relire un diff** (secrets, code de debug, patterns risqués) | `review_diff` | 🟢 |
+| Inférer les **conventions de style** du projet | `analyze_code_style` | 🟢 |
+| **Profiler un projet** à l'ouverture (stack, scripts, structure, README) | `load_project_context` | 🟢 |
+| Auditer un `.env` vs `.env.example` (clés manquantes, secrets) | `audit_env` | 🟢 |
+| Recherche locale par mots-clés/sémantique | `semantic_search` | 🟢 |
+
+## 5. Git & GitHub
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Générer un **message de commit** (Conventional Commits) | `generate_commit_message` | 🟢 |
+| Générer une **description de PR** (commits vs base) | `generate_pr_description` | 🟢 |
+| Résumer l'**historique git** (par type/auteur/zone) | `summarize_git_log` | 🟢 |
+| Aider à résoudre les **conflits de merge** (ours/theirs) | `resolve_conflicts` | 🟢 |
+| Piloter un **git bisect** (compter, choisir le prochain commit) | `bisect_guided` | 🟢 |
+| Surveiller la **CI GitHub Actions** (jobs/étapes en échec) | `watch_ci` | 🟢 |
+| Lister/chercher des **issues GitHub** | `github_list_issues` | 🟢 |
+| Détails complets d'une **PR** (fichiers, reviews, diff) | `github_get_pr` | 🟢 |
+
+## 6. Productivité
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Détecter quand tu **tournes en rond** sur un problème | `detect_spiral` | 🟢 |
+| Rédiger un **standup quotidien** depuis l'activité git | `generate_standup` | 🟢 |
+
+## 7. Système & infra (local)
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Exécuter une **commande** PowerShell/CMD (sandbox) | `run_command` | 🟠 |
+| Lister les **ports TCP** en écoute + processus liés | `inspect_port` | 🟢 |
+| **Tuer un processus** par PID | `kill_process` | 🟠 |
+| Lister les **conteneurs Docker** + logs | `docker_ps` | 🟢 |
+| Contrôler Docker (start/stop/restart, compose up/down) | `docker_control` | 🟠 |
+| Requêter une base **SQLite** locale (lecture seule par défaut) | `run_sqlite` | 🟡 |
+
+## 8. Mémoire & RAG
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Rechercher en **mémoire** (sémantique ou repli mots-clés) | `search_memory` | 🟢 |
+
+- VectorStore réel : embeddings Ollama (`nomic-embed-text`) + similarité cosinus
+  en mémoire, persistance disque (`vectors.json`).
+- **Repli automatique mots-clés** si les embeddings sont indisponibles → la
+  mémoire fonctionne dès l'installation.
+
+## 9. Orchestration & autonomie
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Lancer un **sous-agent** isolé (contexte propre, anti-récursion) | `run_subagent` | 🟡 |
+| Lancer jusqu'à 8 **sous-agents en parallèle** | `run_parallel_agents` | 🟡 |
+| **Planifier une tâche récurrente** (cron, tick 60s, persistance SQLite) | `schedule_task` | 🟠 |
+| Lister les tâches planifiées | `list_scheduled_tasks` | 🟢 |
+| Annuler une tâche planifiée | `cancel_scheduled_task` | 🟡 |
+
+Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
+
+**Planification opt-in** : pour les tâches multi-étapes, l'agent peut d'abord
+établir un plan (visible dans l'UI sous un encart « 📋 Plan ») puis le suivre
+(`usePlanning: true`).
+
+---
+
+## 10. Modèles & inférence
+
+- **3 modèles** pour la parité de fonctionnalités :
+  `qwen2.5:7b` (chat principal), `llava:7b` (vision écran),
+  `nomic-embed-text` (mémoire sémantique).
+- **Sélecteur de mode dans le chat** : *Auto* (route léger/code selon la tâche),
+  *Léger* (économie), *Code* (force `qwen2.5-coder:14b`).
+- **Routage de modèles** en downgrade-only via `CATDESK_MODEL_SMALL`.
+- Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
+  réglable par requête, KV-cache 4-bit possible.
+- Voir [Modèle LLM](../CATDESK-MODELE-LLM.md) pour le choix matériel et le routage.
+
+## 11. Garde-fous & sécurité
+
+- **100 % local** : aucune sortie réseau pour l'inférence (Ollama).
+- **Sandbox Rust** : `check_path` + `check_command` avant tout accès FS/shell.
+- **Permissions risk-gated** à 4 niveaux (auto / une fois / confirmer / désactivé).
+- **Safe mode** : un toggle bloque tous les outils medium+.
+- **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat).
+- **Isolation de processus** : agent et sidecar OCR tournent séparément.
+
+## 12. Distribution
+
+- **Installeur Windows hors-ligne** (Inno Setup, ~19 Go avec modèles) :
+  install/désinstall silencieux vérifiés de bout en bout.
+- Le **modèle** (lourd, immuable) est séparé du code → les **mises à jour
+  auto** (GitHub Releases, signées) ne transportent que le code (~50–300 Mo).
+- Détails complets : [DISTRIBUTION.md](DISTRIBUTION.md).
+
+---
+
+_Cette carte évolue avec le projet. Pour les bornes actuelles, voir
+[LIMITES.md](LIMITES.md)._

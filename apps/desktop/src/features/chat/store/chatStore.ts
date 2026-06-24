@@ -21,6 +21,8 @@ interface ChatState {
   status: AgentStatus;
   activeTool: string | null;
   selectedModel: string;
+  /** True once the user manually picks a model — stops the adaptive default from overriding it. */
+  userPickedModel: boolean;
   availableModels: string[];
   modelMode: 'auto' | 'light' | 'code';
   lightModel: string;
@@ -65,12 +67,18 @@ export const useChatStore = create<ChatState>()(
     streamingMessageId: null,
     status: 'idle',
     activeTool: null,
+    // Safe pre-load default; loadModels() replaces it with the VRAM-adaptive
+    // recommendation (7B on weak/unknown GPUs, 14B where it fits).
     selectedModel: 'qwen2.5:7b',
-    availableModels: ['qwen2.5:7b', 'llama3.2:3b', 'deepseek-r1:7b'],
+    userPickedModel: false,
+    // Pre-load placeholder; loadModels() overwrites it with the real installed
+    // set. Mirrors the bundled lineup so the UI isn't empty before Ollama answers.
+    availableModels: ['qwen3:14b', 'qwen2.5-coder:14b', 'qwen2.5:7b'],
     modelMode: 'auto',
-    // Tier léger distinct du main (3B ~2 GB) : rend le mode « Léger » et la
-    // rétrogradation auto réellement utiles. Tient large dans 10 GB de VRAM.
-    lightModel: 'qwen2.5:3b',
+    // Tier léger distinct du main (7B ~4.7 GB) : rend le mode « Léger » et la
+    // rétrogradation auto réellement utiles, sans le français cassé du 3B. Tient
+    // dans 10 GB de VRAM.
+    lightModel: 'qwen2.5:7b',
     codeModel: 'qwen2.5-coder:14b',
     modelSizes: {},
     vramBytes: null,
@@ -239,7 +247,7 @@ export const useChatStore = create<ChatState>()(
     },
 
     setModel: model => {
-      set(s => { s.selectedModel = model; });
+      set(s => { s.selectedModel = model; s.userPickedModel = true; });
     },
 
     setModelMode: mode => {
@@ -261,6 +269,21 @@ export const useChatStore = create<ChatState>()(
         set(s => { s.vramBytes = vram; });
       } catch {
         // VRAM undetectable → leave null, warnings stay off.
+      }
+      // Adaptive default: start on the model this machine can actually run well
+      // (3B on weak/unknown GPUs, 14B where it fits). Skipped once the user has
+      // manually chosen a model. Falls back to an installed model if the
+      // recommendation isn't present.
+      try {
+        const recommended = await invoke<string>('get_recommended_model');
+        set(s => {
+          if (s.userPickedModel) return;
+          s.selectedModel = s.availableModels.includes(recommended)
+            ? recommended
+            : (s.availableModels[0] ?? s.selectedModel);
+        });
+      } catch {
+        // Recommendation unavailable (Ollama/GPU probe failed) → keep current.
       }
     },
   })),

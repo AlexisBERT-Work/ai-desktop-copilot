@@ -153,7 +153,7 @@ async function main() {
   tools.register(new SemanticSearchTool());
   tools.register(new ReadWebpageTool());
   tools.register(new FetchTechNewsTool());
-  tools.register(new PostTechNewsDiscordTool(llm, process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b'));
+  tools.register(new PostTechNewsDiscordTool(llm, process.env['CATDESK_MODEL'] ?? 'qwen3:14b'));
   tools.register(new ObsidianNotesTool());
   tools.register(new NotionSearchTool());
   tools.register(new SendWebhookMessageTool());
@@ -184,7 +184,7 @@ async function main() {
   // (testé : il renvoie []), donc on extrait avec le modèle PRINCIPAL par
   // défaut, indépendamment du petit modèle de routage. Surchargeable via
   // CATDESK_EXTRACT_MODEL (ex. un 14B dédié sur une grosse machine).
-  const extractModel = process.env['CATDESK_EXTRACT_MODEL'] ?? process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b';
+  const extractModel = process.env['CATDESK_EXTRACT_MODEL'] ?? process.env['CATDESK_MODEL'] ?? 'qwen3:14b';
   const factExtractor = warmEnabled ? new FactExtractor(llm, extractModel, warmStore) : undefined;
   // Compaction : replie l'historique ancien en résumé glissant (long sessions).
   // Utilise le modèle d'extraction (capable) ; désactivable via CATDESK_COMPACTION=0.
@@ -232,7 +232,7 @@ async function main() {
   spiralMonitor.start();
 
   // ─── Sub-agent tools (need orchestrator reference) ─────────
-  const defaultModel = process.env['CATDESK_MODEL'] ?? 'qwen2.5:7b';
+  const defaultModel = process.env['CATDESK_MODEL'] ?? 'qwen3:14b';
   const subAgentRunner = new SubAgentRunner(orchestrator, tools, defaultModel);
   tools.register(new RunSubAgentTool(subAgentRunner));
   tools.register(new RunParallelAgentsTool(subAgentRunner));

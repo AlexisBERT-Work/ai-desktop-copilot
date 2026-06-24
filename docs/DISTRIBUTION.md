@@ -156,8 +156,9 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 
 ## 6. Limites & notes
 
-- **RAM.** `qwen2.5:7b` ≈ 6–8 Go libres. Machine 8 Go → préfère un modèle plus
-  petit (ex. `qwen2.5:3b`) et mets-le en `CATDESK_MODEL`.
+- **RAM.** `qwen2.5:7b` ≈ 6–8 Go libres, et c'est le plancher du lineup (le
+  `qwen2.5:3b` a été abandonné pour son français cassé). Machine très contrainte →
+  pull manuellement un modèle plus petit et mets-le en `CATDESK_MODEL`.
 - **GPU.** Ollama utilise le GPU si présent, sinon CPU (plus lent, mais marche
   partout). Les DLLs bundlées viennent de ton PC ; le repli CPU fonctionne.
 - **Signature SmartScreen.** Pour supprimer l'avertissement « éditeur inconnu »,

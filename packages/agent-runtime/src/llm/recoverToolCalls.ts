@@ -69,6 +69,21 @@ export function looksLikeToolCallStart(text: string): boolean {
   return /^\s*(<tool_call>|\{|\[)/.test(text);
 }
 
+/**
+ * Cheap check: does this (partial) response open like a "I'll do X, hang on"
+ * preamble that models emit before a tool call ("Je vais capturer l'écran,
+ * attends une seconde…") instead of just calling the tool? We withhold such
+ * openings from the live UI; if the turn ends in a tool call we drop the
+ * preamble entirely (the real answer comes after the tool result), otherwise we
+ * flush it as the genuine answer. Anchored to the opening but tolerant of a
+ * short leading interjection ("Ok,", "Bien sûr,"). The "je vais …" branch
+ * requires an action verb so genuine answers like "je vais bien" aren't caught.
+ */
+export function looksLikePreamble(text: string): boolean {
+  const head = text.slice(0, 80).toLowerCase();
+  return /\b(je vais (te |maintenant |d.?abord |tout de suite )?(captur|ouvr|lanc|lire|[ée]cri|cherch|envoy|ex[ée]cut|faire|pr[ée]par|regard|analys|prendre|r[ée]cup[ée]r|affich|montr|dire|t[ée]l[ée]charg|cr[ée]er|v[ée]rifi|consult)|laisse[- ]moi|un (petit )?instant|attends?[ -]?(toi)?|patiente|je m.?en occupe|je commence|je pr[ée]pare|c.?est parti)/.test(head);
+}
+
 function safeParse(s: string): unknown {
   try {
     return JSON.parse(s.trim());
