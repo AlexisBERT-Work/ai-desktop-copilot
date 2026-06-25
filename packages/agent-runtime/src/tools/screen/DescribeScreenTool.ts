@@ -10,7 +10,10 @@ interface Args {
   activeWindowOnly?: boolean;
 }
 
-const DEFAULT_PROMPT = "Décris en détail ce qui est affiché à l'écran.";
+// English on purpose: LLaVA-family vision models describe far better in English
+// and tend to refuse French ("je ne parle pas français") instead of describing.
+// The agent's main model (qwen) relays the result to the user in French.
+const DEFAULT_PROMPT = 'Describe in detail what is shown on this screen.';
 
 /**
  * Capture l'écran et le décrit **visuellement** via un modèle multimodal
@@ -33,7 +36,10 @@ export class DescribeScreenTool extends BaseTool {
 
   async execute(rawArgs: unknown): Promise<ToolResult> {
     const args = rawArgs as Args;
-    const prompt = args.prompt?.trim() || DEFAULT_PROMPT;
+    // Force English output even when the caller (agent) passes a French prompt:
+    // see DEFAULT_PROMPT. The orchestrator translates the result for the user.
+    const ask = args.prompt?.trim();
+    const prompt = ask ? `Look at this screenshot and answer in English.\n${ask}` : DEFAULT_PROMPT;
 
     // 1) Capture via le sidecar Python (mss)
     let imageBase64: string;
