@@ -162,11 +162,12 @@ async function main() {
   tools.register(new GitHubPRTool());
   tools.register(new CaptureScreenTool());
   tools.register(new OcrRegionTool());
-  // Vision model for describe_screen. Its output is shown to the user verbatim,
-  // so French quality matters: llama3.2-vision:11b reads UIs/charts well and
-  // speaks coherent French, and fits a ~10 GiB GPU in q4 (the old llava:7b
-  // default produced weak French). Override via CATDESK_VISION_MODEL.
-  tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'llama3.2-vision:11b'));
+  // Vision model for describe_screen. Must be a CLIP-based model (LLaVA family):
+  // llama.cpp — the engine Ollama uses on this Windows/AMD setup — can't load the
+  // 'mllama' architecture (llama3.2-vision), it fails with "unknown model
+  // architecture: 'mllama'". llava-llama3 has a Llama 3 8B base so its French is
+  // the best of the LLaVA family. Override via CATDESK_VISION_MODEL.
+  tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'llava-llama3:8b'));
   tools.register(new TranscribeAudioTool());
 
   // ─── Agent ─────────────────────────────────────────────────
