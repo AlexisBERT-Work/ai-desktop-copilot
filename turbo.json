@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalPassThroughEnv": ["CARGO_TARGET_DIR"],
   "tasks": {
     "dev": {
       "cache": false,
