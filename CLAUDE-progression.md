@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 54 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 55 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
@@ -28,6 +28,7 @@
 - Transcription audio locale (Whisper / faster-whisper, CPU int8) — `transcribe_audio`
 - Lecture de documents locaux : PDF / Word (.docx) / CSV — texte + métadonnées, 100% local — `parse_document`
 - Analyse de tableaux locaux CSV/Excel : profil + stats + agrégation `group_by` (pandas) — `analyze_data`
+- Génération de documents : Markdown/texte → PDF / Word (.docx) / HTML / Markdown (xhtml2pdf + python-docx) — `export_document`
 
 **Code & Git**
 - Analyse de stacktrace (cause racine + fix) — `analyze_stacktrace`
@@ -159,6 +160,7 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Base de données locale | ✅ dispo | — | `run_sqlite` — SQL sur SQLite local, lecture seule par défaut (garde anti-écriture + multi-statement) |
 | Bases SQL serveur (Postgres/MySQL) | ✅ dispo | — | `query_database` — Postgres + MySQL/MariaDB, lecture seule par défaut (garde + transaction READ ONLY au niveau SGBD), connexion via DSN ou env |
 | Lecture/analyse de documents & données | ✅ dispo | — | `parse_document` (PDF/Word/CSV → texte+méta) · `analyze_data` (CSV/Excel → profil/stats/agrégation pandas), 100% local |
+| Génération de documents | ✅ dispo | — | `export_document` — Markdown/texte → PDF/Word/HTML/Markdown (xhtml2pdf + python-docx), écrit sur disque (confirmation), 100% local |
 
 ### 06 — Agents & automatisations
 
