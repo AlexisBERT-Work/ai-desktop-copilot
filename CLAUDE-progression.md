@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 55 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 56 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
@@ -29,6 +29,7 @@
 - Lecture de documents locaux : PDF / Word (.docx) / CSV — texte + métadonnées, 100% local — `parse_document`
 - Analyse de tableaux locaux CSV/Excel : profil + stats + agrégation `group_by` (pandas) — `analyze_data`
 - Génération de documents : Markdown/texte → PDF / Word (.docx) / HTML / Markdown (xhtml2pdf + python-docx) — `export_document`
+- Lecture de calendrier local .ics : événements sur une fenêtre de dates, récurrences développées — `read_calendar`
 
 **Code & Git**
 - Analyse de stacktrace (cause racine + fix) — `analyze_stacktrace`
@@ -143,7 +144,8 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Filesystem | ✅ dispo | — | Outils natifs `read_file` / `list_dir` + sandbox Rust (pas encore exposé en MCP) |
 | Obsidian / Notion | ✅ dispo | — | `obsidian_notes` (coffre local, sans réseau) + `notion_search` (API Notion : recherche + lecture page) |
 | Discord / Slack | ✅ dispo | — | `send_webhook_message` — webhook entrant Discord/Slack (sortant, confirmation requise) |
-| Google Calendar | ⬜ prévu | moyenne | OAuth + FastMCP (flux OAuth à câbler) |
+| Calendrier local (.ics) | ✅ dispo | — | `read_calendar` — lit un fichier .ics, fenêtre de dates, récurrences développées, 100% local (sans OAuth) |
+| Google Calendar | ⬜ prévu | moyenne | OAuth + FastMCP (flux OAuth à câbler) — alternative cloud du `read_calendar` local |
 | Linear / Jira | 🟡 via `call_api` | moyenne | Accessible via le client REST générique ; tool dédié possible plus tard |
 | Tes sites perso (API) | ✅ dispo | — | `call_api` — client REST/JSON générique (GET/POST/PUT/PATCH/DELETE, Bearer, https + http localhost) |
 | Sites sans API | ✅ dispo | — | Browser automation Chrome — `browser_navigate/click/type/get_text/screenshot/close` |
