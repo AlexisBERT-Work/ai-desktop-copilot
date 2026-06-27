@@ -470,6 +470,23 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  read_email: {
+    type: 'object' as const,
+    properties: {
+      host: { type: 'string' as const, description: 'IMAP server host (falls back to IMAP_HOST env)' },
+      port: { type: 'number' as const, default: 993, description: 'IMAP port (993 TLS, 143 STARTTLS)' },
+      secure: { type: 'boolean' as const, description: 'Use TLS. Defaults to true unless port is 143.' },
+      user: { type: 'string' as const, description: 'Account username (falls back to IMAP_USER env)' },
+      password: { type: 'string' as const, description: 'Account password/app-password (falls back to IMAP_PASSWORD env)' },
+      mailbox: { type: 'string' as const, default: 'INBOX', description: 'Mailbox/folder to open' },
+      limit: { type: 'number' as const, default: 20, maximum: 100, description: 'Max messages to list' },
+      unseen_only: { type: 'boolean' as const, default: false, description: 'List only unread messages' },
+      since: { type: 'string' as const, description: 'Only messages on/after this date (YYYY-MM-DD)' },
+      search: { type: 'string' as const, description: 'Match text in subject or sender' },
+      fetch_uid: { type: 'number' as const, description: 'Instead of listing, download and extract the text of this message UID' },
+    },
+  },
+
   fetch_tech_news: {
     type: 'object' as const,
     properties: {

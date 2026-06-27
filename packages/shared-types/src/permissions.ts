@@ -85,6 +85,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     notion_search: { name: 'notion_search', description: 'Search Notion pages/databases and read page content via the Notion API', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     send_webhook_message: { name: 'send_webhook_message', description: 'Post a message to a Discord/Slack incoming webhook (outward-facing)', riskLevel: 'high', enabled: true, requiresConfirmation: true },
     call_api: { name: 'call_api', description: 'Make an HTTP/JSON request to a REST API (GET auto; write methods need confirmation)', riskLevel: 'high', enabled: true, requiresConfirmation: true },
+    read_email: { name: 'read_email', description: 'Read a mailbox over IMAP (read-only): list recent messages or fetch one by UID. Outward network connector with credentials', riskLevel: 'high', enabled: true, requiresConfirmation: true },
     run_subagent: { name: 'run_subagent', description: 'Spawn an independent sub-agent to complete a task autonomously', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     run_parallel_agents: { name: 'run_parallel_agents', description: 'Spawn multiple sub-agents running in parallel on independent tasks', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     transcribe_audio: { name: 'transcribe_audio', description: 'Transcrit un fichier audio localement via Whisper (100% privé, sans cloud)', riskLevel: 'low', enabled: true, requiresConfirmation: false },

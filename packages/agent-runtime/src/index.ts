@@ -63,6 +63,7 @@ import { ObsidianNotesTool } from './tools/connectors/ObsidianNotesTool';
 import { NotionSearchTool } from './tools/connectors/NotionSearchTool';
 import { SendWebhookMessageTool } from './tools/connectors/SendWebhookMessageTool';
 import { CallApiTool } from './tools/connectors/CallApiTool';
+import { ReadEmailTool } from './tools/connectors/ReadEmailTool';
 import { GitHubIssuesTool } from './tools/github/GitHubIssuesTool';
 import { GitHubPRTool } from './tools/github/GitHubPRTool';
 import { CaptureScreenTool } from './tools/screen/CaptureScreenTool';
@@ -164,6 +165,7 @@ async function main() {
   tools.register(new NotionSearchTool());
   tools.register(new SendWebhookMessageTool());
   tools.register(new CallApiTool());
+  tools.register(new ReadEmailTool());
   tools.register(new GitHubIssuesTool());
   tools.register(new GitHubPRTool());
   tools.register(new CaptureScreenTool());
