@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 49 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 54 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
@@ -26,6 +26,8 @@
 - Lecture d'écran : capture + OCR Tesseract + description vision (llava) — `capture_screen`, `ocr_region`, `describe_screen`
 - Lecture de page web — `read_webpage` (+ steering vers les outils browser pour pages JS/SPA)
 - Transcription audio locale (Whisper / faster-whisper, CPU int8) — `transcribe_audio`
+- Lecture de documents locaux : PDF / Word (.docx) / CSV — texte + métadonnées, 100% local — `parse_document`
+- Analyse de tableaux locaux CSV/Excel : profil + stats + agrégation `group_by` (pandas) — `analyze_data`
 
 **Code & Git**
 - Analyse de stacktrace (cause racine + fix) — `analyze_stacktrace`
@@ -54,6 +56,7 @@
 - Monitoring de ports + kill de process — `inspect_port`, `kill_process`
 - Docker : liste/logs + start/stop/compose — `docker_ps`, `docker_control`
 - Base SQLite locale (lecture seule par défaut) — `run_sqlite`
+- Bases Postgres / MySQL-MariaDB : lecture seule par défaut + transaction READ ONLY au niveau SGBD — `query_database`
 - Mémoire vectorielle inter-sessions (VectorStore réel) — `search_memory`
 
 **Agents & automatisation**
@@ -154,6 +157,8 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Monitoring de ports | ✅ dispo | — | `inspect_port` (qui écoute sur un port + process) + `kill_process` (libère le port) |
 | Variables d'environnement | ✅ dispo | — | `audit_env` — .env vs .env.example, secrets, valeurs vides, alerte gitignore |
 | Base de données locale | ✅ dispo | — | `run_sqlite` — SQL sur SQLite local, lecture seule par défaut (garde anti-écriture + multi-statement) |
+| Bases SQL serveur (Postgres/MySQL) | ✅ dispo | — | `query_database` — Postgres + MySQL/MariaDB, lecture seule par défaut (garde + transaction READ ONLY au niveau SGBD), connexion via DSN ou env |
+| Lecture/analyse de documents & données | ✅ dispo | — | `parse_document` (PDF/Word/CSV → texte+méta) · `analyze_data` (CSV/Excel → profil/stats/agrégation pandas), 100% local |
 
 ### 06 — Agents & automatisations
 
