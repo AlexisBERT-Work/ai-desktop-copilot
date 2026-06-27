@@ -33,6 +33,16 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  parse_document: {
+    type: 'object' as const,
+    required: ['path'],
+    properties: {
+      path: { type: 'string' as const, description: 'Absolute path to a local .pdf, .docx or .csv file. The format is detected from the extension.' },
+      max_pages: { type: 'number' as const, default: 50, description: 'PDF only: maximum number of pages to extract' },
+      max_rows: { type: 'number' as const, default: 1000, description: 'CSV only: maximum number of rows to parse' },
+    },
+  },
+
   capture_screen: {
     type: 'object' as const,
     properties: {

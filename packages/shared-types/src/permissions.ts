@@ -88,6 +88,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     run_subagent: { name: 'run_subagent', description: 'Spawn an independent sub-agent to complete a task autonomously', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     run_parallel_agents: { name: 'run_parallel_agents', description: 'Spawn multiple sub-agents running in parallel on independent tasks', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     transcribe_audio: { name: 'transcribe_audio', description: 'Transcrit un fichier audio localement via Whisper (100% privé, sans cloud)', riskLevel: 'low', enabled: true, requiresConfirmation: false },
+    parse_document: { name: 'parse_document', description: 'Extrait le texte et les métadonnées d\'un document local PDF/Word/CSV (100% local, sans cloud)', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     github_list_issues: { name: 'github_list_issues', description: 'List or search GitHub issues for a repository', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     github_get_pr: { name: 'github_get_pr', description: 'Get pull request details, files changed, and optionally the diff', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     docker_ps: { name: 'docker_ps', description: 'List Docker containers and optionally tail a container\'s logs', riskLevel: 'low', enabled: true, requiresConfirmation: false },
