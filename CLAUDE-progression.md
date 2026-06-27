@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 56 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 57 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
@@ -50,6 +50,7 @@
 - Obsidian (coffre local) + Notion (API) — `obsidian_notes`, `notion_search`
 - Discord / Slack (webhook sortant) — `send_webhook_message`
 - Client REST/JSON générique (sites perso, API, MCP local) — `call_api`
+- Email IMAP (lecture seule) : liste de la boîte + lecture d'un message — `read_email`
 - Browser automation (Chrome) : navigate, click, type, get_text, screenshot, close — 6 outils `browser_*`
 
 **Système & infra**
@@ -144,6 +145,7 @@ Principe : un serveur FastMCP local par app. Ollama l'appelle comme outil natif.
 | Filesystem | ✅ dispo | — | Outils natifs `read_file` / `list_dir` + sandbox Rust (pas encore exposé en MCP) |
 | Obsidian / Notion | ✅ dispo | — | `obsidian_notes` (coffre local, sans réseau) + `notion_search` (API Notion : recherche + lecture page) |
 | Discord / Slack | ✅ dispo | — | `send_webhook_message` — webhook entrant Discord/Slack (sortant, confirmation requise) |
+| Email (IMAP) | ✅ dispo | — | `read_email` — lecture seule : liste de la boîte (filtres unseen/since/search) + lecture d'un message par UID ; identifiants via args ou env IMAP_* (high, confirmation) |
 | Calendrier local (.ics) | ✅ dispo | — | `read_calendar` — lit un fichier .ics, fenêtre de dates, récurrences développées, 100% local (sans OAuth) |
 | Google Calendar | ⬜ prévu | moyenne | OAuth + FastMCP (flux OAuth à câbler) — alternative cloud du `read_calendar` local |
 | Linear / Jira | 🟡 via `call_api` | moyenne | Accessible via le client REST générique ; tool dédié possible plus tard |
