@@ -43,6 +43,18 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  read_calendar: {
+    type: 'object' as const,
+    required: ['path'],
+    properties: {
+      path: { type: 'string' as const, description: 'Absolute path to a local .ics (iCalendar) file' },
+      from: { type: 'string' as const, description: 'Window start as YYYY-MM-DD (defaults to today)' },
+      to: { type: 'string' as const, description: 'Window end as YYYY-MM-DD (defaults to from + days)' },
+      days: { type: 'number' as const, default: 30, description: 'Window length in days when "to" is omitted' },
+      limit: { type: 'number' as const, default: 50, description: 'Maximum number of events to return' },
+    },
+  },
+
   export_document: {
     type: 'object' as const,
     required: ['content', 'path'],

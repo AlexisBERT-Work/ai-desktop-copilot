@@ -103,6 +103,9 @@ def dispatch(method: str, params: dict) -> Any:
         case "files.export_document":
             return export_document_rpc(params)
 
+        case "files.read_calendar":
+            return read_calendar_rpc(params)
+
         case _:
             raise ValueError(f"Unknown method: {method}")
 
@@ -201,6 +204,17 @@ def export_document_rpc(params: dict) -> dict:
         params["path"],
         fmt=params.get("format"),
         title=params.get("title"),
+    )
+
+
+def read_calendar_rpc(params: dict) -> dict:
+    from files.calendar_reader import read_calendar
+    return read_calendar(
+        params["path"],
+        start=params.get("from"),
+        end=params.get("to"),
+        days=params.get("days", 30),
+        limit=params.get("limit", 50),
     )
 
 
