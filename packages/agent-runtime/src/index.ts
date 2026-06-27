@@ -69,6 +69,7 @@ import { OcrRegionTool } from './tools/screen/OcrRegionTool';
 import { DescribeScreenTool } from './tools/screen/DescribeScreenTool';
 import { TranscribeAudioTool } from './tools/audio/TranscribeAudioTool';
 import { ParseDocumentTool } from './tools/files/ParseDocumentTool';
+import { AnalyzeDataTool } from './tools/files/AnalyzeDataTool';
 import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
 import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
 import { ScheduleTaskTool } from './tools/automation/ScheduleTaskTool';
@@ -172,6 +173,7 @@ async function main() {
   tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'minicpm-v'));
   tools.register(new TranscribeAudioTool());
   tools.register(new ParseDocumentTool());
+  tools.register(new AnalyzeDataTool());
 
   // ─── Agent ─────────────────────────────────────────────────
   // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder

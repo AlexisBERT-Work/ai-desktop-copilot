@@ -97,6 +97,9 @@ def dispatch(method: str, params: dict) -> Any:
         case "files.parse_csv":
             return parse_csv(params)
 
+        case "files.analyze_data":
+            return analyze_data(params)
+
         case _:
             raise ValueError(f"Unknown method: {method}")
 
@@ -173,6 +176,19 @@ def parse_docx(params: dict) -> dict:
 def parse_csv(params: dict) -> dict:
     from files.csv_parser import parse_csv_file
     return parse_csv_file(params["path"], max_rows=params.get("maxRows", 1000))
+
+
+def analyze_data(params: dict) -> dict:
+    from files.data_analyzer import analyze_dataframe
+    return analyze_dataframe(
+        params["path"],
+        operation=params.get("operation", "profile"),
+        sheet=params.get("sheet"),
+        max_rows=params.get("maxRows", 100_000),
+        group_by=params.get("groupBy"),
+        value_column=params.get("valueColumn"),
+        agg=params.get("agg", "sum"),
+    )
 
 
 def main():

@@ -43,6 +43,20 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  analyze_data: {
+    type: 'object' as const,
+    required: ['path'],
+    properties: {
+      path: { type: 'string' as const, description: 'Absolute path to a local .csv, .xlsx or .xls file' },
+      operation: { type: 'string' as const, enum: ['profile', 'aggregate'] as const, default: 'profile', description: "'profile' = structure + summary stats + preview; 'aggregate' = group_by + an aggregation" },
+      group_by: { type: 'array' as const, items: { type: 'string' as const }, description: 'aggregate only: one or more column names to group by' },
+      value_column: { type: 'string' as const, description: "aggregate only: numeric column to aggregate (omit when agg='count')" },
+      agg: { type: 'string' as const, enum: ['sum', 'mean', 'median', 'min', 'max', 'count', 'std', 'nunique'] as const, default: 'sum', description: 'aggregate only: aggregation function' },
+      sheet: { type: 'string' as const, description: 'Excel only: sheet name (defaults to the first sheet)' },
+      max_rows: { type: 'number' as const, default: 100000, description: 'Max rows to load into memory' },
+    },
+  },
+
   capture_screen: {
     type: 'object' as const,
     properties: {
