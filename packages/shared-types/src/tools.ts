@@ -43,6 +43,17 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  export_document: {
+    type: 'object' as const,
+    required: ['content', 'path'],
+    properties: {
+      content: { type: 'string' as const, description: 'Markdown or plain text to render into the document' },
+      path: { type: 'string' as const, description: 'Absolute output path. The extension picks the format unless "format" is set.' },
+      format: { type: 'string' as const, enum: ['pdf', 'docx', 'html', 'md'] as const, description: 'Output format. Optional — inferred from the path extension otherwise.' },
+      title: { type: 'string' as const, description: 'Optional document title rendered as a top heading' },
+    },
+  },
+
   analyze_data: {
     type: 'object' as const,
     required: ['path'],

@@ -90,6 +90,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     transcribe_audio: { name: 'transcribe_audio', description: 'Transcrit un fichier audio localement via Whisper (100% privé, sans cloud)', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     parse_document: { name: 'parse_document', description: 'Extrait le texte et les métadonnées d\'un document local PDF/Word/CSV (100% local, sans cloud)', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     analyze_data: { name: 'analyze_data', description: 'Analyse un tableau local CSV/Excel via pandas (profil + stats ou agrégation group_by). 100% local', riskLevel: 'low', enabled: true, requiresConfirmation: false },
+    export_document: { name: 'export_document', description: 'Génère un document local (PDF/Word/HTML/Markdown) depuis du texte/Markdown. Écrit sur le disque', riskLevel: 'medium', enabled: true, requiresConfirmation: true },
     github_list_issues: { name: 'github_list_issues', description: 'List or search GitHub issues for a repository', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     github_get_pr: { name: 'github_get_pr', description: 'Get pull request details, files changed, and optionally the diff', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     docker_ps: { name: 'docker_ps', description: 'List Docker containers and optionally tail a container\'s logs', riskLevel: 'low', enabled: true, requiresConfirmation: false },

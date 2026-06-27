@@ -71,6 +71,7 @@ import { DescribeScreenTool } from './tools/screen/DescribeScreenTool';
 import { TranscribeAudioTool } from './tools/audio/TranscribeAudioTool';
 import { ParseDocumentTool } from './tools/files/ParseDocumentTool';
 import { AnalyzeDataTool } from './tools/files/AnalyzeDataTool';
+import { ExportDocumentTool } from './tools/files/ExportDocumentTool';
 import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
 import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
 import { ScheduleTaskTool } from './tools/automation/ScheduleTaskTool';
@@ -176,6 +177,7 @@ async function main() {
   tools.register(new TranscribeAudioTool());
   tools.register(new ParseDocumentTool());
   tools.register(new AnalyzeDataTool());
+  tools.register(new ExportDocumentTool());
 
   // ─── Agent ─────────────────────────────────────────────────
   // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder

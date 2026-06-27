@@ -100,6 +100,9 @@ def dispatch(method: str, params: dict) -> Any:
         case "files.analyze_data":
             return analyze_data(params)
 
+        case "files.export_document":
+            return export_document_rpc(params)
+
         case _:
             raise ValueError(f"Unknown method: {method}")
 
@@ -188,6 +191,16 @@ def analyze_data(params: dict) -> dict:
         group_by=params.get("groupBy"),
         value_column=params.get("valueColumn"),
         agg=params.get("agg", "sum"),
+    )
+
+
+def export_document_rpc(params: dict) -> dict:
+    from files.document_exporter import export_document
+    return export_document(
+        params["content"],
+        params["path"],
+        fmt=params.get("format"),
+        title=params.get("title"),
     )
 
 
