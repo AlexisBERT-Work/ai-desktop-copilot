@@ -139,6 +139,19 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  query_database: {
+    type: 'object' as const,
+    required: ['query'],
+    properties: {
+      query: { type: 'string' as const, description: 'SQL to execute. Read-only by default: only single-statement SELECT/WITH/EXPLAIN/SHOW are allowed.' },
+      dialect: { type: 'string' as const, enum: ['postgres', 'mysql'] as const, description: "Database engine. Optional if the connection string scheme makes it clear (postgres:// / mysql://)." },
+      connection_string: { type: 'string' as const, description: 'DSN, e.g. postgres://user:pass@host:5432/db or mysql://user:pass@host:3306/db. Falls back to PG_URL/MYSQL_URL/DATABASE_URL env vars.' },
+      read_only: { type: 'boolean' as const, default: true, description: 'Reject writes (guard + DB-level READ ONLY transaction). Set false to allow writes.' },
+      max_rows: { type: 'number' as const, default: 1000, description: 'Maximum number of rows to return' },
+      timeout_ms: { type: 'number' as const, default: 15000, maximum: 60000, description: 'Query/connection timeout in milliseconds' },
+    },
+  },
+
   audit_env: {
     type: 'object' as const,
     properties: {

@@ -95,6 +95,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     docker_ps: { name: 'docker_ps', description: 'List Docker containers and optionally tail a container\'s logs', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     docker_control: { name: 'docker_control', description: 'Start/stop/restart a container or compose up/down a project', riskLevel: 'high', enabled: true, requiresConfirmation: true },
     run_sqlite: { name: 'run_sqlite', description: 'Run SQL against a local SQLite database (read-only by default)', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
+    query_database: { name: 'query_database', description: 'Run SQL against a Postgres or MySQL/MariaDB database (read-only by default, DB-level READ ONLY transaction)', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     audit_env: { name: 'audit_env', description: 'Compare .env against .env.example and flag missing keys, secrets and empty values', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     inspect_port: { name: 'inspect_port', description: 'List listening TCP ports and the processes bound to them', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     kill_process: { name: 'kill_process', description: 'Terminate a process by PID', riskLevel: 'high', enabled: true, requiresConfirmation: true },

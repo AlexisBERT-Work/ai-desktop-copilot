@@ -37,6 +37,7 @@ import { KillProcessTool } from './tools/system/KillProcessTool';
 import { DockerPsTool } from './tools/infra/DockerPsTool';
 import { DockerControlTool } from './tools/infra/DockerControlTool';
 import { RunSqliteTool } from './tools/infra/RunSqliteTool';
+import { QueryDatabaseTool } from './tools/infra/QueryDatabaseTool';
 import { ReadClipboardTool } from './tools/clipboard/ReadClipboardTool';
 import { SearchMemoryTool } from './tools/memory/SearchMemoryTool';
 import { AnalyzeStacktraceTool } from './tools/analysis/AnalyzeStacktraceTool';
@@ -135,6 +136,7 @@ async function main() {
   tools.register(new DockerPsTool());
   tools.register(new DockerControlTool());
   tools.register(new RunSqliteTool());
+  tools.register(new QueryDatabaseTool());
   tools.register(new ReadClipboardTool());
   tools.register(new SearchMemoryTool(vectorStore));
   tools.register(new AnalyzeStacktraceTool());

@@ -12,13 +12,16 @@
   },
   "dependencies": {
     "@catdesk/shared-types": "workspace:*",
+    "mysql2": "^3.22.5",
+    "pg": "^8.22.0",
     "playwright-core": "^1.48.0",
     "sql.js": "^1.12.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/sql.js": "^1.4.9",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "@types/sql.js": "^1.4.9",
     "esbuild": "^0.24.0",
     "tsx": "^4.15.0",
     "typescript": "^5.5.0",
