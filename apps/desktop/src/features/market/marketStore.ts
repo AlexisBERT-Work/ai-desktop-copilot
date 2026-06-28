@@ -6,6 +6,8 @@ interface MarketState {
   quotes: Record<string, Quote>;
   /** Valeurs des formules calculées côté sidecar. */
   computed: ComputedValue[];
+  /** Historique de prix récent par symbole (clé = MAJUSCULES) pour les sparklines. */
+  history: Record<string, number[]>;
   /** Horodatage du dernier instantané reçu, ou null. */
   updatedAt: number | null;
   apply: (snapshot: MarketSnapshot) => void;
@@ -15,11 +17,15 @@ interface MarketState {
 export const useMarketStore = create<MarketState>((set) => ({
   quotes: {},
   computed: [],
+  history: {},
   updatedAt: null,
   apply: (snapshot) =>
     set({
       quotes: Object.fromEntries(snapshot.quotes.map((q) => [q.symbol.toUpperCase(), q])),
       computed: snapshot.computed,
+      history: Object.fromEntries(
+        Object.entries(snapshot.history).map(([sym, values]) => [sym.toUpperCase(), values]),
+      ),
       updatedAt: snapshot.timestamp,
     }),
 }));

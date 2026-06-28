@@ -118,6 +118,13 @@ export class MarketService {
         : { id: f.id, name: f.name, value: r.value };
     });
 
-    return { quotes, computed, timestamp: Date.now() };
+    // Historique récent (≤ 40 points) par symbole, pour les sparklines.
+    const history: Record<string, number[]> = {};
+    for (const s of this.symbols) {
+      const h = this.history.get(s);
+      if (h !== undefined && h.length > 0) history[s] = h.slice(-40);
+    }
+
+    return { quotes, computed, history, timestamp: Date.now() };
   }
 }

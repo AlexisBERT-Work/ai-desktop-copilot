@@ -40,6 +40,8 @@ export interface ComputedValue {
 export interface MarketSnapshot {
   quotes: Quote[];
   computed: ComputedValue[];
+  /** Historique de prix récent par symbole (pour les sparklines). */
+  history: Record<string, number[]>;
   timestamp: number;
 }
 
