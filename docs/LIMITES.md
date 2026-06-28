@@ -1,6 +1,6 @@
 # CE QUE CATDESK NE SAIT PAS (ENCORE) FAIRE
 
-> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-06-15**.
+> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-06-28**.
 > Liste honnête des bornes actuelles, pour ne pas survendre l'outil.
 
 ---
@@ -85,6 +85,23 @@ Présent : sandbox Rust, permissions risk-gated, audit, safe mode.
   (le `qwen2.5:3b` a été abandonné — français cassé). Il déborde en RAM (lent mais
   cohérent) ; pour de la vitesse pure, pull manuellement un modèle plus petit et
   mets-le en `CATDESK_MODEL`.
+
+## 8. Tableau de bord & Bourse
+
+- **Pas de temps réel tick par tick** : la bourse rafraîchit à ~30 s (volontaire —
+  le tick exige des données d'échange payantes). OK pour le suivi, pas le scalping.
+- **Source Yahoo non officielle** : endpoint public sans garantie ; s'il change, la
+  cotation peut tomber (le symbole passe `stale`). Pas de batch (1 requête/symbole).
+- **Cotations possiblement différées** selon la place ; l'horodatage est affiché.
+- **News** : nécessite un **projet Supabase configuré** (URL + clé anon + migration +
+  rôle admin) ; sans config, la news est simplement masquée. Voir
+  [dashboard-p2.md](projects/dashboard-p2.md).
+- **Local-first nuancé** : bourse et news ajoutent des **flux réseau sortants en
+  lecture seule** (allow-listés). L'inférence, elle, reste 100 % locale.
+- **Câblage Rust** (bras `market.update`, commande `set_market_watchlist`) : effectif
+  après recompilation (`pnpm dev` / `cargo build`).
+- **Placement libre des widgets** (drag x/y façon Grafana) : non — ordre + tailles
+  par pas seulement (react-grid-layout en suivi).
 
 ---
 
