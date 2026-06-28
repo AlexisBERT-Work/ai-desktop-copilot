@@ -41,6 +41,7 @@ import { QueryDatabaseTool } from './tools/infra/QueryDatabaseTool';
 import { ReadClipboardTool } from './tools/clipboard/ReadClipboardTool';
 import { SearchMemoryTool } from './tools/memory/SearchMemoryTool';
 import { AnalyzeStacktraceTool } from './tools/analysis/AnalyzeStacktraceTool';
+import { AnalyzeLogsTool } from './tools/analysis/AnalyzeLogsTool';
 import { GenerateUnitTestsTool } from './tools/analysis/GenerateUnitTestsTool';
 import { SuggestRefactorTool } from './tools/analysis/SuggestRefactorTool';
 import { AnalyzeDependenciesTool } from './tools/analysis/AnalyzeDependenciesTool';
@@ -197,6 +198,7 @@ async function main() {
   tools.register(new ReadClipboardTool());
   tools.register(new SearchMemoryTool(vectorStore));
   tools.register(new AnalyzeStacktraceTool());
+  tools.register(new AnalyzeLogsTool());
   tools.register(new GenerateUnitTestsTool());
   tools.register(new SuggestRefactorTool());
   tools.register(new AnalyzeDependenciesTool());

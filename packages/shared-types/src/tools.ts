@@ -261,6 +261,17 @@ export const TOOL_SCHEMAS = {
     },
   },
 
+  analyze_logs: {
+    type: 'object' as const,
+    required: ['path'],
+    properties: {
+      path: { type: 'string' as const, description: 'Absolute path to a local log file' },
+      max_lines: { type: 'number' as const, default: 5000, maximum: 100000, description: 'Analyze only the last N lines' },
+      pattern: { type: 'string' as const, description: 'Keep only lines containing this text (case-insensitive) before analyzing' },
+      top_errors: { type: 'number' as const, default: 10, description: 'Number of grouped error clusters to return' },
+    },
+  },
+
   generate_commit_message: {
     type: 'object' as const,
     properties: {

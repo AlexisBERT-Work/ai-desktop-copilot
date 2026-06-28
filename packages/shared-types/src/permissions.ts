@@ -63,6 +63,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     open_app: { name: 'open_app', description: 'Open application', riskLevel: 'medium', enabled: true, requiresConfirmation: true },
     store_memory: { name: 'store_memory', description: 'Store in memory', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     analyze_stacktrace: { name: 'analyze_stacktrace', description: 'Analyze stacktrace and extract error info', riskLevel: 'low', enabled: true, requiresConfirmation: false },
+    analyze_logs: { name: 'analyze_logs', description: 'Analyse un fichier de log local (niveaux, erreurs regroupées, plage temporelle). Lecture seule, 100% local', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     generate_commit_message: { name: 'generate_commit_message', description: 'Read git diff and generate a commit message', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     generate_pr_description: { name: 'generate_pr_description', description: 'Read git log/diff and generate a PR description', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     generate_unit_tests: { name: 'generate_unit_tests', description: 'Detect test framework and scaffold unit tests for a source file', riskLevel: 'low', enabled: true, requiresConfirmation: false },
