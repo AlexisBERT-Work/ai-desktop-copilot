@@ -350,7 +350,7 @@ Process [CLAUDE.md](../../CLAUDE.md) §« Adding a New Tool ». Le poller est un
 | **P1 — Ossature dashboard** ✅ | Grille de widgets + `DashboardConfig` persistée + **mode édition** (ajout / drag-reorder / resize / rename / config) + widgets `quick_action` & `stocks` | **Implémenté** — voir [dashboard-p1.md](dashboard-p1.md) |
 | **P2 — Backend news (Supabase)** ✅ | Table `news` + **RLS** + Auth anonyme + `@supabase/supabase-js` + Realtime + bandeau & widget news + CSP egress | **Code + SQL livrés** (reste : provisionner le projet Supabase) — voir [dashboard-p2.md](dashboard-p2.md) |
 | **P3 — Module Bourse** ✅ | YahooQuoteSource + MarketService + MarketPoller + FormulaEngine (mathjs) + 5 outils agent + event `market:update` + widget `stocks` live | **Implémenté** — voir [dashboard-p3.md](dashboard-p3.md) |
-| **P4 — Enrichissements** | Catalogue widgets (KPI/stat/chart), **temps réel news (WS/SSE)**, alertes, `WebScrapeAdapter`, analytics « qui a vu quoi » | Plateforme étendue |
+| **P4 — Enrichissements** | Backlog priorisé (widgets KPI/chart, alertes, formules glissantes, portefeuille, ciblage news…) → [dashboard-backlog.md](dashboard-backlog.md) | Post-MVP |
 
 ---
 
