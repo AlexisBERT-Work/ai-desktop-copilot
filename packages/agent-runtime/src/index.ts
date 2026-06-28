@@ -74,6 +74,13 @@ import { ParseDocumentTool } from './tools/files/ParseDocumentTool';
 import { AnalyzeDataTool } from './tools/files/AnalyzeDataTool';
 import { ExportDocumentTool } from './tools/files/ExportDocumentTool';
 import { ReadCalendarTool } from './tools/files/ReadCalendarTool';
+import { MarketService } from './market/MarketService';
+import { MarketPoller } from './market/MarketPoller';
+import { GetMarketTool } from './tools/market/GetMarketTool';
+import { AddToWatchlistTool } from './tools/market/AddToWatchlistTool';
+import { RemoveFromWatchlistTool } from './tools/market/RemoveFromWatchlistTool';
+import { SetFormulaTool } from './tools/market/SetFormulaTool';
+import { RemoveFormulaTool } from './tools/market/RemoveFormulaTool';
 import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
 import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
 import { ScheduleTaskTool } from './tools/automation/ScheduleTaskTool';
@@ -183,6 +190,23 @@ async function main() {
   tools.register(new ExportDocumentTool());
   tools.register(new ReadCalendarTool());
 
+  // ─── Market (bourse, P3) ───────────────────────────────────
+  // Provider de cotations Yahoo + moteur de formules. Le poller pousse
+  // périodiquement `market.update` (stdout → bras Rust → event UI). Watchlist
+  // de départ via CATDESK_WATCHLIST, cadence via CATDESK_MARKET_INTERVAL_MS.
+  const marketSeed = (process.env['CATDESK_WATCHLIST'] ?? 'AAPL,MSFT,TSLA').split(',');
+  const market = new MarketService(marketSeed);
+  tools.register(new GetMarketTool(market));
+  tools.register(new AddToWatchlistTool(market));
+  tools.register(new RemoveFromWatchlistTool(market));
+  tools.register(new SetFormulaTool(market));
+  tools.register(new RemoveFormulaTool(market));
+  const marketPoller = new MarketPoller(
+    market,
+    Number(process.env['CATDESK_MARKET_INTERVAL_MS'] ?? 30_000),
+  );
+  marketPoller.start();
+
   // ─── Agent ─────────────────────────────────────────────────
   // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
   // pour les tâches triviales (gain ressources). Absent => pas de routage.
@@ -283,6 +307,7 @@ async function main() {
     log.info('SIGTERM received — shutting down');
     consolidator?.stop();
     cron.shutdown();
+    marketPoller.stop();
     BrowserManager.get().shutdown();
     OcrSidecarClient.get().shutdown();
     db.close();

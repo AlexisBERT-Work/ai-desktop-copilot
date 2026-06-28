@@ -229,6 +229,12 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                     window.emit("proactive:suggestion", params)?;
                 }
             }
+            "market.update" => {
+                // Live market snapshot pushed by the MarketPoller.
+                if let Some(window) = app.get_webview_window("main") {
+                    window.emit("market:update", params)?;
+                }
+            }
             _ => {
                 warn!("Unknown agent notification: {method}");
             }
