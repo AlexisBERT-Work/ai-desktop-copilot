@@ -3,6 +3,7 @@ import { Search, Terminal, FileText, Camera, Clipboard, Settings, LayoutDashboar
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
+import { openDashboardWindow } from '../dashboard/openDashboardWindow';
 
 interface Command {
   id: string;
@@ -54,10 +55,10 @@ export function CommandPalette() {
     },
     {
       id: 'dashboard',
-      label: 'Open dashboard',
-      description: 'Configurable KPIs, stats and quick actions',
+      label: 'Marchés & News',
+      description: 'Open the markets & news dashboard (separate window)',
       icon: <LayoutDashboard className="w-4 h-4" />,
-      action: () => setMode('dashboard'),
+      action: () => void openDashboardWindow(),
     },
     {
       id: 'settings',

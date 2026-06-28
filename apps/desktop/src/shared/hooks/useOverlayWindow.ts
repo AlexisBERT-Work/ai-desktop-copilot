@@ -18,7 +18,6 @@ const PANEL_SIZE: Record<Exclude<OverlayMode, 'hidden'>, { w: number; h: number 
   chat: { w: 724, h: 648 },
   command: { w: 648, h: 470 },
   settings: { w: 748, h: 568 },
-  dashboard: { w: 1100, h: 720 }, // repli si le moniteur est indétectable
 };
 
 /** Gap from the screen edges; extra bottom gap keeps the bubble above the taskbar. */
@@ -45,36 +44,17 @@ export function useOverlayWindow() {
         return;
       }
 
-      const mon = await currentMonitor();
+      const size = PANEL_SIZE[mode];
+      await win.setSize(new LogicalSize(size.w, size.h));
 
-      if (mode === 'dashboard' && mon) {
-        // Vraie interface : grande fenêtre centrée (pas une bulle de coin).
+      const mon = await currentMonitor();
+      if (mon && !cancelled) {
         const sf = mon.scaleFactor;
         const monW = mon.size.width / sf;
         const monH = mon.size.height / sf;
-        const w = Math.round(monW * 0.9);
-        const h = Math.round((monH - TASKBAR_GAP) * 0.9);
-        await win.setSize(new LogicalSize(w, h));
-        if (!cancelled) {
-          await win.setPosition(
-            new LogicalPosition(
-              Math.round((monW - w) / 2),
-              Math.round((monH - TASKBAR_GAP - h) / 2),
-            ),
-          );
-        }
-      } else {
-        // Bulle ancrée en bas à droite.
-        const size = PANEL_SIZE[mode];
-        await win.setSize(new LogicalSize(size.w, size.h));
-        if (mon && !cancelled) {
-          const sf = mon.scaleFactor;
-          const monW = mon.size.width / sf;
-          const monH = mon.size.height / sf;
-          const x = Math.max(EDGE_GAP, monW - size.w - EDGE_GAP);
-          const y = Math.max(EDGE_GAP, monH - size.h - EDGE_GAP - TASKBAR_GAP);
-          await win.setPosition(new LogicalPosition(x, y));
-        }
+        const x = Math.max(EDGE_GAP, monW - size.w - EDGE_GAP);
+        const y = Math.max(EDGE_GAP, monH - size.h - EDGE_GAP - TASKBAR_GAP);
+        await win.setPosition(new LogicalPosition(x, y));
       }
 
       if (cancelled) return;

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2/capability",
   "identifier": "default",
-  "description": "Default capability for CatDesk main window",
-  "windows": ["main"],
+  "description": "Default capability for CatDesk windows",
+  "windows": ["main", "dashboard"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -10,6 +10,7 @@
     "core:window:allow-set-size",
     "core:window:allow-set-position",
     "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
     "core:window:allow-set-always-on-top",
     "core:window:allow-current-monitor",
     "shell:allow-open",

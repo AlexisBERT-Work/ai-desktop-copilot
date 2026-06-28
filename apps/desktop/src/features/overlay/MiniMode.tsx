@@ -3,6 +3,7 @@ import { Sparkles, ArrowUp, Expand } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
+import { openDashboardWindow } from '../dashboard/openDashboardWindow';
 
 export function MiniMode() {
   const [input, setInput] = useState('');
@@ -84,13 +85,13 @@ function QuickActions() {
   return (
     <div className="border-t border-white/5 px-3 py-2 flex gap-1.5 flex-wrap">
       <button
-        onClick={() => setMode('dashboard')}
+        onClick={() => void openDashboardWindow()}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
                    text-xs text-brand-300 hover:text-brand-200
                    bg-brand-500/10 hover:bg-brand-500/20 transition-colors"
       >
         <span>📊</span>
-        Tableau de bord
+        Marchés &amp; News
       </button>
       {actions.map(action => (
         <button

@@ -230,10 +230,9 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                 }
             }
             "market.update" => {
-                // Live market snapshot pushed by the MarketPoller.
-                if let Some(window) = app.get_webview_window("main") {
-                    window.emit("market:update", params)?;
-                }
+                // Live market snapshot — broadcast to all windows (incl. the
+                // separate dashboard window).
+                app.emit("market:update", params)?;
             }
             _ => {
                 warn!("Unknown agent notification: {method}");
