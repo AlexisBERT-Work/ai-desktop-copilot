@@ -6,7 +6,7 @@ import { useDashboardStore } from './dashboardStore';
 import { DashboardWidgetCard } from './DashboardWidgetCard';
 import { AddWidgetMenu } from './widgets/AddWidgetMenu';
 
-const COLS = 3;
+const COLS = 4;
 
 /**
  * Interface configurable (Pilier A) : une grille de widgets pilotée par
@@ -40,7 +40,7 @@ export function DashboardWindow() {
 
   return (
     <motion.div
-      className="flex max-h-[80vh] w-[860px] flex-col overflow-hidden rounded-2xl
+      className="flex h-full w-full flex-col overflow-hidden rounded-2xl
                  border border-white/10 bg-gray-950/97 shadow-2xl shadow-black/60
                  backdrop-blur-2xl ring-1 ring-white/5"
       layoutId="overlay-shell"

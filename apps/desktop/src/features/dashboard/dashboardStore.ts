@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DashboardConfig, Widget } from '@catdesk/shared-types';
 
-const MAX_W = 3; // colonnes de la grille
+const MAX_W = 4; // colonnes de la grille
 const MAX_H = 2; // hauteurs possibles d'un widget
 
 /**
