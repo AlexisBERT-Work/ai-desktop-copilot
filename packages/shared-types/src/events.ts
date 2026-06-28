@@ -25,7 +25,7 @@ export type AppEvent =
   | { type: 'system:clipboard-changed'; content: string }
   | { type: 'system:notification'; title: string; body: string };
 
-export type OverlayMode = 'mini' | 'chat' | 'command' | 'settings' | 'hidden';
+export type OverlayMode = 'mini' | 'chat' | 'command' | 'settings' | 'dashboard' | 'hidden';
 
 export type AppEventType = AppEvent['type'];
 export type AppEventByType<T extends AppEventType> = Extract<AppEvent, { type: T }>;

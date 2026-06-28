@@ -4,6 +4,7 @@ import { MiniMode } from './MiniMode';
 import { ChatWindow } from '../chat/components/ChatWindow';
 import { CommandPalette } from './CommandPalette';
 import { SettingsWindow } from '../settings/SettingsWindow';
+import { DashboardWindow } from '../dashboard/DashboardWindow';
 
 const SPRING = { type: 'spring', stiffness: 320, damping: 32 } as const;
 
@@ -26,6 +27,7 @@ export function FloatingOverlay() {
             {mode === 'chat' && <ChatWindow />}
             {mode === 'command' && <CommandPalette />}
             {mode === 'settings' && <SettingsWindow />}
+            {mode === 'dashboard' && <DashboardWindow />}
           </motion.div>
         )}
       </AnimatePresence>

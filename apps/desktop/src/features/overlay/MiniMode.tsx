@@ -83,6 +83,15 @@ function QuickActions() {
 
   return (
     <div className="border-t border-white/5 px-3 py-2 flex gap-1.5 flex-wrap">
+      <button
+        onClick={() => setMode('dashboard')}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
+                   text-xs text-brand-300 hover:text-brand-200
+                   bg-brand-500/10 hover:bg-brand-500/20 transition-colors"
+      >
+        <span>📊</span>
+        Tableau de bord
+      </button>
       {actions.map(action => (
         <button
           key={action.label}

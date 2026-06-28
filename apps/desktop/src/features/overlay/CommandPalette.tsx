@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Terminal, FileText, Camera, Clipboard, Settings, X } from 'lucide-react';
+import { Search, Terminal, FileText, Camera, Clipboard, Settings, LayoutDashboard, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
@@ -51,6 +51,13 @@ export function CommandPalette() {
       description: 'Open and analyze a document',
       icon: <FileText className="w-4 h-4" />,
       action: () => sendAndExpand('Analyse un fichier pour moi.'),
+    },
+    {
+      id: 'dashboard',
+      label: 'Open dashboard',
+      description: 'Configurable KPIs, stats and quick actions',
+      icon: <LayoutDashboard className="w-4 h-4" />,
+      action: () => setMode('dashboard'),
     },
     {
       id: 'settings',

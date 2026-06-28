@@ -4,3 +4,4 @@ export * from './conversation';
 export * from './permissions';
 export * from './events';
 export * from './tools';
+export * from './dashboard';
