@@ -29,6 +29,11 @@ export class MarketPoller {
     }
   }
 
+  /** Rafraîchit et pousse immédiatement (hors cycle), ex. après un changement de watchlist. */
+  async refreshNow(): Promise<void> {
+    await this.tick();
+  }
+
   private async tick(): Promise<void> {
     try {
       const snapshot = await this.service.refresh();

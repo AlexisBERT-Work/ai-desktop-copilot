@@ -146,6 +146,7 @@ export type AgentMethod =
   | 'agent.process'
   | 'agent.stream'
   | 'agent.cancel'
+  | 'market.set_watchlist'
   | 'tools.execute'
   | 'tools.list'
   | 'memory.store'

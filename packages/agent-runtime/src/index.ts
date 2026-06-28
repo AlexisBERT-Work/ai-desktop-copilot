@@ -297,7 +297,10 @@ async function main() {
   log.info('Tools registered', { tools: tools.listNames() });
 
   // ─── IPC Bridge ────────────────────────────────────────────
-  const bridge = new StdinBridge(orchestrator);
+  const bridge = new StdinBridge(orchestrator, async (symbols) => {
+    market.setWatchlist(symbols);
+    await marketPoller.refreshNow();
+  });
   bridge.start();
 
   log.info('Agent Runtime ready and listening on stdin');

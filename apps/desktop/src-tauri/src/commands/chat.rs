@@ -105,6 +105,21 @@ pub async fn chat_cancel(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Replace the live market watchlist with the symbols shown in the dashboard
+/// (union of the `stocks` widgets). Forwarded to the agent's MarketService.
+#[tauri::command]
+pub async fn set_market_watchlist(app: AppHandle, symbols: Vec<String>) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "market.set_watchlist",
+        "params": { "symbols": symbols }
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// List locally available Ollama models.
 #[tauri::command]
 pub async fn get_ollama_models() -> Result<Vec<String>, String> {

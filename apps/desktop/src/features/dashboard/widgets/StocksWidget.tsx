@@ -3,9 +3,8 @@ import type { WidgetProps } from './types';
 
 /**
  * Widget bourse — cotations en direct (provider `market` du sidecar, poussé via
- * l'event `market:update`). Les symboles à afficher viennent de la config du
- * widget ; ils doivent être dans la watchlist du sidecar pour avoir une valeur
- * (les ajouter via l'agent : « ajoute TSLA à ma watchlist »).
+ * l'event `market:update`). Les symboles de la config sont automatiquement
+ * synchronisés vers la watchlist du sidecar (voir useMarketWatchSync).
  */
 export function StocksWidget({ widget }: WidgetProps) {
   const quotes = useMarketStore((s) => s.quotes);

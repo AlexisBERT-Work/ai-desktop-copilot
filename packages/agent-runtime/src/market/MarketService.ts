@@ -52,6 +52,19 @@ export class MarketService {
     this.history.delete(up);
   }
 
+  /** Remplace toute la watchlist (source de vérité = widgets de l'UI). */
+  setWatchlist(symbols: string[]): void {
+    const next = uniqueUpper(symbols);
+    const keep = new Set(next);
+    for (const s of this.symbols) {
+      if (!keep.has(s)) {
+        this.quotes.delete(s);
+        this.history.delete(s);
+      }
+    }
+    this.symbols = next;
+  }
+
   setFormula(name: string, expression: string, id?: string): FormulaCell {
     const cell: FormulaCell = { id: id ?? crypto.randomUUID(), name, expression };
     const idx = this.formulas.findIndex((f) => f.id === cell.id);

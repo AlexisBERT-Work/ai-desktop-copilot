@@ -101,14 +101,21 @@ Erreur isolée par formule (`ComputedValue.error`), jamais de crash. Langage mat
 
 ---
 
-## 7. Limite connue
+## 7. Synchro symboles widget ↔ sidecar (résolu)
 
-La **watchlist appartient au sidecar**. Le `StocksWidget` affiche les symboles de
-sa config s'ils sont dans cette watchlist (le seed `AAPL,MSFT,TSLA` correspond au
-widget par défaut → live immédiat). Pour suivre d'autres titres, on les ajoute
-**via l'agent** (`add_to_watchlist`). La **synchro automatique** « symboles du
-widget → watchlist du sidecar » (commande Tauri renderer→sidecar) est volontairement
-reportée — elle demande une nouvelle commande Rust.
+La **watchlist est pilotée par l'UI** : `useMarketWatchSync` calcule l'union des
+symboles de tous les widgets `stocks` et l'envoie au sidecar via la commande Tauri
+`set_market_watchlist` → `StdinBridge` (`market.set_watchlist`) →
+`MarketService.setWatchlist()` + refresh immédiat. Ajouter/retirer un symbole dans
+un widget suffit donc à le suivre (plus besoin de passer par l'agent).
+
+Chemin : `useMarketWatchSync` → `invoke('set_market_watchlist')` → `chat.rs` →
+`send_to_agent` (stdin) → `StdinBridge` → `MarketService.setWatchlist` +
+`MarketPoller.refreshNow()`.
+
+> Précédence : les widgets font foi (`setWatchlist` **remplace**). Les outils agent
+> `add/remove_to_watchlist` restent utiles en chat/headless, mais une re-synchro de
+> l'UI réaligne la watchlist sur les widgets.
 
 ---
 

@@ -13,7 +13,10 @@ export class StdinBridge {
   /** Abort controller for the run in progress, used by the Stop button. */
   private currentAbort: AbortController | null = null;
 
-  constructor(private orchestrator: AgentOrchestrator) {}
+  constructor(
+    private orchestrator: AgentOrchestrator,
+    private onSetWatchlist?: (symbols: string[]) => void | Promise<void>,
+  ) {}
 
   start(): void {
     process.stdin.setEncoding('utf-8');
@@ -54,6 +57,17 @@ export class StdinBridge {
     // typed switch since it's a control signal, not an AgentMethod.
     if (request.method === 'agent.cancel') {
       this.currentAbort?.abort();
+      this.sendResponse(request.id, { ok: true });
+      return;
+    }
+
+    // Watchlist bourse pilotée par l'UI (symboles des widgets `stocks`).
+    if (request.method === 'market.set_watchlist') {
+      const params = request.params as { symbols?: unknown };
+      const symbols = Array.isArray(params.symbols)
+        ? params.symbols.filter((s): s is string => typeof s === 'string')
+        : [];
+      await this.onSetWatchlist?.(symbols);
       this.sendResponse(request.id, { ok: true });
       return;
     }
