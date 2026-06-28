@@ -15,7 +15,10 @@ export class StdinBridge {
 
   constructor(
     private orchestrator: AgentOrchestrator,
-    private onSetWatchlist?: (symbols: string[]) => void | Promise<void>,
+    private onSetConfig?: (
+      symbols: string[],
+      formulas: { name: string; expression: string }[],
+    ) => void | Promise<void>,
   ) {}
 
   start(): void {
@@ -61,13 +64,22 @@ export class StdinBridge {
       return;
     }
 
-    // Watchlist bourse pilotée par l'UI (symboles des widgets `stocks`).
+    // Config bourse pilotée par l'UI (symboles + formules des widgets `stocks`).
     if (request.method === 'market.set_watchlist') {
-      const params = request.params as { symbols?: unknown };
+      const params = request.params as { symbols?: unknown; formulas?: unknown };
       const symbols = Array.isArray(params.symbols)
         ? params.symbols.filter((s): s is string => typeof s === 'string')
         : [];
-      await this.onSetWatchlist?.(symbols);
+      const formulas = Array.isArray(params.formulas)
+        ? params.formulas.flatMap((f) => {
+            if (f === null || typeof f !== 'object') return [];
+            const o = f as { name?: unknown; expression?: unknown };
+            return typeof o.name === 'string' && typeof o.expression === 'string'
+              ? [{ name: o.name, expression: o.expression }]
+              : [];
+          })
+        : [];
+      await this.onSetConfig?.(symbols, formulas);
       this.sendResponse(request.id, { ok: true });
       return;
     }

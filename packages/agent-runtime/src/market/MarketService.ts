@@ -77,6 +77,13 @@ export class MarketService {
     this.formulas = this.formulas.filter((f) => f.id !== id);
   }
 
+  /** Remplace toutes les formules (source de vérité = widgets de l'UI). */
+  setFormulas(defs: { name: string; expression: string }[]): void {
+    this.formulas = defs
+      .filter((d) => d.name.trim().length > 0 && d.expression.trim().length > 0)
+      .map((d) => ({ id: crypto.randomUUID(), name: d.name.trim(), expression: d.expression.trim() }));
+  }
+
   /** Récupère les cotations, met à jour cache + historique, renvoie l'instantané. */
   async refresh(): Promise<MarketSnapshot> {
     if (this.symbols.length > 0) {

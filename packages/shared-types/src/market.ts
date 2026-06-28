@@ -42,3 +42,9 @@ export interface MarketSnapshot {
   computed: ComputedValue[];
   timestamp: number;
 }
+
+/** Définition de formule portée par un widget (config UI). */
+export interface WidgetFormula {
+  name: string;
+  expression: string;
+}

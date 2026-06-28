@@ -1,20 +1,36 @@
 import { useMarketStore } from '../../market/marketStore';
 import type { WidgetProps } from './types';
 
+function readFormulaNames(config: Record<string, unknown>): string[] {
+  const fs = config.formulas;
+  if (!Array.isArray(fs)) return [];
+  const names: string[] = [];
+  for (const f of fs) {
+    if (f !== null && typeof f === 'object') {
+      const o = f as { name?: unknown };
+      if (typeof o.name === 'string' && o.name.trim().length > 0) names.push(o.name.trim());
+    }
+  }
+  return names;
+}
+
 /**
- * Widget bourse — cotations en direct (provider `market` du sidecar, poussé via
- * l'event `market:update`). Les symboles de la config sont automatiquement
- * synchronisés vers la watchlist du sidecar (voir useMarketWatchSync).
+ * Widget bourse — cotations en direct + colonnes de formules (provider `market`
+ * du sidecar, poussé via `market:update`). Symboles et formules de la config
+ * sont synchronisés vers le sidecar (voir useMarketWatchSync) ; les valeurs
+ * calculées reviennent dans `computed` et sont matchées par nom.
  */
 export function StocksWidget({ widget }: WidgetProps) {
   const quotes = useMarketStore((s) => s.quotes);
+  const computed = useMarketStore((s) => s.computed);
 
   const symbols = Array.isArray(widget.config.symbols)
     ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
     : [];
+  const formulaNames = readFormulaNames(widget.config);
 
-  if (symbols.length === 0) {
-    return <p className="text-xs text-white/30">Aucun symbole configuré.</p>;
+  if (symbols.length === 0 && formulaNames.length === 0) {
+    return <p className="text-xs text-white/30">Aucun symbole ni formule configuré.</p>;
   }
 
   return (
@@ -43,6 +59,30 @@ export function StocksWidget({ widget }: WidgetProps) {
           </div>
         );
       })}
+
+      {formulaNames.length > 0 && (
+        <div className="mt-1 space-y-1 border-t border-white/5 pt-1.5">
+          {formulaNames.map((name) => {
+            const c = computed.find((v) => v.name === name);
+            return (
+              <div key={name} className="flex items-center justify-between text-sm">
+                <span className="truncate text-brand-300/90">ƒ {name}</span>
+                {c === undefined ? (
+                  <span className="tabular-nums text-white/25">—</span>
+                ) : c.error !== undefined || c.value === null ? (
+                  <span className="text-red-400/80" title={c.error ?? 'erreur'}>
+                    erreur
+                  </span>
+                ) : (
+                  <span className="tabular-nums text-white/85">
+                    {Number.isInteger(c.value) ? c.value : c.value.toFixed(4)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -105,15 +105,26 @@ pub async fn chat_cancel(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Replace the live market watchlist with the symbols shown in the dashboard
-/// (union of the `stocks` widgets). Forwarded to the agent's MarketService.
+/// A user-defined formula carried from the dashboard to the agent.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FormulaDef {
+    pub name: String,
+    pub expression: String,
+}
+
+/// Replace the live market config (watchlist + formulas) with what the dashboard
+/// `stocks` widgets show. Forwarded to the agent's MarketService.
 #[tauri::command]
-pub async fn set_market_watchlist(app: AppHandle, symbols: Vec<String>) -> Result<(), String> {
+pub async fn set_market_watchlist(
+    app: AppHandle,
+    symbols: Vec<String>,
+    formulas: Vec<FormulaDef>,
+) -> Result<(), String> {
     let payload = serde_json::json!({
         "jsonrpc": "2.0",
         "id": uuid::Uuid::new_v4().to_string(),
         "method": "market.set_watchlist",
-        "params": { "symbols": symbols }
+        "params": { "symbols": symbols, "formulas": formulas }
     });
     send_to_agent(&app, payload, String::new(), String::new())
         .await

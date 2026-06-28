@@ -78,6 +78,12 @@ Contexte = un objet par symbole : `AAPL.price`, `AAPL.change`,
 Erreur isolée par formule (`ComputedValue.error`), jamais de crash. Langage mathjs
 (pas d'`eval` JS).
 
+**Colonnes de formules dans le widget** : chaque widget `stocks` porte ses formules
+dans sa config (`config.formulas: { name, expression }[]`), éditables via l'éditeur
+de widget. Elles sont synchronisées au sidecar (même mécanisme que les symboles,
+voir §7), calculées à chaque tick et **affichées sous les cotations** (matchées par
+nom sur `computed`), avec valeur ou « erreur » par formule.
+
 ---
 
 ## 5. Outils agent
@@ -101,21 +107,21 @@ Erreur isolée par formule (`ComputedValue.error`), jamais de crash. Langage mat
 
 ---
 
-## 7. Synchro symboles widget ↔ sidecar (résolu)
+## 7. Synchro config (symboles + formules) widget ↔ sidecar (résolu)
 
-La **watchlist est pilotée par l'UI** : `useMarketWatchSync` calcule l'union des
-symboles de tous les widgets `stocks` et l'envoie au sidecar via la commande Tauri
-`set_market_watchlist` → `StdinBridge` (`market.set_watchlist`) →
-`MarketService.setWatchlist()` + refresh immédiat. Ajouter/retirer un symbole dans
-un widget suffit donc à le suivre (plus besoin de passer par l'agent).
+La **config bourse est pilotée par l'UI** : `useMarketWatchSync` calcule l'union des
+**symboles** et des **formules** de tous les widgets `stocks` et l'envoie au sidecar
+via la commande Tauri `set_market_watchlist` → `StdinBridge` (`market.set_watchlist`)
+→ `MarketService.setWatchlist()` + `setFormulas()` + refresh immédiat. Éditer un
+widget suffit donc (plus besoin de passer par l'agent).
 
-Chemin : `useMarketWatchSync` → `invoke('set_market_watchlist')` → `chat.rs` →
-`send_to_agent` (stdin) → `StdinBridge` → `MarketService.setWatchlist` +
+Chemin : `useMarketWatchSync` → `invoke('set_market_watchlist', { symbols, formulas })`
+→ `chat.rs` → `send_to_agent` (stdin) → `StdinBridge` → `MarketService` +
 `MarketPoller.refreshNow()`.
 
-> Précédence : les widgets font foi (`setWatchlist` **remplace**). Les outils agent
-> `add/remove_to_watchlist` restent utiles en chat/headless, mais une re-synchro de
-> l'UI réaligne la watchlist sur les widgets.
+> Précédence : les widgets font foi (`setWatchlist`/`setFormulas` **remplacent**).
+> Les outils agent `add/remove_to_watchlist`, `set/remove_formula` restent utiles en
+> chat/headless, mais une re-synchro de l'UI réaligne tout sur les widgets.
 
 ---
 

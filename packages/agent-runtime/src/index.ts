@@ -297,8 +297,9 @@ async function main() {
   log.info('Tools registered', { tools: tools.listNames() });
 
   // ─── IPC Bridge ────────────────────────────────────────────
-  const bridge = new StdinBridge(orchestrator, async (symbols) => {
+  const bridge = new StdinBridge(orchestrator, async (symbols, formulas) => {
     market.setWatchlist(symbols);
+    market.setFormulas(formulas);
     await marketPoller.refreshNow();
   });
   bridge.start();
