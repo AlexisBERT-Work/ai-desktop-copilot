@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { X } from 'lucide-react';
 import { computeActiveNews, useNewsStore } from './newsStore';
 import { NewsMarkdown } from './NewsMarkdown';
-import { NEWS_BANNER_STYLE, NEWS_ICON } from './newsStyles';
+import { NEWS_BANNER_STYLE, NEWS_ICON, NEWS_ICON_COLOR } from './newsStyles';
 
 /**
  * Bandeau d'annonce affiché en haut à l'ouverture : la news active la plus
@@ -17,6 +17,7 @@ export function NewsBanner() {
   const top = active[0];
   if (top === undefined) return null;
   const extra = active.length - 1;
+  const Icon = NEWS_ICON[top.severity];
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4">
@@ -25,9 +26,7 @@ export function NewsBanner() {
                     px-4 py-3 shadow-lg backdrop-blur ${NEWS_BANNER_STYLE[top.severity]}`}
         role="status"
       >
-        <span className="mt-0.5 text-lg" aria-hidden>
-          {NEWS_ICON[top.severity]}
-        </span>
+        <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${NEWS_ICON_COLOR[top.severity]}`} aria-hidden />
         <div className="min-w-0 flex-1 text-sm">
           <p className="font-medium text-white/90">{top.title}</p>
           <div className="mt-0.5 text-white/70">

@@ -6,7 +6,7 @@ import { DashboardWidgetCard } from './DashboardWidgetCard';
 import { AddWidgetMenu } from './widgets/AddWidgetMenu';
 import { computeActiveNews, useNewsStore } from '../news/newsStore';
 import { NewsMarkdown } from '../news/NewsMarkdown';
-import { NEWS_BANNER_STYLE, NEWS_ICON } from '../news/newsStyles';
+import { NEWS_BANNER_STYLE, NEWS_ICON, NEWS_ICON_COLOR } from '../news/newsStyles';
 
 const COLS = 4;
 
@@ -176,14 +176,14 @@ function NewsSection() {
 
   return (
     <div className="space-y-2 border-b border-white/10 px-5 py-3">
-      {active.slice(0, 4).map((n) => (
+      {active.slice(0, 4).map((n) => {
+        const Icon = NEWS_ICON[n.severity];
+        return (
         <div
           key={n.id}
           className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${NEWS_BANNER_STYLE[n.severity]}`}
         >
-          <span className="mt-0.5 text-lg" aria-hidden>
-            {NEWS_ICON[n.severity]}
-          </span>
+          <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${NEWS_ICON_COLOR[n.severity]}`} aria-hidden />
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-medium text-white/90">{n.title}</p>
             <div className="text-white/70">
@@ -198,7 +198,8 @@ function NewsSection() {
             <X className="h-4 w-4" />
           </button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

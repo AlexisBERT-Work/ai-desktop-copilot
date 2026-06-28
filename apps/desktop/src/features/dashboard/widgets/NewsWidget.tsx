@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { computeActiveNews, useNewsStore } from '../../news/newsStore';
-import { NEWS_ICON } from '../../news/newsStyles';
+import { NEWS_ICON, NEWS_ICON_COLOR } from '../../news/newsStyles';
 
 /** Widget tableau de bord : liste compacte des news actives. */
 export function NewsWidget() {
@@ -21,12 +21,15 @@ export function NewsWidget() {
 
   return (
     <ul className="space-y-1.5">
-      {active.slice(0, 6).map((n) => (
-        <li key={n.id} className="flex items-start gap-2 text-sm">
-          <span aria-hidden>{NEWS_ICON[n.severity]}</span>
-          <span className="min-w-0 truncate font-medium text-white/80">{n.title}</span>
-        </li>
-      ))}
+      {active.slice(0, 6).map((n) => {
+        const Icon = NEWS_ICON[n.severity];
+        return (
+          <li key={n.id} className="flex items-start gap-2 text-sm">
+            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${NEWS_ICON_COLOR[n.severity]}`} aria-hidden />
+            <span className="min-w-0 truncate font-medium text-white/80">{n.title}</span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

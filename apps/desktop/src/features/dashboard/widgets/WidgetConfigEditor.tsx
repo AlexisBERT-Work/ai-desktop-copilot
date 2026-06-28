@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import type { Widget } from '@catdesk/shared-types';
 import { useDashboardStore } from '../dashboardStore';
+import { QUICK_ACTION_ICON_NAMES } from './quickActionIcons';
+import { QUOTE_FIELDS, type QuoteField } from './metric';
 
 interface Props {
   widget: Widget;
@@ -8,6 +11,7 @@ interface Props {
 }
 
 type Update = (id: string, patch: Record<string, unknown>) => void;
+type EditorProps = Props & { update: Update };
 
 const FIELD =
   'w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm ' +
@@ -18,26 +22,48 @@ const SAVE =
   'transition-colors hover:bg-brand-500';
 const CANCEL = 'rounded-lg px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80';
 
-/** Éditeur de configuration spécifique au type de widget. */
-export function WidgetConfigEditor({ widget, onClose }: Props) {
-  const update = useDashboardStore((s) => s.updateWidgetConfig);
-
-  if (widget.type === 'quick_action') {
-    return <QuickActionConfig widget={widget} update={update} onClose={onClose} />;
-  }
-  if (widget.type === 'stocks') {
-    return <StocksConfig widget={widget} update={update} onClose={onClose} />;
-  }
+function Actions({ onSave, onClose }: { onSave: () => void; onClose: () => void }) {
   return (
-    <p className="py-2 text-center text-xs text-white/30">
-      Ce widget n'a pas encore de réglages.
-    </p>
+    <div className="flex justify-end gap-1">
+      <button className={CANCEL} onClick={onClose}>
+        Annuler
+      </button>
+      <button className={SAVE} onClick={onSave}>
+        Enregistrer
+      </button>
+    </div>
   );
 }
 
-function QuickActionConfig({ widget, update, onClose }: Props & { update: Update }) {
-  const [icon, setIcon] = useState(
-    typeof widget.config.icon === 'string' ? widget.config.icon : '',
+/** Éditeur de configuration spécifique au type de widget. */
+export function WidgetConfigEditor({ widget, onClose }: Props) {
+  const update = useDashboardStore((s) => s.updateWidgetConfig);
+  const props: EditorProps = { widget, update, onClose };
+
+  switch (widget.type) {
+    case 'quick_action':
+      return <QuickActionConfig {...props} />;
+    case 'stocks':
+      return <StocksConfig {...props} />;
+    case 'table':
+      return <SymbolsConfig {...props} />;
+    case 'chart':
+      return <ChartConfig {...props} />;
+    case 'kpi':
+    case 'stat':
+      return <MetricConfigEditor {...props} />;
+    default:
+      return (
+        <p className="py-2 text-center text-xs text-white/30">
+          Ce widget n'a pas encore de réglages.
+        </p>
+      );
+  }
+}
+
+function QuickActionConfig({ widget, update, onClose }: EditorProps) {
+  const [iconName, setIconName] = useState(
+    typeof widget.config.iconName === 'string' ? widget.config.iconName : 'zap',
   );
   const [query, setQuery] = useState(
     typeof widget.config.query === 'string' ? widget.config.query : '',
@@ -47,13 +73,17 @@ function QuickActionConfig({ widget, update, onClose }: Props & { update: Update
     <div className="space-y-2.5">
       <label className={LABEL}>
         Icône
-        <input
+        <select
           className={`${FIELD} mt-1`}
-          value={icon}
-          onChange={(e) => setIcon(e.target.value)}
-          placeholder="⚡"
-          maxLength={4}
-        />
+          value={iconName}
+          onChange={(e) => setIconName(e.target.value)}
+        >
+          {QUICK_ACTION_ICON_NAMES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </label>
       <label className={LABEL}>
         Requête envoyée à l'agent
@@ -65,20 +95,148 @@ function QuickActionConfig({ widget, update, onClose }: Props & { update: Update
           placeholder="Ex. Capture mon écran et décris-le."
         />
       </label>
-      <div className="flex justify-end gap-1">
-        <button className={CANCEL} onClick={onClose}>
-          Annuler
-        </button>
-        <button
-          className={SAVE}
-          onClick={() => {
-            update(widget.id, { icon: icon.trim() || '⚡', query: query.trim() });
-            onClose();
-          }}
+      <Actions
+        onClose={onClose}
+        onSave={() => {
+          update(widget.id, { iconName, query: query.trim() });
+          onClose();
+        }}
+      />
+    </div>
+  );
+}
+
+function MetricConfigEditor({ widget, update, onClose }: EditorProps) {
+  const [symbol, setSymbol] = useState(
+    typeof widget.config.symbol === 'string' ? widget.config.symbol : '',
+  );
+  const [field, setField] = useState<QuoteField>(
+    (QUOTE_FIELDS as readonly string[]).includes(widget.config.field as string)
+      ? (widget.config.field as QuoteField)
+      : 'price',
+  );
+  const [formula, setFormula] = useState(
+    typeof widget.config.formula === 'string' ? widget.config.formula : '',
+  );
+  const [label, setLabel] = useState(
+    typeof widget.config.label === 'string' ? widget.config.label : '',
+  );
+
+  const save = () => {
+    const patch: Record<string, unknown> = { label: label.trim() };
+    if (formula.trim().length > 0) {
+      patch.formula = formula.trim();
+      patch.symbol = '';
+    } else {
+      patch.symbol = symbol.trim().toUpperCase();
+      patch.field = field;
+      patch.formula = '';
+    }
+    update(widget.id, patch);
+    onClose();
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <label className={LABEL}>
+        Symbole
+        <input
+          className={`${FIELD} mt-1`}
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value)}
+          placeholder="AAPL"
+        />
+      </label>
+      <label className={LABEL}>
+        Champ
+        <select
+          className={`${FIELD} mt-1`}
+          value={field}
+          onChange={(e) => setField(e.target.value as QuoteField)}
         >
-          Enregistrer
-        </button>
-      </div>
+          {QUOTE_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className={LABEL}>
+        … ou une formule (prioritaire)
+        <input
+          className={`${FIELD} mt-1`}
+          value={formula}
+          onChange={(e) => setFormula(e.target.value)}
+          placeholder="AAPL.price / MSFT.price"
+        />
+      </label>
+      <label className={LABEL}>
+        Libellé (optionnel)
+        <input
+          className={`${FIELD} mt-1`}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="ex. AAPL · prix"
+        />
+      </label>
+      <Actions onClose={onClose} onSave={save} />
+    </div>
+  );
+}
+
+function ChartConfig({ widget, update, onClose }: EditorProps) {
+  const [symbol, setSymbol] = useState(
+    typeof widget.config.symbol === 'string' ? widget.config.symbol : '',
+  );
+  return (
+    <div className="space-y-2.5">
+      <label className={LABEL}>
+        Symbole
+        <input
+          className={`${FIELD} mt-1`}
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value)}
+          placeholder="AAPL"
+        />
+      </label>
+      <Actions
+        onClose={onClose}
+        onSave={() => {
+          update(widget.id, { symbol: symbol.trim().toUpperCase() });
+          onClose();
+        }}
+      />
+    </div>
+  );
+}
+
+function SymbolsConfig({ widget, update, onClose }: EditorProps) {
+  const initial = Array.isArray(widget.config.symbols)
+    ? widget.config.symbols.filter((s): s is string => typeof s === 'string').join(', ')
+    : '';
+  const [text, setText] = useState(initial);
+  return (
+    <div className="space-y-2.5">
+      <label className={LABEL}>
+        Symboles (séparés par des virgules)
+        <input
+          className={`${FIELD} mt-1`}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="AAPL, MSFT, TSLA"
+        />
+      </label>
+      <Actions
+        onClose={onClose}
+        onSave={() => {
+          const symbols = text
+            .split(',')
+            .map((s) => s.trim().toUpperCase())
+            .filter((s) => s.length > 0);
+          update(widget.id, { symbols });
+          onClose();
+        }}
+      />
     </div>
   );
 }
@@ -103,7 +261,7 @@ function readFormulas(widget: Widget): FormulaRow[] {
   return out;
 }
 
-function StocksConfig({ widget, update, onClose }: Props & { update: Update }) {
+function StocksConfig({ widget, update, onClose }: EditorProps) {
   const initialSymbols = Array.isArray(widget.config.symbols)
     ? widget.config.symbols.filter((s): s is string => typeof s === 'string').join(', ')
     : '';
@@ -154,11 +312,11 @@ function StocksConfig({ widget, update, onClose }: Props & { update: Update }) {
               placeholder="AAPL.price / MSFT.price"
             />
             <button
-              className="shrink-0 rounded px-1.5 py-1 text-xs text-white/40 hover:bg-white/10 hover:text-red-300"
+              className="shrink-0 rounded p-1 text-white/40 hover:bg-white/10 hover:text-red-300"
               onClick={() => setFormulas((rows) => rows.filter((_, j) => j !== i))}
               aria-label="Retirer la formule"
             >
-              ✕
+              <X className="h-3.5 w-3.5" />
             </button>
           </div>
         ))}
@@ -170,14 +328,7 @@ function StocksConfig({ widget, update, onClose }: Props & { update: Update }) {
         </button>
       </div>
 
-      <div className="flex justify-end gap-1">
-        <button className={CANCEL} onClick={onClose}>
-          Annuler
-        </button>
-        <button className={SAVE} onClick={save}>
-          Enregistrer
-        </button>
-      </div>
+      <Actions onClose={onClose} onSave={save} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Sparkles } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { MessageItem } from './MessageItem';
 import { StreamingIndicator } from './StreamingIndicator';
@@ -21,7 +22,7 @@ export function MessageList({ conversationId }: Props) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8 gap-4">
         <div className="w-12 h-12 rounded-2xl bg-brand-600/20 flex items-center justify-center">
-          <span className="text-2xl">✨</span>
+          <Sparkles className="h-6 w-6 text-brand-400" />
         </div>
         <div>
           <p className="text-white/70 font-medium">Comment puis-je vous aider ?</p>

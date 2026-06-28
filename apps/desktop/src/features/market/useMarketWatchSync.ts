@@ -3,25 +3,27 @@ import { invoke } from '@tauri-apps/api/core';
 import { useDashboardStore } from '../dashboard/dashboardStore';
 import type { Widget, WidgetFormula } from '@catdesk/shared-types';
 
-/** Union des symboles configurés dans tous les widgets `stocks`. */
+/**
+ * Union des symboles configurés dans tous les widgets marché : `config.symbols`
+ * (stocks/table) ET `config.symbol` (chart/kpi/stat).
+ */
 function collectSymbols(widgets: Widget[]): string[] {
   const set = new Set<string>();
+  const add = (s: unknown) => {
+    if (typeof s === 'string' && s.trim().length > 0) set.add(s.trim().toUpperCase());
+  };
   for (const w of widgets) {
-    if (w.type !== 'stocks') continue;
     const syms = w.config.symbols;
-    if (!Array.isArray(syms)) continue;
-    for (const s of syms) {
-      if (typeof s === 'string' && s.trim().length > 0) set.add(s.trim().toUpperCase());
-    }
+    if (Array.isArray(syms)) for (const s of syms) add(s);
+    add(w.config.symbol);
   }
   return [...set];
 }
 
-/** Union (par nom) des formules configurées dans les widgets `stocks`. */
+/** Union (par nom) des formules configurées dans tous les widgets. */
 function collectFormulas(widgets: Widget[]): WidgetFormula[] {
   const byName = new Map<string, WidgetFormula>();
   for (const w of widgets) {
-    if (w.type !== 'stocks') continue;
     const fs = w.config.formulas;
     if (!Array.isArray(fs)) continue;
     for (const f of fs) {

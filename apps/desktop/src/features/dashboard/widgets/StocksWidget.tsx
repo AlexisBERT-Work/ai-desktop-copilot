@@ -1,3 +1,4 @@
+import { AlertTriangle, Sigma } from 'lucide-react';
 import { useMarketStore } from '../../market/marketStore';
 import { Sparkline } from '../../market/Sparkline';
 import type { WidgetProps } from './types';
@@ -54,9 +55,10 @@ export function StocksWidget({ widget }: WidgetProps) {
                     {q.changePercent.toFixed(2)}%
                   </span>
                   {q.stale && (
-                    <span className="text-amber-400/70" title="Donnée non rafraîchie">
-                      ⚠
-                    </span>
+                    <AlertTriangle
+                      className="h-3.5 w-3.5 text-amber-400/70"
+                      aria-label="Donnée non rafraîchie"
+                    />
                   )}
                 </span>
               ) : (
@@ -73,7 +75,10 @@ export function StocksWidget({ widget }: WidgetProps) {
             const c = computed.find((v) => v.name === name);
             return (
               <div key={name} className="flex items-center justify-between text-sm">
-                <span className="truncate text-brand-300/90">ƒ {name}</span>
+                <span className="flex min-w-0 items-center gap-1 truncate text-brand-300/90">
+                  <Sigma className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {name}
+                </span>
                 {c === undefined ? (
                   <span className="tabular-nums text-white/25">—</span>
                 ) : c.error !== undefined || c.value === null ? (
