@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Check, LayoutDashboard, Pencil, Plus, RotateCcw, X } from 'lucide-react';
+import { BookOpen, Check, LayoutDashboard, Pencil, Plus, RotateCcw, X } from 'lucide-react';
 import { useDashboardStore } from './dashboardStore';
 import { DashboardWidgetCard } from './DashboardWidgetCard';
 import { AddWidgetMenu } from './widgets/AddWidgetMenu';
@@ -19,7 +19,11 @@ const hideWindow = () => {
  * séparée de la bulle IA. Affiche les annonces + la grille de widgets (marchés,
  * stats, formules…).
  */
-export function DashboardPage() {
+interface DashboardPageProps {
+  onOpenGuide: () => void;
+}
+
+export function DashboardPage({ onOpenGuide }: DashboardPageProps) {
   const { config, editMode, setEditMode, reorderWidget, resetToDefault } = useDashboardStore();
   const [addOpen, setAddOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -52,6 +56,16 @@ export function DashboardPage() {
         </span>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={onOpenGuide}
+            className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
+                       text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
+            title="Guide des widgets (exportable en PDF)"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Guide
+          </button>
+
           {editMode && (
             <>
               <button

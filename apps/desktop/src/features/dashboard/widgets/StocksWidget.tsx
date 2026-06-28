@@ -1,4 +1,5 @@
 import { AlertTriangle, Sigma } from 'lucide-react';
+import type { ComputedValue, Quote } from '@catdesk/shared-types';
 import { useMarketStore } from '../../market/marketStore';
 import { Sparkline } from '../../market/Sparkline';
 import type { WidgetProps } from './types';
@@ -16,22 +17,16 @@ function readFormulaNames(config: Record<string, unknown>): string[] {
   return names;
 }
 
-/**
- * Widget bourse — cotations en direct + colonnes de formules (provider `market`
- * du sidecar, poussé via `market:update`). Symboles et formules de la config
- * sont synchronisés vers le sidecar (voir useMarketWatchSync) ; les valeurs
- * calculées reviennent dans `computed` et sont matchées par nom.
- */
-export function StocksWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const computed = useMarketStore((s) => s.computed);
-  const history = useMarketStore((s) => s.history);
+interface StocksViewProps {
+  symbols: string[];
+  formulaNames: string[];
+  quotes: Record<string, Quote>;
+  computed: ComputedValue[];
+  history: Record<string, number[]>;
+}
 
-  const symbols = Array.isArray(widget.config.symbols)
-    ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
-    : [];
-  const formulaNames = readFormulaNames(widget.config);
-
+/** Rendu pur du widget bourse (cotations + colonnes de formules). */
+export function StocksView({ symbols, formulaNames, quotes, computed, history }: StocksViewProps) {
   if (symbols.length === 0 && formulaNames.length === 0) {
     return <p className="text-xs text-white/30">Aucun symbole ni formule configuré.</p>;
   }
@@ -96,5 +91,32 @@ export function StocksWidget({ widget }: WidgetProps) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Widget bourse — cotations en direct + colonnes de formules (provider `market`
+ * du sidecar, poussé via `market:update`). Symboles et formules de la config
+ * sont synchronisés vers le sidecar (voir useMarketWatchSync) ; les valeurs
+ * calculées reviennent dans `computed` et sont matchées par nom.
+ */
+export function StocksWidget({ widget }: WidgetProps) {
+  const quotes = useMarketStore((s) => s.quotes);
+  const computed = useMarketStore((s) => s.computed);
+  const history = useMarketStore((s) => s.history);
+
+  const symbols = Array.isArray(widget.config.symbols)
+    ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
+    : [];
+  const formulaNames = readFormulaNames(widget.config);
+
+  return (
+    <StocksView
+      symbols={symbols}
+      formulaNames={formulaNames}
+      quotes={quotes}
+      computed={computed}
+      history={history}
+    />
   );
 }

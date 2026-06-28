@@ -1,5 +1,5 @@
 import { useMarketStore } from '../../market/marketStore';
-import { readMetricConfig, resolveMetric } from './metric';
+import { readMetricConfig, resolveMetric, type MetricResult } from './metric';
 import type { WidgetProps } from './types';
 
 function format(value: number, unit?: string): string {
@@ -8,14 +8,10 @@ function format(value: number, unit?: string): string {
 }
 
 /**
- * Widget KPI / statistique : une valeur unique (champ d'un symbole ou résultat
- * de formule), en grand, avec la variation du jour colorée.
+ * Rendu pur d'un KPI / statistique à partir d'une métrique déjà résolue.
+ * Sans dépendance au store → réutilisable (guide, tests).
  */
-export function KpiWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const computed = useMarketStore((s) => s.computed);
-  const m = resolveMetric(readMetricConfig(widget.config), quotes, computed);
-
+export function KpiView({ metric: m }: { metric: MetricResult }) {
   const valueColor =
     m.unit === '%' && m.value !== null
       ? m.value >= 0
@@ -47,4 +43,15 @@ export function KpiWidget({ widget }: WidgetProps) {
       )}
     </div>
   );
+}
+
+/**
+ * Widget KPI / statistique : une valeur unique (champ d'un symbole ou résultat
+ * de formule), en grand, avec la variation du jour colorée.
+ */
+export function KpiWidget({ widget }: WidgetProps) {
+  const quotes = useMarketStore((s) => s.quotes);
+  const computed = useMarketStore((s) => s.computed);
+  const m = resolveMetric(readMetricConfig(widget.config), quotes, computed);
+  return <KpiView metric={m} />;
 }

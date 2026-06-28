@@ -1,14 +1,14 @@
+import type { Quote } from '@catdesk/shared-types';
 import { useMarketStore } from '../../market/marketStore';
 import type { WidgetProps } from './types';
 
-/** Widget table : plusieurs symboles avec prix / variation / volume. */
-export function TableWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
+interface TableViewProps {
+  symbols: string[];
+  quotes: Record<string, Quote>;
+}
 
-  const symbols = Array.isArray(widget.config.symbols)
-    ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
-    : [];
-
+/** Rendu pur d'une table de cotations — sans dépendance au store. */
+export function TableView({ symbols, quotes }: TableViewProps) {
   if (symbols.length === 0) {
     return <p className="text-xs text-white/30">Aucun symbole configuré.</p>;
   }
@@ -48,4 +48,13 @@ export function TableWidget({ widget }: WidgetProps) {
       </tbody>
     </table>
   );
+}
+
+/** Widget table : plusieurs symboles avec prix / variation / volume. */
+export function TableWidget({ widget }: WidgetProps) {
+  const quotes = useMarketStore((s) => s.quotes);
+  const symbols = Array.isArray(widget.config.symbols)
+    ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
+    : [];
+  return <TableView symbols={symbols} quotes={quotes} />;
 }

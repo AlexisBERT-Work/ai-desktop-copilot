@@ -42,3 +42,32 @@
   ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 }
+
+/* Force la reproduction des couleurs/fonds (aperçus sombres dans le guide). */
+.print-exact {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Impression du guide des widgets → « Enregistrer en PDF ». */
+@media print {
+  @page { margin: 14mm; }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body { background: #fff !important; }
+
+  /* Masque les barres d'action et déplie les conteneurs scrollables. */
+  .no-print { display: none !important; }
+  .guide-scroll {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* Évite de couper une section au milieu d'une page. */
+  .print-break { break-inside: avoid; }
+}

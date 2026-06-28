@@ -16,6 +16,8 @@ type EditorProps = Props & { update: Update };
 const FIELD =
   'w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm ' +
   'text-white/90 outline-none placeholder-white/25 focus:border-brand-400/50';
+// Les <option> natives s'affichent sinon sur fond blanc (illisible en thème sombre).
+const OPTION = 'bg-gray-900 text-white/90';
 const LABEL = 'block text-xs font-medium text-white/50';
 const SAVE =
   'rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white ' +
@@ -79,7 +81,7 @@ function QuickActionConfig({ widget, update, onClose }: EditorProps) {
           onChange={(e) => setIconName(e.target.value)}
         >
           {QUICK_ACTION_ICON_NAMES.map((n) => (
-            <option key={n} value={n}>
+            <option key={n} value={n} className={OPTION}>
               {n}
             </option>
           ))}
@@ -155,7 +157,7 @@ function MetricConfigEditor({ widget, update, onClose }: EditorProps) {
           onChange={(e) => setField(e.target.value as QuoteField)}
         >
           {QUOTE_FIELDS.map((f) => (
-            <option key={f} value={f}>
+            <option key={f} value={f} className={OPTION}>
               {f}
             </option>
           ))}
