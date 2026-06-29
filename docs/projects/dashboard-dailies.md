@@ -64,12 +64,23 @@ proposé dans le menu d'ajout ([widgetMeta.ts](../../apps/desktop/src/features/d
 
 ---
 
-## 4. Lecture seule garantie (rappel)
+## 4. Lecture seule garantie + console admin
 
-Identique à la news : l'app cliente ne fait que `select` + `subscribe` (clé
-`anon`, bornée par RLS). L'écriture (`dailies_admin_write`) exige le claim
-`app_metadata.role = 'admin'`. Rédaction des dailys = **Supabase Studio** (Table
-editor / SQL) avec le compte admin.
+L'écriture (`dailies_admin_write`) exige le claim `app_metadata.role = 'admin'` :
+un client (clé `anon`, session anonyme) ne peut **rien** publier, même en
+contournant l'UI. Deux façons de rédiger côté admin :
+
+- **Console intégrée** (recommandée) — bouton **« Admin »** dans l'en-tête de la
+  fenêtre Marchés & News (visible si Supabase est configuré). Connexion par
+  e-mail/mot de passe → CRUD complet (rédiger / éditer / faire expirer /
+  supprimer). Fichiers : [adminAuth.ts](../../apps/desktop/src/features/dailies/adminAuth.ts),
+  [dailiesAdmin.ts](../../apps/desktop/src/features/dailies/dailiesAdmin.ts),
+  [DailiesAdminConsole.tsx](../../apps/desktop/src/features/dailies/DailiesAdminConsole.tsx).
+- **Supabase Studio** (repli) — Table editor / SQL avec le compte admin.
+
+> La console n'est qu'un confort d'écriture : **la sécurité est serveur** (RLS).
+> Se connecter dans la console = obtenir le JWT admin ; sans le claim, les
+> écritures sont rejetées par Postgres.
 
 ---
 
@@ -85,8 +96,10 @@ editor / SQL) avec le compte admin.
 ## 6. Mise en route
 
 La migration est appliquée par le même `pnpm exec supabase db push` que la news
-(voir [../../supabase/DEPLOY.md](../../supabase/DEPLOY.md)). Publier une daily :
-Table editor → `dailies` → Insert (`title`, `body` Markdown, `category`).
+(voir [../../supabase/DEPLOY.md](../../supabase/DEPLOY.md)). Pour utiliser la
+**console admin**, le compte admin doit avoir un **mot de passe** (Auth → Add
+user *avec* mot de passe, ou sign-up) **et** le claim `role=admin` (DEPLOY §7).
+Ensuite : fenêtre Marchés & News → **Admin** → connexion → rédiger.
 
 ---
 
@@ -102,7 +115,9 @@ Table editor → `dailies` → Insert (`title`, `body` Markdown, `category`).
 
 ## 8. Suite possible
 
+- **Console admin** : ✅ livrée (login + CRUD dans l'app). Étendre à la **news**.
 - Catégories paramétrables côté admin (au lieu d'une liste fixe).
 - Multi-tags par daily (filtrage plus fin).
 - Accusés de lecture / « non lus », marque-page.
+- Programmation (publier à une date future) — aujourd'hui `published_at = now()`.
 - Daily auto-générée par l'agent (lien avec `NewsSummarizer`/cron).

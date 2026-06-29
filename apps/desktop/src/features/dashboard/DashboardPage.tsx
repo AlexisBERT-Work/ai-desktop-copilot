@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { BookOpen, Check, LayoutDashboard, Pencil, Plus, RotateCcw, X } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  LayoutDashboard,
+  Pencil,
+  Plus,
+  RotateCcw,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import { useDashboardStore } from './dashboardStore';
+import { isNewsConfigured as isSupabaseConfigured } from '../news/supabaseClient';
 import { DashboardWidgetCard } from './DashboardWidgetCard';
 import { AddWidgetMenu } from './widgets/AddWidgetMenu';
 import { computeActiveNews, useNewsStore } from '../news/newsStore';
@@ -21,9 +31,10 @@ const hideWindow = () => {
  */
 interface DashboardPageProps {
   onOpenGuide: () => void;
+  onOpenAdmin: () => void;
 }
 
-export function DashboardPage({ onOpenGuide }: DashboardPageProps) {
+export function DashboardPage({ onOpenGuide, onOpenAdmin }: DashboardPageProps) {
   const { config, editMode, setEditMode, reorderWidget, resetToDefault } = useDashboardStore();
   const [addOpen, setAddOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -65,6 +76,18 @@ export function DashboardPage({ onOpenGuide }: DashboardPageProps) {
             <BookOpen className="h-3.5 w-3.5" />
             Guide
           </button>
+
+          {isSupabaseConfigured && (
+            <button
+              onClick={onOpenAdmin}
+              className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
+                         text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
+              title="Console admin — rédiger les dailys (réservé à l'admin)"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Admin
+            </button>
+          )}
 
           {editMode && (
             <>

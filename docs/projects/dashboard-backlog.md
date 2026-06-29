@@ -59,7 +59,7 @@ Ce qui constitue le MVP et qu'on **ne touche plus** sauf bug :
 | # | Évolution | Valeur | Effort |
 |---|---|---|---|
 | N1 | **Ciblage par client** : UI pour récupérer l'`uid` client + cibler depuis la console | Haute | M |
-| N2 | **Console admin custom** (CRUD news/dailys dédié, hors Supabase Studio) | Moyenne | M |
+| N2 | **Console admin custom** — ✅ livrée pour les **dailys** (login + CRUD in-app) ; reste à étendre à la **news** | Moyenne | M |
 | N3 | Analytics « qui a vu quoi » / accusés de lecture | Faible | M |
 | N4 | Signature de contenu optionnelle (défense en profondeur) | Faible | S |
 | N5 | Catégories de dailys **paramétrables** (liste fixe → admin) + multi-tags | Moyenne | M |
