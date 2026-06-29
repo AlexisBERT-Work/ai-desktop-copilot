@@ -62,6 +62,13 @@ const DEFAULT_CONFIG: DashboardConfig = {
       config: { iconName: 'camera', query: 'Capture mon écran et décris ce que tu vois en détail.' },
       layout: { x: 0, y: 3, w: 1, h: 1 },
     },
+    {
+      id: 'dailies-demo',
+      type: 'dailies',
+      title: 'Dailys',
+      config: {},
+      layout: { x: 0, y: 4, w: 4, h: 2 },
+    },
   ],
 };
 

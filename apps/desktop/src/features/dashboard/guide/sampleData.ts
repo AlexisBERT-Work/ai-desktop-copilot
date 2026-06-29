@@ -1,4 +1,4 @@
-import type { ComputedValue, NewsItem, Quote } from '@catdesk/shared-types';
+import type { ComputedValue, Daily, NewsItem, Quote } from '@catdesk/shared-types';
 
 // ─── Données d'exemple pour le guide des widgets ───────────────
 // Déterministes (aucun aléa) afin que le PDF exporté soit toujours identique.
@@ -75,6 +75,33 @@ export const SAMPLE_NEWS: NewsItem[] = [
     severity: 'info',
     audienceClientId: null,
     publishedAt: '2026-06-27T18:00:00.000Z',
+    expiresAt: null,
+  },
+];
+
+export const SAMPLE_DAILIES: Daily[] = [
+  {
+    id: 'd1',
+    title: 'Ouverture US : futures en hausse',
+    body: 'Le **S&P 500** ouvre +0,6 %. Focus sur les semis après NVDA.',
+    category: 'markets',
+    publishedAt: '2026-06-29T07:30:00.000Z',
+    expiresAt: null,
+  },
+  {
+    id: 'd2',
+    title: 'IA : nouveau modèle open-weights',
+    body: 'Un acteur publie un modèle compétitif sous licence permissive.',
+    category: 'tech',
+    publishedAt: '2026-06-29T06:50:00.000Z',
+    expiresAt: null,
+  },
+  {
+    id: 'd3',
+    title: 'BTC consolide sous 70k$',
+    body: 'Volatilité en baisse, volumes faibles avant la clôture mensuelle.',
+    category: 'crypto',
+    publishedAt: '2026-06-28T20:10:00.000Z',
     expiresAt: null,
   },
 ];

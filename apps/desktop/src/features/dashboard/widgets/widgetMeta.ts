@@ -7,6 +7,7 @@ import {
   BarChart3,
   Table2,
   Megaphone,
+  Newspaper,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -96,6 +97,12 @@ export const WIDGET_META: readonly WidgetMeta[] = [
     label: 'News',
     Icon: Megaphone,
     build: () => ({ type: 'news', title: 'News', config: {}, layout: { x: 0, y: 0, w: 2, h: 1 } }),
+  },
+  {
+    type: 'dailies',
+    label: 'Dailys',
+    Icon: Newspaper,
+    build: () => ({ type: 'dailies', title: 'Dailys', config: {}, layout: { x: 0, y: 0, w: 2, h: 2 } }),
   },
 ];
 

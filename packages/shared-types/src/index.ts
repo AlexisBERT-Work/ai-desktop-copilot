@@ -6,4 +6,5 @@ export * from './events';
 export * from './tools';
 export * from './dashboard';
 export * from './news';
+export * from './dailies';
 export * from './market';

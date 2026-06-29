@@ -51,13 +51,19 @@ Ce qui constitue le MVP et qu'on **ne touche plus** sauf bug :
 | B6 | **Persistance historique** en SQLite (actuellement en mémoire, perdu au restart) | Moyenne | S |
 | B7 | Univers + cadence réglables depuis l'UI (pas seulement via env) | Faible | S |
 
-### News
+### News & Dailys
+> **Livré (2026-06-29)** : **dailys** — flux éditorial admin, lecture seule
+> client, **filtrable par catégorie** (widget + préférence persistée).
+> Voir [dashboard-dailies.md](dashboard-dailies.md).
+
 | # | Évolution | Valeur | Effort |
 |---|---|---|---|
 | N1 | **Ciblage par client** : UI pour récupérer l'`uid` client + cibler depuis la console | Haute | M |
-| N2 | **Console admin custom** (CRUD news dédié, hors Supabase Studio) | Moyenne | M |
+| N2 | **Console admin custom** (CRUD news/dailys dédié, hors Supabase Studio) | Moyenne | M |
 | N3 | Analytics « qui a vu quoi » / accusés de lecture | Faible | M |
 | N4 | Signature de contenu optionnelle (défense en profondeur) | Faible | S |
+| N5 | Catégories de dailys **paramétrables** (liste fixe → admin) + multi-tags | Moyenne | M |
+| N6 | Daily **auto-générée** par l'agent (lien `NewsSummarizer`/cron) | Moyenne | M |
 
 ### Qualité / robustesse
 | # | Évolution | Valeur | Effort |

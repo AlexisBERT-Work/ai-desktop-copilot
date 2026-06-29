@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LineChart,
   Megaphone,
+  Newspaper,
   Pencil,
   Settings2,
   Table2,
@@ -19,10 +20,12 @@ import { ChartView } from '../widgets/ChartWidget';
 import { TableView } from '../widgets/TableWidget';
 import { StocksView } from '../widgets/StocksWidget';
 import { NewsView } from '../widgets/NewsWidget';
+import { DailiesView } from '../widgets/DailiesWidget';
 import { QuickActionView } from '../widgets/QuickActionWidget';
 import { resolveMetric } from '../widgets/metric';
 import {
   SAMPLE_COMPUTED,
+  SAMPLE_DAILIES,
   SAMPLE_HISTORY,
   SAMPLE_NEWS,
   SAMPLE_QUOTES,
@@ -153,6 +156,18 @@ const ENTRIES: readonly GuideEntry[] = [
       "Liste les annonces actives (maintenance, nouveautés, alertes). Le contenu est piloté par l'administrateur via le backend ; côté client, ce widget est en lecture seule.",
     params: [{ key: 'Aucun réglage', desc: 'Le contenu provient du backend Supabase, pas de la configuration locale.' }],
     preview: <NewsView items={SAMPLE_NEWS} />,
+  },
+  {
+    Icon: Newspaper,
+    name: 'Dailys',
+    summary: "Flux de briefings quotidiens, filtrable par centre d'intérêt.",
+    detail:
+      "L'administrateur publie des dailys catégorisées (Marchés, Tech, Crypto, Macro, Produit…). Chaque utilisateur, en lecture seule, coche les catégories qui l'intéressent via les puces de filtre — sa sélection est mémorisée. Sans sélection, tout s'affiche.",
+    params: [
+      { key: 'Catégories suivies', desc: 'Choisies par l’utilisateur dans le widget (puces). Préférence locale, pas un réglage admin.' },
+      { key: 'Contenu', desc: 'Rédigé par l’admin via le backend Supabase ; le client ne peut que consulter.' },
+    ],
+    preview: <DailiesView items={SAMPLE_DAILIES} followed={['markets', 'tech']} onToggle={() => {}} />,
   },
   {
     Icon: Zap,

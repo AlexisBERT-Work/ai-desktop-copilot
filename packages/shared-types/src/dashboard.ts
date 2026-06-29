@@ -10,7 +10,8 @@ export type WidgetType =
   | 'table'
   | 'stocks'
   | 'quick_action'
-  | 'news';
+  | 'news'
+  | 'dailies';
 
 /** Position/taille dans la grille, en unités de colonnes/lignes. */
 export interface WidgetLayout {

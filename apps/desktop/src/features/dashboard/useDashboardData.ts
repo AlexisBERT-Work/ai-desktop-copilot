@@ -3,12 +3,13 @@ import { listen } from '@tauri-apps/api/event';
 import type { MarketSnapshot } from '@catdesk/shared-types';
 import { useMarketStore } from '../market/marketStore';
 import { useNews } from '../news/useNews';
+import { useDailies } from '../dailies/useDailies';
 import { useMarketWatchSync } from '../market/useMarketWatchSync';
 
 /**
  * Câblage data de la fenêtre dashboard (contexte JS séparé du bot) :
  * - écoute `market:update` (diffusé à toutes les fenêtres) → marketStore
- * - charge la news (Supabase) et synchronise la watchlist depuis les widgets
+ * - charge la news + les dailys (Supabase) et synchronise la watchlist
  */
 export function useDashboardData(): void {
   const applyMarket = useMarketStore((s) => s.apply);
@@ -21,5 +22,6 @@ export function useDashboardData(): void {
   }, [applyMarket]);
 
   useNews();
+  useDailies();
   useMarketWatchSync();
 }
