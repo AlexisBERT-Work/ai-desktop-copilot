@@ -3,9 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ⚠️ Garder en phase avec la CSP de src-tauri/tauri.conf.json (app.security.csp).
+         Le navigateur applique l'intersection des deux : un connect-src manquant ici
+         bloque la requête même si Tauri l'autorise (ex. Supabase → "Failed to fetch"). -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:11434 ipc: asset:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:11434 https://*.supabase.co wss://*.supabase.co ipc: asset:"
     />
     <title>CatDesk</title>
   </head>

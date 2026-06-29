@@ -36,7 +36,7 @@ fort** et garde-le (il sert au `link` et à l'accès SQL direct) :
 ```powershell
 pnpm exec supabase orgs list          # note l'ID d'org (ex. iaouquktvvfcewnxbtnu)
 
-$dbpass = "RemplaceParUnMotDePasseFort!"
+$dbpass = "RemplaceParUnMotDePasseFort!"   # ⚠️ valeur de session uniquement — jamais ton vrai mdp dans ce fichier versionné
 pnpm exec supabase projects create catdesk-news --org-id TON_ORG_ID --region eu-central-1 --db-password $dbpass
 ```
 
@@ -73,14 +73,27 @@ pnpm exec supabase migration list
 
 ## 5. Activer l'auth anonyme côté distant
 
-Notre `config.toml` a déjà `enable_anonymous_sign_ins = true` ; on le pousse :
+Notre `config.toml` a déjà `enable_anonymous_sign_ins = true`. On peut tenter de
+le pousser :
 
 ```powershell
 pnpm exec supabase config push
 ```
 
-> Repli si besoin : Dashboard → **Authentication → Sign In / Providers** →
-> activer **Anonymous sign-ins**.
+> ⚠️ **Bug connu CLI 2.108.0** : `config push` plante après l'étape Auth avec
+> `failed to read Storage config: SchemaError(Missing key at ["databasePoolMode"])`.
+> C'est un défaut du lecteur Storage du CLI (clé absente de la réponse API), sans
+> rapport avec l'auth et non corrigeable via `config.toml`.
+>
+> **Voie fiable** : activer le réglage directement dans le dashboard —
+> **Authentication → Sign In / Providers → Anonymous sign-ins** → *Save*.
+> C'est le seul réglage auth nécessaire pour CatDesk ; pas besoin d'insister sur
+> `config push`.
+
+> ⚠️ **Captcha** : si la protection Captcha est activée (Authentication → Attack
+> Protection), **désactive-la**. L'app n'envoie pas de `captcha_token`, donc et la
+> connexion admin (`signInWithPassword`) et la lecture client (`signInAnonymously`)
+> échouent avec `captcha protection: request disallowed`.
 
 ## 6. Renseigner les clés client (.env)
 
