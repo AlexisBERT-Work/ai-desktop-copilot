@@ -145,6 +145,70 @@ export async function analyzeJournal(
   return { analysis: parsed.analysis, summaries };
 }
 
+// ─── Synthèse transversale (tous journaux) ─────────────────────
+
+export interface JournalEntry {
+  journal: string;
+  analysis: string;
+}
+
+const GLOBAL_SYSTEM = `Tu es rédacteur en chef d'une revue de presse francophone. On te donne l'analyse du jour de plusieurs journaux.
+Tu réponds UNIQUEMENT avec un objet JSON valide : {"synthese": "..."}
+- "synthese" : 3 à 5 phrases (en français) dégageant les grandes tendances TRANSVERSALES du jour et, quand c'est pertinent, les angles différents selon les journaux.`;
+
+/** Invite de synthèse à partir des analyses par journal. Pur. */
+export function buildGlobalPrompt(entries: JournalEntry[]): string {
+  const lines = entries.map((e) => `- ${e.journal} : ${e.analysis}`);
+  return `Analyses par journal :\n\n${lines.join('\n')}`;
+}
+
+/** Extrait la "synthese" d'une réponse JSON. Pur. */
+export function parseSynthesisJson(text: string): string | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const s = (parsed as Record<string, unknown>)['synthese'];
+  const synthesis = typeof s === 'string' ? s.trim() : '';
+  return synthesis.length > 0 ? synthesis : null;
+}
+
+/** Titre daté de la synthèse transversale. Pur. */
+export function globalTitle(now = new Date()): string {
+  const date = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  return `Synthèse du jour — ${date}`;
+}
+
+/** Corps Markdown de la synthèse (texte + journaux couverts). Pur. */
+export function buildGlobalBody(synthesis: string, journals: string[]): string {
+  const blocks = [synthesis];
+  if (journals.length > 0) blocks.push(`_Journaux couverts : ${journals.join(', ')}._`);
+  return blocks.join('\n\n');
+}
+
+/** Synthèse transversale via le LLM. Renvoie '' en cas d'échec (non bloquant). */
+export async function buildGlobalSynthesis(
+  llm: OllamaClient,
+  model: string,
+  entries: JournalEntry[],
+): Promise<string> {
+  if (entries.length === 0) return '';
+  let raw: string;
+  try {
+    raw = await complete(llm, model, GLOBAL_SYSTEM, buildGlobalPrompt(entries));
+  } catch (err) {
+    log.warn('Global synthesis failed', { error: String(err) });
+    return '';
+  }
+  return parseSynthesisJson(raw) ?? '';
+}
+
 export interface PressDigestDeps {
   llm: OllamaClient;
   model: string;
@@ -155,6 +219,8 @@ export interface PressDigestDeps {
   sinceHours: number;
   /** Articles max par journal. */
   perJournalLimit: number;
+  /** Ajoute une daily « Synthèse du jour » transversale en tête. */
+  synthesis: boolean;
   now?: Date;
 }
 
@@ -168,6 +234,7 @@ export async function buildPressDailies(deps: PressDigestDeps): Promise<JournalD
   const now = deps.now ?? new Date();
   const ids = sourceIds.filter((id) => id in NEWS_SOURCES);
   const drafts: JournalDraft[] = [];
+  const analysed: JournalEntry[] = [];
 
   for (const id of ids) {
     let items: NewsItem[] = [];
@@ -181,17 +248,31 @@ export async function buildPressDailies(deps: PressDigestDeps): Promise<JournalD
     if (items.length === 0) continue;
 
     await enrichExcerpts(items);
-    const { analysis, summaries } = await analyzeJournal(llm, model, NEWS_SOURCES[id]!.label, items);
-
     const journal = NEWS_SOURCES[id]!.label;
+    const { analysis, summaries } = await analyzeJournal(llm, model, journal, items);
+
     drafts.push({
       journal,
       category: categoryForSourceLabel(journal),
       title: journalTitle(journal, now),
       body: buildJournalBody(analysis, items, summaries),
     });
+    if (analysis.trim().length > 0) analysed.push({ journal, analysis });
   }
 
-  log.info('Press dailies built', { journals: drafts.length, requested: ids.length });
+  // Synthèse transversale en tête (optionnelle, nécessite ≥2 analyses).
+  if (deps.synthesis && analysed.length >= 2) {
+    const synthesis = await buildGlobalSynthesis(llm, model, analysed);
+    if (synthesis.length > 0) {
+      drafts.unshift({
+        journal: 'Synthèse',
+        category: 'misc',
+        title: globalTitle(now),
+        body: buildGlobalBody(synthesis, analysed.map((a) => a.journal)),
+      });
+    }
+  }
+
+  log.info('Press dailies built', { journals: drafts.length, requested: ids.length, synthesis: deps.synthesis });
   return drafts;
 }

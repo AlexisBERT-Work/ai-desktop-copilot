@@ -52,7 +52,9 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
   lesnumeriques: { id: 'lesnumeriques', label: 'Les Numériques', lang: 'fr', kind: 'feed', url: 'https://www.lesnumeriques.com/rss.xml', category: 'tech' },
 
   // ─── Finance / marchés ───────────────────────────────────────
-  lesechos: { id: 'lesechos', label: 'Les Échos', lang: 'fr', kind: 'feed', url: 'https://www.lesechos.fr/rss/rss_une_titres.xml', category: 'markets' },
+  // (Les Échos retiré : flux en 403 systématique. La Tribune + Yahoo Finance OK.)
+  latribune: { id: 'latribune', label: 'La Tribune', lang: 'fr', kind: 'feed', url: 'https://www.latribune.fr/feed.xml', category: 'markets' },
+  yahoofinance: { id: 'yahoofinance', label: 'Yahoo Finance', lang: 'en', kind: 'feed', url: 'https://finance.yahoo.com/news/rssindex', category: 'markets' },
   investing: { id: 'investing', label: 'Investing.com', lang: 'en', kind: 'feed', url: 'https://www.investing.com/rss/news_25.rss', category: 'markets' },
   marketwatch: { id: 'marketwatch', label: 'MarketWatch', lang: 'en', kind: 'feed', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', category: 'markets' },
   ft: { id: 'ft', label: 'Financial Times', lang: 'en', kind: 'feed', url: 'https://www.ft.com/rss/home', category: 'markets' },

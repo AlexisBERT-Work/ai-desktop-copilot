@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildGlobalBody,
+  buildGlobalPrompt,
   buildJournalBody,
   buildJournalPrompt,
+  globalTitle,
   journalTitle,
   parseAnalysisJson,
+  parseSynthesisJson,
 } from './pressDigest';
 import { msUntilHour } from './PressDigestScheduler';
 import type { NewsItem } from '../tools/web/FetchTechNewsTool';
@@ -68,6 +72,35 @@ describe('buildJournalBody', () => {
   it('omet le bloc analyse si vide', () => {
     const body = buildJournalBody('', [item('T', 'https://x/t')], ['']);
     expect(body.startsWith('- [T]')).toBe(true);
+  });
+});
+
+describe('synthèse transversale', () => {
+  const entries = [
+    { journal: 'Le Monde', analysis: 'Focus climat.' },
+    { journal: 'BBC', analysis: 'Focus géopolitique.' },
+  ];
+
+  it('buildGlobalPrompt liste les journaux et analyses', () => {
+    const p = buildGlobalPrompt(entries);
+    expect(p).toContain('- Le Monde : Focus climat.');
+    expect(p).toContain('- BBC : Focus géopolitique.');
+  });
+
+  it('parseSynthesisJson lit la synthèse, null si vide/illisible', () => {
+    expect(parseSynthesisJson('{"synthese":"Tendance globale"}')).toBe('Tendance globale');
+    expect(parseSynthesisJson('{"synthese":""}')).toBeNull();
+    expect(parseSynthesisJson('rien')).toBeNull();
+  });
+
+  it('globalTitle est daté', () => {
+    expect(globalTitle(new Date('2026-06-30T08:00:00'))).toContain('Synthèse du jour —');
+  });
+
+  it('buildGlobalBody ajoute les journaux couverts', () => {
+    const body = buildGlobalBody('Synthèse X.', ['Le Monde', 'BBC']);
+    expect(body).toContain('Synthèse X.');
+    expect(body).toContain('Journaux couverts : Le Monde, BBC');
   });
 });
 

@@ -144,12 +144,18 @@ SUPABASE_ANON_KEY=<clé anon>
 SUPABASE_ADMIN_EMAIL=<email admin>
 SUPABASE_ADMIN_PASSWORD=<mot de passe admin>
 # Optionnels :
-CATDESK_PRESS_SOURCES=lesechos,cnbc,lemonde,lefigaro,france24,bbc,guardian
+CATDESK_PRESS_SOURCES=latribune,cnbc,lemonde,lefigaro,france24,bbc,guardian
 CATDESK_PRESS_TOPICS=IA,inflation,Nvidia      # recherche de caractères (filtre)
+CATDESK_PRESS_SYNTHESIS=1   # 1 (défaut) = ajoute une « Synthèse du jour » transversale ; 0 = off
 CATDESK_PRESS_HOUR=7        # heure locale de publication
 CATDESK_PRESS_SINCE_HOURS=24
 CATDESK_PRESS_LIMIT=6       # articles max par journal
 ```
+
+> Flux RSS **testés en direct** (2026-06-30). Marchent : La Tribune, Yahoo Finance,
+> Investing, MarketWatch, FT, CNBC, Le Monde (+Éco), Le Figaro, Libération,
+> France 24, BBC, The Guardian, Al Jazeera, + sources tech. **Les Échos** est
+> retiré (flux en 403). Une source en échec est ignorée sans bloquer les autres.
 
 > Sans `CATDESK_PRESS_DIGEST=1` **et** les 4 identifiants, le planificateur ne
 > démarre pas (cas des postes clients). La sécurité reste serveur (RLS admin).

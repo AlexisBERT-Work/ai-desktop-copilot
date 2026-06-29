@@ -13,6 +13,8 @@ export interface PressDigestConfig {
   topics: string[];
   sinceHours: number;
   perJournalLimit: number;
+  /** Ajoute une daily « Synthèse du jour » transversale. */
+  synthesis: boolean;
   /** Heure locale de publication quotidienne (0-23). */
   hour: number;
   supabase: SupabaseAdminConfig;
@@ -77,6 +79,7 @@ export class PressDigestScheduler {
         topics: this.cfg.topics,
         sinceHours: this.cfg.sinceHours,
         perJournalLimit: this.cfg.perJournalLimit,
+        synthesis: this.cfg.synthesis,
       });
       const res = await publishDailies(this.cfg.supabase, drafts);
       log.info('Press digest run complete', {

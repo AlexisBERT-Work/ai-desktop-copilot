@@ -102,7 +102,7 @@ const log = createLogger('runtime:main');
 
 // Sélection de journaux par défaut pour la revue de presse quotidienne
 // (finance + généraliste FR + international). Surchargeable via CATDESK_PRESS_SOURCES.
-const DEFAULT_PRESS_SOURCES = ['lesechos', 'cnbc', 'lemonde', 'lefigaro', 'france24', 'bbc', 'guardian'];
+const DEFAULT_PRESS_SOURCES = ['latribune', 'cnbc', 'lemonde', 'lefigaro', 'france24', 'bbc', 'guardian'];
 
 /**
  * Config de la revue de presse auto-publiée (dailys). Renvoie null — donc le
@@ -127,6 +127,7 @@ function readPressDigestConfig(): PressDigestConfig | null {
     topics: csv(process.env['CATDESK_PRESS_TOPICS'], []),
     sinceHours: Number(process.env['CATDESK_PRESS_SINCE_HOURS'] ?? 24),
     perJournalLimit: Number(process.env['CATDESK_PRESS_LIMIT'] ?? 6),
+    synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
     hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
     supabase: { url, anonKey, email, password },
   };
