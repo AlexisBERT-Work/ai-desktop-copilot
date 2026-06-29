@@ -11,3 +11,5 @@ verifyDepsBeforeRun: false
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+  # CLI Supabase : son postinstall télécharge le binaire de la plateforme.
+  supabase: true

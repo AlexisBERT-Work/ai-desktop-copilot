@@ -19,6 +19,7 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.3.0",
     "rimraf": "^6.0.0",
+    "supabase": "^2.108.0",
     "turbo": "^2.5.0",
     "typescript": "^5.5.0"
   },
@@ -32,10 +33,12 @@
   },
   "packageManager": "pnpm@11.3.0",
   "lint-staged": {
-    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
-    "*.{json,md,css}": ["prettier --write"]
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
   }
 }

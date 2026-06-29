@@ -14,7 +14,7 @@
 ## 1. Ce qui est livré
 
 - **SQL** prêt à appliquer : table `news` + **RLS** + Realtime
-  ([supabase/migrations/0001_news.sql](../../supabase/migrations/0001_news.sql)).
+  ([supabase/migrations/20260628000000_news.sql](../../supabase/migrations/20260628000000_news.sql)).
 - **Client complet** : client Supabase, identité anonyme stable, fetch + **Realtime**,
   **bandeau** d'annonce à l'ouverture, **widget `news`** dans le dashboard.
 - **Dégradation propre** : sans variables d'env, la news est simplement masquée —
@@ -27,7 +27,7 @@
 
 ```
 supabase/
-├─ migrations/0001_news.sql     # table + RLS + realtime (+ snippet rôle admin)
+├─ migrations/20260628000000_news.sql     # table + RLS + realtime (+ snippet rôle admin)
 └─ README.md
 
 apps/desktop/
@@ -107,7 +107,7 @@ implicite : au pire, la news est vue au prochain montage de l'app.
 
 1. **Créer un projet Supabase** — région **EU (Frankfurt)** pour le RGPD.
 2. **SQL Editor** → exécuter
-   [`supabase/migrations/0001_news.sql`](../../supabase/migrations/0001_news.sql).
+   [`supabase/migrations/20260628000000_news.sql`](../../supabase/migrations/20260628000000_news.sql).
 3. **Auth → Providers** : activer **Anonymous sign-ins**.
 4. **Compte admin** : crée ton utilisateur (Auth → Add user, ou sign-up), puis
    donne-lui le rôle admin (SQL, en remplaçant l'email) :
