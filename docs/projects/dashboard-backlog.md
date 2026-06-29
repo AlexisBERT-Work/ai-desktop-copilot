@@ -63,7 +63,7 @@ Ce qui constitue le MVP et qu'on **ne touche plus** sauf bug :
 | N3 | Analytics « qui a vu quoi » / accusés de lecture | Faible | M |
 | N4 | Signature de contenu optionnelle (défense en profondeur) | Faible | S |
 | N5 | Catégories de dailys **paramétrables** (liste fixe → admin) + multi-tags | Moyenne | M |
-| N6 | Daily **auto-générée** par l'agent (lien `NewsSummarizer`/cron) | Moyenne | M |
+| N6 | Daily **auto-générée** par l'agent — ✅ livrée : revue de presse multi-journaux + analyse intra-journal (LLM) + publication cron (poste de référence) | Moyenne | M |
 
 ### Qualité / robustesse
 | # | Évolution | Valeur | Effort |

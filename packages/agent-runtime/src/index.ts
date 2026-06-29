@@ -94,10 +94,43 @@ import { BrowserTypeTool } from './tools/browser/BrowserTypeTool';
 import { BrowserCloseTool } from './tools/browser/BrowserCloseTool';
 import { SubAgentRunner } from './SubAgentRunner';
 import { CronScheduler } from './CronScheduler';
+import { PressDigestScheduler, type PressDigestConfig } from './news/PressDigestScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
 
 const log = createLogger('runtime:main');
+
+// Sélection de journaux par défaut pour la revue de presse quotidienne
+// (finance + généraliste FR + international). Surchargeable via CATDESK_PRESS_SOURCES.
+const DEFAULT_PRESS_SOURCES = ['lesechos', 'cnbc', 'lemonde', 'lefigaro', 'france24', 'bbc', 'guardian'];
+
+/**
+ * Config de la revue de presse auto-publiée (dailys). Renvoie null — donc le
+ * planificateur ne démarre PAS — sauf si explicitement activé ET muni des
+ * identifiants admin Supabase. Les postes clients n'ont pas ces variables, donc
+ * eux ne publient jamais : « tout passe par nous » (le poste de référence).
+ */
+function readPressDigestConfig(): PressDigestConfig | null {
+  if (process.env['CATDESK_PRESS_DIGEST'] !== '1') return null;
+  const url = process.env['SUPABASE_URL'];
+  const anonKey = process.env['SUPABASE_ANON_KEY'];
+  const email = process.env['SUPABASE_ADMIN_EMAIL'];
+  const password = process.env['SUPABASE_ADMIN_PASSWORD'];
+  if (!url || !anonKey || !email || !password) {
+    log.warn('CATDESK_PRESS_DIGEST=1 mais config admin Supabase incomplète — désactivé');
+    return null;
+  }
+  const csv = (v: string | undefined, fallback: string[]): string[] =>
+    v ? v.split(',').map((s) => s.trim()).filter((s) => s.length > 0) : fallback;
+  return {
+    sourceIds: csv(process.env['CATDESK_PRESS_SOURCES'], DEFAULT_PRESS_SOURCES),
+    topics: csv(process.env['CATDESK_PRESS_TOPICS'], []),
+    sinceHours: Number(process.env['CATDESK_PRESS_SINCE_HOURS'] ?? 24),
+    perJournalLimit: Number(process.env['CATDESK_PRESS_LIMIT'] ?? 6),
+    hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
+    supabase: { url, anonKey, email, password },
+  };
+}
 
 async function main() {
   // Load a local .env (gitignored) for connector secrets — DISCORD_WEBHOOK_URL,
@@ -286,6 +319,13 @@ async function main() {
   tools.register(new ListScheduledTasksTool(cron));
   tools.register(new CancelScheduledTaskTool(cron));
 
+  // ─── Revue de presse → dailys (poste de référence uniquement) ──
+  // Agrège plusieurs journaux, analyse intra-journal (LLM local) et publie une
+  // daily par journal dans Supabase. Inactif sans config admin (cf. ci-dessus).
+  const pressCfg = readPressDigestConfig();
+  const pressScheduler = pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
+  pressScheduler?.start();
+
   // ─── Browser tools (playwright-core, lazy-launch) ──────────
   tools.register(new BrowserNavigateTool());
   tools.register(new BrowserScreenshotTool());
@@ -311,6 +351,7 @@ async function main() {
     log.info('SIGTERM received — shutting down');
     consolidator?.stop();
     cron.shutdown();
+    pressScheduler?.stop();
     marketPoller.stop();
     BrowserManager.get().shutdown();
     OcrSidecarClient.get().shutdown();

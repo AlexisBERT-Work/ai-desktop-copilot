@@ -113,11 +113,51 @@ Ensuite : fenêtre Marchés & News → **Admin** → connexion → rédiger.
 
 ---
 
-## 8. Suite possible
+## 8. Génération automatique (revue de presse IA)
 
-- **Console admin** : ✅ livrée (login + CRUD dans l'app). Étendre à la **news**.
-- Catégories paramétrables côté admin (au lieu d'une liste fixe).
-- Multi-tags par daily (filtrage plus fin).
+Le cœur des dailys : un pipeline qui agrège plusieurs **journaux**, fait une
+**analyse intra-journal** par le LLM local, et **publie une daily par journal**.
+Tourne **uniquement sur le poste de référence** (celui qui a les identifiants
+admin) → « tout passe par nous » ; les clients ne publient jamais.
+
+**Chaîne** (tout en TypeScript, agent-runtime — aucun changement Rust/frontend) :
+1. `aggregateNews({ sources:[id], topics, sinceHours, limit })` par journal —
+   registre étendu (finance, généraliste FR, international, tech) dans
+   [FetchTechNewsTool.ts](../../packages/agent-runtime/src/tools/web/FetchTechNewsTool.ts).
+   Le filtre `topics` = la **« recherche de caractères »** (mots-clés dans titre+extrait).
+2. `enrichExcerpts` (récupère un extrait pour les articles qui n'en ont pas).
+3. `analyzeJournal` → JSON `{ analyse, resumes[] }` (LLM local) →
+   [pressDigest.ts](../../packages/agent-runtime/src/news/pressDigest.ts).
+4. `buildJournalBody` → Markdown (analyse + liste d'articles liés/résumés) ;
+   catégorie déduite du journal (`categoryForSourceLabel`).
+5. `publishDailies` → connexion admin (mot de passe) + `insert` REST, **idempotent**
+   (saute une daily de même titre) →
+   [SupabasePublisher.ts](../../packages/agent-runtime/src/news/SupabasePublisher.ts).
+6. `PressDigestScheduler` → exécution **quotidienne** à `CATDESK_PRESS_HOUR`.
+
+**Activation (poste de référence — `.env` de l'agent, jamais distribué)** :
+
+```
+CATDESK_PRESS_DIGEST=1
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_ANON_KEY=<clé anon>
+SUPABASE_ADMIN_EMAIL=<email admin>
+SUPABASE_ADMIN_PASSWORD=<mot de passe admin>
+# Optionnels :
+CATDESK_PRESS_SOURCES=lesechos,cnbc,lemonde,lefigaro,france24,bbc,guardian
+CATDESK_PRESS_TOPICS=IA,inflation,Nvidia      # recherche de caractères (filtre)
+CATDESK_PRESS_HOUR=7        # heure locale de publication
+CATDESK_PRESS_SINCE_HOURS=24
+CATDESK_PRESS_LIMIT=6       # articles max par journal
+```
+
+> Sans `CATDESK_PRESS_DIGEST=1` **et** les 4 identifiants, le planificateur ne
+> démarre pas (cas des postes clients). La sécurité reste serveur (RLS admin).
+
+## 9. Suite possible
+
+- **Console admin** : ✅ livrée. Étendre à la **news**.
+- Synthèse transversale (tous journaux) en plus de l'intra-journal.
+- Catégories paramétrables / multi-tags par daily (filtrage plus fin).
 - Accusés de lecture / « non lus », marque-page.
 - Programmation (publier à une date future) — aujourd'hui `published_at = now()`.
-- Daily auto-générée par l'agent (lien avec `NewsSummarizer`/cron).
