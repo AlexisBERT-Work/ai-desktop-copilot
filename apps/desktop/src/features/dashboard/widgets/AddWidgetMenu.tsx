@@ -18,7 +18,7 @@ export function AddWidgetMenu({ onClose }: Props) {
     >
       {WIDGET_META.map((m) => (
         <button
-          key={m.type}
+          key={m.label}
           role="menuitem"
           onClick={() => {
             addWidget(m.build());

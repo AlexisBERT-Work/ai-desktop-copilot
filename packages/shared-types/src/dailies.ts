@@ -38,3 +38,27 @@ export interface Daily {
   publishedAt: string; // ISO 8601
   expiresAt: string | null; // ISO 8601 ou null
 }
+
+/**
+ * Genre d'une daily, déduit du titre (le pipeline produit des préfixes stables) :
+ * - 'topic'     : digest transversal trié par sujet     → « Sujet — … »
+ * - 'synthesis' : synthèse transversale du jour          → « Synthèse du jour … »
+ * - 'journal'   : revue d'un journal (défaut)            → « <Journal> — revue du … »
+ * Permet d'offrir des widgets distincts (par sujet vs par journal).
+ */
+export type DailyKind = 'journal' | 'topic' | 'synthesis';
+
+export function dailyKindFromTitle(title: string): DailyKind {
+  if (title.startsWith('Sujet — ')) return 'topic';
+  if (title.startsWith('Synthèse du jour')) return 'synthesis';
+  return 'journal';
+}
+
+/** Filtre de genre porté par un widget dailys. */
+export type DailyKindFilter = 'all' | 'journal' | 'topic';
+
+export const DAILY_KIND_FILTER_LABEL: Record<DailyKindFilter, string> = {
+  all: 'Tout',
+  journal: 'Par journal',
+  topic: 'Par sujet',
+};

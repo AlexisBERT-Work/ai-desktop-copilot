@@ -63,11 +63,18 @@ const DEFAULT_CONFIG: DashboardConfig = {
       layout: { x: 0, y: 3, w: 1, h: 1 },
     },
     {
-      id: 'dailies-demo',
+      id: 'dailies-topics',
       type: 'dailies',
-      title: 'Dailys',
-      config: {},
-      layout: { x: 0, y: 4, w: 4, h: 2 },
+      title: 'Dailys — par sujet',
+      config: { kind: 'topic' },
+      layout: { x: 0, y: 4, w: 2, h: 2 },
+    },
+    {
+      id: 'dailies-journals',
+      type: 'dailies',
+      title: 'Dailys — par journal',
+      config: { kind: 'journal' },
+      layout: { x: 2, y: 4, w: 2, h: 2 },
     },
   ],
 };

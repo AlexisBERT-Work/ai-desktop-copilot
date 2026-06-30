@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isDailyCategory, type Daily, type DailyCategory } from '@catdesk/shared-types';
+import {
+  dailyKindFromTitle,
+  isDailyCategory,
+  type Daily,
+  type DailyCategory,
+  type DailyKindFilter,
+} from '@catdesk/shared-types';
 
 export type DailiesStatus = 'unconfigured' | 'loading' | 'ready' | 'error';
 
@@ -64,4 +70,16 @@ export function filterByFollowed(items: Daily[], followed: DailyCategory[]): Dai
   if (followed.length === 0) return items;
   const set = new Set(followed);
   return items.filter((d) => set.has(d.category));
+}
+
+/**
+ * Restreint au genre du widget : 'journal' inclut la synthèse transversale ;
+ * 'topic' = digests par sujet ; 'all' = tout. Pur.
+ */
+export function filterByKind(items: Daily[], kind: DailyKindFilter): Daily[] {
+  if (kind === 'all') return items;
+  return items.filter((d) => {
+    const k = dailyKindFromTitle(d.title);
+    return kind === 'journal' ? k === 'journal' || k === 'synthesis' : k === 'topic';
+  });
 }

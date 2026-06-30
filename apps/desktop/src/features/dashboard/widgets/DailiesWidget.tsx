@@ -4,9 +4,22 @@ import {
   DAILY_CATEGORY_LABEL,
   type Daily,
   type DailyCategory,
+  type DailyKindFilter,
 } from '@catdesk/shared-types';
 import { NewsMarkdown } from '../../news/NewsMarkdown';
-import { computeActiveDailies, filterByFollowed, useDailiesStore } from '../../dailies/dailiesStore';
+import {
+  computeActiveDailies,
+  filterByFollowed,
+  filterByKind,
+  useDailiesStore,
+} from '../../dailies/dailiesStore';
+import type { WidgetProps } from './types';
+
+/** Lit le genre (sujet/journal/tout) depuis la config du widget. */
+function readKind(config: Record<string, unknown>): DailyKindFilter {
+  const k = config['kind'];
+  return k === 'journal' || k === 'topic' ? k : 'all';
+}
 
 const CHIP_BASE = 'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors';
 
@@ -22,12 +35,20 @@ interface DailiesViewProps {
   /** Catégories suivies ; vide ⇒ toutes. */
   followed: DailyCategory[];
   onToggle: (c: DailyCategory) => void;
+  /** Genre affiché par ce widget (par sujet / par journal / tout). */
+  kindFilter?: DailyKindFilter;
   max?: number;
 }
 
 /** Rendu pur du widget dailys : chips de filtre + liste — sans dépendance au store. */
-export function DailiesView({ items, followed, onToggle, max = 5 }: DailiesViewProps) {
-  const visible = filterByFollowed(items, followed).slice(0, max);
+export function DailiesView({
+  items,
+  followed,
+  onToggle,
+  kindFilter = 'all',
+  max = 5,
+}: DailiesViewProps) {
+  const visible = filterByFollowed(filterByKind(items, kindFilter), followed).slice(0, max);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -88,12 +109,13 @@ export function DailiesView({ items, followed, onToggle, max = 5 }: DailiesViewP
  * l'utilisateur filtre par catégorie. Données via Supabase (voir useDailies) ;
  * la sélection de catégories est une préférence locale persistée.
  */
-export function DailiesWidget() {
+export function DailiesWidget({ widget }: WidgetProps) {
   const items = useDailiesStore((s) => s.items);
   const status = useDailiesStore((s) => s.status);
   const followed = useDailiesStore((s) => s.followed);
   const toggle = useDailiesStore((s) => s.toggleCategory);
   const active = useMemo(() => computeActiveDailies(items), [items]);
+  const kindFilter = readKind(widget.config);
 
   if (status === 'unconfigured') {
     return <p className="text-xs text-white/30">Dailys non configurées.</p>;
@@ -105,5 +127,5 @@ export function DailiesWidget() {
     return <p className="text-xs text-red-400/70">Erreur de chargement.</p>;
   }
 
-  return <DailiesView items={active} followed={followed} onToggle={toggle} />;
+  return <DailiesView items={active} followed={followed} onToggle={toggle} kindFilter={kindFilter} />;
 }

@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { Widget } from '@catdesk/shared-types';
+import {
+  DAILY_KIND_FILTER_LABEL,
+  type DailyKindFilter,
+  type Widget,
+} from '@catdesk/shared-types';
 import { useDashboardStore } from '../dashboardStore';
 import { QUICK_ACTION_ICON_NAMES } from './quickActionIcons';
 import { QUOTE_FIELDS, type QuoteField } from './metric';
@@ -54,6 +58,8 @@ export function WidgetConfigEditor({ widget, onClose }: Props) {
     case 'kpi':
     case 'stat':
       return <MetricConfigEditor {...props} />;
+    case 'dailies':
+      return <DailiesConfig {...props} />;
     default:
       return (
         <p className="py-2 text-center text-xs text-white/30">
@@ -101,6 +107,40 @@ function QuickActionConfig({ widget, update, onClose }: EditorProps) {
         onClose={onClose}
         onSave={() => {
           update(widget.id, { iconName, query: query.trim() });
+          onClose();
+        }}
+      />
+    </div>
+  );
+}
+
+const KIND_OPTIONS: readonly DailyKindFilter[] = ['all', 'journal', 'topic'];
+
+function DailiesConfig({ widget, update, onClose }: EditorProps) {
+  const initial = widget.config.kind;
+  const [kind, setKind] = useState<DailyKindFilter>(
+    initial === 'journal' || initial === 'topic' ? initial : 'all',
+  );
+  return (
+    <div className="space-y-2.5">
+      <label className={LABEL}>
+        Affichage
+        <select
+          className={`${FIELD} mt-1`}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as DailyKindFilter)}
+        >
+          {KIND_OPTIONS.map((k) => (
+            <option key={k} value={k} className={OPTION}>
+              {DAILY_KIND_FILTER_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Actions
+        onClose={onClose}
+        onSave={() => {
+          update(widget.id, { kind });
           onClose();
         }}
       />

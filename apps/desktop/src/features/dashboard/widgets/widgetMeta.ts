@@ -8,6 +8,7 @@ import {
   Table2,
   Megaphone,
   Newspaper,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -100,9 +101,25 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   },
   {
     type: 'dailies',
-    label: 'Dailys',
+    label: 'Dailys · sujets',
+    Icon: Layers,
+    build: () => ({
+      type: 'dailies',
+      title: 'Dailys — par sujet',
+      config: { kind: 'topic' },
+      layout: { x: 0, y: 0, w: 2, h: 2 },
+    }),
+  },
+  {
+    type: 'dailies',
+    label: 'Dailys · journaux',
     Icon: Newspaper,
-    build: () => ({ type: 'dailies', title: 'Dailys', config: {}, layout: { x: 0, y: 0, w: 2, h: 2 } }),
+    build: () => ({
+      type: 'dailies',
+      title: 'Dailys — par journal',
+      config: { kind: 'journal' },
+      layout: { x: 0, y: 0, w: 2, h: 2 },
+    }),
   },
 ];
 
