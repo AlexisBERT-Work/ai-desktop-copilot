@@ -17,6 +17,8 @@ export interface PressDigestConfig {
   synthesis: boolean;
   /** Heure locale de publication quotidienne (0-23). */
   hour: number;
+  /** Lance aussi une publication immédiate au démarrage (vérif/premier remplissage). */
+  runOnStart: boolean;
   supabase: SupabaseAdminConfig;
 }
 
@@ -54,7 +56,10 @@ export class PressDigestScheduler {
       hour: this.cfg.hour,
       firstRunInMin: Math.round(delay / 60_000),
       sources: this.cfg.sourceIds.length,
+      runOnStart: this.cfg.runOnStart,
     });
+    // Publication immédiate optionnelle (idempotente : pas de doublon le même jour).
+    if (this.cfg.runOnStart) void this.runOnce();
   }
 
   stop(): void {

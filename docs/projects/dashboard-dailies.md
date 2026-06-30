@@ -135,7 +135,11 @@ admin) → « tout passe par nous » ; les clients ne publient jamais.
    [SupabasePublisher.ts](../../packages/agent-runtime/src/news/SupabasePublisher.ts).
 6. `PressDigestScheduler` → exécution **quotidienne** à `CATDESK_PRESS_HOUR`.
 
-**Activation (poste de référence — `.env` de l'agent, jamais distribué)** :
+**Activation (poste de référence — fichier `packages/agent-runtime/.env`, gitignoré, jamais distribué)** :
+
+Pré-requis : un **compte admin Supabase** existant, avec **mot de passe** et le
+claim `role=admin` (cf. [DEPLOY §7](../../supabase/DEPLOY.md)). Vérifiable en se
+connectant une fois dans la **console Admin** de l'app.
 
 ```
 CATDESK_PRESS_DIGEST=1
@@ -144,6 +148,7 @@ SUPABASE_ANON_KEY=<clé anon>
 SUPABASE_ADMIN_EMAIL=<email admin>
 SUPABASE_ADMIN_PASSWORD=<mot de passe admin>
 # Optionnels :
+CATDESK_PRESS_RUN_ON_START=1   # publie aussi au démarrage (vérif immédiate, idempotent)
 CATDESK_PRESS_SOURCES=latribune,cnbc,lemonde,lefigaro,france24,bbc,guardian
 CATDESK_PRESS_TOPICS=IA,inflation,Nvidia      # recherche de caractères (filtre)
 CATDESK_PRESS_SYNTHESIS=1   # 1 (défaut) = ajoute une « Synthèse du jour » transversale ; 0 = off
@@ -151,6 +156,10 @@ CATDESK_PRESS_HOUR=7        # heure locale de publication
 CATDESK_PRESS_SINCE_HOURS=24
 CATDESK_PRESS_LIMIT=6       # articles max par journal
 ```
+
+> Modèle (template) versionné : [`packages/agent-runtime/.env.example`](../../packages/agent-runtime/.env.example).
+> Idempotence : rejouer une même journée (redémarrage, run-on-start) ne crée pas
+> de doublon — une daily de même titre est ignorée.
 
 > Flux RSS **testés en direct** (2026-06-30). Marchent : La Tribune, Yahoo Finance,
 > Investing, MarketWatch, FT, CNBC, Le Monde (+Éco), Le Figaro, Libération,

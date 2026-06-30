@@ -129,6 +129,7 @@ function readPressDigestConfig(): PressDigestConfig | null {
     perJournalLimit: Number(process.env['CATDESK_PRESS_LIMIT'] ?? 6),
     synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
     hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
+    runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
     supabase: { url, anonKey, email, password },
   };
 }
