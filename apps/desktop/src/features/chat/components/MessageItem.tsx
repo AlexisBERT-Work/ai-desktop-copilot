@@ -6,6 +6,7 @@ import { Copy, Check, Sparkles, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import type { Message } from '@catdesk/shared-types';
 import { ToolCallBadge } from '../../agent/ToolCallBadge';
+import { openExternal } from '../../../shared/openExternal';
 
 interface Props {
   message: Message;
@@ -86,6 +87,19 @@ function MarkdownContent({ content }: { content: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children }) {
+            return (
+              <a
+                href={href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openExternal(href);
+                }}
+              >
+                {children}
+              </a>
+            );
+          },
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className ?? '');
             const lang = match?.[1] ?? '';
