@@ -90,8 +90,8 @@ export function buildJournalBody(analysis: string, items: NewsItem[], summaries:
   return blocks.join('\n\n');
 }
 
-/** Accumule une complétion non-streamée. */
-async function complete(llm: OllamaClient, model: string, system: string, user: string): Promise<string> {
+/** Accumule une complétion non-streamée. Partagé avec topicDigest. */
+export async function complete(llm: OllamaClient, model: string, system: string, user: string): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
     model,

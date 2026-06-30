@@ -1,10 +1,14 @@
 import type { OllamaClient } from '../llm/OllamaClient';
-import { buildPressDailies } from './pressDigest';
+import { buildPressDailies, type JournalDraft } from './pressDigest';
+import { buildTopicDigest } from './topicDigest';
 import { publishDailies, type SupabaseAdminConfig } from './SupabasePublisher';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:press-scheduler');
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Organisation des dailys : par journal, par sujet (transversal), ou les deux. */
+export type PressMode = 'journal' | 'topic' | 'both';
 
 export interface PressDigestConfig {
   /** Ids de sources (clés de NEWS_SOURCES). */
@@ -13,7 +17,11 @@ export interface PressDigestConfig {
   topics: string[];
   sinceHours: number;
   perJournalLimit: number;
-  /** Ajoute une daily « Synthèse du jour » transversale. */
+  /** Mode d'organisation des dailys produites. */
+  mode: PressMode;
+  /** Nb d'articles (les plus importants) soumis au regroupement par sujet. */
+  topicLimit: number;
+  /** Ajoute une daily « Synthèse du jour » transversale (mode journal/both). */
   synthesis: boolean;
   /** Heure locale de publication quotidienne (0-23). */
   hour: number;
@@ -77,17 +85,38 @@ export class PressDigestScheduler {
     if (this.running) return;
     this.running = true;
     try {
-      const drafts = await buildPressDailies({
-        llm: this.llm,
-        model: this.model,
-        sourceIds: this.cfg.sourceIds,
-        topics: this.cfg.topics,
-        sinceHours: this.cfg.sinceHours,
-        perJournalLimit: this.cfg.perJournalLimit,
-        synthesis: this.cfg.synthesis,
-      });
+      const { mode } = this.cfg;
+      const drafts: JournalDraft[] = [];
+
+      if (mode === 'journal' || mode === 'both') {
+        drafts.push(
+          ...(await buildPressDailies({
+            llm: this.llm,
+            model: this.model,
+            sourceIds: this.cfg.sourceIds,
+            topics: this.cfg.topics,
+            sinceHours: this.cfg.sinceHours,
+            perJournalLimit: this.cfg.perJournalLimit,
+            synthesis: this.cfg.synthesis,
+          })),
+        );
+      }
+      if (mode === 'topic' || mode === 'both') {
+        drafts.push(
+          ...(await buildTopicDigest({
+            llm: this.llm,
+            model: this.model,
+            sourceIds: this.cfg.sourceIds,
+            topics: this.cfg.topics,
+            sinceHours: this.cfg.sinceHours,
+            limit: this.cfg.topicLimit,
+          })),
+        );
+      }
+
       const res = await publishDailies(this.cfg.supabase, drafts);
       log.info('Press digest run complete', {
+        mode,
         published: res.published,
         skipped: res.skipped,
         errors: res.errors.length,

@@ -148,6 +148,8 @@ SUPABASE_ANON_KEY=<clé anon>
 SUPABASE_ADMIN_EMAIL=<email admin>
 SUPABASE_ADMIN_PASSWORD=<mot de passe admin>
 # Optionnels :
+CATDESK_PRESS_MODE=both        # journal = 1 daily/journal · topic = les news importantes triées par SUJET · both
+CATDESK_PRESS_TOPIC_LIMIT=24   # articles les plus importants soumis au tri par sujet (mode topic/both)
 CATDESK_PRESS_RUN_ON_START=1   # publie aussi au démarrage (vérif immédiate, idempotent)
 CATDESK_PRESS_SOURCES=latribune,cnbc,lemonde,lefigaro,france24,bbc,guardian
 CATDESK_PRESS_TOPICS=IA,inflation,Nvidia      # recherche de caractères (filtre)

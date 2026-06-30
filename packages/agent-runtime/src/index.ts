@@ -94,7 +94,7 @@ import { BrowserTypeTool } from './tools/browser/BrowserTypeTool';
 import { BrowserCloseTool } from './tools/browser/BrowserCloseTool';
 import { SubAgentRunner } from './SubAgentRunner';
 import { CronScheduler } from './CronScheduler';
-import { PressDigestScheduler, type PressDigestConfig } from './news/PressDigestScheduler';
+import { PressDigestScheduler, type PressDigestConfig, type PressMode } from './news/PressDigestScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
 
@@ -110,6 +110,10 @@ const DEFAULT_PRESS_SOURCES = ['latribune', 'cnbc', 'lemonde', 'lefigaro', 'fran
  * identifiants admin Supabase. Les postes clients n'ont pas ces variables, donc
  * eux ne publient jamais : « tout passe par nous » (le poste de référence).
  */
+function readPressMode(v: string | undefined): PressMode {
+  return v === 'journal' || v === 'topic' || v === 'both' ? v : 'both';
+}
+
 function readPressDigestConfig(): PressDigestConfig | null {
   if (process.env['CATDESK_PRESS_DIGEST'] !== '1') return null;
   const url = process.env['SUPABASE_URL'];
@@ -127,6 +131,8 @@ function readPressDigestConfig(): PressDigestConfig | null {
     topics: csv(process.env['CATDESK_PRESS_TOPICS'], []),
     sinceHours: Number(process.env['CATDESK_PRESS_SINCE_HOURS'] ?? 24),
     perJournalLimit: Number(process.env['CATDESK_PRESS_LIMIT'] ?? 6),
+    mode: readPressMode(process.env['CATDESK_PRESS_MODE']),
+    topicLimit: Number(process.env['CATDESK_PRESS_TOPIC_LIMIT'] ?? 24),
     synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
     hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
     runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
