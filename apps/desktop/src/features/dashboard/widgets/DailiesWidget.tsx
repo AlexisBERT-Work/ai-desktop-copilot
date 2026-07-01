@@ -25,10 +25,45 @@ function readKind(config: Record<string, unknown>): DailyKindFilter {
 
 const CHIP_BASE = 'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors';
 
-function formatDate(iso: string): string {
+// Combo de dévoilement progressif : aperçu court → 20 → totalité.
+const STEP_LIMITS = [20, Infinity] as const;
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function dayLabel(iso: string, now: Date): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(d, now)) return "Aujourd'hui";
+  if (sameDay(d, yesterday)) return 'Hier';
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+}
+
+interface DayGroup {
+  key: string;
+  label: string;
+  items: Daily[];
+}
+
+/** Regroupe des dailys (déjà triées récent→ancien) par jour local. Pur. */
+function groupByDay(items: Daily[], now: Date): DayGroup[] {
+  const order: DayGroup[] = [];
+  const byKey = new Map<string, DayGroup>();
+  for (const d of items) {
+    const dt = new Date(d.publishedAt);
+    const key = `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+    let g = byKey.get(key);
+    if (g === undefined) {
+      g = { key, label: dayLabel(d.publishedAt, now), items: [] };
+      byKey.set(key, g);
+      order.push(g);
+    }
+    g.items.push(d);
+  }
+  return order;
 }
 
 interface DailiesViewProps {
@@ -51,12 +86,15 @@ export function DailiesView({
   max = 5,
 }: DailiesViewProps) {
   const [query, setQuery] = useState('');
-  const scoped = filterByFollowed(filterByKind(items, kindFilter), followed);
+  const [step, setStep] = useState(0);
   const searching = query.trim().length > 0;
-  const matched = searchDailies(scoped, query);
-  // La recherche fouille toute la liste (titres + articles) et affiche davantage
-  // de résultats ; hors recherche on garde un aperçu court.
-  const visible = matched.slice(0, searching ? 30 : max);
+
+  // Filtre genre + catégories + recherche, puis dévoilement progressif (5 → 20 → tout).
+  const list = searchDailies(filterByFollowed(filterByKind(items, kindFilter), followed), query);
+  const limit = step === 0 ? max : (STEP_LIMITS[step - 1] ?? Infinity);
+  const visible = list.slice(0, limit);
+  const groups = groupByDay(visible, new Date());
+  const hasMore = visible.length < list.length;
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -102,8 +140,8 @@ export function DailiesView({
         )}
       </div>
 
-      {/* Liste */}
-      {visible.length === 0 ? (
+      {/* Liste groupée par jour + dévoilement progressif */}
+      {list.length === 0 ? (
         <p className="text-xs text-white/30">
           {searching
             ? `Aucun résultat pour « ${query.trim()} ».`
@@ -112,26 +150,50 @@ export function DailiesView({
               : 'Aucune daily pour l’instant.'}
         </p>
       ) : (
-        <ul className="space-y-2 overflow-y-auto">
-          {visible.map((d) => (
-            <li key={d.id} className="border-t border-white/5 pt-2 first:border-0 first:pt-0">
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
-                  {DAILY_CATEGORY_LABEL[d.category]}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
-                  {d.title}
-                </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-white/30">
-                  {formatDate(d.publishedAt)}
-                </span>
-              </div>
-              <div className="mt-0.5 text-xs text-white/60">
-                <NewsMarkdown content={d.body} />
-              </div>
-            </li>
+        <div className="flex-1 space-y-3 overflow-y-auto">
+          {groups.map((g) => (
+            <div key={g.key}>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                {g.label}
+              </p>
+              <ul className="space-y-2">
+                {g.items.map((d) => (
+                  <li key={d.id} className="border-t border-white/5 pt-2 first:border-0 first:pt-0">
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
+                        {DAILY_CATEGORY_LABEL[d.category]}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
+                        {d.title}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-white/60">
+                      <NewsMarkdown content={d.body} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+
+          {(hasMore || step > 0) && (
+            <div className="flex items-center gap-3 pt-1 text-xs">
+              {hasMore && (
+                <button
+                  onClick={() => setStep((s) => s + 1)}
+                  className="font-medium text-brand-300 hover:text-brand-200"
+                >
+                  {step === 0 ? 'Voir plus' : 'Voir tout'} ({list.length})
+                </button>
+              )}
+              {step > 0 && (
+                <button onClick={() => setStep(0)} className="text-white/40 hover:text-white/70">
+                  Réduire
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
