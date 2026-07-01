@@ -75,6 +75,12 @@ interface DailiesViewProps {
   /** Genre affiché par ce widget (par sujet / par journal / tout). */
   kindFilter?: DailyKindFilter;
   max?: number;
+  /** Le serveur détient-il des dailys plus anciennes non encore chargées ? */
+  serverHasMore?: boolean;
+  /** Un chargement de page serveur est-il en cours ? */
+  loadingMore?: boolean;
+  /** Demande une page de plus au serveur (dailys plus anciennes). */
+  onLoadMore?: () => void;
 }
 
 /** Rendu pur du widget dailys : chips de filtre + liste — sans dépendance au store. */
@@ -84,6 +90,9 @@ export function DailiesView({
   onToggle,
   kindFilter = 'all',
   max = 5,
+  serverHasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: DailiesViewProps) {
   const [query, setQuery] = useState('');
   const [step, setStep] = useState(0);
@@ -94,7 +103,10 @@ export function DailiesView({
   const limit = step === 0 ? max : (STEP_LIMITS[step - 1] ?? Infinity);
   const visible = list.slice(0, limit);
   const groups = groupByDay(visible, new Date());
-  const hasMore = visible.length < list.length;
+  // Reste-t-il des dailys DÉJÀ chargées à dévoiler ? (pagination client, 5→20→tout)
+  const canRevealMore = visible.length < list.length;
+  // Toutes les dailys chargées sont visibles mais le serveur en a d'autres ⇒ page suivante.
+  const canLoadServer = !canRevealMore && serverHasMore && onLoadMore !== undefined;
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -176,14 +188,23 @@ export function DailiesView({
             </div>
           ))}
 
-          {(hasMore || step > 0) && (
+          {(canRevealMore || canLoadServer || step > 0) && (
             <div className="flex items-center gap-3 pt-1 text-xs">
-              {hasMore && (
+              {canRevealMore && (
                 <button
                   onClick={() => setStep((s) => s + 1)}
                   className="font-medium text-brand-300 hover:text-brand-200"
                 >
                   {step === 0 ? 'Voir plus' : 'Voir tout'} ({list.length})
+                </button>
+              )}
+              {canLoadServer && (
+                <button
+                  onClick={onLoadMore}
+                  disabled={loadingMore}
+                  className="font-medium text-brand-300 hover:text-brand-200 disabled:opacity-50"
+                >
+                  {loadingMore ? 'Chargement…' : 'Charger plus d’articles'}
                 </button>
               )}
               {step > 0 && (
@@ -209,6 +230,9 @@ export function DailiesWidget({ widget }: WidgetProps) {
   const status = useDailiesStore((s) => s.status);
   const followed = useDailiesStore((s) => s.followed);
   const toggle = useDailiesStore((s) => s.toggleCategory);
+  const hasMore = useDailiesStore((s) => s.hasMore);
+  const loadingMore = useDailiesStore((s) => s.loadingMore);
+  const loadMore = useDailiesStore((s) => s.loadMore);
   const active = useMemo(() => computeActiveDailies(items), [items]);
   const kindFilter = readKind(widget.config);
 
@@ -222,5 +246,15 @@ export function DailiesWidget({ widget }: WidgetProps) {
     return <p className="text-xs text-red-400/70">Erreur de chargement.</p>;
   }
 
-  return <DailiesView items={active} followed={followed} onToggle={toggle} kindFilter={kindFilter} />;
+  return (
+    <DailiesView
+      items={active}
+      followed={followed}
+      onToggle={toggle}
+      kindFilter={kindFilter}
+      serverHasMore={hasMore}
+      loadingMore={loadingMore}
+      onLoadMore={loadMore}
+    />
+  );
 }

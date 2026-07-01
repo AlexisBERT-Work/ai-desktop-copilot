@@ -15,9 +15,21 @@ interface DailiesState {
   status: DailiesStatus;
   /** Catégories suivies par l'utilisateur (persistées). Vide = toutes. */
   followed: DailyCategory[];
+  /** Le serveur détient-il des dailys plus anciennes que la fenêtre chargée ? */
+  hasMore: boolean;
+  /** Un chargement de page supplémentaire est-il en cours ? */
+  loadingMore: boolean;
 
   setItems: (items: Daily[]) => void;
   setStatus: (status: DailiesStatus) => void;
+  setHasMore: (hasMore: boolean) => void;
+  setLoadingMore: (loadingMore: boolean) => void;
+  /**
+   * Charge une page de plus depuis le serveur (dailys plus anciennes).
+   * Implémenté par `useDailies` au montage ; no-op tant qu'il n'est pas câblé.
+   */
+  loadMore: () => void;
+  setLoadMore: (fn: () => void) => void;
   toggleCategory: (category: DailyCategory) => void;
   clearFollowed: () => void;
 }
@@ -28,9 +40,15 @@ export const useDailiesStore = create<DailiesState>()(
       items: [],
       status: 'loading',
       followed: [],
+      hasMore: false,
+      loadingMore: false,
 
       setItems: (items) => set({ items }),
       setStatus: (status) => set({ status }),
+      setHasMore: (hasMore) => set({ hasMore }),
+      setLoadingMore: (loadingMore) => set({ loadingMore }),
+      loadMore: () => {},
+      setLoadMore: (fn) => set({ loadMore: fn }),
       toggleCategory: (category) =>
         set((s) => ({
           followed: s.followed.includes(category)

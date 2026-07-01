@@ -390,7 +390,9 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
     else failed.push(`${tasks[idx]!.label}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
   });
 
-  const cappedLimit = Math.min(Math.max(1, limit ?? 15), 50);
+  // Plafond haut pour laisser de la marge aux digests volumineux (des centaines
+  // d'articles à terme) ; la valeur usuelle reste bien plus basse via `limit`.
+  const cappedLimit = Math.min(Math.max(1, limit ?? 15), 200);
   const items = rankItems(
     filterByAge(filterByTopics(dedupeItems(collected), Array.isArray(topics) ? topics : []), sinceHours ?? 24),
   ).slice(0, cappedLimit);

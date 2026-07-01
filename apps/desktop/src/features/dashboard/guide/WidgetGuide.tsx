@@ -168,6 +168,7 @@ const ENTRIES: readonly GuideEntry[] = [
       { key: 'Catégories', desc: 'Puces pour ne suivre que certains centres d’intérêt. Préférence locale mémorisée.' },
       { key: 'Recherche', desc: 'Champ de recherche approfondie : fouille les titres ET les articles de toutes les dailys.' },
       { key: 'Historique', desc: 'Dailys groupées par jour (Aujourd’hui, Hier…) ; « Voir plus » puis « Voir tout » pour rattraper les jours manqués — rien n’est supprimé.' },
+      { key: 'Pagination', desc: 'Chargement par pages depuis le serveur : « Charger plus d’articles » remonte les dailys plus anciennes à la demande, prêt à encaisser des centaines d’articles sans tout charger d’un coup.' },
     ],
     preview: <DailiesView items={SAMPLE_DAILIES} followed={[]} onToggle={() => {}} />,
   },
