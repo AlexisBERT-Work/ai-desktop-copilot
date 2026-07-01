@@ -131,9 +131,15 @@ admin) → « tout passe par nous » ; les clients ne publient jamais.
 4. `buildJournalBody` → Markdown (analyse + liste d'articles liés/résumés) ;
    catégorie déduite du journal (`categoryForSourceLabel`).
 5. `publishDailies` → connexion admin (mot de passe) + `insert` REST, **idempotent**
-   (saute une daily de même titre) →
+   (saute une daily de même titre), renvoie les drafts **réellement insérés** →
    [SupabasePublisher.ts](../../packages/agent-runtime/src/news/SupabasePublisher.ts).
 6. `PressDigestScheduler` → exécution **quotidienne** à `CATDESK_PRESS_HOUR`.
+7. *(optionnel)* **Miroir Discord** : les dailys **neuves** (celles insérées à
+   l'étape 5, pas les doublons ignorés) sont aussi postées en embeds sur un
+   webhook → [DiscordDailyPublisher.ts](../../packages/agent-runtime/src/news/DiscordDailyPublisher.ts).
+   Un embed par daily (couleur selon la catégorie), lots de 10 (limite Discord).
+   Comme on ne miroite que le neuf, l'idempotence Supabase couvre aussi Discord :
+   pas de doublon au redémarrage / run-on-start.
 
 **Activation (poste de référence — fichier `packages/agent-runtime/.env`, gitignoré, jamais distribué)** :
 
@@ -157,6 +163,7 @@ CATDESK_PRESS_SYNTHESIS=1   # 1 (défaut) = ajoute une « Synthèse du jour » t
 CATDESK_PRESS_HOUR=7        # heure locale de publication
 CATDESK_PRESS_SINCE_HOURS=24
 CATDESK_PRESS_LIMIT=6       # articles max par journal
+CATDESK_PRESS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/…  # miroir Discord (repli sur DISCORD_WEBHOOK_URL)
 ```
 
 > Modèle (template) versionné : [`packages/agent-runtime/.env.example`](../../packages/agent-runtime/.env.example).

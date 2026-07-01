@@ -2,6 +2,7 @@ import type { OllamaClient } from '../llm/OllamaClient';
 import { buildPressDailies, type JournalDraft } from './pressDigest';
 import { buildTopicDigest } from './topicDigest';
 import { publishDailies, type SupabaseAdminConfig } from './SupabasePublisher';
+import { publishDailiesToDiscord } from './DiscordDailyPublisher';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:press-scheduler');
@@ -28,6 +29,8 @@ export interface PressDigestConfig {
   /** Lance aussi une publication immédiate au démarrage (vérif/premier remplissage). */
   runOnStart: boolean;
   supabase: SupabaseAdminConfig;
+  /** Webhook Discord optionnel : miroite les dailys publiées. Vide = désactivé. */
+  discordWebhook?: string;
 }
 
 /** Ms jusqu'à la prochaine occurrence de `hour:00` locale. Pur, exporté pour tests. */
@@ -121,6 +124,19 @@ export class PressDigestScheduler {
         skipped: res.skipped,
         errors: res.errors.length,
       });
+
+      // Miroir Discord (optionnel) : on ne poste QUE les dailys neuves (celles
+      // réellement insérées dans Supabase), ce qui hérite de l'idempotence et
+      // évite les doublons à chaque redémarrage / run-on-start.
+      const webhook = this.cfg.discordWebhook?.trim();
+      if (webhook && res.publishedDrafts.length > 0) {
+        const dz = await publishDailiesToDiscord(webhook, res.publishedDrafts);
+        log.info('Press digest mirrored to Discord', {
+          posted: dz.posted,
+          batches: dz.batches,
+          errors: dz.errors.length,
+        });
+      }
     } catch (err) {
       log.error('Press digest run failed', { error: String(err) });
     } finally {

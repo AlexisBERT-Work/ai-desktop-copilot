@@ -31,7 +31,7 @@ const BRAND_COLOR = 0x5865f2; // Discord blurple
 
 export interface DiscordEmbed {
   title: string;
-  url: string;
+  url?: string;
   description?: string;
   color: number;
   footer?: { text: string };
@@ -108,7 +108,7 @@ export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
   return items;
 }
 
-async function postToDiscord(url: string, payload: unknown): Promise<{ status: number; text: string }> {
+export async function postToDiscord(url: string, payload: unknown): Promise<{ status: number; text: string }> {
   const { default: https } = await import('https');
   const body = JSON.stringify(payload);
   return new Promise((resolve, reject) => {

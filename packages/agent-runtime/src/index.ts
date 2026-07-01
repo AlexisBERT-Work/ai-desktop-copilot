@@ -137,6 +137,12 @@ function readPressDigestConfig(): PressDigestConfig | null {
     hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
     runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
     supabase: { url, anonKey, email, password },
+    // Miroir Discord optionnel : réutilise DISCORD_WEBHOOK_URL par défaut, ou une
+    // cible dédiée aux dailys via CATDESK_PRESS_DISCORD_WEBHOOK.
+    ...(() => {
+      const hook = (process.env['CATDESK_PRESS_DISCORD_WEBHOOK'] ?? process.env['DISCORD_WEBHOOK_URL'] ?? '').trim();
+      return hook.length > 0 ? { discordWebhook: hook } : {};
+    })(),
   };
 }
 

@@ -15,6 +15,8 @@ export interface PublishResult {
   published: number;
   skipped: number;
   errors: string[];
+  /** Drafts réellement insérés (hors doublons ignorés) — pour miroir Discord. */
+  publishedDrafts: JournalDraft[];
 }
 
 function base(url: string): string {
@@ -81,7 +83,7 @@ export async function publishDailies(
   cfg: SupabaseAdminConfig,
   drafts: JournalDraft[],
 ): Promise<PublishResult> {
-  const result: PublishResult = { published: 0, skipped: 0, errors: [] };
+  const result: PublishResult = { published: 0, skipped: 0, errors: [], publishedDrafts: [] };
   if (drafts.length === 0) return result;
 
   let jwt: string;
@@ -100,6 +102,7 @@ export async function publishDailies(
       }
       await insertDaily(cfg, jwt, draft);
       result.published += 1;
+      result.publishedDrafts.push(draft);
     } catch (err) {
       result.errors.push(`${draft.journal}: ${err instanceof Error ? err.message : String(err)}`);
     }
