@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Search, X } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
@@ -11,6 +12,7 @@ import {
   computeActiveDailies,
   filterByFollowed,
   filterByKind,
+  searchDailies,
   useDailiesStore,
 } from '../../dailies/dailiesStore';
 import type { WidgetProps } from './types';
@@ -48,7 +50,13 @@ export function DailiesView({
   kindFilter = 'all',
   max = 5,
 }: DailiesViewProps) {
-  const visible = filterByFollowed(filterByKind(items, kindFilter), followed).slice(0, max);
+  const [query, setQuery] = useState('');
+  const scoped = filterByFollowed(filterByKind(items, kindFilter), followed);
+  const searching = query.trim().length > 0;
+  const matched = searchDailies(scoped, query);
+  // La recherche fouille toute la liste (titres + articles) et affiche davantage
+  // de résultats ; hors recherche on garde un aperçu court.
+  const visible = matched.slice(0, searching ? 30 : max);
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -73,10 +81,35 @@ export function DailiesView({
         })}
       </div>
 
+      {/* Recherche approfondie (titres + articles) */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher dans les dailys…"
+          className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-7 pr-7 text-xs
+                     text-white/85 outline-none placeholder-white/30 focus:border-brand-400/50"
+        />
+        {searching && (
+          <button
+            onClick={() => setQuery('')}
+            aria-label="Effacer la recherche"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/30 hover:text-white/70"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Liste */}
       {visible.length === 0 ? (
         <p className="text-xs text-white/30">
-          {followed.length > 0 ? 'Aucune daily dans ces catégories.' : 'Aucune daily pour l’instant.'}
+          {searching
+            ? `Aucun résultat pour « ${query.trim()} ».`
+            : followed.length > 0
+              ? 'Aucune daily dans ces catégories.'
+              : 'Aucune daily pour l’instant.'}
         </p>
       ) : (
         <ul className="space-y-2 overflow-y-auto">

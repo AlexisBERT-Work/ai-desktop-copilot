@@ -160,14 +160,15 @@ const ENTRIES: readonly GuideEntry[] = [
   {
     Icon: Newspaper,
     name: 'Dailys',
-    summary: "Flux de briefings quotidiens, filtrable par centre d'intérêt.",
+    summary: 'Revue de presse quotidienne générée par IA, en lecture seule.',
     detail:
-      "L'administrateur publie des dailys catégorisées (Marchés, Tech, Crypto, Macro, Produit…). Chaque utilisateur, en lecture seule, coche les catégories qui l'intéressent via les puces de filtre — sa sélection est mémorisée. Sans sélection, tout s'affiche.",
+      "Chaque jour, le système agrège les articles de nombreux journaux (finance, généraliste FR, international, tech), en fait des résumés par IA, et publie des « dailys » : soit une revue PAR JOURNAL, soit les news importantes triées PAR SUJET (International, Économie & marchés, Politique, Société, Tech & sciences, Culture & sport), plus une synthèse du jour. Génération réservée à l'admin ; les clients ne font que consulter.",
     params: [
-      { key: 'Catégories suivies', desc: 'Choisies par l’utilisateur dans le widget (puces). Préférence locale, pas un réglage admin.' },
-      { key: 'Contenu', desc: 'Rédigé par l’admin via le backend Supabase ; le client ne peut que consulter.' },
+      { key: 'Affichage', desc: 'Trois widgets au choix : « Tout », « Par sujet », « Par journal » (réglable via la roue).' },
+      { key: 'Catégories', desc: 'Puces pour ne suivre que certains centres d’intérêt. Préférence locale mémorisée.' },
+      { key: 'Recherche', desc: 'Champ de recherche approfondie : fouille les titres ET les articles de toutes les dailys.' },
     ],
-    preview: <DailiesView items={SAMPLE_DAILIES} followed={['markets', 'tech']} onToggle={() => {}} />,
+    preview: <DailiesView items={SAMPLE_DAILIES} followed={[]} onToggle={() => {}} />,
   },
   {
     Icon: Zap,

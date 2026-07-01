@@ -73,6 +73,16 @@ export function filterByFollowed(items: Daily[], followed: DailyCategory[]): Dai
 }
 
 /**
+ * Recherche approfondie : garde les dailys dont le titre OU le corps (donc les
+ * articles/résumés) contient la requête (insensible à la casse). Vide ⇒ tout. Pur.
+ */
+export function searchDailies(items: Daily[], query: string): Daily[] {
+  const q = query.trim().toLowerCase();
+  if (q === '') return items;
+  return items.filter((d) => `${d.title}\n${d.body}`.toLowerCase().includes(q));
+}
+
+/**
  * Restreint au genre du widget : 'journal' inclut la synthèse transversale ;
  * 'topic' = digests par sujet ; 'all' = tout. Pur.
  */
