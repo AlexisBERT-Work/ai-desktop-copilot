@@ -13,12 +13,11 @@ correspondant n'est enregistré** dans
 [index.ts](../packages/agent-runtime/src/index.ts) — l'agent **ne peut donc pas
 les appeler aujourd'hui** :
 
+> **Câblés le 2026-07-03** : `write_file`, `write_clipboard`, `open_app`,
+> `store_memory` — ils ne manquent plus (voir [CAPACITES.md](CAPACITES.md)).
+
 | Action manquante | Permission déclarée | Contournement actuel |
 |---|---|---|
-| **Écrire / créer un fichier** | `write_file` (🟡) | passer par `run_command` (PowerShell) |
-| **Écrire dans le presse-papier** | `write_clipboard` (🟡) | `run_command` (`Set-Clipboard`) |
-| **Ouvrir une application** | `open_app` (🟡) | `run_command` |
-| **Stocker un fait en mémoire** | `store_memory` (🟡) | mémoire alimentée autrement ; seul `search_memory` est câblé |
 | **Fermer une fenêtre** | `close_window` (🟠) | — |
 | **Envoyer des frappes clavier** | `send_keys` (🟠) | `browser_type` pour le navigateur uniquement |
 | **Supprimer un fichier** | `delete_file` (🔴) | désactivé par design |

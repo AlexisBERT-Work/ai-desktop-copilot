@@ -4,7 +4,7 @@
 > Dernière mise à jour : 2026-07-02.
 
 ## État actuel
-63 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
+67 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
 git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
 connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.
 Plateforme dashboard livrée sur `feat/dashboard-platform` : widgets
@@ -12,7 +12,7 @@ configurables, bourse live (Yahoo + formules mathjs), news/dailys Supabase
 avec console admin, revue de presse auto (cron + LLM), miroir Discord.
 Mémoire hiérarchique (warm store + consolidation), cache sémantique, playbook
 auto-évolution et spiral monitor câblés dans `index.ts`.
-Le monorepo type-check intégralement — **436 tests verts (61 fichiers)**.
+Le monorepo type-check intégralement — **458 tests verts (65 fichiers)**.
 
 ## Travail — Session 2 (2026-06-11)
 
@@ -163,3 +163,22 @@ Audit complet du projet, puis corrections :
 - Vérifié au passage : `build-dist/` n'est **pas** tracké par git (bien ignoré),
   et les modules « avancés » (warm memory, cache sémantique, EvolutionDaemon,
   SpiralMonitor) sont tous réellement branchés dans `index.ts` — pas de code mort.
+
+## Phase 1 — les 4 outils manquants (2026-07-03)
+
+Les 4 actions qui avaient une fiche de permission sans outil câblé
+(LIMITES.md §1) sont maintenant implémentées, testées et enregistrées :
+- [x] `write_file` — écrit/append UTF-8 ou base64, crée les dossiers parents,
+      **bloque les répertoires système** (Windows, Program Files, ProgramData),
+      plafond 5 Mo. 10 tests.
+- [x] `write_clipboard` — Set-Clipboard via fichier temporaire UTF-8 (accents
+      préservés, zéro problème de quoting). Tests de validation (le vrai
+      presse-papier n'est pas touché par la suite).
+- [x] `open_app` — Start-Process avec échappement PowerShell anti-injection,
+      validation du nom (caractères de contrôle interdits). 6 tests.
+- [x] `store_memory` — VectorStore.store avec métadonnées source/tags/date ;
+      la mémoire est enfin inscriptible par l'agent. 5 tests.
+
+**67 outils · 458 tests verts (65 fichiers)** · type-check OK.
+Reste en « pas câblé » : `close_window`, `send_keys` (🟠) et les deux 🔴
+volontairement désactivés.

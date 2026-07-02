@@ -18,11 +18,12 @@
 
 ## Capacités disponibles (✅)
 
-> 63 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 67 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`
-- Lecture presse-papier — `read_clipboard`
+- Écriture de fichiers (répertoires système bloqués) — `write_file`
+- Lecture + écriture presse-papier — `read_clipboard`, `write_clipboard`
 - Lecture d'écran : capture + OCR Tesseract + description vision (llava) — `capture_screen`, `ocr_region`, `describe_screen`
 - Lecture de page web — `read_webpage` (+ steering vers les outils browser pour pages JS/SPA)
 - Transcription audio locale (Whisper / faster-whisper, CPU int8) — `transcribe_audio`
@@ -55,12 +56,13 @@
 
 **Système & infra**
 - Lancement de commandes PowerShell/cmd avec sandbox Rust — `run_command`
+- Ouverture d'applications — `open_app`
 - Audit des variables d'environnement (.env vs .env.example) — `audit_env`
 - Monitoring de ports + kill de process — `inspect_port`, `kill_process`
 - Docker : liste/logs + start/stop/compose — `docker_ps`, `docker_control`
 - Base SQLite locale (lecture seule par défaut) — `run_sqlite`
 - Bases Postgres / MySQL-MariaDB : lecture seule par défaut + transaction READ ONLY au niveau SGBD — `query_database`
-- Mémoire vectorielle inter-sessions (VectorStore réel) — `search_memory`
+- Mémoire vectorielle inter-sessions (VectorStore réel) — `search_memory`, `store_memory`
 
 **Agents & automatisation**
 - Sous-agents (isolés) + sous-agents parallèles — `run_subagent`, `run_parallel_agents`

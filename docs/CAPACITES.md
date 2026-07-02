@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-06-28**. Inventaire basé sur les **62 outils réellement
+> À jour au **2026-07-03**. Inventaire basé sur les **67 outils réellement
 > enregistrés** dans [index.ts](../packages/agent-runtime/src/index.ts) et leurs
 > niveaux de risque dans
 > [permissions.ts](../packages/shared-types/src/permissions.ts). Inclut désormais
@@ -47,7 +47,9 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 |---|---|:--:|
 | Lire un fichier | `read_file` | 🟢 |
 | Lister un dossier | `list_directory` | 🟢 |
+| **Écrire / créer un fichier** (dossiers parents auto, répertoires système bloqués) | `write_file` | 🟡 |
 | Lire le presse-papier | `read_clipboard` | 🟢 |
+| **Écrire dans le presse-papier** (UTF-8, accents préservés) | `write_clipboard` | 🟡 |
 | Capturer l'écran (total/partiel) | `capture_screen` | 🟢 |
 | Lire le **texte de l'écran (OCR)** Tesseract fra+eng | `ocr_region` | 🟢 |
 | **Décrire visuellement** l'écran (modèle multimodal `llava:7b`) | `describe_screen` | 🟢 |
@@ -86,6 +88,7 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | Capacité | Outil(s) | Risque |
 |---|---|:--:|
 | Analyser une **stacktrace** (Node/TS/Python/Rust/Java + cause racine) | `analyze_stacktrace` | 🟢 |
+| Analyser un **fichier de log** local (erreurs, patterns, lecture seule) | `analyze_logs` | 🟢 |
 | Générer des **tests unitaires** (détecte le framework) | `generate_unit_tests` | 🟢 |
 | Repérer des **refactos** (fonctions longues, duplication, complexité) | `suggest_refactor` | 🟢 |
 | Analyser les **dépendances** (package.json / Cargo.toml / requirements.txt) | `analyze_dependencies` | 🟢 |
@@ -120,6 +123,7 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | Capacité | Outil(s) | Risque |
 |---|---|:--:|
 | Exécuter une **commande** PowerShell/CMD (sandbox) | `run_command` | 🟠 |
+| **Ouvrir une application** (nom, chemin ou app du PATH) | `open_app` | 🟡 |
 | Lister les **ports TCP** en écoute + processus liés | `inspect_port` | 🟢 |
 | **Tuer un processus** par PID | `kill_process` | 🟠 |
 | Lister les **conteneurs Docker** + logs | `docker_ps` | 🟢 |
@@ -131,6 +135,7 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | Capacité | Outil(s) | Risque |
 |---|---|:--:|
 | Rechercher en **mémoire** (sémantique ou repli mots-clés) | `search_memory` | 🟢 |
+| **Stocker un fait en mémoire** persistante (tags, inter-sessions) | `store_memory` | 🟡 |
 
 - VectorStore réel : embeddings Ollama (`nomic-embed-text`) + similarité cosinus
   en mémoire, persistance disque (`vectors.json`).
