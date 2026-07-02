@@ -81,6 +81,7 @@ import { ExportDocumentTool } from './tools/files/ExportDocumentTool';
 import { ReadCalendarTool } from './tools/files/ReadCalendarTool';
 import { MarketService } from './market/MarketService';
 import { MarketPoller } from './market/MarketPoller';
+import { MarketHistoryStore } from './market/MarketHistoryStore';
 import { GetMarketTool } from './tools/market/GetMarketTool';
 import { AddToWatchlistTool } from './tools/market/AddToWatchlistTool';
 import { RemoveFromWatchlistTool } from './tools/market/RemoveFromWatchlistTool';
@@ -253,6 +254,17 @@ async function main() {
   // de départ via CATDESK_WATCHLIST, cadence via CATDESK_MARKET_INTERVAL_MS.
   const marketSeed = (process.env['CATDESK_WATCHLIST'] ?? 'AAPL,MSFT,TSLA').split(',');
   const market = new MarketService(marketSeed);
+  // B6 : historique persisté en SQLite (survit aux redémarrages, base des
+  // futures formules glissantes). Échec non-fatal : le marché reste en mémoire.
+  try {
+    const marketHistory = new MarketHistoryStore();
+    await marketHistory.initialize();
+    market.attachHistoryStore(marketHistory);
+  } catch (err) {
+    log.warn('MarketHistoryStore indisponible (historique en mémoire seulement)', {
+      error: String(err),
+    });
+  }
   tools.register(new GetMarketTool(market));
   tools.register(new AddToWatchlistTool(market));
   tools.register(new RemoveFromWatchlistTool(market));

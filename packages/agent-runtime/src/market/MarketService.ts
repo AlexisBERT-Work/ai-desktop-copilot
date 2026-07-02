@@ -1,5 +1,6 @@
 import { fetchQuotes } from './YahooQuoteSource';
 import { buildScope, evaluateFormula } from './FormulaEngine';
+import type { MarketHistoryStore } from './MarketHistoryStore';
 import type {
   ComputedValue,
   FormulaCell,
@@ -24,9 +25,23 @@ export class MarketService {
   private formulas: FormulaCell[] = [];
   private readonly quotes = new Map<string, Quote>();
   private readonly history = new Map<string, number[]>();
+  private historyStore: MarketHistoryStore | undefined;
 
   constructor(seedSymbols: string[] = []) {
     this.symbols = uniqueUpper(seedSymbols);
+  }
+
+  /**
+   * Branche la persistance SQLite (B6) : réamorce l'historique en mémoire
+   * depuis le disque, puis chaque refresh y ajoute les nouveaux points.
+   */
+  attachHistoryStore(store: MarketHistoryStore): void {
+    this.historyStore = store;
+    for (const [symbol, prices] of store.loadAll(HISTORY_CAP)) {
+      if (this.symbols.includes(symbol) && !this.history.has(symbol)) {
+        this.history.set(symbol, prices.slice(-HISTORY_CAP));
+      }
+    }
   }
 
   getWatchlist(): WatchlistItem[] {
@@ -50,6 +65,7 @@ export class MarketService {
     this.symbols = this.symbols.filter((s) => s !== up);
     this.quotes.delete(up);
     this.history.delete(up);
+    this.historyStore?.deleteSymbol(up);
   }
 
   /** Remplace toute la watchlist (source de vérité = widgets de l'UI). */
@@ -60,6 +76,7 @@ export class MarketService {
       if (!keep.has(s)) {
         this.quotes.delete(s);
         this.history.delete(s);
+        this.historyStore?.deleteSymbol(s);
       }
     }
     this.symbols = next;
@@ -88,6 +105,7 @@ export class MarketService {
   async refresh(): Promise<MarketSnapshot> {
     if (this.symbols.length > 0) {
       const fetched = await fetchQuotes(this.symbols);
+      const persisted: Array<{ symbol: string; price: number }> = [];
       for (const symbol of this.symbols) {
         const q = fetched.get(symbol);
         if (q !== undefined) {
@@ -96,11 +114,13 @@ export class MarketService {
           h.push(q.price);
           if (h.length > HISTORY_CAP) h.shift();
           this.history.set(symbol, h);
+          persisted.push({ symbol, price: q.price });
         } else {
           const prev = this.quotes.get(symbol);
           if (prev !== undefined) this.quotes.set(symbol, { ...prev, stale: true });
         }
       }
+      this.historyStore?.appendMany(persisted);
     }
     return this.snapshot();
   }
