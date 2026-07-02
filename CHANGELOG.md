@@ -10,7 +10,7 @@ Versioning: [Semantic Versioning](https://semver.org/)
 ## [Unreleased]
 
 ### Added — 2026-06 → 2026-07
-- **62 outils agent** enregistrés (perception, code/git, connecteurs, système,
+- **63 outils agent** enregistrés (perception, code/git, connecteurs, système,
   navigateur, bourse, automatisation) — voir `docs/CAPACITES.md`
 - **Plateforme dashboard** : grille de widgets configurables (ajout, drag-reorder,
   resize, config, persistance), fenêtre dédiée, guide imprimable PDF
@@ -29,7 +29,7 @@ Versioning: [Semantic Versioning](https://semver.org/)
   anti-injection sur les sorties d'outils)
 - **Boucle plan→exécute** opt-in (Planner) avec plan affiché dans le chat ;
   routeur de modèles Auto / Léger / Code
-- Socle de tests vitest : **427 tests (60 fichiers)**
+- Socle de tests vitest : **436 tests (61 fichiers)**
 
 ### Added — scaffold initial (2026-05)
 - Initial project structure and monorepo setup

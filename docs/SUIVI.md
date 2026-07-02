@@ -4,7 +4,7 @@
 > Dernière mise à jour : 2026-07-02.
 
 ## État actuel
-62 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
+63 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
 git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
 connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.
 Plateforme dashboard livrée sur `feat/dashboard-platform` : widgets
@@ -12,7 +12,7 @@ configurables, bourse live (Yahoo + formules mathjs), news/dailys Supabase
 avec console admin, revue de presse auto (cron + LLM), miroir Discord.
 Mémoire hiérarchique (warm store + consolidation), cache sémantique, playbook
 auto-évolution et spiral monitor câblés dans `index.ts`.
-Le monorepo type-check intégralement — **427 tests verts (60 fichiers)**.
+Le monorepo type-check intégralement — **436 tests verts (61 fichiers)**.
 
 ## Travail — Session 2 (2026-06-11)
 
