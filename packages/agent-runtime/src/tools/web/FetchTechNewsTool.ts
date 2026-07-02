@@ -286,6 +286,42 @@ export function filterByTopics(items: NewsItem[], topics: string[]): NewsItem[] 
   });
 }
 
+/**
+ * Compile un motif regex tolérant : renvoie null (⇒ inactif) si le motif est
+ * vide ou invalide, plutôt que de jeter. Insensible à la casse. Pur.
+ */
+export function safeRegex(pattern: string | null | undefined): RegExp | null {
+  const p = (pattern ?? '').trim();
+  if (p.length === 0) return null;
+  try {
+    return new RegExp(p, 'iu');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Filtre regex par article (sur titre + extrait) :
+ * - `include` : ne garde QUE les articles qui matchent (null = pas de contrainte) ;
+ * - `exclude` : retire les articles qui matchent (null = aucune exclusion).
+ * Un motif invalide est ignoré (traité comme null). Pur.
+ */
+export function filterByRegex(
+  items: NewsItem[],
+  include: string | null,
+  exclude: string | null,
+): NewsItem[] {
+  const inc = safeRegex(include);
+  const exc = safeRegex(exclude);
+  if (inc === null && exc === null) return items;
+  return items.filter((i) => {
+    const hay = `${i.title}\n${i.excerpt ?? ''}`;
+    if (inc !== null && !inc.test(hay)) return false;
+    if (exc !== null && exc.test(hay)) return false;
+    return true;
+  });
+}
+
 /** Derive a readable source label from a feed URL ("blog.rust-lang.org"). */
 export function feedLabelFromUrl(rawUrl: string): string {
   try {

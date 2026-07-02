@@ -162,7 +162,7 @@ const ENTRIES: readonly GuideEntry[] = [
     name: 'Dailys',
     summary: 'Revue de presse quotidienne générée par IA, en lecture seule.',
     detail:
-      "Chaque jour, le système agrège les articles de nombreux journaux (finance, généraliste FR, international, tech), en fait des résumés par IA, et publie des « dailys » : soit une revue PAR JOURNAL, soit les news importantes triées PAR SUJET (International, Économie & marchés, Politique, Société, Tech & sciences, Culture & sport), plus une synthèse du jour. Génération réservée à l'admin ; les clients ne font que consulter.",
+      "Chaque jour, le système agrège les articles de nombreux journaux (finance, généraliste FR, international, tech), en fait des résumés par IA, et publie des « dailys » : soit une revue PAR JOURNAL, soit les news importantes triées PAR SUJET (International, Économie & marchés, Politique, Société, Tech & sciences, Culture & sport), plus une synthèse du jour. L'admin peut aussi créer des JOURNAUX PERSONNALISÉS (console admin) : ses propres sources/URLs de flux + filtres mots-clés et regex (inclure/exclure), publiés automatiquement et visibles de tous. Génération réservée à l'admin ; les clients ne font que consulter.",
     params: [
       { key: 'Affichage', desc: 'Trois widgets au choix : « Tout », « Par sujet », « Par journal » (réglable via la roue).' },
       { key: 'Catégories', desc: 'Puces pour ne suivre que certains centres d’intérêt. Préférence locale mémorisée.' },

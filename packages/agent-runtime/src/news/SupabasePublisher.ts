@@ -24,7 +24,7 @@ function base(url: string): string {
 }
 
 /** Connexion admin (mot de passe) → renvoie un JWT porteur du claim role=admin. */
-async function signIn(cfg: SupabaseAdminConfig): Promise<string> {
+export async function signIn(cfg: SupabaseAdminConfig): Promise<string> {
   const res = await fetch(`${base(cfg.url)}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: { apikey: cfg.anonKey, 'Content-Type': 'application/json' },

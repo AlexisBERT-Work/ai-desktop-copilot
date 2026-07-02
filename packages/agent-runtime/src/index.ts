@@ -351,11 +351,18 @@ async function main() {
   log.info('Tools registered', { tools: tools.listNames() });
 
   // ─── IPC Bridge ────────────────────────────────────────────
-  const bridge = new StdinBridge(orchestrator, async (symbols, formulas) => {
-    market.setWatchlist(symbols);
-    market.setFormulas(formulas);
-    await marketPoller.refreshNow();
-  });
+  const bridge = new StdinBridge(
+    orchestrator,
+    async (symbols, formulas) => {
+      market.setWatchlist(symbols);
+      market.setFormulas(formulas);
+      await marketPoller.refreshNow();
+    },
+    // « Publier maintenant » (console admin) : lance un run immédiat de la revue
+    // de presse. Absent (undefined) sur les postes sans config admin → le bridge
+    // répond « inactif » sans rien publier.
+    pressScheduler !== null ? () => pressScheduler.runOnce() : undefined,
+  );
   bridge.start();
 
   log.info('Agent Runtime ready and listening on stdin');

@@ -131,6 +131,24 @@ pub async fn set_market_watchlist(
         .map_err(|e| e.to_string())
 }
 
+/// Trigger an immediate press-digest run ("Publier maintenant" in the admin
+/// console). Fire-and-forget: the agent publishes to Supabase and the dailys
+/// arrive via Realtime. No-op on client machines (the agent replies "inactive"
+/// when no admin credentials are configured).
+#[tauri::command]
+pub async fn run_press_digest(app: AppHandle) -> Result<(), String> {
+    info!("run_press_digest");
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "press.run_now",
+        "params": {}
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// List locally available Ollama models.
 #[tauri::command]
 pub async fn get_ollama_models() -> Result<Vec<String>, String> {

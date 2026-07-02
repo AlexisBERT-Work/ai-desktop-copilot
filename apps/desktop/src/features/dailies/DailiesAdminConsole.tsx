@@ -9,6 +9,7 @@ import {
 import { NewsMarkdown } from '../news/NewsMarkdown';
 import { useAdminSession, signInAdmin, signOutAdmin } from './adminAuth';
 import { createDaily, deleteDaily, listAllDailies, updateDaily, type DailyInput } from './dailiesAdmin';
+import { PressFeedsPanel } from './PressFeedsPanel';
 
 const FIELD =
   'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 ' +
@@ -79,11 +80,34 @@ export function DailiesAdminConsole({ onClose }: { onClose: () => void }) {
         {loading ? (
           <p className="text-sm text-white/40">Chargement…</p>
         ) : isAdmin ? (
-          <Console />
+          <AdminTabs />
         ) : (
           <AdminLogin />
         )}
       </div>
+    </div>
+  );
+}
+
+/** Onglets de la console admin : dailys manuelles vs journaux personnalisés. */
+function AdminTabs() {
+  const [tab, setTab] = useState<'dailies' | 'feeds'>('dailies');
+  const tabClass = (active: boolean) =>
+    `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+      active ? 'bg-brand-600 text-white' : 'text-white/55 hover:bg-white/10 hover:text-white/85'
+    }`;
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-5 flex items-center gap-2">
+        <button className={tabClass(tab === 'dailies')} onClick={() => setTab('dailies')}>
+          Dailys
+        </button>
+        <button className={tabClass(tab === 'feeds')} onClick={() => setTab('feeds')}>
+          Journaux personnalisés
+        </button>
+      </div>
+      {tab === 'dailies' ? <Console /> : <PressFeedsPanel />}
     </div>
   );
 }

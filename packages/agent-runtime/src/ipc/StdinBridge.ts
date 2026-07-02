@@ -19,6 +19,8 @@ export class StdinBridge {
       symbols: string[],
       formulas: { name: string; expression: string }[],
     ) => void | Promise<void>,
+    /** Déclenche une publication immédiate de la revue de presse (bouton admin). */
+    private onRunPressDigest?: () => void | Promise<void>,
   ) {}
 
   start(): void {
@@ -60,6 +62,20 @@ export class StdinBridge {
     // typed switch since it's a control signal, not an AgentMethod.
     if (request.method === 'agent.cancel') {
       this.currentAbort?.abort();
+      this.sendResponse(request.id, { ok: true });
+      return;
+    }
+
+    // Publication immédiate de la revue de presse (bouton « Publier maintenant »
+    // de la console admin). No-op si le planificateur n'est pas actif (poste
+    // client sans identifiants admin) — on répond ok sans rien faire. Le run est
+    // lancé sans l'attendre (~1 min) : les dailys arrivent via Realtime.
+    if (request.method === 'press.run_now') {
+      if (this.onRunPressDigest === undefined) {
+        this.sendResponse(request.id, { ok: false, reason: 'press-digest-inactive' });
+        return;
+      }
+      void this.onRunPressDigest();
       this.sendResponse(request.id, { ok: true });
       return;
     }

@@ -178,9 +178,32 @@ CATDESK_PRESS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/…  # miroir Dis
 > Sans `CATDESK_PRESS_DIGEST=1` **et** les 4 identifiants, le planificateur ne
 > démarre pas (cas des postes clients). La sécurité reste serveur (RLS admin).
 
+## 8bis. Journaux personnalisés (admin)
+
+L'admin définit ses propres « journaux » sans redéploiement, via la console admin
+(onglet **Journaux personnalisés**). Chaque recette est stockée dans
+`public.press_feeds` (RLS admin uniquement — les clients ne voient QUE les dailys
+produites, pas les recettes) et comprend :
+
+- **Sources** : ids intégrés (`lemonde`, `lefigaro`, …) et/ou **URLs de flux** RSS/Atom.
+- **Filtres** : **mots-clés** (garde ce qui en contient un) + **regex** inclure
+  (ne garde que ce qui matche) / exclure (retire ce qui matche), sur titre+extrait.
+- **Fenêtre** (heures) et **nombre d'articles max**, actif/inactif.
+
+Le planificateur `PressDigestScheduler` lit les journaux **actifs** à chaque run
+(`fetchEnabledPressFeeds`), agrège+filtre (`buildCustomJournalDailies`), analyse
+via le LLM local (même pipeline que les revues par journal) et publie une daily
+par journal (titre `<Nom> — revue du <date>` ⇒ genre « journal », idempotent).
+
+Migration : [`supabase/migrations/20260702000000_press_feeds.sql`](../../supabase/migrations/20260702000000_press_feeds.sql).
+
+**Publier maintenant** : le bouton de la console envoie l'IPC
+`run_press_digest` → RPC `press.run_now` → `scheduler.runOnce()` (fire-and-forget ;
+les dailys arrivent via Realtime). Sans effet sur un poste sans identifiants admin.
+
 ## 9. Suite possible
 
-- **Console admin** : ✅ livrée. Étendre à la **news**.
+- **Console admin** : ✅ livrée (dailys + journaux personnalisés). Étendre à la **news**.
 - Synthèse transversale (tous journaux) en plus de l'intra-journal.
 - Catégories paramétrables / multi-tags par daily (filtrage plus fin).
 - Accusés de lecture / « non lus », marque-page.

@@ -1,6 +1,8 @@
 import type { OllamaClient } from '../llm/OllamaClient';
 import { buildPressDailies, type JournalDraft } from './pressDigest';
 import { buildTopicDigest } from './topicDigest';
+import { buildCustomJournalDailies } from './customJournalDigest';
+import { fetchEnabledPressFeeds } from './PressFeedStore';
 import { publishDailies, type SupabaseAdminConfig } from './SupabasePublisher';
 import { publishDailiesToDiscord } from './DiscordDailyPublisher';
 import { createLogger } from '../logger';
@@ -117,9 +119,20 @@ export class PressDigestScheduler {
         );
       }
 
+      // Journaux personnalisés définis par l'admin (Supabase). Indépendants du
+      // mode : toujours collectés/publiés s'il en existe d'actifs. Échec réseau
+      // → liste vide, sans bloquer le digest standard.
+      const feeds = await fetchEnabledPressFeeds(this.cfg.supabase);
+      if (feeds.length > 0) {
+        drafts.push(
+          ...(await buildCustomJournalDailies(feeds, { llm: this.llm, model: this.model })),
+        );
+      }
+
       const res = await publishDailies(this.cfg.supabase, drafts);
       log.info('Press digest run complete', {
         mode,
+        customJournals: feeds.length,
         published: res.published,
         skipped: res.skipped,
         errors: res.errors.length,
