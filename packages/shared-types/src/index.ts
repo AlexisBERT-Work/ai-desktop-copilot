@@ -4,3 +4,8 @@ export * from './conversation';
 export * from './permissions';
 export * from './events';
 export * from './tools';
+export * from './dashboard';
+export * from './news';
+export * from './dailies';
+export * from './pressFeeds';
+export * from './market';

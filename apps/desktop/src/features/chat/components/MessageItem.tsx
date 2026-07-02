@@ -2,10 +2,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Sparkles, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import type { Message } from '@catdesk/shared-types';
 import { ToolCallBadge } from '../../agent/ToolCallBadge';
+import { openExternal } from '../../../shared/openExternal';
 
 interface Props {
   message: Message;
@@ -23,7 +24,7 @@ export function MessageItem({ message, isStreaming }: Props) {
       {/* Avatar */}
       {!isUser && (
         <div className="w-7 h-7 rounded-lg bg-brand-600/20 flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-sm">✨</span>
+          <Sparkles className="h-3.5 w-3.5 text-brand-400" />
         </div>
       )}
 
@@ -60,7 +61,9 @@ export function MessageItem({ message, isStreaming }: Props) {
 function PlanBlock({ steps }: { steps: string[] }) {
   return (
     <div className="rounded-xl border border-brand-600/30 bg-brand-600/10 px-3 py-2 mb-1">
-      <div className="text-xs font-semibold text-brand-300 mb-1">📋 Plan</div>
+      <div className="flex items-center gap-1 text-xs font-semibold text-brand-300 mb-1">
+        <ClipboardList className="h-3.5 w-3.5" /> Plan
+      </div>
       <ol className="list-decimal list-inside space-y-0.5 text-xs text-white/70">
         {steps.map((step, i) => (
           <li key={i}>{step}</li>
@@ -84,6 +87,19 @@ function MarkdownContent({ content }: { content: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children }) {
+            return (
+              <a
+                href={href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openExternal(href);
+                }}
+              >
+                {children}
+              </a>
+            );
+          },
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className ?? '');
             const lang = match?.[1] ?? '';

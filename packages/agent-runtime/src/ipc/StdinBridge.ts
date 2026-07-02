@@ -13,7 +13,15 @@ export class StdinBridge {
   /** Abort controller for the run in progress, used by the Stop button. */
   private currentAbort: AbortController | null = null;
 
-  constructor(private orchestrator: AgentOrchestrator) {}
+  constructor(
+    private orchestrator: AgentOrchestrator,
+    private onSetConfig?: (
+      symbols: string[],
+      formulas: { name: string; expression: string }[],
+    ) => void | Promise<void>,
+    /** Déclenche une publication immédiate de la revue de presse (bouton admin). */
+    private onRunPressDigest?: () => void | Promise<void>,
+  ) {}
 
   start(): void {
     process.stdin.setEncoding('utf-8');
@@ -54,6 +62,40 @@ export class StdinBridge {
     // typed switch since it's a control signal, not an AgentMethod.
     if (request.method === 'agent.cancel') {
       this.currentAbort?.abort();
+      this.sendResponse(request.id, { ok: true });
+      return;
+    }
+
+    // Publication immédiate de la revue de presse (bouton « Publier maintenant »
+    // de la console admin). No-op si le planificateur n'est pas actif (poste
+    // client sans identifiants admin) — on répond ok sans rien faire. Le run est
+    // lancé sans l'attendre (~1 min) : les dailys arrivent via Realtime.
+    if (request.method === 'press.run_now') {
+      if (this.onRunPressDigest === undefined) {
+        this.sendResponse(request.id, { ok: false, reason: 'press-digest-inactive' });
+        return;
+      }
+      void this.onRunPressDigest();
+      this.sendResponse(request.id, { ok: true });
+      return;
+    }
+
+    // Config bourse pilotée par l'UI (symboles + formules des widgets `stocks`).
+    if (request.method === 'market.set_watchlist') {
+      const params = request.params as { symbols?: unknown; formulas?: unknown };
+      const symbols = Array.isArray(params.symbols)
+        ? params.symbols.filter((s): s is string => typeof s === 'string')
+        : [];
+      const formulas = Array.isArray(params.formulas)
+        ? params.formulas.flatMap((f) => {
+            if (f === null || typeof f !== 'object') return [];
+            const o = f as { name?: unknown; expression?: unknown };
+            return typeof o.name === 'string' && typeof o.expression === 'string'
+              ? [{ name: o.name, expression: o.expression }]
+              : [];
+          })
+        : [];
+      await this.onSetConfig?.(symbols, formulas);
       this.sendResponse(request.id, { ok: true });
       return;
     }

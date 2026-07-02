@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 
 export function StreamingIndicator() {
   return (
     <div className="flex items-center gap-3">
       <div className="w-7 h-7 rounded-lg bg-brand-600/20 flex items-center justify-center shrink-0">
-        <span className="text-sm">✨</span>
+        <Sparkles className="h-4 w-4 text-brand-400" />
       </div>
       <div className="flex items-center gap-1 h-6">
         {[0, 1, 2].map(i => (

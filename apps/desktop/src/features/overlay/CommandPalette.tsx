@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Search, Terminal, FileText, Camera, Clipboard, Settings, X } from 'lucide-react';
+import { Search, Terminal, FileText, Camera, Clipboard, Settings, LayoutDashboard, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
+import { openDashboardWindow } from '../dashboard/openDashboardWindow';
 
 interface Command {
   id: string;
@@ -51,6 +52,13 @@ export function CommandPalette() {
       description: 'Open and analyze a document',
       icon: <FileText className="w-4 h-4" />,
       action: () => sendAndExpand('Analyse un fichier pour moi.'),
+    },
+    {
+      id: 'dashboard',
+      label: 'Marchés & News',
+      description: 'Open the markets & news dashboard (separate window)',
+      icon: <LayoutDashboard className="w-4 h-4" />,
+      action: () => void openDashboardWindow(),
     },
     {
       id: 'settings',

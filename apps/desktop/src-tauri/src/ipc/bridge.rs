@@ -229,6 +229,11 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                     window.emit("proactive:suggestion", params)?;
                 }
             }
+            "market.update" => {
+                // Live market snapshot — broadcast to all windows (incl. the
+                // separate dashboard window).
+                app.emit("market:update", params)?;
+            }
             _ => {
                 warn!("Unknown agent notification: {method}");
             }

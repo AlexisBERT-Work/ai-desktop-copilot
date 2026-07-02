@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
-import { Sparkles, ArrowUp, Expand } from 'lucide-react';
+import { Sparkles, ArrowUp, Expand, Camera, Clipboard, Terminal, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
+import { openDashboardWindow } from '../dashboard/openDashboardWindow';
 
 export function MiniMode() {
   const [input, setInput] = useState('');
@@ -74,15 +75,24 @@ function QuickActions() {
   const { setMode } = useOverlayStore();
 
   const actions = [
-    { label: 'Screenshot & analyze', icon: '📸', query: 'Capture my screen and tell me what you see' },
-    { label: 'Read clipboard', icon: '📋', query: 'Read my clipboard and summarize it' },
-    { label: 'Run command', icon: '⚡', query: 'Run a PowerShell command for me' },
+    { label: 'Screenshot & analyze', Icon: Camera, query: 'Capture my screen and tell me what you see' },
+    { label: 'Read clipboard', Icon: Clipboard, query: 'Read my clipboard and summarize it' },
+    { label: 'Run command', Icon: Terminal, query: 'Run a PowerShell command for me' },
   ];
 
   const { sendMessage, activeConversationId } = useChatStore();
 
   return (
     <div className="border-t border-white/5 px-3 py-2 flex gap-1.5 flex-wrap">
+      <button
+        onClick={() => void openDashboardWindow()}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
+                   text-xs text-brand-300 hover:text-brand-200
+                   bg-brand-500/10 hover:bg-brand-500/20 transition-colors"
+      >
+        <BarChart3 className="w-3.5 h-3.5" />
+        Marchés &amp; News
+      </button>
       {actions.map(action => (
         <button
           key={action.label}
@@ -94,7 +104,7 @@ function QuickActions() {
                      text-xs text-white/50 hover:text-white/80
                      bg-white/5 hover:bg-white/10 transition-colors"
         >
-          <span>{action.icon}</span>
+          <action.Icon className="w-3.5 h-3.5" />
           {action.label}
         </button>
       ))}

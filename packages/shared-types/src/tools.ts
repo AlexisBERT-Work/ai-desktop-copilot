@@ -667,4 +667,43 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     properties: {},
   },
+
+  get_market: {
+    type: 'object' as const,
+    properties: {},
+  },
+
+  add_to_watchlist: {
+    type: 'object' as const,
+    required: ['symbol'],
+    properties: {
+      symbol: { type: 'string' as const, description: 'Ticker à suivre, ex. "AAPL", "MSFT", "MC.PA" (Euronext via suffixe Yahoo)' },
+    },
+  },
+
+  remove_from_watchlist: {
+    type: 'object' as const,
+    required: ['symbol'],
+    properties: {
+      symbol: { type: 'string' as const, description: 'Ticker à retirer de la watchlist' },
+    },
+  },
+
+  set_formula: {
+    type: 'object' as const,
+    required: ['name', 'expression'],
+    properties: {
+      name: { type: 'string' as const, description: 'Nom lisible de la formule, ex. "ratio_AAPL_MSFT"' },
+      expression: { type: 'string' as const, description: 'Expression mathjs sur les cotations, ex. "AAPL.price / MSFT.price" ou "max(AAPL.changePercent, MSFT.changePercent)"' },
+      id: { type: 'string' as const, description: 'Optionnel : id d\'une formule existante à modifier' },
+    },
+  },
+
+  remove_formula: {
+    type: 'object' as const,
+    required: ['id'],
+    properties: {
+      id: { type: 'string' as const, description: 'Id de la formule à supprimer (voir get_market)' },
+    },
+  },
 } as const;

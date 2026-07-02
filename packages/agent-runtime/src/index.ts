@@ -74,6 +74,13 @@ import { ParseDocumentTool } from './tools/files/ParseDocumentTool';
 import { AnalyzeDataTool } from './tools/files/AnalyzeDataTool';
 import { ExportDocumentTool } from './tools/files/ExportDocumentTool';
 import { ReadCalendarTool } from './tools/files/ReadCalendarTool';
+import { MarketService } from './market/MarketService';
+import { MarketPoller } from './market/MarketPoller';
+import { GetMarketTool } from './tools/market/GetMarketTool';
+import { AddToWatchlistTool } from './tools/market/AddToWatchlistTool';
+import { RemoveFromWatchlistTool } from './tools/market/RemoveFromWatchlistTool';
+import { SetFormulaTool } from './tools/market/SetFormulaTool';
+import { RemoveFormulaTool } from './tools/market/RemoveFormulaTool';
 import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
 import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
 import { ScheduleTaskTool } from './tools/automation/ScheduleTaskTool';
@@ -87,10 +94,57 @@ import { BrowserTypeTool } from './tools/browser/BrowserTypeTool';
 import { BrowserCloseTool } from './tools/browser/BrowserCloseTool';
 import { SubAgentRunner } from './SubAgentRunner';
 import { CronScheduler } from './CronScheduler';
+import { PressDigestScheduler, type PressDigestConfig, type PressMode } from './news/PressDigestScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
 
 const log = createLogger('runtime:main');
+
+// Sélection de journaux par défaut pour la revue de presse quotidienne
+// (finance + généraliste FR + international). Surchargeable via CATDESK_PRESS_SOURCES.
+const DEFAULT_PRESS_SOURCES = ['latribune', 'cnbc', 'lemonde', 'lefigaro', 'france24', 'bbc', 'guardian'];
+
+/**
+ * Config de la revue de presse auto-publiée (dailys). Renvoie null — donc le
+ * planificateur ne démarre PAS — sauf si explicitement activé ET muni des
+ * identifiants admin Supabase. Les postes clients n'ont pas ces variables, donc
+ * eux ne publient jamais : « tout passe par nous » (le poste de référence).
+ */
+function readPressMode(v: string | undefined): PressMode {
+  return v === 'journal' || v === 'topic' || v === 'both' ? v : 'both';
+}
+
+function readPressDigestConfig(): PressDigestConfig | null {
+  if (process.env['CATDESK_PRESS_DIGEST'] !== '1') return null;
+  const url = process.env['SUPABASE_URL'];
+  const anonKey = process.env['SUPABASE_ANON_KEY'];
+  const email = process.env['SUPABASE_ADMIN_EMAIL'];
+  const password = process.env['SUPABASE_ADMIN_PASSWORD'];
+  if (!url || !anonKey || !email || !password) {
+    log.warn('CATDESK_PRESS_DIGEST=1 mais config admin Supabase incomplète — désactivé');
+    return null;
+  }
+  const csv = (v: string | undefined, fallback: string[]): string[] =>
+    v ? v.split(',').map((s) => s.trim()).filter((s) => s.length > 0) : fallback;
+  return {
+    sourceIds: csv(process.env['CATDESK_PRESS_SOURCES'], DEFAULT_PRESS_SOURCES),
+    topics: csv(process.env['CATDESK_PRESS_TOPICS'], []),
+    sinceHours: Number(process.env['CATDESK_PRESS_SINCE_HOURS'] ?? 24),
+    perJournalLimit: Number(process.env['CATDESK_PRESS_LIMIT'] ?? 10),
+    mode: readPressMode(process.env['CATDESK_PRESS_MODE']),
+    topicLimit: Number(process.env['CATDESK_PRESS_TOPIC_LIMIT'] ?? 40),
+    synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
+    hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
+    runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
+    supabase: { url, anonKey, email, password },
+    // Miroir Discord optionnel : réutilise DISCORD_WEBHOOK_URL par défaut, ou une
+    // cible dédiée aux dailys via CATDESK_PRESS_DISCORD_WEBHOOK.
+    ...(() => {
+      const hook = (process.env['CATDESK_PRESS_DISCORD_WEBHOOK'] ?? process.env['DISCORD_WEBHOOK_URL'] ?? '').trim();
+      return hook.length > 0 ? { discordWebhook: hook } : {};
+    })(),
+  };
+}
 
 async function main() {
   // Load a local .env (gitignored) for connector secrets — DISCORD_WEBHOOK_URL,
@@ -183,6 +237,23 @@ async function main() {
   tools.register(new ExportDocumentTool());
   tools.register(new ReadCalendarTool());
 
+  // ─── Market (bourse, P3) ───────────────────────────────────
+  // Provider de cotations Yahoo + moteur de formules. Le poller pousse
+  // périodiquement `market.update` (stdout → bras Rust → event UI). Watchlist
+  // de départ via CATDESK_WATCHLIST, cadence via CATDESK_MARKET_INTERVAL_MS.
+  const marketSeed = (process.env['CATDESK_WATCHLIST'] ?? 'AAPL,MSFT,TSLA').split(',');
+  const market = new MarketService(marketSeed);
+  tools.register(new GetMarketTool(market));
+  tools.register(new AddToWatchlistTool(market));
+  tools.register(new RemoveFromWatchlistTool(market));
+  tools.register(new SetFormulaTool(market));
+  tools.register(new RemoveFormulaTool(market));
+  const marketPoller = new MarketPoller(
+    market,
+    Number(process.env['CATDESK_MARKET_INTERVAL_MS'] ?? 30_000),
+  );
+  marketPoller.start();
+
   // ─── Agent ─────────────────────────────────────────────────
   // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
   // pour les tâches triviales (gain ressources). Absent => pas de routage.
@@ -262,6 +333,13 @@ async function main() {
   tools.register(new ListScheduledTasksTool(cron));
   tools.register(new CancelScheduledTaskTool(cron));
 
+  // ─── Revue de presse → dailys (poste de référence uniquement) ──
+  // Agrège plusieurs journaux, analyse intra-journal (LLM local) et publie une
+  // daily par journal dans Supabase. Inactif sans config admin (cf. ci-dessus).
+  const pressCfg = readPressDigestConfig();
+  const pressScheduler = pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
+  pressScheduler?.start();
+
   // ─── Browser tools (playwright-core, lazy-launch) ──────────
   tools.register(new BrowserNavigateTool());
   tools.register(new BrowserScreenshotTool());
@@ -273,7 +351,18 @@ async function main() {
   log.info('Tools registered', { tools: tools.listNames() });
 
   // ─── IPC Bridge ────────────────────────────────────────────
-  const bridge = new StdinBridge(orchestrator);
+  const bridge = new StdinBridge(
+    orchestrator,
+    async (symbols, formulas) => {
+      market.setWatchlist(symbols);
+      market.setFormulas(formulas);
+      await marketPoller.refreshNow();
+    },
+    // « Publier maintenant » (console admin) : lance un run immédiat de la revue
+    // de presse. Absent (undefined) sur les postes sans config admin → le bridge
+    // répond « inactif » sans rien publier.
+    pressScheduler !== null ? () => pressScheduler.runOnce() : undefined,
+  );
   bridge.start();
 
   log.info('Agent Runtime ready and listening on stdin');
@@ -283,6 +372,8 @@ async function main() {
     log.info('SIGTERM received — shutting down');
     consolidator?.stop();
     cron.shutdown();
+    pressScheduler?.stop();
+    marketPoller.stop();
     BrowserManager.get().shutdown();
     OcrSidecarClient.get().shutdown();
     db.close();

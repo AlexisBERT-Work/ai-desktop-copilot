@@ -7,19 +7,23 @@
 > en place concrètement** dans CatDesk. Ce n'est pas une liste de features produit (voir
 > `CLAUDE.md` pour ça) mais une boîte à outils d'architecture pour rendre l'agent
 > plus rapide, plus fiable et plus malin.
+>
+> **État d'implémentation (2026-07-02)** — une bonne partie est déjà câblée dans
+> `packages/agent-runtime/src/index.ts` :
+> ✅ = en place · 🟡 = partiel · ⬜ = à faire
 
 ---
 
 ## Sommaire
 
-1. [Le harness : le vrai cœur de CatDesk](#1-le-harness)
-2. [Context engineering : pourquoi plus de tokens = pire](#2-context-engineering)
-3. [Mémoire hiérarchique multi-couches](#3-mémoire-hiérarchique)
-4. [RAG local moderne : hybrid search + reranking + GraphRAG](#4-rag-local-moderne)
-5. [Optimisation d'inférence : 2-3x de vitesse gratuite](#5-optimisation-dinférence)
-6. [Architecture multi-agents : orchestrateur + sous-agents](#6-multi-agents)
-7. [Sécurité défense en profondeur](#7-sécurité)
-8. [Auto-amélioration : l'agent qui apprend de ses traces](#8-auto-amélioration)
+1. [Le harness : le vrai cœur de CatDesk](#1-le-harness) — 🟡 (boucle + outils + audit oui ; skills non)
+2. [Context engineering : pourquoi plus de tokens = pire](#2-context-engineering) — 🟡 (ContextManager, selectTools, Compactor)
+3. [Mémoire hiérarchique multi-couches](#3-mémoire-hiérarchique) — ✅ warm (WarmMemoryStore + FactExtractor + MemoryConsolidator + SemanticCache) ; ⬜ episodic
+4. [RAG local moderne : hybrid search + reranking + GraphRAG](#4-rag-local-moderne) — 🟡 hybride dense+BM25 (VectorStore) ; ⬜ reranking, GraphRAG
+5. [Optimisation d'inférence : 2-3x de vitesse gratuite](#5-optimisation-dinférence) — 🟡 (keep_alive, num_ctx, IdleUnloader, routeur de modèles)
+6. [Architecture multi-agents : orchestrateur + sous-agents](#6-multi-agents) — ✅ (SubAgentRunner, run_subagent, run_parallel_agents)
+7. [Sécurité défense en profondeur](#7-sécurité) — 🟡 post-scan sorties (sanitizeToolOutput : secrets + spotlighting) ; ⬜ pre-check inputs, PII, isolation réseau
+8. [Auto-amélioration : l'agent qui apprend de ses traces](#8-auto-amélioration) — ✅ (PlaybookStore + EvolutionDaemon, propositions human-in-the-loop) ; ⬜ skills
 9. [Roadmap d'intégration suggérée](#9-roadmap)
 
 ---

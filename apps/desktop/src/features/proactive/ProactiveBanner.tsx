@@ -1,3 +1,4 @@
+import { Lightbulb } from 'lucide-react';
 import { useProactiveStore } from './proactiveStore';
 
 /**
@@ -14,9 +15,7 @@ export function ProactiveBanner() {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
       <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-amber-300/40 bg-amber-50/95 px-4 py-3 shadow-lg backdrop-blur dark:border-amber-400/30 dark:bg-amber-950/90">
-        <span className="mt-0.5 text-lg" aria-hidden>
-          💡
-        </span>
+        <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden />
         <div className="flex-1 text-sm">
           <p className="font-medium text-amber-900 dark:text-amber-100">{title}</p>
           {current.suggestion !== null && (

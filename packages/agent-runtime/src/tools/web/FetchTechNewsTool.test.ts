@@ -3,6 +3,8 @@ import {
   parseFeed,
   dedupeItems,
   filterByTopics,
+  filterByRegex,
+  safeRegex,
   filterByAge,
   rankItems,
   toExcerpt,
@@ -97,6 +99,49 @@ describe('filterByTopics', () => {
       { title: 'Autre titre', url: 'https://x/2', source: 'X', excerpt: 'Rien à voir.' },
     ];
     expect(filterByTopics(withExcerpt, ['kubernetes']).map((i) => i.url)).toEqual(['https://x/1']);
+  });
+});
+
+describe('safeRegex', () => {
+  it('renvoie null pour vide ou invalide', () => {
+    expect(safeRegex(null)).toBeNull();
+    expect(safeRegex('')).toBeNull();
+    expect(safeRegex('(non fermé')).toBeNull();
+  });
+
+  it('compile un motif valide (insensible à la casse)', () => {
+    const re = safeRegex('ia');
+    expect(re).not.toBeNull();
+    expect(re!.test('Une IA générative')).toBe(true);
+  });
+});
+
+describe('filterByRegex', () => {
+  const items: NewsItem[] = [
+    { title: 'Une IA générative', url: 'https://x/1', source: 'X' },
+    { title: 'Marché boursier', url: 'https://x/2', source: 'X', excerpt: 'contenu sponsorisé' },
+    { title: 'Note LLM', url: 'https://x/3', source: 'X' },
+  ];
+
+  it('garde tout si aucun motif', () => {
+    expect(filterByRegex(items, null, null)).toHaveLength(3);
+  });
+
+  it('inclure ne garde que ce qui matche (titre + extrait)', () => {
+    expect(filterByRegex(items, '(IA|LLM)', null).map((i) => i.url)).toEqual(['https://x/1', 'https://x/3']);
+  });
+
+  it('exclure retire ce qui matche', () => {
+    expect(filterByRegex(items, null, 'sponsoris').map((i) => i.url)).toEqual(['https://x/1', 'https://x/3']);
+  });
+
+  it('combine inclure et exclure', () => {
+    const out = filterByRegex(items, '.', 'sponsoris').map((i) => i.url);
+    expect(out).toEqual(['https://x/1', 'https://x/3']);
+  });
+
+  it('ignore un motif invalide (traité comme absent)', () => {
+    expect(filterByRegex(items, '(pasfermé', null)).toHaveLength(3);
   });
 });
 

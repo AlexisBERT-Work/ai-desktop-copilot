@@ -4,7 +4,8 @@ import { useChatStore } from '../../features/chat/store/chatStore';
 import { useOverlayStore } from '../../features/overlay/overlayStore';
 import { useSettingsStore } from '../../features/settings/settingsStore';
 import { useProactiveStore, type ProactiveSuggestion } from '../../features/proactive/proactiveStore';
-import type { TokenEvent, DoneEvent, ErrorEvent } from '@catdesk/shared-types';
+import { useMarketStore } from '../../features/market/marketStore';
+import type { TokenEvent, DoneEvent, ErrorEvent, MarketSnapshot } from '@catdesk/shared-types';
 
 /**
  * Wires Tauri backend events into Zustand stores.
@@ -15,6 +16,7 @@ export function useTauriEvents() {
   const { toggle } = useOverlayStore();
   const { syncToRuntime } = useSettingsStore();
   const showSuggestion = useProactiveStore(s => s.show);
+  const applyMarket = useMarketStore(s => s.apply);
 
   useEffect(() => {
     // Push persisted settings (e.g. safeMode) to the agent runtime once it's ready
@@ -72,9 +74,14 @@ export function useTauriEvents() {
       }),
     );
 
+    // Live market snapshot (bourse) → marketStore → widget stocks
+    unlisteners.push(
+      listen<MarketSnapshot>('market:update', e => applyMarket(e.payload)),
+    );
+
     return () => {
       clearTimeout(syncTimer);
       unlisteners.forEach(p => p.then(fn => fn()));
     };
-  }, [appendToken, setPlan, finalizeMessage, setToolActivity, setError, syncToRuntime, showSuggestion]);
+  }, [appendToken, setPlan, finalizeMessage, setToolActivity, setError, syncToRuntime, showSuggestion, applyMarket]);
 }

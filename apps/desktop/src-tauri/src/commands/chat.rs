@@ -105,6 +105,50 @@ pub async fn chat_cancel(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// A user-defined formula carried from the dashboard to the agent.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FormulaDef {
+    pub name: String,
+    pub expression: String,
+}
+
+/// Replace the live market config (watchlist + formulas) with what the dashboard
+/// `stocks` widgets show. Forwarded to the agent's MarketService.
+#[tauri::command]
+pub async fn set_market_watchlist(
+    app: AppHandle,
+    symbols: Vec<String>,
+    formulas: Vec<FormulaDef>,
+) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "market.set_watchlist",
+        "params": { "symbols": symbols, "formulas": formulas }
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Trigger an immediate press-digest run ("Publier maintenant" in the admin
+/// console). Fire-and-forget: the agent publishes to Supabase and the dailys
+/// arrive via Realtime. No-op on client machines (the agent replies "inactive"
+/// when no admin credentials are configured).
+#[tauri::command]
+pub async fn run_press_digest(app: AppHandle) -> Result<(), String> {
+    info!("run_press_digest");
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "press.run_now",
+        "params": {}
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// List locally available Ollama models.
 #[tauri::command]
 pub async fn get_ollama_models() -> Result<Vec<String>, String> {

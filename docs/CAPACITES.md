@@ -1,10 +1,12 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-06-15**. Inventaire basé sur les **51 outils réellement
+> À jour au **2026-06-28**. Inventaire basé sur les **62 outils réellement
 > enregistrés** dans [index.ts](../packages/agent-runtime/src/index.ts) et leurs
 > niveaux de risque dans
-> [permissions.ts](../packages/shared-types/src/permissions.ts).
+> [permissions.ts](../packages/shared-types/src/permissions.ts). Inclut désormais
+> le **tableau de bord configurable**, la **news pilotée par l'admin** (Supabase)
+> et le **module Bourse** (cf. [docs/projects/](projects/)).
 >
 > Pour ce que CatDesk **ne sait pas (encore) faire**, voir [LIMITES.md](LIMITES.md).
 > Pour les détails techniques : [README](../README.md) ·
@@ -153,7 +155,27 @@ Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
 
 ---
 
-## 10. Modèles & inférence
+## 10. Tableau de bord & Bourse
+
+Interface d'accueil = **grille de widgets configurables** (KPI, stats, actions,
+bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
+
+| Capacité | Outil(s) | Risque |
+|---|---|:--:|
+| Lire l'instantané bourse (cotations + formules) | `get_market` | 🟢 |
+| Ajouter un symbole à la watchlist live | `add_to_watchlist` | 🟡 |
+| Retirer un symbole de la watchlist | `remove_from_watchlist` | 🟡 |
+| Créer/modifier une formule (mathjs, recalcul live) | `set_formula` | 🟡 |
+| Supprimer une formule | `remove_formula` | 🟡 |
+
+- **Bourse live** : cotations Yahoo rafraîchies ~30 s, **formules** (ratios…)
+  recalculées à chaque tick, **sparklines** par symbole. Les symboles et formules
+  des widgets pilotent la watchlist du sidecar (synchro automatique).
+- **News** : annonce rédigée par l'**admin seul** (Supabase + RLS), diffusée à
+  tous les clients en lecture seule (bandeau + widget). Setup :
+  [dashboard-p2.md](projects/dashboard-p2.md).
+
+## 11. Modèles & inférence
 
 - **3 modèles** pour la parité de fonctionnalités :
   `qwen2.5:7b` (chat principal), `llava:7b` (vision écran),
@@ -165,16 +187,18 @@ Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
   réglable par requête, KV-cache 4-bit possible.
 - Voir [Modèle LLM](../CATDESK-MODELE-LLM.md) pour le choix matériel et le routage.
 
-## 11. Garde-fous & sécurité
+## 12. Garde-fous & sécurité
 
-- **100 % local** : aucune sortie réseau pour l'inférence (Ollama).
+- **Local-first** : l'**inférence** reste 100 % locale (Ollama, aucune sortie
+  réseau). Les seuls flux distants sont **en lecture seule et allow-listés** :
+  cotations bourse et news (Supabase). Voir [LIMITES.md](LIMITES.md).
 - **Sandbox Rust** : `check_path` + `check_command` avant tout accès FS/shell.
 - **Permissions risk-gated** à 4 niveaux (auto / une fois / confirmer / désactivé).
 - **Safe mode** : un toggle bloque tous les outils medium+.
 - **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat).
 - **Isolation de processus** : agent et sidecar OCR tournent séparément.
 
-## 12. Distribution
+## 13. Distribution
 
 - **Installeur Windows hors-ligne** (Inno Setup, ~19 Go avec modèles) :
   install/désinstall silencieux vérifiés de bout en bout.

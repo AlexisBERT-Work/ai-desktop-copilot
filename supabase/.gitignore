@@ -1,0 +1,8 @@
+# Supabase CLI — dossiers de scratch (ne pas versionner)
+.branches
+.temp
+
+# Secrets éventuels chargés localement
+.env
+.env.local
+.env.*.local
