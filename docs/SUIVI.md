@@ -182,3 +182,20 @@ Les 4 actions qui avaient une fiche de permission sans outil câblé
 **67 outils · 458 tests verts (65 fichiers)** · type-check OK.
 Reste en « pas câblé » : `close_window`, `send_keys` (🟠) et les deux 🔴
 volontairement désactivés.
+
+## B6 + tests sandbox (2026-07-03)
+
+- [x] **B6 — persistance SQLite de l'historique bourse** :
+      `market/MarketHistoryStore.ts` (sql.js, `data/market.db`) — append par
+      tick du poller, réamorçage de l'historique au démarrage, purge quand un
+      symbole quitte la watchlist, plafond par symbole
+      (`CATDESK_MARKET_HISTORY_CAP`, défaut 2880 ≈ 24 h à 30 s). Échec d'init
+      non-fatal (repli mémoire pure). 9 tests. Débloque les formules
+      glissantes (B1).
+- [x] **Tests Rust de `sandbox.rs`** — la barrière de sécurité du projet
+      n'avait aucun test : 8 tests couvrent la blocklist de commandes
+      (destructives + évasion PowerShell + insensibilité à la casse + longueur
+      max), le path traversal et les racines autorisées (USERPROFILE/temp).
+      `cargo test --lib` : **15 verts** (avec tuning.rs).
+
+**Node : 467 tests (67 fichiers) · Rust : 15 tests** · type-check OK.

