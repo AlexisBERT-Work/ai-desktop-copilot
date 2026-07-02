@@ -1,13 +1,18 @@
 # SUIVI — Évolution de CatDesk
 
 > Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
-> Dernière mise à jour : 2026-06-11.
+> Dernière mise à jour : 2026-07-02.
 
 ## État actuel
-Projet bien avancé : ~27 outils agent enregistrés (filesystem, système, web,
-navigateur Playwright, git, GitHub, écran/OCR, audio, mémoire, sous-agents,
-cron, analyse). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.
-Le monorepo type-check intégralement.
+62 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
+git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
+connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.
+Plateforme dashboard livrée sur `feat/dashboard-platform` : widgets
+configurables, bourse live (Yahoo + formules mathjs), news/dailys Supabase
+avec console admin, revue de presse auto (cron + LLM), miroir Discord.
+Mémoire hiérarchique (warm store + consolidation), cache sémantique, playbook
+auto-évolution et spiral monitor câblés dans `index.ts`.
+Le monorepo type-check intégralement — **427 tests verts (60 fichiers)**.
 
 ## Travail — Session 2 (2026-06-11)
 
@@ -140,3 +145,21 @@ Lancer : `pnpm --filter @catdesk/agent-runtime test`.
 4. ⬜ Packaging / distribution.
 
 _Aucun commit effectué — tout est dans l'arbre de travail._
+_(Note 2026-07-02 : obsolète — tout a été commité depuis sur `feat/dashboard-platform`.)_
+
+## Hygiène du repo — Session 3 (2026-07-02)
+
+Audit complet du projet, puis corrections :
+- [x] Docs resynchronisées avec la réalité du code : compte d'outils (57→62),
+      état actuel ci-dessus, [LIMITES.md](LIMITES.md) §4 (mémoire warm et RAG
+      hybride BM25 sont câblés), CHANGELOG réellement rempli,
+      [CATDESK-CONCEPTS-AVANCES.md](../CATDESK-CONCEPTS-AVANCES.md) annoté avec
+      l'état d'implémentation par section.
+- [x] PR #1 (`feat/dashboard-platform`, 32 commits) mergée dans `master`.
+- [x] Outil orphelin `analyze_logs` (branche `feat/analyze-logs-tool`, complet
+      + testé mais jamais intégré) rapatrié dans `master`.
+- [x] Branches mortes supprimées (0 commit unique) ; `dev` remise au niveau de
+      `master`.
+- Vérifié au passage : `build-dist/` n'est **pas** tracké par git (bien ignoré),
+  et les modules « avancés » (warm memory, cache sémantique, EvolutionDaemon,
+  SpiralMonitor) sont tous réellement branchés dans `index.ts` — pas de code mort.

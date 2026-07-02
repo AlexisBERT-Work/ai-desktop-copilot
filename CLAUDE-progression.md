@@ -18,7 +18,7 @@
 
 ## Capacités disponibles (✅)
 
-> 57 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
+> 62 outils enregistrés dans l'agent runtime (`packages/agent-runtime/src/index.ts`).
 
 **Perception**
 - Lecture fichiers (code, configs, logs) — `read_file`, `list_dir`

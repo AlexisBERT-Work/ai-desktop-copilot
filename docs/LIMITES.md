@@ -1,6 +1,6 @@
 # CE QUE CATDESK NE SAIT PAS (ENCORE) FAIRE
 
-> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-06-28**.
+> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-07-02**.
 > Liste honnête des bornes actuelles, pour ne pas survendre l'outil.
 
 ---
@@ -41,32 +41,41 @@ les appeler aujourd'hui** :
 - Le local **ne bat pas le cloud** sur les refactos multi-fichiers cross-repo les
   plus durs. Il couvre ~80 % du travail quotidien (édits, fixes, tests, explication).
 - Les **poids du modèle sont figés** : il ne « s'améliore » pas seul. Seul le
-  système autour (mémoire, playbook, skills) apprend — et ces couches sont encore
-  largement à l'état de roadmap (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §3, §8).
+  système autour apprend — mémoire warm, playbook et EvolutionDaemon sont
+  **câblés** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §3, §8),
+  mais les propositions d'évolution restent à valider par l'humain et le
+  système de *skills* n'existe pas encore.
 
 ## 4. Capacités partielles / à durcir
 
 - **Capture écran côté Rust** : [screen.rs](../apps/desktop/src-tauri/src/commands/screen.rs)
   est un **stub** — tout passe par le sidecar Python.
 - **Mémoire sémantique** : sans `nomic-embed-text`, retombe sur un repli mots-clés
-  (moins précis). La mémoire hiérarchique (warm/episodic) n'est pas implémentée.
+  (moins précis). La mémoire hiérarchique **warm est implémentée** (WarmMemoryStore
+  + FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
+  *episodic* structurée reste à faire.
 - **Sélecteur HTML de `read_webpage`** : naïf (le sélecteur `#id` s'arrête au
   premier `</`). Suffisant pour du texte simple, pas pour du parsing fin.
 - **Vision écran** : dépend de `llava:7b` ; sans lui, `describe_screen` tombe en
   panne silencieuse.
 - **Pas de boucle plan→exécute** robuste pour les recherches longues
   (planification opt-in basique seulement).
-- **Pas de RAG hybride** (BM25 + reranking + GraphRAG) — vector seul pour l'instant.
+- **RAG hybride partiel** : la fusion dense + BM25 est implémentée dans
+  `VectorStore.ts` ; **pas de reranking ni de GraphRAG** pour l'instant.
 
 ## 5. Sécurité — défenses encore manquantes
 
-Présent : sandbox Rust, permissions risk-gated, audit, safe mode.
+Présent : sandbox Rust, permissions risk-gated, audit, safe mode, et
+**post-execution scan des sorties d'outils** (`security/sanitizeToolOutput.ts`,
+câblé dans l'orchestrateur) : redaction des **secrets/credentials** (clés API,
+tokens, clés privées…) + détection d'injection avec cadrage « untrusted data »
+(spotlighting).
 **Manquent** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §7) :
 
-- **Pre-check déterministe** des inputs (patterns d'injection connus).
-- **Post-execution scan** des sorties d'outils — critique car l'OCR et la lecture
-  web ingèrent du contenu non fiable (risque d'**injection de prompt indirecte**).
-- **Redaction PII/secrets** avant que les sorties n'entrent dans le contexte.
+- **Pre-check déterministe** des inputs (patterns d'injection connus) — seule la
+  sortie des outils est scannée, pas l'entrée utilisateur/fichier.
+- **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
+  sont redactés aujourd'hui.
 - **Isolation réseau** pour l'exécution de code généré.
 
 ## 6. Tests & qualité
