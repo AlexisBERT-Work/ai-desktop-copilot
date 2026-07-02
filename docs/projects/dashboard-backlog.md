@@ -43,12 +43,12 @@ Ce qui constitue le MVP et qu'on **ne touche plus** sauf bug :
 ### Bourse
 | # | Évolution | Valeur | Effort |
 |---|---|---|---|
-| B1 | **Formules glissantes** (moyennes mobiles…) — exposer l'historique aux formules | Haute | M |
+| B1 | **Formules glissantes** — ✅ livré (2026-07-03) : `X.history` + `sma`/`ema` dans le scope mathjs | Haute | M |
 | B2 | **Alertes / seuils** + notifications quand un cours/formule franchit un seuil | Haute | M |
 | B3 | **Portefeuille** : quantités détenues → valeur, P&L (formules agrégées) | Haute | M |
 | B4 | Plus de marchés (Euronext/crypto/forex) + `WebScrapeAdapter` de secours | Moyenne | M |
 | B5 | Source payante (Finnhub/Twelve Data) pour fiabilité / vrai temps réel | Moyenne | M |
-| B6 | **Persistance historique** en SQLite (actuellement en mémoire, perdu au restart) | Moyenne | S |
+| B6 | **Persistance historique** en SQLite — ✅ livré (2026-07-03) : `MarketHistoryStore` (`data/market.db`) | Moyenne | S |
 | B7 | Univers + cadence réglables depuis l'UI (pas seulement via env) | Faible | S |
 
 ### News & Dailys
@@ -82,5 +82,5 @@ Ce qui constitue le MVP et qu'on **ne touche plus** sauf bug :
 
 ## Quand piocher dans le backlog
 Après le MVP, candidats **prioritaires** (forte valeur / effort raisonnable) :
-**B2** (alertes), **B1** (formules glissantes), **B3** (portefeuille), **D1** (widgets KPI/chart),
+**B2** (alertes), ~~B1~~ ✅, **B3** (portefeuille), **D1** (widgets KPI/chart),
 **N1** (ciblage client). Le reste au fil des retours d'usage.

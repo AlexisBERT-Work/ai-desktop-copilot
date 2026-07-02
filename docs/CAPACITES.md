@@ -174,7 +174,10 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 | Supprimer une formule | `remove_formula` | 🟡 |
 
 - **Bourse live** : cotations Yahoo rafraîchies ~30 s, **formules** (ratios…)
-  recalculées à chaque tick, **sparklines** par symbole. Les symboles et formules
+  recalculées à chaque tick, **sparklines** par symbole. **Formules glissantes** :
+  `X.history`, `sma(X.history, n)`, `ema(X.history, n)` (B1). **Historique
+  persisté en SQLite** (`data/market.db`, B6) — survit aux redémarrages.
+  Les symboles et formules
   des widgets pilotent la watchlist du sidecar (synchro automatique).
 - **News** : annonce rédigée par l'**admin seul** (Supabase + RLS), diffusée à
   tous les clients en lecture seule (bandeau + widget). Setup :

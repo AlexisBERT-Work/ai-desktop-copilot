@@ -262,6 +262,14 @@ export function WidgetGuide({ onClose }: Props) {
               • Les formules utilisent la syntaxe <em>mathjs</em> et accèdent aux champs d’un symbole
               via un point (ex. <code className="rounded bg-slate-200 px-1">AAPL.price</code>).
             </li>
+            <li>
+              • Formules <strong>glissantes</strong> : l’historique de prix est accessible via{' '}
+              <code className="rounded bg-slate-200 px-1">AAPL.history</code>, avec{' '}
+              <code className="rounded bg-slate-200 px-1">sma(AAPL.history, 20)</code> (moyenne
+              mobile) et <code className="rounded bg-slate-200 px-1">ema(AAPL.history, 20)</code>{' '}
+              (exponentielle). Ex. écart à la moyenne :{' '}
+              <code className="rounded bg-slate-200 px-1">AAPL.price - sma(AAPL.history, 50)</code>.
+            </li>
           </ul>
         </section>
 

@@ -199,3 +199,15 @@ volontairement désactivés.
       `cargo test --lib` : **15 verts** (avec tuning.rs).
 
 **Node : 467 tests (67 fichiers) · Rust : 15 tests** · type-check OK.
+
+## B1 — formules glissantes (2026-07-03)
+
+- [x] `FormulaEngine.buildScope` accepte l'historique : chaque symbole expose
+      `X.history` (série de prix), et le scope gagne `sma(serie, n)` /
+      `ema(serie, n)`. Exemples : `sma(AAPL.history, 20)`,
+      `AAPL.price - sma(AAPL.history, 50)`, `max(MSFT.history)`.
+- [x] Fenêtre en mémoire : 120 points (~1 h à 30 s) ; réamorcée depuis SQLite
+      (B6) au démarrage — les moyennes ne repartent plus de zéro.
+- [x] Guide widgets (PDF) et CAPACITES mis à jour ; B1 + B6 cochés au backlog.
+
+**Node : 471 tests (67 fichiers) · Rust : 15** · type-check OK.

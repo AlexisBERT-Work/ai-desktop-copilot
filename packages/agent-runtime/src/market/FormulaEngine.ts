@@ -6,11 +6,38 @@ export interface EvalResult {
   error?: string;
 }
 
+/** Moyenne mobile simple sur les `n` derniers points (utilise ce qui existe si moins). */
+export function sma(values: number[], n: number): number {
+  if (!Array.isArray(values) || values.length === 0 || n < 1) return NaN;
+  const window = values.slice(-Math.floor(n));
+  return window.reduce((a, b) => a + b, 0) / window.length;
+}
+
+/** Moyenne mobile exponentielle (k = 2/(n+1)) sur toute la série disponible. */
+export function ema(values: number[], n: number): number {
+  if (!Array.isArray(values) || values.length === 0 || n < 1) return NaN;
+  const k = 2 / (Math.floor(n) + 1);
+  let acc = values[0] as number;
+  for (let i = 1; i < values.length; i++) {
+    acc = (values[i] as number) * k + acc * (1 - k);
+  }
+  return acc;
+}
+
 /**
  * Construit le contexte d'évaluation : chaque symbole devient un objet
  * accessible par champ, ex. `AAPL.price`, `MSFT.changePercent`.
+ *
+ * B1 — formules glissantes : si `history` est fourni, chaque symbole expose
+ * aussi `X.history` (série de prix, du plus ancien au plus récent) et le scope
+ * gagne `sma(serie, n)` / `ema(serie, n)`. Exemples :
+ *   `sma(AAPL.history, 20)` · `AAPL.price - sma(AAPL.history, 50)` ·
+ *   `max(MSFT.history)` (fonctions mathjs natives utilisables aussi).
  */
-export function buildScope(quotes: Quote[]): Record<string, unknown> {
+export function buildScope(
+  quotes: Quote[],
+  history?: ReadonlyMap<string, number[]>,
+): Record<string, unknown> {
   const scope: Record<string, unknown> = {};
   for (const q of quotes) {
     scope[q.symbol] = {
@@ -18,8 +45,11 @@ export function buildScope(quotes: Quote[]): Record<string, unknown> {
       change: q.change,
       changePercent: q.changePercent,
       volume: q.volume ?? 0,
+      history: [...(history?.get(q.symbol) ?? [q.price])],
     };
   }
+  scope['sma'] = sma;
+  scope['ema'] = ema;
   return scope;
 }
 

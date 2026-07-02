@@ -130,7 +130,7 @@ export class MarketService {
       .map((s) => this.quotes.get(s))
       .filter((q): q is Quote => q !== undefined);
 
-    const scope = buildScope(quotes);
+    const scope = buildScope(quotes, this.history);
     const computed: ComputedValue[] = this.formulas.map((f) => {
       const r = evaluateFormula(f.expression, scope);
       return r.error !== undefined
