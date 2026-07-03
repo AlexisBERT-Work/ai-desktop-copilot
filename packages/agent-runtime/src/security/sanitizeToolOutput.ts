@@ -40,6 +40,10 @@ const SECRET_PATTERNS: Pattern[] = [
   { name: 'slack_token', re: /\bxox[baprs]-[A-Za-z0-9-]{10,}/g },
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g },
   { name: 'bearer_token', re: /\bBearer\s+[A-Za-z0-9._-]{20,}/g },
+  // URLs de webhook entrant : porteuses d'un secret (token) et directement
+  // exploitables pour l'exfiltration si elles atteignent le modèle.
+  { name: 'discord_webhook', re: /https:\/\/(?:ptb\.|canary\.)?disc(?:ord)?(?:app)?\.com\/api\/webhooks\/[0-9]+\/[A-Za-z0-9_-]+/gi },
+  { name: 'slack_webhook', re: /https:\/\/hooks\.slack\.com\/services\/T[A-Za-z0-9]+\/B[A-Za-z0-9]+\/[A-Za-z0-9]+/gi },
 ];
 
 // Generic `KEY = value` / `KEY: value` credentials — redact the value, keep the

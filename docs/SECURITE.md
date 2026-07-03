@@ -129,10 +129,10 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 ## Déjà réparé (commits `§` — à ne pas refaire)
 
 - **§7 — scan post-exécution** (`security/sanitizeToolOutput.ts`, câblé
-  `AgentOrchestrator.ts:333-347`) : rédaction de secrets + encadrement « contenu
-  non fiable » contre l'injection indirecte. **Bonne base.** Angles morts :
-  appliqué seulement si `result.success` (les erreurs brutes passent non filtrées),
-  et les motifs ne couvrent pas les URL de webhook.
+  `AgentOrchestrator.ts`) : rédaction de secrets + encadrement « contenu non
+  fiable » contre l'injection indirecte. **Bonne base.** Angles morts **fermés le
+  2026-07-03** (Vuln 5) : le scan s'applique désormais aussi à la branche d'erreur,
+  et les URL de webhook Discord/Slack sont rédigées.
 - **`fix(security): path whitelist never matched on Windows`** (aaa5ea3) : la
   normalisation casse/slash de `isPathAllowed` est correcte — mais c'est cette
   même fonction qui reste vulnérable au `../` (Vuln 1).
@@ -172,8 +172,13 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
    + blocage des interpréteurs/LOLBins.
 4. ~~**Politique de commande unique + alias/abréviations** (Vuln 4)~~ — ✅ **FAIT
    (2026-07-03)** dans `security/commandPolicy.ts`.
-5. **Boucher les angles morts §7** : sanitiser aussi les sorties d'erreur, ajouter
-   les URL de webhook aux motifs. *Prochaine étape.*
+5. ~~**Boucher les angles morts §7**~~ — ✅ **FAIT (2026-07-03)**. Scan appliqué à
+   la branche d'erreur + rédaction des webhooks Discord/Slack.
+
+> **Toutes les vulnérabilités du diagnostic initial sont traitées.** Reste, en
+> amélioration continue de fond : la surveillance de mathjs (watch-item), et la
+> convergence Rust/Node (le sandbox Rust reste hors du chemin d'exécution de
+> l'agent — chantier d'architecture, pas une faille).
 
 ---
 
@@ -193,6 +198,10 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 - **2026-07-03** — **Vuln 4 atténuée** : politique de commande unique
   (`security/commandPolicy.ts`), motifs durcis (abréviations `-enc`, `iex` nu,
   cmdlets de download, `Remove-Item -Recurse`). 27 tests. 505 tests verts.
+- **2026-07-03** — **Vuln 5 corrigée** (angles morts §7) : scan appliqué aussi aux
+  sorties d'erreur (`AgentOrchestrator.ts`) + rédaction des URL de webhook
+  Discord/Slack (`sanitizeToolOutput.ts`). 2 tests. 507 tests verts.
+- **2026-07-03** — ✅ **Toutes les vulnérabilités du diagnostic traitées.**
 
 ---
 
