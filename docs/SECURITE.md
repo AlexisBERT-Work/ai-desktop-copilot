@@ -104,7 +104,15 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   soit le nom de l'outil (dans `BaseTool` ou le gate, piloté par le schéma).
 
 ### Vuln 4 — Blocklist `run_command` contournable (deny-list poreuse)
-- **Sévérité : MOYENNE (défense en profondeur)** · `insufficient_input_validation` · **STATUT : ouvert**
+- **Sévérité : MOYENNE (défense en profondeur)** · `insufficient_input_validation` · **STATUT : ✅ ATTÉNUÉ (2026-07-03)**
+- **Correctif appliqué** : politique extraite dans `security/commandPolicy.ts`
+  (source unique côté Node, utilisée par `run_command`). Motifs durcis pour couvrir
+  les contournements documentés : abréviations `-e`/`-en`/`-enc` de `-EncodedCommand`,
+  `iex` sans parenthèse, cmdlets de download (`iwr`/`irm`/`Invoke-WebRequest`/
+  `Invoke-RestMethod`/`DownloadFile`…), `Remove-Item -Recurse`. 27 tests dédiés.
+- **Rappel** : ça reste une deny-list, pas une frontière — la vraie borne est la
+  confirmation `high` de `run_command`. La divergence Rust (`sandbox.rs`) subsiste
+  mais ce code n'est pas sur le chemin de l'agent (cf. constat d'architecture).
 - `tools/system/RunCommandTool.ts:17-30`. Contournements : `-enc` bloqué mais
   PowerShell accepte les abréviations `-e`/`-en`/`-ec` ; `/iex\s*\(/` rate
   `iex $x` (sans parenthèse) ; `downloadstring` ne couvre pas
@@ -162,11 +170,10 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
    — ✅ **FAIT (2026-07-03)**.
 3. ~~**Durcir `open_app`** (Vuln 2)~~ — ✅ **FAIT (2026-07-03)**. Reclassé `high`
    + blocage des interpréteurs/LOLBins.
-4. **Source de vérité unique pour l'exécution de commandes** : `run_command` +
-   `open_app` via une seule couche, pour supprimer la divergence des deux
-   blocklists (Vuln 4) + couvrir alias/abréviations.
+4. ~~**Politique de commande unique + alias/abréviations** (Vuln 4)~~ — ✅ **FAIT
+   (2026-07-03)** dans `security/commandPolicy.ts`.
 5. **Boucher les angles morts §7** : sanitiser aussi les sorties d'erreur, ajouter
-   les URL de webhook aux motifs.
+   les URL de webhook aux motifs. *Prochaine étape.*
 
 ---
 
@@ -183,6 +190,9 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   read_calendar, transcribe_audio, run_sqlite. 3 tests. 477 tests verts.
 - **2026-07-03** — **Vuln 2 corrigée** : `open_app` reclassé `high` + blocage des
   interpréteurs/LOLBins comme cible. 1 test. 478 tests verts.
+- **2026-07-03** — **Vuln 4 atténuée** : politique de commande unique
+  (`security/commandPolicy.ts`), motifs durcis (abréviations `-enc`, `iex` nu,
+  cmdlets de download, `Remove-Item -Recurse`). 27 tests. 505 tests verts.
 
 ---
 
