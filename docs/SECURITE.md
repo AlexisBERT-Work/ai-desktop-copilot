@@ -59,7 +59,15 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   une seule fonction `assertPathAllowed`.
 
 ### Vuln 2 — `open_app` = exécution de commande arbitraire contournant la blocklist de `run_command`
-- **Sévérité : HAUTE** · `command_injection` / `risk_misclassification` · confiance élevée · **STATUT : ouvert**
+- **Sévérité : HAUTE** · `command_injection` / `risk_misclassification` · confiance élevée · **STATUT : ✅ CORRIGÉ (2026-07-03)**
+- **Correctif appliqué** : `open_app` reclassé `medium` → `high` (`OpenAppTool.ts`
+  + `permissions.ts`), ce qui supprime l'auto-approbation « se souvenir » de
+  session. `validateAppName` refuse désormais les interpréteurs/LOLBins comme
+  cible (powershell/pwsh/cmd/wscript/cscript/mshta/rundll32/regsvr32/python/node/
+  bash…), fermant le contournement de `run_command`. Test dédié. 478 tests verts.
+- **Résiduel** : un exécutable « légitime » peut toujours recevoir des arguments ;
+  la vraie borne reste la confirmation `high`. Le durcissement va plus loin en
+  Vuln 4 (source de validation unique).
 - `tools/system/OpenAppTool.ts:38-49` construit
   `Start-Process -FilePath '<name>' -ArgumentList '<args>'`. Le nom peut être
   **n'importe quel exécutable**, les args sont arbitraires. Classé `medium`
@@ -152,8 +160,8 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
    + match à la frontière de dossier.
 2. ~~**Étendre le contrôle de chemin à tout argument `path`/`db_path`** (Vuln 3)~~
    — ✅ **FAIT (2026-07-03)**.
-3. **Durcir `open_app`** (Vuln 2) : reclasser `high`, allow-list d'exécutables,
-   blocage des interpréteurs. Fusionner la validation avec `run_command`.
+3. ~~**Durcir `open_app`** (Vuln 2)~~ — ✅ **FAIT (2026-07-03)**. Reclassé `high`
+   + blocage des interpréteurs/LOLBins.
 4. **Source de vérité unique pour l'exécution de commandes** : `run_command` +
    `open_app` via une seule couche, pour supprimer la divergence des deux
    blocklists (Vuln 4) + couvrir alias/abréviations.
@@ -173,6 +181,8 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 - **2026-07-03** — **Vuln 3 corrigée** : le gate valide `path`/`db_path` pour tout
   outil (plus seulement `*file*`) ; couvre parse_document, analyze_data,
   read_calendar, transcribe_audio, run_sqlite. 3 tests. 477 tests verts.
+- **2026-07-03** — **Vuln 2 corrigée** : `open_app` reclassé `high` + blocage des
+  interpréteurs/LOLBins comme cible. 1 test. 478 tests verts.
 
 ---
 

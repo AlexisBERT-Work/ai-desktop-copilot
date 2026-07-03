@@ -22,6 +22,15 @@ describe('validateAppName', () => {
     // Une single quote est acceptée (échappée à l'exécution, pas ici)
     expect(validateAppName("l'app")).toBeNull();
   });
+
+  // ─── Vuln 2 (docs/SECURITE.md): open_app ne doit pas lancer d'interpréteurs ───
+  it('refuse les interpréteurs (contournement de run_command)', () => {
+    for (const n of ['powershell', 'PowerShell.exe', 'cmd', 'CMD.EXE', 'pwsh',
+                     'wscript', 'cscript', 'mshta', 'rundll32', 'python', 'node',
+                     'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe']) {
+      expect(validateAppName(n), n).not.toBeNull();
+    }
+  });
 });
 
 describe('OpenAppTool.execute — validation seulement (pas de vrai lancement)', () => {
