@@ -76,7 +76,12 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   validation avec `run_command`.
 
 ### Vuln 3 — La whitelist de chemins ne s'applique qu'aux outils dont le nom contient `"file"`
-- **Sévérité : MOYENNE** · `broken_access_control` · confiance élevée · **STATUT : ouvert**
+- **Sévérité : MOYENNE** · `broken_access_control` · confiance élevée · **STATUT : ✅ CORRIGÉ (2026-07-03)**
+- **Correctif appliqué** : le gate (`PermissionEngine.check`) valide désormais tout
+  argument `path` **et** `db_path` par `isPathAllowed`, quel que soit le nom de
+  l'outil (`workdir` volontairement exclu — c'est un cwd de commande, pas une
+  cible de lecture/écriture). 3 tests ajoutés (parse_document, run_sqlite cookies,
+  chemin whitelisté autorisé). 477 tests verts.
 - `PermissionEngine.ts:45` : `if (request.tool.includes('file') || request.tool === 'list_directory')`.
   Or `parse_document`, `analyze_data`, `read_calendar`, `transcribe_audio` prennent
   un `path` et lisent le disque **sans jamais passer par cette vérification**, et
@@ -145,9 +150,8 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 
 1. ~~**`isPathAllowed` durci** (Vuln 1)~~ — ✅ **FAIT (2026-07-03)**. `..` interdit
    + match à la frontière de dossier.
-2. **Étendre le contrôle de chemin à tout argument `path`/`db_path`** (Vuln 3) :
-   dans le gate, ne plus se baser sur `tool.includes('file')` mais sur la présence
-   d'un argument chemin. *Prochaine étape.*
+2. ~~**Étendre le contrôle de chemin à tout argument `path`/`db_path`** (Vuln 3)~~
+   — ✅ **FAIT (2026-07-03)**.
 3. **Durcir `open_app`** (Vuln 2) : reclasser `high`, allow-list d'exécutables,
    blocage des interpréteurs. Fusionner la validation avec `run_command`.
 4. **Source de vérité unique pour l'exécution de commandes** : `run_command` +
@@ -166,6 +170,9 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 - **2026-07-03** — **Vuln 1 corrigée** : `isPathAllowed` rejette le traversal `..`
   et impose un match à la frontière de dossier ; 3 tests de non-régression.
   474 tests verts, type-check OK.
+- **2026-07-03** — **Vuln 3 corrigée** : le gate valide `path`/`db_path` pour tout
+  outil (plus seulement `*file*`) ; couvre parse_document, analyze_data,
+  read_calendar, transcribe_audio, run_sqlite. 3 tests. 477 tests verts.
 
 ---
 

@@ -68,4 +68,33 @@ describe('PermissionEngine path whitelist', () => {
     const r = await engine.check(req(`${join(HOME, 'Documents')}-evil\\x.txt`));
     expect(r.granted).toBe(false);
   });
+
+  // ─── Vuln 3 (docs/SECURITE.md): path check must cover non-"file" tools ───
+  it('enforces the whitelist on a path-taking tool not named *file* (parse_document)', async () => {
+    const r = await engine.check({
+      tool: 'parse_document',
+      args: { path: 'C:/Windows/System32/config/SAM' },
+      context: { conversationId: 'c' },
+    });
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('Chemin non autorisé');
+  });
+
+  it('enforces the whitelist on run_sqlite db_path (Chrome cookies DB)', async () => {
+    const r = await engine.check({
+      tool: 'run_sqlite',
+      args: { db_path: 'C:/Users/other/AppData/Local/Google/Chrome/User Data/Default/Cookies', query: 'SELECT 1' },
+      context: { conversationId: 'c' },
+    });
+    expect(r.granted).toBe(false);
+  });
+
+  it('still allows a whitelisted path for a non-file tool', async () => {
+    const r = await engine.check({
+      tool: 'parse_document',
+      args: { path: join(HOME, 'Documents', 'rapport.pdf') },
+      context: { conversationId: 'c' },
+    });
+    expect(r.granted).toBe(true);
+  });
 });

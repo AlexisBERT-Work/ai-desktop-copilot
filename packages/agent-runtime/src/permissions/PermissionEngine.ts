@@ -41,11 +41,17 @@ export class PermissionEngine {
       return { granted: false, reason: `Outil critique non activé dans les paramètres de sécurité` };
     }
 
-    // Filesystem path validation
-    if (request.tool.includes('file') || request.tool === 'list_directory') {
-      const path = request.args['path'] as string | undefined;
-      if (path && !this.isPathAllowed(path)) {
-        return { granted: false, reason: `Chemin non autorisé: ${path}` };
+    // Filesystem path validation — applies to ANY tool carrying a filesystem
+    // path argument, not just those whose name contains "file". Otherwise
+    // path-taking tools like parse_document, analyze_data, read_calendar,
+    // transcribe_audio or run_sqlite (db_path) read arbitrary files outside the
+    // whitelist (e.g. the Chrome cookies SQLite DB), defeating the whole point
+    // of the whitelist. `workdir` is intentionally excluded: it is a working
+    // directory for command tools (git/docker), not a read/write target.
+    for (const key of ['path', 'db_path'] as const) {
+      const candidate = request.args[key];
+      if (typeof candidate === 'string' && candidate.length > 0 && !this.isPathAllowed(candidate)) {
+        return { granted: false, reason: `Chemin non autorisé: ${candidate}` };
       }
     }
 
