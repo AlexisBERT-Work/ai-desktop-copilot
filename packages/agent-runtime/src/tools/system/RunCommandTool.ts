@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { isCommandBlocked, MAX_COMMAND_LEN } from '../../security/commandPolicy';
 
 const execFileAsync = promisify(execFile);
 
@@ -12,22 +13,6 @@ interface Args {
   workdir?: string;
   timeoutMs?: number;
 }
-
-// Commands that are always blocked
-const BLOCKED_PATTERNS = [
-  /rm\s+-rf\s+\//i,
-  /format\s+[a-z]:/i,
-  /del\s+\/[sf]/i,
-  /shutdown\s*\//i,
-  /reg\s+delete\s+hklm/i,
-  /bcdedit/i,
-  /diskpart/i,
-  /powershell\s+-enc/i,
-  /invoke-expression/i,
-  /iex\s*\(/i,
-  /downloadstring/i,
-  /bypass/i,
-];
 
 export class RunCommandTool extends BaseTool {
   name = 'run_command';
@@ -41,14 +26,13 @@ export class RunCommandTool extends BaseTool {
     const args = rawArgs as Args;
     if (!args.command) return this.fail('command est requis');
 
-    // Safety check
-    const blocked = BLOCKED_PATTERNS.some(p => p.test(args.command));
-    if (blocked) {
+    // Safety check (politique partagée — voir security/commandPolicy.ts)
+    if (isCommandBlocked(args.command)) {
       return this.fail('Commande bloquée par politique de sécurité');
     }
 
-    if (args.command.length > 2048) {
-      return this.fail('Commande trop longue (max 2048 chars)');
+    if (args.command.length > MAX_COMMAND_LEN) {
+      return this.fail(`Commande trop longue (max ${MAX_COMMAND_LEN} chars)`);
     }
 
     const shell = args.shell ?? 'powershell';

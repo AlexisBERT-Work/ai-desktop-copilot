@@ -332,18 +332,18 @@ export class AgentOrchestrator {
           yield { type: 'tool_result', toolName: toolCall.name, result };
           // Post-execution safety scan (§7): a tool output becomes LLM context,
           // so redact secrets and neutralize injection BEFORE it gets there.
-          let content = JSON.stringify(result.success ? result.data : { error: result.error });
-          if (result.success) {
-            const scan = sanitizeToolOutput(content);
-            content = scan.text;
-            if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {
-              log.warn('Tool output sanitized', {
-                runId,
-                tool: toolCall.name,
-                redactions: scan.redactions,
-                injection: scan.injectionFlags,
-              });
-            }
+          // Applied to BOTH success and error branches — an error message can
+          // echo file contents, injected text, or secrets just as easily.
+          const rawContent = JSON.stringify(result.success ? result.data : { error: result.error });
+          const scan = sanitizeToolOutput(rawContent);
+          const content = scan.text;
+          if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {
+            log.warn('Tool output sanitized', {
+              runId,
+              tool: toolCall.name,
+              redactions: scan.redactions,
+              injection: scan.injectionFlags,
+            });
           }
           messages.push({ role: 'tool', content, tool_call_id: toolCall.id });
         } catch (err) {

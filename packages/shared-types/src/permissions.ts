@@ -60,7 +60,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     search_memory: { name: 'search_memory', description: 'Search memory', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     write_file: { name: 'write_file', description: 'Write file', riskLevel: 'medium', enabled: true, requiresConfirmation: true },
     write_clipboard: { name: 'write_clipboard', description: 'Write clipboard', riskLevel: 'medium', enabled: true, requiresConfirmation: true },
-    open_app: { name: 'open_app', description: 'Open application', riskLevel: 'medium', enabled: true, requiresConfirmation: true },
+    open_app: { name: 'open_app', description: 'Open application', riskLevel: 'high', enabled: true, requiresConfirmation: true },
     store_memory: { name: 'store_memory', description: 'Store in memory', riskLevel: 'medium', enabled: true, requiresConfirmation: false },
     analyze_stacktrace: { name: 'analyze_stacktrace', description: 'Analyze stacktrace and extract error info', riskLevel: 'low', enabled: true, requiresConfirmation: false },
     analyze_logs: { name: 'analyze_logs', description: 'Analyse un fichier de log local (niveaux, erreurs regroupées, plage temporelle). Lecture seule, 100% local', riskLevel: 'low', enabled: true, requiresConfirmation: false },

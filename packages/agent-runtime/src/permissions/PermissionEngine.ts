@@ -41,11 +41,17 @@ export class PermissionEngine {
       return { granted: false, reason: `Outil critique non activé dans les paramètres de sécurité` };
     }
 
-    // Filesystem path validation
-    if (request.tool.includes('file') || request.tool === 'list_directory') {
-      const path = request.args['path'] as string | undefined;
-      if (path && !this.isPathAllowed(path)) {
-        return { granted: false, reason: `Chemin non autorisé: ${path}` };
+    // Filesystem path validation — applies to ANY tool carrying a filesystem
+    // path argument, not just those whose name contains "file". Otherwise
+    // path-taking tools like parse_document, analyze_data, read_calendar,
+    // transcribe_audio or run_sqlite (db_path) read arbitrary files outside the
+    // whitelist (e.g. the Chrome cookies SQLite DB), defeating the whole point
+    // of the whitelist. `workdir` is intentionally excluded: it is a working
+    // directory for command tools (git/docker), not a read/write target.
+    for (const key of ['path', 'db_path'] as const) {
+      const candidate = request.args[key];
+      if (typeof candidate === 'string' && candidate.length > 0 && !this.isPathAllowed(candidate)) {
+        return { granted: false, reason: `Chemin non autorisé: ${candidate}` };
       }
     }
 
@@ -135,11 +141,26 @@ export class PermissionEngine {
     const temp = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
 
     const normalized = norm(path);
+
+    // Reject path traversal outright: no legitimate whitelisted path needs a
+    // `..` segment. Without this, `…/Downloads/../.ssh/id_rsa` slips through the
+    // startsWith() check below (it starts with the whitelisted `…/Downloads`)
+    // and Node's fs then resolves the `..` to read outside the allowed roots.
+    if (normalized.split('/').some(seg => seg === '..')) return false;
+
     const expandedWhitelist = this.config.pathWhitelist.map(p =>
       norm(p.replace(/%userprofile%/gi, userProfile).replace(/%temp%/gi, temp)),
     );
 
-    return expandedWhitelist.some(allowed => normalized.startsWith(allowed));
+    // Require a directory-boundary match so an allowed root like `…/documents`
+    // does not also authorize a sibling `…/documents-evil`. Accept an exact
+    // match or the root followed by a separator.
+    return expandedWhitelist.some(allowed => {
+      if (allowed.length === 0) return false;
+      if (normalized === allowed) return true;
+      const withSep = allowed.endsWith('/') ? allowed : `${allowed}/`;
+      return normalized.startsWith(withSep);
+    });
   }
 
   clearSessionGrants(): void {

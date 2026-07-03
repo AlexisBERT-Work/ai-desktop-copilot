@@ -16,6 +16,21 @@ describe('sanitizeToolOutput — secret redaction', () => {
     expect(r.text).not.toContain('AKIAIOSFODNN7EXAMPLE');
   });
 
+  it('redacts a Discord webhook URL (Vuln 5)', () => {
+    const url = 'https://discord.com/api/webhooks/123456789012345678/aBcD_eFgH-iJkLmNoPqRsTuVwXyZ0123456789';
+    const r = sanitizeToolOutput(`poste vers ${url} stp`);
+    expect(r.text).toContain('[REDACTED:discord_webhook]');
+    expect(r.text).not.toContain('aBcD_eFgH');
+    expect(r.redactions).toContain('discord_webhook');
+  });
+
+  it('redacts a Slack webhook URL (Vuln 5)', () => {
+    const url = 'https://hooks.slack.com/services/T00000000/B11111111/abcdefABCDEF0123456789';
+    const r = sanitizeToolOutput(url);
+    expect(r.text).toContain('[REDACTED:slack_webhook]');
+    expect(r.text).not.toContain('B11111111');
+  });
+
   it('redacts a private key block', () => {
     const pem = '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----';
     const r = sanitizeToolOutput(`avant ${pem} après`);
