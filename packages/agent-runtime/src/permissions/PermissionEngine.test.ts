@@ -45,4 +45,27 @@ describe('PermissionEngine path whitelist', () => {
     const r = await engine.check(req('C:/Windows/System32/config/SAM'));
     expect(r.granted).toBe(true);
   });
+
+  // ─── Vuln 1 (docs/SECURITE.md): traversal out of a whitelisted root ───
+  it('denies `..` traversal that escapes a whitelisted root', async () => {
+    // Starts with the whitelisted …\Downloads prefix, then walks back to ~/.ssh.
+    const evil = join(HOME, 'Downloads', '..', '.ssh', 'id_rsa');
+    const r = await engine.check(req(evil));
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('Chemin non autorisé');
+  });
+
+  it('denies `..` traversal written with forward slashes', async () => {
+    const lower = join(HOME, 'Documents', '..', '..', 'secret.txt')
+      .replace(/\\/g, '/')
+      .toLowerCase();
+    const r = await engine.check(req(lower));
+    expect(r.granted).toBe(false);
+  });
+
+  it('denies a sibling dir sharing a whitelisted prefix (boundary match)', async () => {
+    // `…\Documents-evil` must NOT be authorized by the `…\Documents` root.
+    const r = await engine.check(req(`${join(HOME, 'Documents')}-evil\\x.txt`));
+    expect(r.granted).toBe(false);
+  });
 });

@@ -135,11 +135,26 @@ export class PermissionEngine {
     const temp = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
 
     const normalized = norm(path);
+
+    // Reject path traversal outright: no legitimate whitelisted path needs a
+    // `..` segment. Without this, `…/Downloads/../.ssh/id_rsa` slips through the
+    // startsWith() check below (it starts with the whitelisted `…/Downloads`)
+    // and Node's fs then resolves the `..` to read outside the allowed roots.
+    if (normalized.split('/').some(seg => seg === '..')) return false;
+
     const expandedWhitelist = this.config.pathWhitelist.map(p =>
       norm(p.replace(/%userprofile%/gi, userProfile).replace(/%temp%/gi, temp)),
     );
 
-    return expandedWhitelist.some(allowed => normalized.startsWith(allowed));
+    // Require a directory-boundary match so an allowed root like `…/documents`
+    // does not also authorize a sibling `…/documents-evil`. Accept an exact
+    // match or the root followed by a separator.
+    return expandedWhitelist.some(allowed => {
+      if (allowed.length === 0) return false;
+      if (normalized === allowed) return true;
+      const withSep = allowed.endsWith('/') ? allowed : `${allowed}/`;
+      return normalized.startsWith(withSep);
+    });
   }
 
   clearSessionGrants(): void {
