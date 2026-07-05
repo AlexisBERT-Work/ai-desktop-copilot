@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
+  isDailyCategory,
   type Daily,
   type DailyCategory,
   type DailyKindFilter,
@@ -15,12 +16,22 @@ import {
   searchDailies,
   useDailiesStore,
 } from '../../dailies/dailiesStore';
+import { useDashboardStore } from '../dashboardStore';
 import type { WidgetProps } from './types';
 
 /** Lit le genre (sujet/journal/tout) depuis la config du widget. */
 function readKind(config: Record<string, unknown>): DailyKindFilter {
   const k = config['kind'];
   return k === 'journal' || k === 'topic' ? k : 'all';
+}
+
+/**
+ * Lit les catégories suivies propres à CE widget depuis sa config.
+ * `undefined` = jamais touché ⇒ on retombe sur la préférence globale héritée.
+ */
+function readFollowed(config: Record<string, unknown>): DailyCategory[] | undefined {
+  const f = config['followed'];
+  return Array.isArray(f) ? f.filter(isDailyCategory) : undefined;
 }
 
 const CHIP_BASE = 'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors';
@@ -228,13 +239,21 @@ export function DailiesView({
 export function DailiesWidget({ widget }: WidgetProps) {
   const items = useDailiesStore((s) => s.items);
   const status = useDailiesStore((s) => s.status);
-  const followed = useDailiesStore((s) => s.followed);
-  const toggle = useDailiesStore((s) => s.toggleCategory);
+  const globalFollowed = useDailiesStore((s) => s.followed);
   const hasMore = useDailiesStore((s) => s.hasMore);
   const loadingMore = useDailiesStore((s) => s.loadingMore);
   const loadMore = useDailiesStore((s) => s.loadMore);
+  const updateWidgetConfig = useDashboardStore((s) => s.updateWidgetConfig);
   const active = useMemo(() => computeActiveDailies(items), [items]);
   const kindFilter = readKind(widget.config);
+
+  // Chaque widget a sa propre sélection de catégories (persistée dans sa
+  // config) ; un widget jamais filtré hérite de l'ancienne préférence globale.
+  const followed = readFollowed(widget.config) ?? globalFollowed;
+  const toggle = (c: DailyCategory) => {
+    const next = followed.includes(c) ? followed.filter((x) => x !== c) : [...followed, c];
+    updateWidgetConfig(widget.id, { followed: next });
+  };
 
   if (status === 'unconfigured') {
     return <p className="text-xs text-white/30">Dailys non configurées.</p>;
