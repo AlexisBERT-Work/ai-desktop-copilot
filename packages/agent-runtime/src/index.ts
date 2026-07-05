@@ -383,7 +383,11 @@ async function main() {
     // « Publier maintenant » (console admin) : lance un run immédiat de la revue
     // de presse. Absent (undefined) sur les postes sans config admin → le bridge
     // répond « inactif » sans rien publier.
-    pressScheduler !== null ? () => pressScheduler.runOnce() : undefined,
+    pressScheduler !== null
+      ? async () => {
+          await pressScheduler.runOnce();
+        }
+      : undefined,
   );
   bridge.start();
 

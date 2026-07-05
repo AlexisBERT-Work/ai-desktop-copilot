@@ -8,7 +8,7 @@ import { publishDailiesToDiscord } from './DiscordDailyPublisher';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:press-scheduler');
-const DAY_MS = 24 * 60 * 60 * 1000;
+const CHECK_MS = 15 * 60 * 1000;
 
 /** Organisation des dailys : par journal, par sujet (transversal), ou les deux. */
 export type PressMode = 'journal' | 'topic' | 'both';
@@ -35,23 +35,34 @@ export interface PressDigestConfig {
   discordWebhook?: string;
 }
 
-/** Ms jusqu'à la prochaine occurrence de `hour:00` locale. Pur, exporté pour tests. */
-export function msUntilHour(hour: number, now = new Date()): number {
-  const next = new Date(now);
-  next.setHours(hour, 0, 0, 0);
-  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
-  return next.getTime() - now.getTime();
+/** Clé de jour local (ex. « 2026-7-4 »). Pur, exporté pour tests. */
+export function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+/**
+ * La publication du jour est-elle due ? Vrai dès que l'heure de publication
+ * est atteinte et qu'aucun run n'a réussi aujourd'hui. Pur, exporté pour tests.
+ */
+export function isRunDue(hour: number, lastRunDay: string | null, now = new Date()): boolean {
+  return now.getHours() >= hour && dayKey(now) !== lastRunDay;
 }
 
 /**
  * Publie chaque jour une daily par journal (analyse intra-journal IA). Tourne
  * uniquement sur le poste de référence (config admin présente) — voir index.ts.
  * Idempotent : rejouer une même journée ne crée pas de doublons.
+ *
+ * Planification par « rattrapage » : on vérifie toutes les 15 min si la
+ * publication du jour est due (heure atteinte, pas encore faite). Un PC éteint
+ * ou en veille à l'heure dite publie donc dès son retour, au lieu de sauter la
+ * journée — les setTimeout longs ne survivent ni à la veille ni aux redémarrages.
  */
 export class PressDigestScheduler {
-  private timeout: ReturnType<typeof setTimeout> | null = null;
   private interval: ReturnType<typeof setInterval> | null = null;
   private running = false;
+  /** Jour local du dernier run réussi (null = aucun depuis le démarrage). */
+  private lastRunDay: string | null = null;
 
   constructor(
     private readonly llm: OllamaClient,
@@ -60,34 +71,39 @@ export class PressDigestScheduler {
   ) {}
 
   start(): void {
-    const delay = msUntilHour(this.cfg.hour);
-    this.timeout = setTimeout(() => {
-      void this.runOnce();
-      this.interval = setInterval(() => void this.runOnce(), DAY_MS);
-    }, delay);
+    this.interval = setInterval(() => void this.checkDue(), CHECK_MS);
     log.info('Press digest scheduled', {
       hour: this.cfg.hour,
-      firstRunInMin: Math.round(delay / 60_000),
+      checkEveryMin: CHECK_MS / 60_000,
       sources: this.cfg.sourceIds.length,
       runOnStart: this.cfg.runOnStart,
     });
-    // Publication immédiate optionnelle (idempotente : pas de doublon le même jour).
-    if (this.cfg.runOnStart) void this.runOnce();
+    // Publication immédiate optionnelle (idempotente : pas de doublon le même
+    // jour), sinon rattrapage immédiat si l'heure du jour est déjà passée.
+    if (this.cfg.runOnStart) void this.tryRun();
+    else void this.checkDue();
   }
 
   stop(): void {
-    if (this.timeout !== null) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
-    }
     if (this.interval !== null) {
       clearInterval(this.interval);
       this.interval = null;
     }
   }
 
-  async runOnce(): Promise<void> {
-    if (this.running) return;
+  /** Lance le run du jour s'il est dû. En cas d'échec, retentera au tick suivant. */
+  private async checkDue(): Promise<void> {
+    if (!isRunDue(this.cfg.hour, this.lastRunDay)) return;
+    await this.tryRun();
+  }
+
+  private async tryRun(): Promise<void> {
+    if (await this.runOnce()) this.lastRunDay = dayKey(new Date());
+  }
+
+  /** @returns vrai si le run est allé au bout (même partiellement publié). */
+  async runOnce(): Promise<boolean> {
+    if (this.running) return false;
     this.running = true;
     try {
       const { mode } = this.cfg;
@@ -150,8 +166,10 @@ export class PressDigestScheduler {
           errors: dz.errors.length,
         });
       }
+      return true;
     } catch (err) {
       log.error('Press digest run failed', { error: String(err) });
+      return false;
     } finally {
       this.running = false;
     }

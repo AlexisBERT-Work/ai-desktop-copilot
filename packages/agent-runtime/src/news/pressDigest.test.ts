@@ -9,7 +9,7 @@ import {
   parseAnalysisJson,
   parseSynthesisJson,
 } from './pressDigest';
-import { msUntilHour } from './PressDigestScheduler';
+import { dayKey, isRunDue } from './PressDigestScheduler';
 import type { NewsItem } from '../tools/web/FetchTechNewsTool';
 
 function item(title: string, url: string, excerpt?: string): NewsItem {
@@ -104,16 +104,26 @@ describe('synthèse transversale', () => {
   });
 });
 
-describe('msUntilHour', () => {
-  it('vise aujourd’hui si l’heure est encore à venir', () => {
-    const now = new Date('2026-06-30T06:00:00');
-    expect(msUntilHour(7, now)).toBe(60 * 60 * 1000);
+describe('isRunDue', () => {
+  it('pas dû avant l’heure de publication', () => {
+    expect(isRunDue(7, null, new Date('2026-06-30T06:00:00'))).toBe(false);
   });
 
-  it('vise demain si l’heure est passée', () => {
-    const now = new Date('2026-06-30T08:00:00');
-    const ms = msUntilHour(7, now);
-    expect(ms).toBeGreaterThan(22 * 60 * 60 * 1000);
-    expect(ms).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+  it('dû dès l’heure atteinte si rien n’a tourné aujourd’hui', () => {
+    expect(isRunDue(7, null, new Date('2026-06-30T07:00:00'))).toBe(true);
+  });
+
+  it('rattrapage : dû même bien après l’heure (démarrage tardif du PC)', () => {
+    expect(isRunDue(7, null, new Date('2026-06-30T18:30:00'))).toBe(true);
+  });
+
+  it('dû si le dernier run réussi date d’hier', () => {
+    const yesterday = dayKey(new Date('2026-06-29T09:00:00'));
+    expect(isRunDue(7, yesterday, new Date('2026-06-30T08:00:00'))).toBe(true);
+  });
+
+  it('pas dû une seconde fois le même jour', () => {
+    const today = dayKey(new Date('2026-06-30T07:05:00'));
+    expect(isRunDue(7, today, new Date('2026-06-30T22:00:00'))).toBe(false);
   });
 });
