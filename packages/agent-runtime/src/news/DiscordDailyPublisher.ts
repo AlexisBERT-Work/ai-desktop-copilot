@@ -11,6 +11,8 @@ const MAX_EMBEDS = 10;
 const MAX_TITLE = 256;
 const MAX_DESC = 4096;
 const MAX_CONTENT = 2000;
+// Total cumulé (titre + description + footer) de TOUS les embeds d'un message.
+const MAX_EMBED_TOTAL = 6000;
 
 /** Couleur de la barre d'embed par catégorie (repli : blurple). */
 const CATEGORY_COLOR: Record<DailyCategory, number> = {
@@ -30,6 +32,34 @@ function truncate(s: string, max: number): string {
 export function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/** Taille d'un embed telle que comptée par Discord (titre + description + footer). */
+export function embedSize(e: DiscordEmbed): number {
+  return (e.title?.length ?? 0) + (e.description?.length ?? 0) + (e.footer?.text.length ?? 0);
+}
+
+/**
+ * Regroupe les embeds en lots respectant les DEUX limites Discord : au plus
+ * `MAX_EMBEDS` embeds ET `MAX_EMBED_TOTAL` caractères cumulés par message —
+ * dépasser l'une ou l'autre vaut un 400. Pur, exporté pour tests.
+ */
+export function batchEmbeds(embeds: DiscordEmbed[]): DiscordEmbed[][] {
+  const out: DiscordEmbed[][] = [];
+  let batch: DiscordEmbed[] = [];
+  let size = 0;
+  for (const e of embeds) {
+    const s = embedSize(e);
+    if (batch.length > 0 && (batch.length >= MAX_EMBEDS || size + s > MAX_EMBED_TOTAL)) {
+      out.push(batch);
+      batch = [];
+      size = 0;
+    }
+    batch.push(e);
+    size += s;
+  }
+  if (batch.length > 0) out.push(batch);
   return out;
 }
 
@@ -77,10 +107,10 @@ export async function publishDailiesToDiscord(
   const result: DiscordPublishResult = { posted: 0, batches: 0, errors: [] };
   if (drafts.length === 0) return result;
 
-  for (const batch of chunk(drafts, MAX_EMBEDS)) {
+  for (const batch of batchEmbeds(drafts.map(draftToEmbed))) {
     const payload: Record<string, unknown> = {
       content: dailyHeader(batch.length, opts.now),
-      embeds: batch.map(draftToEmbed),
+      embeds: batch,
       ...(opts.username && opts.username.length > 0 ? { username: opts.username } : {}),
     };
     try {
@@ -96,6 +126,12 @@ export async function publishDailiesToDiscord(
     }
   }
 
-  log.info('Dailys mirrored to Discord', { posted: result.posted, batches: result.batches, errors: result.errors.length });
+  log.info('Dailys mirrored to Discord', {
+    posted: result.posted,
+    batches: result.batches,
+    errors: result.errors.length,
+    // Sans le détail, un échec est indiagnosticable depuis les logs.
+    ...(result.errors.length > 0 ? { firstError: result.errors[0] } : {}),
+  });
   return result;
 }
