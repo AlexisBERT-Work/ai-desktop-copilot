@@ -13,10 +13,22 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+/** Familles du menu d'ajout — l'ordre ici est l'ordre d'affichage. */
+export const WIDGET_CATEGORIES = ['action', 'market', 'press'] as const;
+export type WidgetCategory = (typeof WIDGET_CATEGORIES)[number];
+
+export const WIDGET_CATEGORY_LABEL: Record<WidgetCategory, string> = {
+  action: 'Actions',
+  market: 'Marchés',
+  press: 'Presse & dailys',
+};
+
 /** Métadonnées d'un type de widget : libellé, icône et constructeur par défaut. */
 export interface WidgetMeta {
   type: WidgetType;
   label: string;
+  /** Famille dans le menu d'ajout (regroupement visuel). */
+  category: WidgetCategory;
   Icon: LucideIcon;
   /** Fabrique un widget neuf (sans id ; l'id est attribué par le store). */
   build: () => Omit<Widget, 'id'>;
@@ -26,6 +38,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'quick_action',
     label: 'Action rapide',
+    category: 'action',
     Icon: Zap,
     build: () => ({
       type: 'quick_action',
@@ -37,6 +50,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'stocks',
     label: 'Bourse',
+    category: 'market',
     Icon: LineChart,
     build: () => ({
       type: 'stocks',
@@ -49,6 +63,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'kpi',
     label: 'KPI',
+    category: 'market',
     Icon: Hash,
     build: () => ({
       type: 'kpi',
@@ -61,6 +76,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'stat',
     label: 'Statistique',
+    category: 'market',
     Icon: Activity,
     build: () => ({
       type: 'stat',
@@ -73,6 +89,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'chart',
     label: 'Graphe',
+    category: 'market',
     Icon: BarChart3,
     build: () => ({
       type: 'chart',
@@ -85,6 +102,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'table',
     label: 'Table',
+    category: 'market',
     Icon: Table2,
     build: () => ({
       type: 'table',
@@ -97,12 +115,14 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'news',
     label: 'News',
+    category: 'press',
     Icon: Megaphone,
     build: () => ({ type: 'news', title: 'News', config: {}, layout: { x: 0, y: 0, w: 2, h: 1 } }),
   },
   {
     type: 'dailies',
     label: 'Dailys · tout',
+    category: 'press',
     Icon: LayoutList,
     build: () => ({
       type: 'dailies',
@@ -114,6 +134,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'dailies',
     label: 'Dailys · sujets',
+    category: 'press',
     Icon: Layers,
     build: () => ({
       type: 'dailies',
@@ -125,6 +146,7 @@ export const WIDGET_META: readonly WidgetMeta[] = [
   {
     type: 'dailies',
     label: 'Dailys · journaux',
+    category: 'press',
     Icon: Newspaper,
     build: () => ({
       type: 'dailies',
