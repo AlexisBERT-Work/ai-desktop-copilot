@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, Play, Plus, Search, Trash2 } from 'lucide-react';
+import { ChevronRight, Filter, Pencil, Play, Plus, Search, Settings2, Trash2 } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
@@ -21,13 +21,67 @@ import {
 
 const FIELD =
   'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 ' +
-  'outline-none placeholder-white/30 focus:border-brand-400/50';
+  'outline-none placeholder-white/30 transition-colors focus:border-brand-400/60 focus:bg-white/[0.07]';
 const OPTION = 'bg-gray-900 text-white/90';
 const LABEL = 'block text-xs font-medium text-white/50 mb-1';
 const BTN_PRIMARY =
   'flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white ' +
-  'transition-colors hover:bg-brand-500 disabled:opacity-50';
-const BTN_GHOST = 'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-colors hover:text-white/85';
+  'transition-all hover:bg-brand-500 hover:shadow-md hover:shadow-brand-600/25 active:scale-[.97] ' +
+  'disabled:opacity-50 disabled:hover:shadow-none';
+const BTN_GHOST =
+  'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-all hover:bg-white/5 hover:text-white/85 active:scale-[.97]';
+
+/** Pastille « optionnel » accolée aux titres de sections non requises. */
+function OptBadge() {
+  return (
+    <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/40">
+      optionnel
+    </span>
+  );
+}
+
+/** Astérisque des champs requis. */
+function Req() {
+  return (
+    <span className="ml-0.5 text-brand-300" aria-hidden>
+      *
+    </span>
+  );
+}
+
+/** Section repliable pour les réglages optionnels, avec compteur d'actifs. */
+function OptSection({
+  title,
+  Icon,
+  activeCount,
+  children,
+}: {
+  title: string;
+  Icon: typeof Filter;
+  activeCount: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-lg border border-white/10 bg-white/[0.02] transition-colors open:border-white/15 open:bg-white/[0.04]">
+      <summary
+        className="flex cursor-pointer select-none list-none items-center gap-2 px-3 py-2 text-xs
+                   font-medium text-white/55 transition-colors hover:text-white/90
+                   [&::-webkit-details-marker]:hidden"
+      >
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-open:rotate-90" />
+        <Icon className="h-3.5 w-3.5 shrink-0 text-brand-300" />
+        {title}
+        <OptBadge />
+        {activeCount > 0 && (
+          <span className="ml-auto rounded-full bg-brand-600/25 px-1.5 py-0.5 text-[10px] font-semibold text-brand-200">
+            {activeCount} actif{activeCount > 1 ? 's' : ''}
+          </span>
+        )}
+      </summary>
+      <div className="space-y-3 px-3 pb-3 pt-1">{children}</div>
+    </details>
+  );
+}
 
 /** Brouillon d'édition : les champs listes sont saisis en texte, convertis au save. */
 interface Draft {
@@ -153,9 +207,9 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
                     type="button"
                     onClick={() => toggle(s.id)}
                     aria-pressed={on}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all active:scale-90 ${
                       on
-                        ? 'bg-brand-600 text-white'
+                        ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/30'
                         : 'bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/85'
                     }`}
                   >
@@ -305,13 +359,17 @@ export function PressFeedsPanel() {
             {editingId === null ? 'Nouveau journal personnalisé' : 'Modifier le journal'}
           </h2>
           <div className="mt-3 space-y-3">
+            {/* ─── L'essentiel ─── */}
             <label className={LABEL}>
-              Nom du journal
+              <span>
+                Nom du journal
+                <Req />
+              </span>
               <input
                 className={FIELD}
                 value={draft.name}
                 onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                placeholder="Le Monde · IA"
+                placeholder="Veille IA, Revue crypto…"
               />
             </label>
             <label className={LABEL}>
@@ -330,85 +388,134 @@ export function PressFeedsPanel() {
             </label>
             <div>
               <span className={LABEL}>
-                Sources ({draft.sourceIds.length} sélectionnée{draft.sourceIds.length > 1 ? 's' : ''}) —
-                clique pour ajouter/retirer
+                <span>
+                  Sources
+                  <Req />
+                </span>{' '}
+                {draft.sourceIds.length > 0 ? (
+                  <span className="text-brand-300">
+                    {draft.sourceIds.length} sélectionnée{draft.sourceIds.length > 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  'clique pour choisir'
+                )}
               </span>
               <SourcePicker
                 selected={draft.sourceIds}
                 onChange={(ids) => setDraft((d) => ({ ...d, sourceIds: ids }))}
               />
             </div>
-            <label className={LABEL}>
-              URLs de flux RSS/Atom supplémentaires (avancé, une par ligne) — optionnel
-              <textarea
-                className={`${FIELD} resize-y font-mono text-xs`}
-                rows={2}
-                value={draft.feedUrls}
-                onChange={(e) => setDraft((d) => ({ ...d, feedUrls: e.target.value }))}
-                placeholder={'https://hnrss.org/frontpage\nhttps://blog.rust-lang.org/feed.xml'}
-              />
-            </label>
-            <label className={LABEL}>
-              Mots-clés (garde ceux qui en contiennent un ; séparés par des virgules)
-              <input
-                className={FIELD}
-                value={draft.includeKeywords}
-                onChange={(e) => setDraft((d) => ({ ...d, includeKeywords: e.target.value }))}
-                placeholder="IA, intelligence artificielle, LLM"
-              />
-            </label>
-            <label className={LABEL}>
-              Regex à inclure (ne garde que ce qui matche) — optionnel
-              <input
-                className={`${FIELD} font-mono text-xs`}
-                value={draft.includeRegex}
-                onChange={(e) => setDraft((d) => ({ ...d, includeRegex: e.target.value }))}
-                placeholder="(IA|intelligence artificielle|LLM)"
-              />
-            </label>
-            <label className={LABEL}>
-              Regex à exclure (retire ce qui matche) — optionnel
-              <input
-                className={`${FIELD} font-mono text-xs`}
-                value={draft.excludeRegex}
-                onChange={(e) => setDraft((d) => ({ ...d, excludeRegex: e.target.value }))}
-                placeholder="(publi.?rédactionnel|sponsorisé)"
-              />
-            </label>
-            <div className="grid grid-cols-2 gap-3">
+
+            {/* ─── Optionnel : affiner la sélection ─── */}
+            <OptSection
+              title="Affiner la sélection"
+              Icon={Filter}
+              activeCount={
+                (csv(draft.includeKeywords).length > 0 ? 1 : 0) +
+                (draft.includeRegex.trim() !== '' ? 1 : 0) +
+                (draft.excludeRegex.trim() !== '' ? 1 : 0)
+              }
+            >
               <label className={LABEL}>
-                Fenêtre (heures)
+                Mots-clés — garde les articles qui contiennent AU MOINS UN (virgules)
                 <input
                   className={FIELD}
-                  type="number"
-                  min={1}
-                  max={168}
-                  value={draft.sinceHours}
-                  onChange={(e) => setDraft((d) => ({ ...d, sinceHours: Number(e.target.value) }))}
+                  value={draft.includeKeywords}
+                  onChange={(e) => setDraft((d) => ({ ...d, includeKeywords: e.target.value }))}
+                  placeholder="IA, intelligence artificielle, LLM"
                 />
               </label>
               <label className={LABEL}>
-                Articles max
+                Regex à inclure — ne garde que ce qui matche
                 <input
-                  className={FIELD}
-                  type="number"
-                  min={1}
-                  max={200}
-                  value={draft.articleLimit}
-                  onChange={(e) => setDraft((d) => ({ ...d, articleLimit: Number(e.target.value) }))}
+                  className={`${FIELD} font-mono text-xs`}
+                  value={draft.includeRegex}
+                  onChange={(e) => setDraft((d) => ({ ...d, includeRegex: e.target.value }))}
+                  placeholder="\b(IA|LLM|ChatGPT)\b"
                 />
               </label>
-            </div>
-            <label className="flex items-center gap-2 text-xs font-medium text-white/60">
-              <input
-                type="checkbox"
-                checked={draft.enabled}
-                onChange={(e) => setDraft((d) => ({ ...d, enabled: e.target.checked }))}
-              />
-              Actif (collecté et publié chaque jour)
+              <label className={LABEL}>
+                Regex à exclure — retire ce qui matche
+                <input
+                  className={`${FIELD} font-mono text-xs`}
+                  value={draft.excludeRegex}
+                  onChange={(e) => setDraft((d) => ({ ...d, excludeRegex: e.target.value }))}
+                  placeholder="(publi.?rédactionnel|sponsorisé)"
+                />
+              </label>
+            </OptSection>
+
+            {/* ─── Optionnel : réglages avancés ─── */}
+            <OptSection
+              title="Réglages avancés"
+              Icon={Settings2}
+              activeCount={
+                lines(draft.feedUrls).length +
+                (draft.sinceHours !== EMPTY_PRESS_FEED.sinceHours ? 1 : 0) +
+                (draft.articleLimit !== EMPTY_PRESS_FEED.articleLimit ? 1 : 0)
+              }
+            >
+              <label className={LABEL}>
+                URLs de flux RSS/Atom hors catalogue (une par ligne)
+                <textarea
+                  className={`${FIELD} resize-y font-mono text-xs`}
+                  rows={2}
+                  value={draft.feedUrls}
+                  onChange={(e) => setDraft((d) => ({ ...d, feedUrls: e.target.value }))}
+                  placeholder={'https://hnrss.org/frontpage\nhttps://blog.rust-lang.org/feed.xml'}
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className={LABEL}>
+                  Fenêtre (heures)
+                  <input
+                    className={FIELD}
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={draft.sinceHours}
+                    onChange={(e) => setDraft((d) => ({ ...d, sinceHours: Number(e.target.value) }))}
+                  />
+                </label>
+                <label className={LABEL}>
+                  Articles max
+                  <input
+                    className={FIELD}
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={draft.articleLimit}
+                    onChange={(e) => setDraft((d) => ({ ...d, articleLimit: Number(e.target.value) }))}
+                  />
+                </label>
+              </div>
+            </OptSection>
+
+            {/* ─── Interrupteur actif/inactif ─── */}
+            <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-white/60 transition-colors hover:text-white/85">
+              <span className="relative inline-flex h-5 w-9 shrink-0 items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={draft.enabled}
+                  onChange={(e) => setDraft((d) => ({ ...d, enabled: e.target.checked }))}
+                />
+                <span className="absolute inset-0 rounded-full bg-white/10 transition-colors duration-200 peer-checked:bg-brand-600" />
+                <span className="absolute left-0.5 h-4 w-4 rounded-full bg-white/60 transition-all duration-200 peer-checked:translate-x-4 peer-checked:bg-white" />
+              </span>
+              {draft.enabled ? 'Actif — collecté et publié chaque jour' : 'Inactif — mis en pause'}
             </label>
 
-            {err !== null && <p className="text-xs text-red-400/80">{err}</p>}
+            <p className="text-[10px] text-white/30">
+              <span className="text-brand-300">*</span> champs requis — le reste a des valeurs par défaut
+              sensées.
+            </p>
+
+            {err !== null && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                {err}
+              </p>
+            )}
 
             <div className="flex items-center gap-2">
               <button className={BTN_PRIMARY} disabled={busy} onClick={() => void save()}>
@@ -435,7 +542,11 @@ export function PressFeedsPanel() {
             <ul className="space-y-2">
               {items.map((f) => {
                 return (
-                  <li key={f.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                  <li
+                    key={f.id}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3 transition-colors
+                               hover:border-brand-400/30 hover:bg-white/[0.05]"
+                  >
                     <div className="flex items-center gap-2">
                       <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
                         {DAILY_CATEGORY_LABEL[f.category]}
