@@ -111,3 +111,57 @@ export function filterByKind(items: Daily[], kind: DailyKindFilter): Daily[] {
     return kind === 'journal' ? k === 'journal' || k === 'synthesis' : k === 'topic';
   });
 }
+
+/** Fenêtre temporelle d'un widget dailys. */
+export type DailyPeriodFilter = 'today' | 'week' | 'all';
+
+export const DAILY_PERIOD_LABEL: Record<DailyPeriodFilter, string> = {
+  today: "Aujourd'hui",
+  week: '7 jours',
+  all: 'Tout',
+};
+
+export function isDailyPeriod(x: unknown): x is DailyPeriodFilter {
+  return x === 'today' || x === 'week' || x === 'all';
+}
+
+/** Restreint à la fenêtre temporelle (jour local ; 'week' = 7 derniers jours). Pur. */
+export function filterByPeriod(items: Daily[], period: DailyPeriodFilter, now = new Date()): Daily[] {
+  if (period === 'all') return items;
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  if (period === 'week') start.setDate(start.getDate() - 6);
+  return items.filter((d) => {
+    const t = Date.parse(d.publishedAt);
+    return !Number.isNaN(t) && t >= start.getTime();
+  });
+}
+
+/**
+ * Source lisible d'une daily, déduite des préfixes stables du pipeline :
+ * « <Journal> — revue du … » → journal ; « Sujet — <Sujet> · … » → sujet ;
+ * synthèse transversale → « Synthèse ». Pur.
+ */
+export function dailySourceLabel(title: string): string {
+  if (title.startsWith('Synthèse du jour')) return 'Synthèse';
+  if (title.startsWith('Sujet — ')) {
+    const rest = title.slice('Sujet — '.length);
+    const dot = rest.indexOf(' · ');
+    return (dot === -1 ? rest : rest.slice(0, dot)).trim();
+  }
+  const dash = title.indexOf(' — ');
+  return (dash === -1 ? title : title.slice(0, dash)).trim();
+}
+
+/** Sources distinctes des dailys données, triées alphabétiquement. Pur. */
+export function listDailySources(items: Daily[]): string[] {
+  return [...new Set(items.map((d) => dailySourceLabel(d.title)))].sort((a, b) =>
+    a.localeCompare(b, 'fr'),
+  );
+}
+
+/** Restreint à une source (journal ou sujet) ; '' ⇒ toutes. Pur. */
+export function filterBySource(items: Daily[], source: string): Daily[] {
+  if (source === '') return items;
+  return items.filter((d) => dailySourceLabel(d.title) === source);
+}

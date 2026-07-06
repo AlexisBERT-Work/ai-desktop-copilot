@@ -11,10 +11,16 @@ import {
 import { NewsMarkdown } from '../../news/NewsMarkdown';
 import {
   computeActiveDailies,
+  DAILY_PERIOD_LABEL,
   filterByFollowed,
   filterByKind,
+  filterByPeriod,
+  filterBySource,
+  isDailyPeriod,
+  listDailySources,
   searchDailies,
   useDailiesStore,
+  type DailyPeriodFilter,
 } from '../../dailies/dailiesStore';
 import { useDashboardStore } from '../dashboardStore';
 import type { WidgetProps } from './types';
@@ -34,7 +40,33 @@ function readFollowed(config: Record<string, unknown>): DailyCategory[] | undefi
   return Array.isArray(f) ? f.filter(isDailyCategory) : undefined;
 }
 
+/** Lit la fenêtre temporelle du widget ('all' par défaut). */
+function readPeriod(config: Record<string, unknown>): DailyPeriodFilter {
+  const p = config['period'];
+  return isDailyPeriod(p) ? p : 'all';
+}
+
+/** Lit la source filtrée du widget ('' = toutes). */
+function readSource(config: Record<string, unknown>): string {
+  const s = config['source'];
+  return typeof s === 'string' ? s : '';
+}
+
 const CHIP_BASE = 'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors';
+
+const KIND_OPTIONS: readonly { value: DailyKindFilter; label: string }[] = [
+  { value: 'all', label: 'Tout' },
+  { value: 'topic', label: 'Sujets' },
+  { value: 'journal', label: 'Journaux' },
+];
+
+const PERIOD_OPTIONS: readonly DailyPeriodFilter[] = ['today', 'week', 'all'];
+
+const SEGMENT_GROUP = 'flex w-fit gap-0.5 rounded-lg bg-white/5 p-0.5';
+const segmentClass = (on: boolean): string =>
+  `rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+    on ? 'bg-white/10 text-white' : 'text-white/45 hover:text-white/80'
+  }`;
 
 // Combo de dévoilement progressif : aperçu court → 20 → totalité.
 const STEP_LIMITS = [20, Infinity] as const;
@@ -85,6 +117,14 @@ interface DailiesViewProps {
   onToggle: (c: DailyCategory) => void;
   /** Genre affiché par ce widget (par sujet / par journal / tout). */
   kindFilter?: DailyKindFilter;
+  /** Si fourni, affiche le sélecteur de genre (Tout · Sujets · Journaux). */
+  onKindChange?: (kind: DailyKindFilter) => void;
+  /** Fenêtre temporelle ; sélecteur affiché si onPeriodChange est fourni. */
+  period?: DailyPeriodFilter;
+  onPeriodChange?: (period: DailyPeriodFilter) => void;
+  /** Source (journal ou sujet) ; menu affiché si onSourceChange est fourni. '' = toutes. */
+  source?: string;
+  onSourceChange?: (source: string) => void;
   max?: number;
   /** Le serveur détient-il des dailys plus anciennes non encore chargées ? */
   serverHasMore?: boolean;
@@ -100,6 +140,11 @@ export function DailiesView({
   followed,
   onToggle,
   kindFilter = 'all',
+  onKindChange,
+  period = 'all',
+  onPeriodChange,
+  source = '',
+  onSourceChange,
   max = 5,
   serverHasMore = false,
   loadingMore = false,
@@ -109,8 +154,17 @@ export function DailiesView({
   const [step, setStep] = useState(0);
   const searching = query.trim().length > 0;
 
-  // Filtre genre + catégories + recherche, puis dévoilement progressif (5 → 20 → tout).
-  const list = searchDailies(filterByFollowed(filterByKind(items, kindFilter), followed), query);
+  // Filtres genre → source → période → catégories → recherche, puis dévoilement
+  // progressif (5 → 20 → tout).
+  const byKind = filterByKind(items, kindFilter);
+  const sources = useMemo(() => listDailySources(byKind), [byKind]);
+  // Une source qui n'existe plus dans la vue courante (changement de genre,
+  // données rafraîchies) est ignorée plutôt que de vider silencieusement la liste.
+  const effectiveSource = source !== '' && sources.includes(source) ? source : '';
+  const list = searchDailies(
+    filterByFollowed(filterByPeriod(filterBySource(byKind, effectiveSource), period), followed),
+    query,
+  );
   const limit = step === 0 ? max : (STEP_LIMITS[step - 1] ?? Infinity);
   const visible = list.slice(0, limit);
   const groups = groupByDay(visible, new Date());
@@ -121,6 +175,42 @@ export function DailiesView({
 
   return (
     <div className="flex h-full flex-col gap-2">
+      {/* Sélecteurs de genre et de période : un seul widget, plusieurs vues */}
+      {(onKindChange !== undefined || onPeriodChange !== undefined) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {onKindChange !== undefined && (
+            <div role="tablist" aria-label="Genre de dailys" className={SEGMENT_GROUP}>
+              {KIND_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  role="tab"
+                  aria-selected={kindFilter === o.value}
+                  onClick={() => onKindChange(o.value)}
+                  className={segmentClass(kindFilter === o.value)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {onPeriodChange !== undefined && (
+            <div role="tablist" aria-label="Période" className={SEGMENT_GROUP}>
+              {PERIOD_OPTIONS.map((p) => (
+                <button
+                  key={p}
+                  role="tab"
+                  aria-selected={period === p}
+                  onClick={() => onPeriodChange(p)}
+                  className={segmentClass(period === p)}
+                >
+                  {DAILY_PERIOD_LABEL[p]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Filtres par centre d'intérêt */}
       <div className="flex flex-wrap gap-1">
         {DAILY_CATEGORIES.map((c) => {
@@ -142,24 +232,43 @@ export function DailiesView({
         })}
       </div>
 
-      {/* Recherche approfondie (titres + articles) */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher dans les dailys…"
-          className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-7 pr-7 text-xs
-                     text-white/85 outline-none placeholder-white/30 focus:border-brand-400/50"
-        />
-        {searching && (
-          <button
-            onClick={() => setQuery('')}
-            aria-label="Effacer la recherche"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/30 hover:text-white/70"
+      {/* Recherche approfondie (titres + articles) + filtre par source */}
+      <div className="flex gap-1.5">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher dans les dailys…"
+            className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-7 pr-7 text-xs
+                       text-white/85 outline-none placeholder-white/30 focus:border-brand-400/50"
+          />
+          {searching && (
+            <button
+              onClick={() => setQuery('')}
+              aria-label="Effacer la recherche"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/30 hover:text-white/70"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {onSourceChange !== undefined && sources.length > 1 && (
+          <select
+            value={effectiveSource}
+            onChange={(e) => onSourceChange(e.target.value)}
+            aria-label="Filtrer par source"
+            className="max-w-[45%] shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5
+                       text-xs text-white/85 outline-none focus:border-brand-400/50
+                       [&>option]:bg-gray-900 [&>option]:text-white/85"
           >
-            <X className="h-3.5 w-3.5" />
-          </button>
+            <option value="">Toutes les sources</option>
+            {sources.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         )}
       </div>
 
@@ -168,8 +277,8 @@ export function DailiesView({
         <p className="text-xs text-white/30">
           {searching
             ? `Aucun résultat pour « ${query.trim()} ».`
-            : followed.length > 0
-              ? 'Aucune daily dans ces catégories.'
+            : followed.length > 0 || effectiveSource !== '' || period !== 'all'
+              ? 'Aucune daily avec ces filtres.'
               : 'Aucune daily pour l’instant.'}
         </p>
       ) : (
@@ -244,8 +353,23 @@ export function DailiesWidget({ widget }: WidgetProps) {
   const loadingMore = useDailiesStore((s) => s.loadingMore);
   const loadMore = useDailiesStore((s) => s.loadMore);
   const updateWidgetConfig = useDashboardStore((s) => s.updateWidgetConfig);
+  const renameWidget = useDashboardStore((s) => s.renameWidget);
   const active = useMemo(() => computeActiveDailies(items), [items]);
   const kindFilter = readKind(widget.config);
+
+  // Bascule de genre en place ; on ne renomme que les titres auto (jamais un
+  // titre personnalisé par l'utilisateur).
+  const AUTO_TITLES: Record<DailyKindFilter, string> = {
+    all: 'Dailys',
+    topic: 'Dailys — par sujet',
+    journal: 'Dailys — par journal',
+  };
+  const setKind = (k: DailyKindFilter) => {
+    updateWidgetConfig(widget.id, { kind: k });
+    if (Object.values(AUTO_TITLES).includes(widget.title)) renameWidget(widget.id, AUTO_TITLES[k]);
+  };
+  const period = readPeriod(widget.config);
+  const source = readSource(widget.config);
 
   // Chaque widget a sa propre sélection de catégories (persistée dans sa
   // config) ; un widget jamais filtré hérite de l'ancienne préférence globale.
@@ -271,6 +395,11 @@ export function DailiesWidget({ widget }: WidgetProps) {
       followed={followed}
       onToggle={toggle}
       kindFilter={kindFilter}
+      onKindChange={setKind}
+      period={period}
+      onPeriodChange={(p) => updateWidgetConfig(widget.id, { period: p })}
+      source={source}
+      onSourceChange={(s) => updateWidgetConfig(widget.id, { source: s })}
       serverHasMore={hasMore}
       loadingMore={loadingMore}
       onLoadMore={loadMore}
