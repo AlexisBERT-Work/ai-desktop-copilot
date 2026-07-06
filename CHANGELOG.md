@@ -9,6 +9,13 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ## [Unreleased]
 
+### Changed — 2026-07-07
+- **Tri de la documentation** : `CATDESK-MODELE-LLM.md` (matériel cible erroné),
+  `CLAUDE-progression.md` (supplanté par `docs/CAPACITES.md`) et
+  `SETUP_PROGRESS.md` (setup terminé) déplacés dans `docs/archive/` ;
+  README resynchronisé (catalogue d'outils → pointeur vers CAPACITES) ;
+  `CLAUDE.md` enrichi d'une carte des documents.
+
 ### Added — 2026-06 → 2026-07
 - **67 outils agent** enregistrés (perception, code/git, connecteurs, système,
   navigateur, bourse, automatisation) — voir `docs/CAPACITES.md`

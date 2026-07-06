@@ -9,6 +9,33 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 - `packages/ocr-vision/` — Python OCR/vision/file parsing sidecar
 - `packages/shared-types/` — Shared TypeScript types only
 
+## Carte des documents (lire AVANT d'explorer — évite les recherches inutiles)
+| Question | Réponse dans |
+|---|---|
+| Que sait faire l'agent ? (67 outils + risques) | `docs/CAPACITES.md` — **référence unique** |
+| Que ne sait-il pas faire ? Bornes matériel | `docs/LIMITES.md` |
+| État actuel + historique du travail | `docs/SUIVI.md` (§ « État actuel » en tête) |
+| Sécurité (sandbox, permissions, audit) | `docs/SECURITE.md` |
+| Installeur offline + auto-update | `docs/DISTRIBUTION.md` |
+| Techniques d'architecture agent (✅/🟡/⬜) | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer) |
+| Dashboard / bourse / news / dailys | `docs/projects/` + `supabase/README.md` |
+| Choix de stack | `docs/architecture/adr-*.md` |
+| `docs/archive/` | **Obsolète — ne jamais lire ni citer** |
+
+Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles : `qwen2.5:7b` (chat) ·
+`qwen2.5-coder:14b` (code) · `llava:7b` (vision) · `nomic-embed-text` (embeddings).
+Jamais de KV-cache `q4_0` global (corrompt la sortie sur ce GPU).
+
+## Économie de tokens (règles de travail)
+- **Ne jamais lire** : `pnpm-lock.yaml` (200 Ko), `node_modules/`,
+  `packages/ocr-vision/.venv/`, `packages/ocr-vision/build-dist/` (bloqués via
+  `.claude/settings.local.json`).
+- **Glob ne respecte pas `.gitignore`** (il ressort node_modules/.venv) → préférer
+  Grep (ripgrep, qui le respecte) ou `git ls-files`.
+- Compter/inventorier les outils agent : `packages/agent-runtime/src/index.ts`
+  (registrations) — pas de scan du dossier `tools/`.
+- Lire les gros fichiers par tranches (`offset`/`limit`), pas en entier.
+
 ## Key Commands
 ```powershell
 pnpm dev              # Start full dev environment (Tauri + sidecars)

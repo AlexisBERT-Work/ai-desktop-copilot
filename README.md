@@ -2,8 +2,6 @@
 
 <div align="center">
 
-![CatDesk Banner](docs/assets/banner.png)
-
 **Local-first AI desktop copilot. Powerful. Private. Extensible.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
@@ -208,18 +206,21 @@ ai-desktop-copilot/
 │   │   ├── files/                  # PDF, DOCX, CSV, code parsers
 │   │   └── embeddings/             # sentence-transformers
 │   │
-│   ├── shared-types/               # Shared TypeScript types (IPC, agents, events)
-│   └── config/                     # Shared ESLint, TSConfig, Tailwind config
+│   └── shared-types/               # Shared TypeScript types (IPC, agents, events)
 │
 ├── scripts/
 │   ├── setup.ps1                   # Full Windows dev setup
-│   ├── build.ps1                   # Production build
-│   └── dev.ps1                     # Start dev environment
+│   ├── dev.ps1                     # Start dev environment
+│   └── build-release.ps1 + build-inno.ps1 + catdesk.iss  # Installer pipeline
 │
 └── docs/
-    ├── architecture/               # Detailed architecture docs
-    ├── api/                        # IPC API reference
-    └── tools/                      # Tool catalog
+    ├── CAPACITES.md                # Tool catalog (single source of truth)
+    ├── LIMITES.md                  # Current limits
+    ├── SUIVI.md                    # Work journal
+    ├── SECURITE.md / DISTRIBUTION.md
+    ├── architecture/               # ADRs
+    ├── projects/                   # Dashboard platform docs
+    └── archive/                    # Obsolete docs — do not use as reference
 ```
 
 ---
@@ -299,7 +300,7 @@ Press `Ctrl+Space` anywhere to open the overlay.
 - [x] `semantic_search` — keyword-scored local file search with snippet extraction
 - [x] `read_webpage` — fetch any URL, strip HTML, return clean text (with CSS selector support)
 
-### 🔨 Phase 3 — Connectors & Automation (current)
+### ✅ Phase 3 — Connectors & Automation
 
 - [x] `github_list_issues` — list/search GitHub issues with state, label and text filters
 - [x] `github_get_pr` — full PR details: files, comments, reviews, merge status, optional diff
@@ -309,7 +310,7 @@ Press `Ctrl+Space` anywhere to open the overlay.
 - [x] `schedule_task` + `list_scheduled_tasks` + `cancel_scheduled_task` — cron en arrière-plan (tick 60s), persistance SQLite, formats `"every 5m"` / `"hourly"` / `"daily"` / `"weekly"`
 - [x] `browser_navigate` + `browser_screenshot` + `browser_get_text` + `browser_click` + `browser_type` + `browser_close` — Playwright headless (playwright-core), auto-détection Chrome/Edge Windows, singleton lazy-launch
 
-### 🔨 Phase 4 — Polish & Settings
+### 🔨 Phase 4 — Polish & Settings (current)
 
 - [x] Full settings panel — panneau tabulaire (Modèle / Sécurité / Raccourcis / À propos), persistance localStorage, hotkey `Ctrl+,`
 - [x] Safe mode toggle in UI — toggle dans l'onglet Sécurité, propagation JSON-RPC `settings.update` → agent runtime → `PermissionEngine`
@@ -329,35 +330,10 @@ Press `Ctrl+Space` anywhere to open the overlay.
 
 ## Agent Tools Catalog
 
-| Tool | Category | Risk | Status | Description |
-| :--- | :------- | :--- | :----: | :---------- |
-| `read_file` | filesystem | 🟢 Low | ✅ | Read file content |
-| `list_directory` | filesystem | 🟢 Low | ✅ | List directory contents |
-| `capture_screen` | screen | 🟢 Low | ✅ | Full or partial screenshot |
-| `ocr_region` | screen | 🟢 Low | ✅ | OCR text from screen region |
-| `read_clipboard` | clipboard | 🟢 Low | ✅ | Read clipboard content |
-| `search_memory` | memory | 🟢 Low | ✅ | Semantic memory search |
-| `analyze_stacktrace` | analysis | 🟢 Low | ✅ | Parse Node.js/Python/Rust/Java stacktraces, extract root cause |
-| `generate_commit_message` | analysis | 🟢 Low | ✅ | Read staged diff → Conventional Commits message |
-| `generate_pr_description` | analysis | 🟢 Low | ✅ | Read commits vs base branch → PR title + sections |
-| `watch_ci` | analysis | 🟢 Low | ✅ | Poll GitHub Actions, surface failed jobs/steps |
-| `semantic_search` | filesystem | 🟢 Low | ✅ | Keyword-scored local file search with snippet extraction |
-| `read_webpage` | web | 🟢 Low | ✅ | Fetch URL, strip HTML, return clean readable text |
-| `github_list_issues` | github | 🟢 Low | ✅ | List/search GitHub issues (state, labels, text query) |
-| `github_get_pr` | github | 🟢 Low | ✅ | Full PR details: files, comments, reviews, optional diff |
-| `transcribe_audio` | audio | 🟢 Low | ✅ | Local Whisper transcription (faster-whisper int8, VAD filter, auto-lang) |
-| `run_subagent` | automation | 🟡 Medium | ✅ | Spawn isolated sub-agent, returns structured result |
-| `run_parallel_agents` | automation | 🟡 Medium | ✅ | Spawn up to 8 sub-agents in parallel via Promise.all |
-| `write_file` | filesystem | 🟡 Medium | ✅ | Write/create file |
-| `write_clipboard` | clipboard | 🟡 Medium | ✅ | Write to clipboard |
-| `open_app` | system | 🟡 Medium | ✅ | Open application |
-| `store_memory` | memory | 🟡 Medium | ✅ | Store fact in memory |
-| `run_command` | system | 🟠 High | ✅ | Execute PowerShell/CMD |
-| `close_window` | system | 🟠 High | ⬜ | Close application window |
-| `send_keys` | automation | 🟠 High | ⬜ | Send keyboard input |
-| `schedule_task` | automation | 🟠 High | ⬜ | Schedule system task |
-| `delete_file` | filesystem | 🔴 Critical | ⬜ | Delete file (disabled by default) |
-| `run_as_admin` | system | 🔴 Critical | ⬜ | Elevate privileges (disabled) |
+**67 outils** enregistrés (perception, code/git, connecteurs, système, navigateur,
+bourse, automatisation). Le catalogue complet et à jour, avec niveaux de risque,
+vit dans **[docs/CAPACITES.md](docs/CAPACITES.md)** (référence unique) ; les
+bornes actuelles dans [docs/LIMITES.md](docs/LIMITES.md).
 
 ---
 

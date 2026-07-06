@@ -10,7 +10,7 @@
 >
 > Pour ce que CatDesk **ne sait pas (encore) faire**, voir [LIMITES.md](LIMITES.md).
 > Pour les détails techniques : [README](../README.md) ·
-> [DISTRIBUTION](DISTRIBUTION.md) · [Modèle LLM](../CATDESK-MODELE-LLM.md) ·
+> [DISTRIBUTION](DISTRIBUTION.md) ·
 > [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md).
 
 ---
@@ -25,7 +25,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 51 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 67 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -192,8 +192,11 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
   *Léger* (économie), *Code* (force `qwen2.5-coder:14b`).
 - **Routage de modèles** en downgrade-only via `CATDESK_MODEL_SMALL`.
 - Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
-  réglable par requête, KV-cache 4-bit possible.
-- Voir [Modèle LLM](../CATDESK-MODELE-LLM.md) pour le choix matériel et le routage.
+  réglable par requête. ⚠️ **Pas de KV-cache 4-bit global** : `q4_0` corrompt la
+  sortie de `qwen2.5:7b` sur la RX 6700 (Vulkan) — texte illisible (incident
+  2026-06-15/16).
+- Matériel cible réel : **AMD RX 6700, 10 Go VRAM** → éviter les modèles 20B+
+  qui débordent en RAM (voir [LIMITES.md](LIMITES.md) §3).
 
 ## 12. Garde-fous & sécurité
 
