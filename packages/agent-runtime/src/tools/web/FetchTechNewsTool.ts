@@ -360,6 +360,9 @@ export interface AggregateOptions {
   sources?: string[] | undefined;
   feeds?: string[] | undefined; // arbitrary RSS/Atom feed URLs chosen by the user
   topics?: string[] | undefined;
+  /** Regex inclure/exclure (titre+extrait), appliquées AVANT classement et plafond. */
+  includeRegex?: string | null | undefined;
+  excludeRegex?: string | null | undefined;
   sinceHours?: number | undefined;
   limit?: number | undefined;
   lang?: 'fr' | 'en' | 'all' | undefined;
@@ -380,6 +383,8 @@ export interface AggregateResult {
  */
 export async function aggregateNews(opts: AggregateOptions): Promise<AggregateResult> {
   const { sources, feeds, topics = [], sinceHours = 24, limit = 15, lang = 'all' } = opts;
+  const includeRegex = opts.includeRegex ?? null;
+  const excludeRegex = opts.excludeRegex ?? null;
 
   // Predefined sources. If the caller gave neither sources nor custom feeds,
   // fall back to the default mix; if they gave only custom feeds, skip defaults.
@@ -428,9 +433,18 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
 
   // Plafond haut pour laisser de la marge aux digests volumineux (des centaines
   // d'articles à terme) ; la valeur usuelle reste bien plus basse via `limit`.
+  // Les regex s'appliquent AVANT classement et plafond, sinon un thème pointu
+  // serait évincé par le top du classement généraliste avant d'être filtré.
   const cappedLimit = Math.min(Math.max(1, limit ?? 15), 200);
   const items = rankItems(
-    filterByAge(filterByTopics(dedupeItems(collected), Array.isArray(topics) ? topics : []), sinceHours ?? 24),
+    filterByAge(
+      filterByRegex(
+        filterByTopics(dedupeItems(collected), Array.isArray(topics) ? topics : []),
+        includeRegex,
+        excludeRegex,
+      ),
+      sinceHours ?? 24,
+    ),
   ).slice(0, cappedLimit);
 
   return { items, sourceLabels: tasks.map((t) => t.label), failed, totalFetched: collected.length };

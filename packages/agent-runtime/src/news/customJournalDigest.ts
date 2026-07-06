@@ -31,15 +31,21 @@ export async function buildCustomJournalDaily(
   const now = deps.now ?? new Date();
 
   let items: NewsItem[] = [];
+  let failed: string[] = [];
+  let totalFetched = 0;
   try {
     const res = await aggregateNews({
       sources: feed.sourceIds,
       feeds: feed.feedUrls,
       topics: feed.includeKeywords,
+      includeRegex: feed.includeRegex,
+      excludeRegex: feed.excludeRegex,
       sinceHours: feed.sinceHours,
       limit: poolLimit(feed.articleLimit),
     });
     items = res.items;
+    failed = res.failed;
+    totalFetched = res.totalFetched;
   } catch (err) {
     log.warn('Custom journal fetch failed — skipped', { name: feed.name, error: String(err) });
     return null;
@@ -47,7 +53,10 @@ export async function buildCustomJournalDaily(
 
   items = filterByRegex(items, feed.includeRegex, feed.excludeRegex).slice(0, feed.articleLimit);
   if (items.length === 0) {
-    log.info('Custom journal produced no articles', { name: feed.name });
+    // Les échecs par source d'aggregateNews sont collectés, pas lancés — les
+    // logguer ici est le seul moyen de distinguer « flux muet », « tout filtré »
+    // et « fetch raté ».
+    log.info('Custom journal produced no articles', { name: feed.name, totalFetched, failed });
     return null;
   }
 
