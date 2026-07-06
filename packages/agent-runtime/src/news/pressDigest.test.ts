@@ -87,20 +87,47 @@ describe('synthèse transversale', () => {
     expect(p).toContain('- BBC : Focus géopolitique.');
   });
 
-  it('parseSynthesisJson lit la synthèse, null si vide/illisible', () => {
-    expect(parseSynthesisJson('{"synthese":"Tendance globale"}')).toBe('Tendance globale');
+  it('parseSynthesisJson lit idées + synthèse, null si vide/illisible', () => {
+    expect(parseSynthesisJson('{"idees":["A frappe fort.","B recule."],"synthese":"Tendance globale"}')).toEqual({
+      ideas: ['A frappe fort.', 'B recule.'],
+      synthesis: 'Tendance globale',
+    });
     expect(parseSynthesisJson('{"synthese":""}')).toBeNull();
     expect(parseSynthesisJson('rien')).toBeNull();
+  });
+
+  it('parseSynthesisJson tolère l’ancien format sans "idees"', () => {
+    expect(parseSynthesisJson('{"synthese":"Tendance globale"}')).toEqual({
+      ideas: [],
+      synthesis: 'Tendance globale',
+    });
+  });
+
+  it('parseSynthesisJson ignore les idées vides ou non textuelles', () => {
+    expect(parseSynthesisJson('{"idees":["OK","",42],"synthese":"S."}')).toEqual({
+      ideas: ['OK'],
+      synthesis: 'S.',
+    });
   });
 
   it('globalTitle est daté', () => {
     expect(globalTitle(new Date('2026-06-30T08:00:00'))).toContain('Synthèse du jour —');
   });
 
-  it('buildGlobalBody ajoute les journaux couverts', () => {
-    const body = buildGlobalBody('Synthèse X.', ['Le Monde', 'BBC']);
-    expect(body).toContain('Synthèse X.');
+  it('buildGlobalBody met les idées fortes en tête puis la synthèse et les journaux', () => {
+    const body = buildGlobalBody(
+      { ideas: ['Idée majeure.', 'Idée secondaire.'], synthesis: 'Synthèse X.' },
+      ['Le Monde', 'BBC'],
+    );
+    expect(body.indexOf('À retenir')).toBeLessThan(body.indexOf('Synthèse X.'));
+    expect(body).toContain('- Idée majeure.');
+    expect(body).toContain('- Idée secondaire.');
     expect(body).toContain('Journaux couverts : Le Monde, BBC');
+  });
+
+  it('buildGlobalBody sans idées reste lisible (pas de bloc vide)', () => {
+    const body = buildGlobalBody({ ideas: [], synthesis: 'Seulement la synthèse.' }, []);
+    expect(body).toBe('Seulement la synthèse.');
   });
 });
 
