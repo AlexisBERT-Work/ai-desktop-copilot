@@ -1,8 +1,26 @@
-import type { JsonRpcRequest, JsonRpcResponse, AgentMethod } from '@catdesk/shared-types';
+import type {
+  JsonRpcRequest,
+  JsonRpcResponse,
+  AgentMethod,
+  Daily,
+  PressFeed,
+  PressFeedInput,
+} from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
 import { createLogger } from '../logger';
 
 const log = createLogger('ipc:bridge');
+
+/** Pilotage des journaux personnalisés LOCAUX (par poste, sans rôle admin). */
+export interface LocalPressControl {
+  listFeeds: () => PressFeed[];
+  saveFeed: (input: PressFeedInput & { id?: string }) => PressFeed;
+  deleteFeed: (id: string) => boolean;
+  /** Dailys locales déjà générées (repoussées au sync de l'UI). */
+  listDailies: () => Daily[];
+  /** Génération immédiate (bouton « Générer maintenant »). Fire-and-forget. */
+  runNow: () => void | Promise<unknown>;
+}
 
 /**
  * JSON-RPC 2.0 bridge over stdin/stdout
@@ -21,6 +39,8 @@ export class StdinBridge {
     ) => void | Promise<void>,
     /** Déclenche une publication immédiate de la revue de presse (bouton admin). */
     private onRunPressDigest?: () => void | Promise<void>,
+    /** Journaux personnalisés locaux — absent si non câblé (tests). */
+    private localPress?: LocalPressControl,
   ) {}
 
   start(): void {
@@ -77,6 +97,57 @@ export class StdinBridge {
       }
       void this.onRunPressDigest();
       this.sendResponse(request.id, { ok: true });
+      return;
+    }
+
+    // Journaux personnalisés LOCAUX (panneau « Mes journaux », tout utilisateur).
+    // L'état complet est repoussé en notification `press.feeds` après chaque
+    // écriture — l'UI n'a pas de canal requête/réponse, elle écoute les events.
+    if (request.method === 'press.feeds.save') {
+      if (this.localPress === undefined) {
+        this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
+        return;
+      }
+      try {
+        const feed = this.localPress.saveFeed(request.params as PressFeedInput & { id?: string });
+        this.sendResponse(request.id, { ok: true, id: feed.id });
+      } catch (err) {
+        this.sendError(request.id, -32602, String(err));
+      }
+      this.sendNotification('press.feeds', { feeds: this.localPress.listFeeds() });
+      return;
+    }
+
+    if (request.method === 'press.feeds.delete') {
+      if (this.localPress === undefined) {
+        this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
+        return;
+      }
+      const { id } = request.params as { id?: string };
+      const removed = typeof id === 'string' ? this.localPress.deleteFeed(id) : false;
+      this.sendResponse(request.id, { ok: removed });
+      this.sendNotification('press.feeds', { feeds: this.localPress.listFeeds() });
+      return;
+    }
+
+    if (request.method === 'press.local.run_now') {
+      if (this.localPress === undefined) {
+        this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
+        return;
+      }
+      void this.localPress.runNow();
+      this.sendResponse(request.id, { ok: true });
+      return;
+    }
+
+    // Resynchronisation à la demande (montage de l'UI) : repousse l'état complet
+    // des journaux locaux et de leurs dailys déjà générées.
+    if (request.method === 'press.local.sync') {
+      if (this.localPress !== undefined) {
+        this.sendNotification('press.feeds', { feeds: this.localPress.listFeeds() });
+        this.sendNotification('dailies.local', { dailies: this.localPress.listDailies() });
+      }
+      this.sendResponse(request.id, { ok: this.localPress !== undefined });
       return;
     }
 

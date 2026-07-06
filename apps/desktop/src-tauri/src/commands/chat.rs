@@ -149,6 +149,70 @@ pub async fn run_press_digest(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Save (create or update) a LOCAL custom press feed — per-machine, no admin
+/// role. The agent persists it and pushes the full list back via the
+/// `press:feeds` event.
+#[tauri::command]
+pub async fn save_local_press_feed(
+    app: AppHandle,
+    feed: serde_json::Value,
+) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "press.feeds.save",
+        "params": feed
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a LOCAL custom press feed by id.
+#[tauri::command]
+pub async fn delete_local_press_feed(app: AppHandle, id: String) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "press.feeds.delete",
+        "params": { "id": id }
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Trigger an immediate generation of the LOCAL custom feeds ("Générer
+/// maintenant"). Fire-and-forget: results arrive via the `dailies:local` event.
+#[tauri::command]
+pub async fn run_local_press_now(app: AppHandle) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "press.local.run_now",
+        "params": {}
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Ask the agent to re-push the local press state (`press:feeds` +
+/// `dailies:local` events) — used by the UI at mount, since notifications
+/// emitted before the window loads are lost.
+#[tauri::command]
+pub async fn sync_local_press(app: AppHandle) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": uuid::Uuid::new_v4().to_string(),
+        "method": "press.local.sync",
+        "params": {}
+    });
+    send_to_agent(&app, payload, String::new(), String::new())
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// List locally available Ollama models.
 #[tauri::command]
 pub async fn get_ollama_models() -> Result<Vec<String>, String> {

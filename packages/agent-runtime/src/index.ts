@@ -3,6 +3,7 @@
  * Communicates with Tauri Rust core via JSON-RPC 2.0 over stdin/stdout.
  */
 
+import { join } from 'node:path';
 import { StdinBridge } from './ipc/StdinBridge';
 import { AgentOrchestrator } from './AgentOrchestrator';
 import { ToolRegistry } from './ToolRegistry';
@@ -101,6 +102,9 @@ import { BrowserCloseTool } from './tools/browser/BrowserCloseTool';
 import { SubAgentRunner } from './SubAgentRunner';
 import { CronScheduler } from './CronScheduler';
 import { PressDigestScheduler, type PressDigestConfig, type PressMode } from './news/PressDigestScheduler';
+import { LocalPressFeedStore } from './news/LocalPressFeedStore';
+import { LocalDailyStore } from './news/LocalDailyStore';
+import { LocalPressScheduler } from './news/LocalPressScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
 
@@ -362,6 +366,23 @@ async function main() {
   const pressScheduler = pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
   pressScheduler?.start();
 
+  // ─── Journaux personnalisés LOCAUX (tout utilisateur) ──────
+  // Chaque poste peut définir ses propres journaux (panneau « Mes journaux »),
+  // générés quotidiennement par SON agent et stockés localement — ils viennent
+  // s'ajouter aux dailys partagées dans le widget. Aucun rôle admin requis.
+  const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
+  const localFeeds = new LocalPressFeedStore(dataDir);
+  const localDailies = new LocalDailyStore(dataDir);
+  const localPress = new LocalPressScheduler(
+    llm,
+    defaultModel,
+    localFeeds,
+    localDailies,
+    Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
+    (dailies) => stdoutNotifier('dailies.local', { dailies }),
+  );
+  localPress.start();
+
   // ─── Browser tools (playwright-core, lazy-launch) ──────────
   tools.register(new BrowserNavigateTool());
   tools.register(new BrowserScreenshotTool());
@@ -388,8 +409,21 @@ async function main() {
           await pressScheduler.runOnce();
         }
       : undefined,
+    {
+      listFeeds: () => localFeeds.list(),
+      saveFeed: (input) => localFeeds.save(input),
+      deleteFeed: (id) => localFeeds.delete(id),
+      listDailies: () => localDailies.list(),
+      runNow: () => localPress.runOnce(),
+    },
   );
   bridge.start();
+
+  // État initial des journaux/dailys locaux — l'UI peut aussi le redemander via
+  // `press.local.sync` (les notifications émises avant le chargement de la
+  // fenêtre sont perdues).
+  stdoutNotifier('press.feeds', { feeds: localFeeds.list() });
+  stdoutNotifier('dailies.local', { dailies: localDailies.list() });
 
   log.info('Agent Runtime ready and listening on stdin');
 

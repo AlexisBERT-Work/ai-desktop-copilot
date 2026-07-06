@@ -3,6 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   BookOpen,
   Check,
+  Newspaper,
   Pencil,
   Plus,
   RotateCcw,
@@ -32,9 +33,11 @@ const hideWindow = () => {
 interface DashboardPageProps {
   onOpenGuide: () => void;
   onOpenAdmin: () => void;
+  /** « Mes journaux » — journaux personnalisés locaux, ouverts à tout utilisateur. */
+  onOpenMyFeeds: () => void;
 }
 
-export function DashboardPage({ onOpenGuide, onOpenAdmin }: DashboardPageProps) {
+export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: DashboardPageProps) {
   const { config, editMode, setEditMode, reorderWidget, resetToDefault } = useDashboardStore();
   const [addOpen, setAddOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -72,6 +75,16 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin }: DashboardPageProps) 
           >
             <BookOpen className="h-3.5 w-3.5" />
             Guide
+          </button>
+
+          <button
+            onClick={onOpenMyFeeds}
+            className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
+                       text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
+            title="Mes journaux — tes propres revues de presse, générées sur ce poste"
+          >
+            <Newspaper className="h-3.5 w-3.5" />
+            Mes journaux
           </button>
 
           {isSupabaseConfigured && (

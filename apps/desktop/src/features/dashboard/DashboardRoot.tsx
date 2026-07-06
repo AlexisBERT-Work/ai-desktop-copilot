@@ -4,8 +4,9 @@ import { useDashboardData } from './useDashboardData';
 import { DashboardPage } from './DashboardPage';
 import { WidgetGuide } from './guide/WidgetGuide';
 import { DailiesAdminConsole } from '../dailies/DailiesAdminConsole';
+import { MyFeedsPanel } from '../dailies/MyFeedsPanel';
 
-type DashboardView = 'dashboard' | 'guide' | 'admin';
+type DashboardView = 'dashboard' | 'guide' | 'admin' | 'myfeeds';
 
 /** Racine montée dans la fenêtre `dashboard` (voir main.tsx). */
 export function DashboardRoot() {
@@ -28,7 +29,12 @@ export function DashboardRoot() {
 
   if (view === 'guide') return <WidgetGuide onClose={() => setView('dashboard')} />;
   if (view === 'admin') return <DailiesAdminConsole onClose={() => setView('dashboard')} />;
+  if (view === 'myfeeds') return <MyFeedsPanel onClose={() => setView('dashboard')} />;
   return (
-    <DashboardPage onOpenGuide={() => setView('guide')} onOpenAdmin={() => setView('admin')} />
+    <DashboardPage
+      onOpenGuide={() => setView('guide')}
+      onOpenAdmin={() => setView('admin')}
+      onOpenMyFeeds={() => setView('myfeeds')}
+    />
   );
 }

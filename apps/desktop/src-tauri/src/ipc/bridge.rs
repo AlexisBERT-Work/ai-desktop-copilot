@@ -234,6 +234,16 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                 // separate dashboard window).
                 app.emit("market:update", params)?;
             }
+            "press.feeds" => {
+                // Journaux personnalisés locaux (état complet, poussé après
+                // chaque écriture ou au sync). Broadcast : le panneau vit dans
+                // la fenêtre dashboard.
+                app.emit("press:feeds", params)?;
+            }
+            "dailies.local" => {
+                // Dailys générées localement par les journaux personnalisés.
+                app.emit("dailies:local", params)?;
+            }
             _ => {
                 warn!("Unknown agent notification: {method}");
             }

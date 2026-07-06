@@ -22,6 +22,7 @@ import {
   useDailiesStore,
   type DailyPeriodFilter,
 } from '../../dailies/dailiesStore';
+import { useLocalPressStore } from '../../dailies/localPress';
 import { useDashboardStore } from '../dashboardStore';
 import type { WidgetProps } from './types';
 
@@ -360,9 +361,15 @@ export function DailiesWidget({ widget }: WidgetProps) {
   const hasMore = useDailiesStore((s) => s.hasMore);
   const loadingMore = useDailiesStore((s) => s.loadingMore);
   const loadMore = useDailiesStore((s) => s.loadMore);
+  const localDailies = useLocalPressStore((s) => s.dailies);
   const updateWidgetConfig = useDashboardStore((s) => s.updateWidgetConfig);
   const renameWidget = useDashboardStore((s) => s.renameWidget);
-  const active = useMemo(() => computeActiveDailies(items), [items]);
+  // Dailys partagées (Supabase) + dailys locales (journaux perso de ce poste),
+  // fusionnées et triées ensemble.
+  const active = useMemo(
+    () => computeActiveDailies([...items, ...localDailies]),
+    [items, localDailies],
+  );
   const kindFilter = readKind(widget.config);
 
   // Bascule de genre en place ; on ne renomme que les titres auto (jamais un
@@ -387,14 +394,18 @@ export function DailiesWidget({ widget }: WidgetProps) {
     updateWidgetConfig(widget.id, { followed: next });
   };
 
-  if (status === 'unconfigured') {
-    return <p className="text-xs text-white/30">Dailys non configurées.</p>;
-  }
-  if (status === 'loading') {
-    return <p className="text-xs text-white/30">Chargement…</p>;
-  }
-  if (status === 'error') {
-    return <p className="text-xs text-red-400/70">Erreur de chargement.</p>;
+  // Les dailys locales existent même sans Supabase : on ne bloque le widget sur
+  // l'état du backend partagé que s'il n'y a rien de local à montrer.
+  if (localDailies.length === 0) {
+    if (status === 'unconfigured') {
+      return <p className="text-xs text-white/30">Dailys non configurées.</p>;
+    }
+    if (status === 'loading') {
+      return <p className="text-xs text-white/30">Chargement…</p>;
+    }
+    if (status === 'error') {
+      return <p className="text-xs text-red-400/70">Erreur de chargement.</p>;
+    }
   }
 
   return (
