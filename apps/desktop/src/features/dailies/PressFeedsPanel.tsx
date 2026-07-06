@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pencil, Play, Plus, Search, Trash2 } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
   EMPTY_PRESS_FEED,
+  PRESS_SOURCE_CATALOG,
+  PRESS_SOURCE_GROUP_LABEL,
   type DailyCategory,
   type PressFeed,
   type PressFeedInput,
+  type PressSourceGroup,
 } from '@catdesk/shared-types';
 import {
   createPressFeed,
@@ -30,7 +33,7 @@ const BTN_GHOST = 'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-color
 interface Draft {
   name: string;
   category: DailyCategory;
-  sourceIds: string; // séparés par des virgules
+  sourceIds: string[]; // sélection dans le catalogue intégré
   feedUrls: string; // une URL par ligne
   includeKeywords: string; // séparés par des virgules
   includeRegex: string;
@@ -43,7 +46,7 @@ interface Draft {
 const EMPTY: Draft = {
   name: '',
   category: 'misc',
-  sourceIds: '',
+  sourceIds: [],
   feedUrls: '',
   includeKeywords: '',
   includeRegex: '',
@@ -60,7 +63,7 @@ function feedToDraft(f: PressFeed): Draft {
   return {
     name: f.name,
     category: f.category,
-    sourceIds: f.sourceIds.join(', '),
+    sourceIds: f.sourceIds,
     feedUrls: f.feedUrls.join('\n'),
     includeKeywords: f.includeKeywords.join(', '),
     includeRegex: f.includeRegex ?? '',
@@ -75,7 +78,7 @@ function draftToInput(d: Draft): PressFeedInput {
   return {
     name: d.name.trim(),
     category: d.category,
-    sourceIds: csv(d.sourceIds),
+    sourceIds: d.sourceIds,
     feedUrls: lines(d.feedUrls),
     includeKeywords: csv(d.includeKeywords),
     includeRegex: d.includeRegex.trim() === '' ? null : d.includeRegex.trim(),
@@ -84,6 +87,107 @@ function draftToInput(d: Draft): PressFeedInput {
     articleLimit: d.articleLimit,
     enabled: d.enabled,
   };
+}
+
+/** Minuscules sans accents, pour une recherche tolérante (« libe » → Libération). */
+const fold = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+const SOURCE_LABEL = new Map(PRESS_SOURCE_CATALOG.map((s) => [s.id, s.label]));
+
+/** Résumé lisible des sources d'un journal (labels du catalogue + nb de flux perso). */
+function sourceSummary(f: PressFeed): string {
+  const parts = f.sourceIds.map((id) => SOURCE_LABEL.get(id) ?? id);
+  if (f.feedUrls.length > 0) parts.push(`${f.feedUrls.length} flux perso`);
+  return parts.length > 0 ? parts.join(', ') : 'aucune source';
+}
+
+/**
+ * Sélecteur de sources intégrées : recherche + pastilles par famille. Les ids
+ * inconnus du catalogue (sources retirées) restent listés pour être retirables.
+ */
+function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+  const [query, setQuery] = useState('');
+  const q = fold(query.trim());
+
+  const groups = useMemo(() => {
+    const matches = PRESS_SOURCE_CATALOG.filter(
+      (s) => q === '' || fold(s.label).includes(q) || fold(s.id).includes(q),
+    );
+    const byGroup = new Map<PressSourceGroup, typeof matches>();
+    for (const s of matches) {
+      const g = byGroup.get(s.group) ?? [];
+      g.push(s);
+      byGroup.set(s.group, g);
+    }
+    return byGroup;
+  }, [q]);
+
+  const known = new Set(PRESS_SOURCE_CATALOG.map((s) => s.id));
+  const unknown = selected.filter((id) => !known.has(id));
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  return (
+    <div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+        <input
+          className={`${FIELD} pl-8`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher une source (Le Monde, CNBC, Numerama…)"
+        />
+      </div>
+      <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
+        {[...groups.entries()].map(([group, sources]) => (
+          <div key={group}>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+              {PRESS_SOURCE_GROUP_LABEL[group]}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {sources.map((s) => {
+                const on = selected.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggle(s.id)}
+                    aria-pressed={on}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                      on
+                        ? 'bg-brand-600 text-white'
+                        : 'bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/85'
+                    }`}
+                  >
+                    {s.label}
+                    <span className={`ml-1 text-[9px] uppercase ${on ? 'text-white/60' : 'text-white/30'}`}>
+                      {s.lang}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {groups.size === 0 && <p className="text-xs text-white/30">Aucune source pour « {query.trim()} ».</p>}
+        {unknown.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {unknown.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggle(id)}
+                className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/25"
+                title="Source inconnue du catalogue — cliquer pour retirer"
+              >
+                {id} ✕
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** Valide un motif regex saisi ; renvoie un message d'erreur ou null. */
@@ -224,23 +328,24 @@ export function PressFeedsPanel() {
                 ))}
               </select>
             </label>
+            <div>
+              <span className={LABEL}>
+                Sources ({draft.sourceIds.length} sélectionnée{draft.sourceIds.length > 1 ? 's' : ''}) —
+                clique pour ajouter/retirer
+              </span>
+              <SourcePicker
+                selected={draft.sourceIds}
+                onChange={(ids) => setDraft((d) => ({ ...d, sourceIds: ids }))}
+              />
+            </div>
             <label className={LABEL}>
-              URLs de flux RSS/Atom (une par ligne)
+              URLs de flux RSS/Atom supplémentaires (avancé, une par ligne) — optionnel
               <textarea
                 className={`${FIELD} resize-y font-mono text-xs`}
-                rows={3}
+                rows={2}
                 value={draft.feedUrls}
                 onChange={(e) => setDraft((d) => ({ ...d, feedUrls: e.target.value }))}
-                placeholder={'https://www.lemonde.fr/rss/une.xml\nhttps://www.lefigaro.fr/rss/figaro_actualites.xml'}
-              />
-            </label>
-            <label className={LABEL}>
-              Sources intégrées (ids, séparés par des virgules) — optionnel
-              <input
-                className={FIELD}
-                value={draft.sourceIds}
-                onChange={(e) => setDraft((d) => ({ ...d, sourceIds: e.target.value }))}
-                placeholder="lemonde, lefigaro, latribune"
+                placeholder={'https://hnrss.org/frontpage\nhttps://blog.rust-lang.org/feed.xml'}
               />
             </label>
             <label className={LABEL}>
@@ -329,7 +434,6 @@ export function PressFeedsPanel() {
           ) : (
             <ul className="space-y-2">
               {items.map((f) => {
-                const sourceCount = f.sourceIds.length + f.feedUrls.length;
                 return (
                   <li key={f.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
                     <div className="flex items-center gap-2">
@@ -344,7 +448,7 @@ export function PressFeedsPanel() {
                       )}
                     </div>
                     <p className="mt-1 text-[11px] text-white/40">
-                      {sourceCount} source{sourceCount > 1 ? 's' : ''}
+                      {sourceSummary(f)}
                       {f.includeKeywords.length > 0 && ` · mots-clés : ${f.includeKeywords.join(', ')}`}
                       {f.includeRegex !== null && ` · regex+`}
                       {f.excludeRegex !== null && ` · regex−`}

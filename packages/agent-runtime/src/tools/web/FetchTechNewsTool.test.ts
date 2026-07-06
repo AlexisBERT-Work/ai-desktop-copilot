@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { PRESS_SOURCE_CATALOG } from '@catdesk/shared-types';
 import {
+  NEWS_SOURCES,
   parseFeed,
   dedupeItems,
   filterByTopics,
@@ -11,6 +13,14 @@ import {
   feedLabelFromUrl,
   type NewsItem,
 } from './FetchTechNewsTool';
+
+describe('PRESS_SOURCE_CATALOG (shared-types) ↔ NEWS_SOURCES (agent)', () => {
+  it('les deux listes ont exactement les mêmes ids et labels', () => {
+    const agent = Object.values(NEWS_SOURCES).map((s) => `${s.id}|${s.label}|${s.lang}`).sort();
+    const catalog = PRESS_SOURCE_CATALOG.map((s) => `${s.id}|${s.label}|${s.lang}`).sort();
+    expect(catalog).toEqual(agent);
+  });
+});
 
 describe('feedLabelFromUrl', () => {
   it('extrait le hostname sans www', () => {

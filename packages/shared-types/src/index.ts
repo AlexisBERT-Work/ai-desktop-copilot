@@ -8,4 +8,5 @@ export * from './dashboard';
 export * from './news';
 export * from './dailies';
 export * from './pressFeeds';
+export * from './pressSources';
 export * from './market';
