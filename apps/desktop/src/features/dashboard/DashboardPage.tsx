@@ -3,13 +3,13 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   BookOpen,
   Check,
-  LayoutDashboard,
   Pencil,
   Plus,
   RotateCcw,
   ShieldCheck,
   X,
 } from 'lucide-react';
+import { BrandMark } from '../../shared/components/BrandMark';
 import { useDashboardStore } from './dashboardStore';
 import { isNewsConfigured as isSupabaseConfigured } from '../news/supabaseClient';
 import { DashboardWidgetCard } from './DashboardWidgetCard';
@@ -61,10 +61,7 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin }: DashboardPageProps) 
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
       {/* Header */}
       <header className="flex items-center gap-2.5 border-b border-white/10 px-5 py-3">
-        <LayoutDashboard className="h-4 w-4 text-brand-400" />
-        <span className="text-sm font-semibold tracking-[-0.01em] text-white/90">
-          Marchés &amp; News
-        </span>
+        <BrandMark subtitle="Marchés & News" />
 
         <div className="ml-auto flex items-center gap-1.5">
           <button

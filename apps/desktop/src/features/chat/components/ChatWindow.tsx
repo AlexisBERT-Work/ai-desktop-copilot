@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { X, Minimize2, Plus } from 'lucide-react';
+import { Cat, X, Minimize2, Plus } from 'lucide-react';
 import { useOverlayStore } from '../../overlay/overlayStore';
 import { useChatStore } from '../store/chatStore';
 import { MessageList } from './MessageList';
@@ -22,6 +22,9 @@ export function ChatWindow() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-2">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand-600/20">
+            <Cat className="h-3.5 w-3.5 text-brand-300" aria-hidden />
+          </span>
           <span className="text-sm font-semibold text-white/80">
             {activeConv?.title ?? 'CatDesk'}
           </span>

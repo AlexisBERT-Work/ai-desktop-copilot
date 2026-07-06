@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Sparkles, ArrowUp, Expand, Camera, Clipboard, Terminal, BarChart3 } from 'lucide-react';
+import { Cat, ArrowUp, Expand, Camera, Clipboard, Terminal, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
@@ -27,7 +27,7 @@ export function MiniMode() {
     >
       {/* Input row */}
       <div className="flex items-center gap-3 px-4 py-3.5">
-        <Sparkles className="w-5 h-5 text-brand-400 shrink-0" />
+        <Cat className="w-5 h-5 text-brand-400 shrink-0" aria-hidden />
         <input
           ref={inputRef}
           autoFocus

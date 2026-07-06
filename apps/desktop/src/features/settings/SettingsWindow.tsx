@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Cpu, Shield, Keyboard, Info, AlertTriangle, Zap, Check, Loader2 } from 'lucide-react';
+import { X, Cat, Cpu, Shield, Keyboard, Info, AlertTriangle, Zap, Check, Loader2 } from 'lucide-react';
 import { useSettingsStore } from './settingsStore';
 import { useOverlayStore } from '../overlay/overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
@@ -438,7 +438,7 @@ function AboutTab() {
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/30
                         flex items-center justify-center">
-          <span className="text-2xl">🧠</span>
+          <Cat className="h-6 w-6 text-brand-300" aria-hidden />
         </div>
         <div>
           <h3 className="text-base font-semibold text-white/90">CatDesk</h3>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Cat, Search, X } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
@@ -274,13 +274,16 @@ export function DailiesView({
 
       {/* Liste groupée par jour + dévoilement progressif */}
       {list.length === 0 ? (
-        <p className="text-xs text-white/30">
-          {searching
-            ? `Aucun résultat pour « ${query.trim()} ».`
-            : followed.length > 0 || effectiveSource !== '' || period !== 'all'
-              ? 'Aucune daily avec ces filtres.'
-              : 'Aucune daily pour l’instant.'}
-        </p>
+        <div className="flex flex-col items-center gap-1.5 py-4 text-center">
+          <Cat className="h-5 w-5 text-white/15" aria-hidden />
+          <p className="text-xs text-white/30">
+            {searching
+              ? `Aucun résultat pour « ${query.trim()} ».`
+              : followed.length > 0 || effectiveSource !== '' || period !== 'all'
+                ? 'Aucune daily avec ces filtres.'
+                : 'Aucune daily pour l’instant.'}
+          </p>
+        </div>
       ) : (
         <div className="flex-1 space-y-3 overflow-y-auto">
           {groups.map((g) => (
