@@ -35,12 +35,21 @@ export default {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in': 'fadeIn 0.15s ease-out',
         'slide-up': 'slideUp 0.2s ease-out',
+        // Entrée des widgets du dashboard — `both` pour que animation-delay
+        // (cascade) garde l'élément invisible avant son tour.
+        'widget-enter': 'slideUp 0.3s ease-out both',
+        // Micro-pulsation d'une valeur qui vient de changer (cours, KPI).
+        'value-tick': 'valueTick 0.45s ease-out',
       },
       keyframes: {
         fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
         slideUp: {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        valueTick: {
+          from: { opacity: '0.35', transform: 'translateY(3px) scale(0.98)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
       },
     },

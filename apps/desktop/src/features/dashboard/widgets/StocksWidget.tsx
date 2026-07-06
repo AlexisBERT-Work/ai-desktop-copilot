@@ -44,7 +44,10 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
               {hist.length >= 2 && <Sparkline values={hist} />}
               {q ? (
                 <span className="flex items-center gap-2 tabular-nums">
-                  <span className="text-white/80">{q.price.toFixed(2)}</span>
+                  {/* key = prix : micro-pulsation à chaque tick de marché. */}
+                  <span key={q.price} className="animate-value-tick text-white/80">
+                    {q.price.toFixed(2)}
+                  </span>
                   <span className={q.change >= 0 ? 'text-green-400' : 'text-red-400'}>
                     {q.change >= 0 ? '+' : ''}
                     {q.changePercent.toFixed(2)}%

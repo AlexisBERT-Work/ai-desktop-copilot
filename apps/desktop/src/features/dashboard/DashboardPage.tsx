@@ -176,10 +176,11 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin }: DashboardPageProps) 
                 gridAutoRows: 'minmax(88px, auto)',
               }}
             >
-              {config.widgets.map((w) => (
+              {config.widgets.map((w, i) => (
                 <DashboardWidgetCard
                   key={w.id}
                   widget={w}
+                  enterDelayMs={Math.min(i, 12) * 45}
                   editMode={editMode}
                   dragging={draggingId === w.id}
                   onDragStart={setDraggingId}

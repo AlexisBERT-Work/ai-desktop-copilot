@@ -285,7 +285,12 @@ export function DailiesView({
           </p>
         </div>
       ) : (
-        <div className="flex-1 space-y-3 overflow-y-auto">
+        // key = filtres actifs : changer de vue rejoue un léger glissement,
+        // ce qui rend le changement de contenu perceptible sans être intrusif.
+        <div
+          key={`${kindFilter}|${period}|${effectiveSource}|${followed.join(',')}`}
+          className="flex-1 animate-slide-up space-y-3 overflow-y-auto"
+        >
           {groups.map((g) => (
             <div key={g.key}>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">

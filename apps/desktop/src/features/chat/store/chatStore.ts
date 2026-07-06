@@ -136,7 +136,7 @@ export const useChatStore = create<ChatState>()(
         set(s => {
           const msgs = s.messages[conversationId];
           const msg = msgs?.find(m => m.id === assistantMessageId);
-          if (msg) msg.content = `❌ Erreur: ${String(err)}`;
+          if (msg) msg.content = `**Erreur :** ${String(err)}`;
           s.isStreaming = false;
           s.streamingMessageId = null;
           s.status = 'error';

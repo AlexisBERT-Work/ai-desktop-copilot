@@ -29,7 +29,12 @@ export function KpiView({ metric: m }: { metric: MetricResult }) {
       ) : m.value === null ? (
         <span className="text-2xl font-semibold tabular-nums text-white/25">—</span>
       ) : (
-        <span className={`text-2xl font-semibold tabular-nums ${valueColor}`}>
+        // key = valeur : chaque tick de marché remonte la valeur avec une
+        // micro-pulsation, signe visible que la donnée est vivante.
+        <span
+          key={m.value}
+          className={`animate-value-tick text-2xl font-semibold tabular-nums ${valueColor}`}
+        >
           {format(m.value, m.unit)}
         </span>
       )}

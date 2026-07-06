@@ -15,6 +15,8 @@ import { WidgetConfigEditor } from './widgets/WidgetConfigEditor';
 
 interface Props {
   widget: Widget;
+  /** Décalage de l'animation d'entrée (cascade au chargement du dashboard). */
+  enterDelayMs?: number;
   editMode: boolean;
   dragging: boolean;
   onDragStart: (id: string) => void;
@@ -27,6 +29,7 @@ const ICON_BTN =
 
 export function DashboardWidgetCard({
   widget,
+  enterDelayMs = 0,
   editMode,
   dragging,
   onDragStart,
@@ -48,12 +51,13 @@ export function DashboardWidgetCard({
 
   return (
     <div
-      className={`group relative flex flex-col rounded-xl border bg-white/5 p-3 transition-colors
-        ${over ? 'border-brand-400/60' : 'border-white/10'}
+      className={`group relative flex animate-widget-enter flex-col rounded-xl border bg-white/5 p-3
+        transition-colors ${over ? 'border-brand-400/60' : 'border-white/10'}
         ${dragging ? 'opacity-40' : ''}`}
       style={{
         gridColumn: `span ${Math.min(widget.layout.w, MAX_W)}`,
         gridRow: `span ${Math.max(widget.layout.h, 1)}`,
+        animationDelay: `${enterDelayMs}ms`,
       }}
       draggable={editMode && !renaming && !editingConfig}
       onDragStart={() => onDragStart(widget.id)}

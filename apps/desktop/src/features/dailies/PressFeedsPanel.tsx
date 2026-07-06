@@ -231,10 +231,11 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
                 key={id}
                 type="button"
                 onClick={() => toggle(id)}
-                className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/25"
+                className="flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-1 text-xs text-red-300 transition-all hover:bg-red-500/25 active:scale-90"
                 title="Source inconnue du catalogue — cliquer pour retirer"
               >
-                {id} ✕
+                {id}
+                <Trash2 className="h-3 w-3" aria-hidden />
               </button>
             ))}
           </div>

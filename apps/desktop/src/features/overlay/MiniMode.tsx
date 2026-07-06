@@ -27,7 +27,15 @@ export function MiniMode() {
     >
       {/* Input row */}
       <div className="flex items-center gap-3 px-4 py-3.5">
-        <Cat className="w-5 h-5 text-brand-400 shrink-0" aria-hidden />
+        {/* Petit salut du chat à l'ouverture de la bulle. */}
+        <motion.span
+          className="shrink-0"
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 16, delay: 0.08 }}
+        >
+          <Cat className="w-5 h-5 text-brand-400" aria-hidden />
+        </motion.span>
         <input
           ref={inputRef}
           autoFocus
