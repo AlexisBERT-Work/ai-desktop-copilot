@@ -22,8 +22,10 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | Choix de stack | `docs/architecture/adr-*.md` |
 | `docs/archive/` | **Obsolète — ne jamais lire ni citer** |
 
-Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles : `qwen2.5:7b` (chat) ·
-`qwen2.5-coder:14b` (code) · `llava:7b` (vision) · `nomic-embed-text` (embeddings).
+Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles : `qwen3:14b` (chat +
+digests — choix VRAM du launcher, `think:false` requis pour les sorties JSON) ·
+`qwen2.5:7b` (palier léger `CATDESK_MODEL_SMALL`) · `qwen2.5-coder:14b` (code) ·
+`minicpm-v` (vision, PAS llava) · `nomic-embed-text` (embeddings).
 Jamais de KV-cache `q4_0` global (corrompt la sortie sur ce GPU).
 
 ## Économie de tokens (règles de travail)
