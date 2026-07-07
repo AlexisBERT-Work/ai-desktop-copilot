@@ -31,7 +31,7 @@ Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme
 {"analyse": "...", "resumes": ["...", "..."], "details": ["...", "..."]}
 - "analyse" : 2 à 4 phrases (en français) qui dégagent les thèmes saillants et l'angle éditorial de CE journal aujourd'hui.
 - "resumes" : un résumé d'UNE phrase par article, dans le MÊME ordre que la liste, en français, factuel et concis.
-- "details" : pour CHAQUE article, dans le MÊME ordre, un paragraphe de 3 à 5 phrases en français qui développe le fond : ce qui s'est passé, les acteurs, les chiffres clés et le contexte. Appuie-toi UNIQUEMENT sur le titre et le texte fournis — n'invente aucun fait, aucun chiffre. Si le texte est trop maigre pour développer, mets une chaîne vide "".
+- "details" : pour CHAQUE article, dans le MÊME ordre, un paragraphe de 3 à 5 phrases en français qui développe le fond : ce qui s'est passé, les acteurs, les chiffres clés et le contexte. Appuie-toi UNIQUEMENT sur le titre et le texte fournis — n'invente aucun fait. Reprends les noms propres et les nombres EXACTEMENT tels qu'ils apparaissent dans le texte. Si le texte est trop maigre pour développer, mets une chaîne vide "".
 Les tableaux "resumes" et "details" doivent contenir exactement autant d'éléments que d'articles.`;
 
 /**
@@ -147,14 +147,14 @@ export async function complete(
   model: string,
   system: string,
   user: string,
-  opts: { numCtx?: number; timeoutMs?: number } = {},
+  opts: { numCtx?: number; timeoutMs?: number; temperature?: number } = {},
 ): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
     model,
     system,
     messages: [{ role: 'user', content: user }],
-    temperature: 0.3,
+    temperature: opts.temperature ?? 0.3,
     ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
   });
@@ -204,11 +204,149 @@ export async function analyzeJournal(
     if (typeof s === 'string' && s.length > 0) return s;
     return it.excerpt ? it.excerpt.slice(0, 200) : '';
   });
-  const details = items.map((_, i) => {
+  const drafted = items.map((_, i) => {
     const d = parsed.details[i];
     return typeof d === 'string' ? d : '';
   });
+  // Anti-invention : un détail qui cite un nombre ou un fait absent de son
+  // article est rejeté (l'UI n'affiche alors pas de « En savoir plus »).
+  const details = await verifyDetails(llm, model, items, drafted);
   return { analysis: parsed.analysis, summaries, details };
+}
+
+// ─── Vérification des détails (anti-invention) ─────────────────
+// Deux couches, chacune pouvant rejeter un détail (rejeté = pas de bouton
+// « En savoir plus » — un détail absent vaut toujours mieux qu'un détail faux) :
+// 1. déterministe : les nombres du détail doivent exister dans la source ;
+// 2. LLM : un passage « vérificateur de faits » compare détail et article.
+
+/**
+ * Suites de chiffres d'un texte. On ignore la ponctuation interne (séparateurs
+ * de milliers « 2,500 » / « 2 500 », décimales « 8.1 » / « 8,1 ») en découpant
+ * sur tout non-chiffre : robuste aux conventions FR/EN. Pur, exporté pour tests.
+ */
+export function digitRuns(text: string): string[] {
+  return text.match(/\d+/g) ?? [];
+}
+
+/**
+ * Garde-fou déterministe : chaque suite de chiffres du détail doit apparaître
+ * dans la matière source — les nombres ne se traduisent pas, un chiffre
+ * inconnu est une invention. Pur, exporté pour tests.
+ */
+export function numbersSupported(detail: string, sourceText: string): boolean {
+  const source = new Set(digitRuns(sourceText));
+  return digitRuns(detail).every((n) => source.has(n));
+}
+
+/** Matière source d'un article pour la vérification (titre + meilleur texte). */
+function sourceTextOf(it: NewsItem): string {
+  return `${it.title}\n${it.fullText ?? it.excerpt ?? ''}`;
+}
+
+const VERIFY_SYSTEM = `Tu es un vérificateur de faits impitoyable. On te donne des articles (titre + texte) et, pour chacun, un paragraphe rédigé à partir de l'article.
+Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte autour. Exemple exact pour 3 paragraphes : {"fidele":[true,false,true]}
+- true si TOUT le contenu du paragraphe est directement soutenu par le titre et le texte de l'article correspondant.
+- false si le paragraphe mentionne une personne, une organisation, un chiffre, un lieu ou un fait ABSENT du texte, ou s'il contredit le texte.
+Le tableau "fidele" contient exactement un booléen JSON (sans guillemets) par paragraphe, dans le même ordre.`;
+
+/** Invite de vérification pour les paires (article, détail) données. Pur, exporté pour tests. */
+export function buildVerifyPrompt(pairs: { source: string; detail: string }[]): string {
+  const blocks = pairs.map(
+    (p, i) => `Article ${i + 1} :\n${p.source}\n\nParagraphe ${i + 1} :\n${p.detail}`,
+  );
+  return `Voici ${pairs.length} paires article/paragraphe :\n\n${blocks.join('\n\n---\n\n')}`;
+}
+
+/**
+ * Parse les verdicts en exigeant `count` entrées. Null si illisible. Tolère ce
+ * que qwen2.5:7b produit réellement : l'objet {"fidele":[...]} demandé, mais
+ * aussi le tableau nu (["false","true"]) et les booléens en chaînes. Tout ce
+ * qui n'est pas un true franc vaut false (prudence). Pur, exporté pour tests.
+ */
+export function parseVerifyJson(text: string, count: number): boolean[] | null {
+  const toBool = (v: unknown): boolean =>
+    v === true || (typeof v === 'string' && v.trim().toLowerCase() === 'true');
+  const tryParse = (slice: string): unknown => {
+    try {
+      return JSON.parse(slice);
+    } catch {
+      return undefined;
+    }
+  };
+
+  let arr: unknown;
+  const os = text.indexOf('{');
+  const oe = text.lastIndexOf('}');
+  if (os !== -1 && oe > os) {
+    const parsed = tryParse(text.slice(os, oe + 1));
+    if (typeof parsed === 'object' && parsed !== null) {
+      arr = (parsed as Record<string, unknown>)['fidele'];
+    }
+  }
+  if (!Array.isArray(arr)) {
+    const as = text.indexOf('[');
+    const ae = text.lastIndexOf(']');
+    if (as === -1 || ae <= as) return null;
+    arr = tryParse(text.slice(as, ae + 1));
+  }
+  if (!Array.isArray(arr) || arr.length !== count) return null;
+  return arr.map(toBool);
+}
+
+/**
+ * Rejette les détails non fidèles à leur article. Couche 1 (nombres) locale et
+ * sûre ; couche 2 (LLM) best-effort : si l'appel échoue ou est illisible, on
+ * garde les détails restants — la couche 1 a déjà filtré le plus flagrant.
+ */
+export async function verifyDetails(
+  llm: OllamaClient,
+  model: string,
+  items: NewsItem[],
+  details: string[],
+): Promise<string[]> {
+  // Couche 1 — nombres inventés.
+  const checked = details.map((d, i) => {
+    const it = items[i];
+    if (d.length === 0 || it === undefined) return d;
+    if (numbersSupported(d, sourceTextOf(it))) return d;
+    log.warn('Detail dropped — unsupported number', { title: it.title.slice(0, 60) });
+    return '';
+  });
+
+  // Couche 2 — jugement LLM sur les détails restants.
+  const idx = checked.map((d, i) => (d.length > 0 ? i : -1)).filter((i) => i >= 0);
+  if (idx.length === 0) return checked;
+  const budget = articleCharBudget(idx.length);
+  const pairs = idx.map((i) => ({
+    source: sourceTextOf(items[i]!).slice(0, budget),
+    detail: checked[i]!,
+  }));
+
+  let raw: string;
+  try {
+    // Température 0 : on juge, on ne rédige pas.
+    raw = await complete(llm, model, VERIFY_SYSTEM, buildVerifyPrompt(pairs), {
+      ...DIGEST_LLM_OPTS,
+      temperature: 0,
+    });
+  } catch (err) {
+    log.warn('Detail verification failed — keeping unverified details', { error: String(err) });
+    return checked;
+  }
+  const verdicts = parseVerifyJson(raw, pairs.length);
+  if (verdicts === null) {
+    log.warn('Detail verification JSON unparsable — keeping unverified details');
+    return checked;
+  }
+
+  for (const [k, i] of idx.entries()) {
+    if (verdicts[k] === false) {
+      log.info('Detail dropped — failed fact check', { title: items[i]!.title.slice(0, 60) });
+      checked[i] = '';
+    }
+  }
+  return checked;
 }
 
 // ─── Synthèse transversale (tous journaux) ─────────────────────

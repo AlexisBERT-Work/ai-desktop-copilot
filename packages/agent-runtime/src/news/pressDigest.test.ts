@@ -5,10 +5,14 @@ import {
   buildGlobalPrompt,
   buildJournalBody,
   buildJournalPrompt,
+  buildVerifyPrompt,
+  digitRuns,
   globalTitle,
   journalTitle,
+  numbersSupported,
   parseAnalysisJson,
   parseSynthesisJson,
+  parseVerifyJson,
 } from './pressDigest';
 import { dayKey, isRunDue } from './PressDigestScheduler';
 import type { NewsItem } from '../tools/web/FetchTechNewsTool';
@@ -129,6 +133,52 @@ describe('buildJournalBody', () => {
     expect(body).toContain('  > Ligne 1. Ligne 2.');
     // Détail identique au résumé → omis.
     expect(body).not.toContain('> résumé B');
+  });
+});
+
+describe('vérification des détails', () => {
+  it('digitRuns découpe sur tout non-chiffre (robuste FR/EN)', () => {
+    expect(digitRuns('$2,500 et 8.1%')).toEqual(['2', '500', '8', '1']);
+    expect(digitRuns('2 500 puis 8,1 %')).toEqual(['2', '500', '8', '1']);
+    expect(digitRuns('aucun chiffre')).toEqual([]);
+  });
+
+  it('numbersSupported accepte les nombres présents dans la source', () => {
+    const source = 'Rivian sells 75 million shares after an 8.1% rise in 2026.';
+    expect(numbersSupported('Rivian a vendu 75 millions d’actions (+8,1 %).', source)).toBe(true);
+    expect(numbersSupported('Aucun chiffre cité.', source)).toBe(true);
+  });
+
+  it('numbersSupported rejette un nombre inventé', () => {
+    const source = 'Rivian sells 75 million shares.';
+    expect(numbersSupported('Rivian a vendu 85 millions d’actions.', source)).toBe(false);
+  });
+
+  it('buildVerifyPrompt numérote les paires article/paragraphe', () => {
+    const p = buildVerifyPrompt([
+      { source: 'Texte A', detail: 'Détail A' },
+      { source: 'Texte B', detail: 'Détail B' },
+    ]);
+    expect(p).toContain('2 paires');
+    expect(p).toContain('Article 1 :\nTexte A');
+    expect(p).toContain('Paragraphe 2 :\nDétail B');
+  });
+
+  it('parseVerifyJson lit les verdicts et exige le bon compte', () => {
+    expect(parseVerifyJson('{"fidele":[true,false]}', 2)).toEqual([true, false]);
+    expect(parseVerifyJson('{"fidele":[true]}', 2)).toBeNull();
+    expect(parseVerifyJson('pas de json', 1)).toBeNull();
+    // Tolère les fences et le texte autour, comme les autres parseurs.
+    expect(parseVerifyJson('```json\n{"fidele":[true]}\n```', 1)).toEqual([true]);
+    // Tout sauf `true` franc vaut false (prudence).
+    expect(parseVerifyJson('{"fidele":["oui", true]}', 2)).toEqual([false, true]);
+  });
+
+  it('parseVerifyJson tolère le tableau nu et les booléens en chaînes (sortie réelle du 7B)', () => {
+    expect(parseVerifyJson('["false","true"]', 2)).toEqual([false, true]);
+    expect(parseVerifyJson('[false, true]', 2)).toEqual([false, true]);
+    expect(parseVerifyJson('{"fidele":["true","false"]}', 2)).toEqual([true, false]);
+    expect(parseVerifyJson('["true"]', 2)).toBeNull();
   });
 });
 
