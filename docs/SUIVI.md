@@ -4,9 +4,13 @@
 > Dernière mise à jour : 2026-07-07.
 
 ## État actuel
-Dailys : chaque article a désormais un paragraphe détaillé (2-4 phrases,
-rédigé par le LLM) replié derrière un bouton « En savoir plus » dans le widget
-(convention : blockquote Markdown imbriqué sous la puce, retiré côté Discord).
+Dailys : le pipeline télécharge désormais le CORPS de chaque article
+(`enrichArticleTexts`, ~1 500 c/article, budget adaptatif dans l'invite) et le
+LLM rédige un paragraphe détaillé par article, replié derrière « En savoir
+plus » dans le widget (blockquote Markdown imbriqué sous la puce, retiré côté
+Discord). Fix critique au passage : les appels LLM de digest étaient tués par
+le timeout global de 120 s (cause des dailys « extraits bruts en anglais ») —
+ils ont maintenant num_ctx 8192 + 10 min de budget (DIGEST_LLM_OPTS).
 67 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
 git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
 connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.

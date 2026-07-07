@@ -2,7 +2,7 @@ import type { DailyCategory } from '@catdesk/shared-types';
 import type { OllamaClient } from '../llm/OllamaClient';
 import { aggregateNews, type NewsItem } from '../tools/web/FetchTechNewsTool';
 import { enrichExcerpts } from '../tools/web/PostTechNewsDiscordTool';
-import { complete, type JournalDraft } from './pressDigest';
+import { complete, DIGEST_LLM_OPTS, type JournalDraft } from './pressDigest';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:topic-digest');
@@ -130,7 +130,7 @@ export async function buildTopicDigest(deps: TopicDigestDeps): Promise<JournalDr
 
   let raw: string;
   try {
-    raw = await complete(llm, model, SYSTEM, buildTopicPrompt(items, names));
+    raw = await complete(llm, model, SYSTEM, buildTopicPrompt(items, names), DIGEST_LLM_OPTS);
   } catch (err) {
     log.warn('Topic digest LLM failed', { error: String(err) });
     return [];

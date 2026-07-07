@@ -108,6 +108,30 @@ export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
   return items;
 }
 
+/**
+ * Lecture du corps des articles : télécharge CHAQUE page liée et en garde le
+ * texte principal (plafonné à `maxChars`), pour donner au LLM bien plus de
+ * matière que le seul extrait RSS. Complète aussi l'extrait manquant au
+ * passage (une seule requête par article). Best-effort en parallèle : un
+ * échec (timeout, paywall) laisse l'item avec son extrait d'origine.
+ */
+export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Promise<NewsItem[]> {
+  await Promise.allSettled(
+    items.map(async (item) => {
+      try {
+        const html = await httpGet(item.url, 8_000);
+        const text = htmlToText(html);
+        // Sous ~200 caractères, on est face à un paywall ou un mur de cookies :
+        // l'extrait RSS fait alors meilleure matière que ce résidu.
+        if (text.length < 200) return;
+        item.fullText = toExcerpt(text, maxChars);
+        if (!item.excerpt || item.excerpt.length === 0) item.excerpt = toExcerpt(text, 500);
+      } catch { /* garde l'extrait RSS */ }
+    }),
+  );
+  return items;
+}
+
 export async function postToDiscord(url: string, payload: unknown): Promise<{ status: number; text: string }> {
   const { default: https } = await import('https');
   const body = JSON.stringify(payload);

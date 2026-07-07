@@ -46,6 +46,12 @@ export interface ChatParams {
   keepAlive?: string;
   /** Taille de la fenêtre de contexte (num_ctx). Plus petit = moins de RAM. */
   numCtx?: number;
+  /**
+   * Délai max de la requête ENTIÈRE, streaming compris (défaut : requestTimeout
+   * de la config, sinon 120 s). Les tâches de fond (digests) passent un budget
+   * large : une longue génération n'est pas une panne.
+   */
+  timeoutMs?: number;
   /** Signal d'abandon : interrompt la génération en cours (bouton Stop). */
   signal?: AbortSignal;
 }
@@ -89,7 +95,7 @@ export class OllamaClient {
     log.debug('Chat request', { model: params.model, messageCount: body.messages.length, keepAlive });
 
     // Abort on either the request timeout or the caller's signal (Stop button).
-    const timeoutSignal = AbortSignal.timeout(this.config.requestTimeout ?? 120_000);
+    const timeoutSignal = AbortSignal.timeout(params.timeoutMs ?? this.config.requestTimeout ?? 120_000);
     const signal = params.signal
       ? AbortSignal.any([timeoutSignal, params.signal])
       : timeoutSignal;

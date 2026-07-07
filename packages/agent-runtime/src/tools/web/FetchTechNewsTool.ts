@@ -12,6 +12,7 @@ export interface NewsItem {
   comments?: number;
   publishedAt?: string; // ISO 8601
   excerpt?: string; // short plain-text teaser, used as input for summarization
+  fullText?: string; // article body fetched from the page (enrichArticleTexts), capped
 }
 
 interface FetchTechNewsArgs {

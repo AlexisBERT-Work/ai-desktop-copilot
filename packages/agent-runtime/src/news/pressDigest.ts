@@ -6,7 +6,7 @@ import {
   NEWS_SOURCES,
   type NewsItem,
 } from '../tools/web/FetchTechNewsTool';
-import { enrichExcerpts } from '../tools/web/PostTechNewsDiscordTool';
+import { enrichArticleTexts } from '../tools/web/PostTechNewsDiscordTool';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:press-digest');
@@ -31,16 +31,45 @@ Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme
 {"analyse": "...", "resumes": ["...", "..."], "details": ["...", "..."]}
 - "analyse" : 2 à 4 phrases (en français) qui dégagent les thèmes saillants et l'angle éditorial de CE journal aujourd'hui.
 - "resumes" : un résumé d'UNE phrase par article, dans le MÊME ordre que la liste, en français, factuel et concis.
-- "details" : pour CHAQUE article, dans le MÊME ordre, un paragraphe de 2 à 4 phrases en français qui développe le fond : ce qui s'est passé, les acteurs, les chiffres et le contexte. Appuie-toi UNIQUEMENT sur le titre et l'extrait fournis — n'invente aucun fait, aucun chiffre. Si l'extrait est trop maigre pour développer, mets une chaîne vide "".
+- "details" : pour CHAQUE article, dans le MÊME ordre, un paragraphe de 3 à 5 phrases en français qui développe le fond : ce qui s'est passé, les acteurs, les chiffres clés et le contexte. Appuie-toi UNIQUEMENT sur le titre et le texte fournis — n'invente aucun fait, aucun chiffre. Si le texte est trop maigre pour développer, mets une chaîne vide "".
 Les tableaux "resumes" et "details" doivent contenir exactement autant d'éléments que d'articles.`;
+
+/**
+ * Budget de caractères de texte par article dans l'invite : vise ~12 000
+ * caractères au total (≈3 500 tokens — tient dans DIGEST_NUM_CTX avec la
+ * réponse), borné entre 600 et 1 500 par article. Pur, exporté pour tests.
+ */
+export function articleCharBudget(count: number): number {
+  if (count <= 0) return 1500;
+  return Math.max(600, Math.min(1500, Math.floor(12_000 / count)));
+}
+
+/**
+ * Fenêtre de contexte des appels de digest : les invites incluent le corps des
+ * articles (~12 k caractères) — la fenêtre par défaut d'Ollama (2-4 k tokens)
+ * tronquerait silencieusement le début et le modèle déraillerait.
+ */
+export const DIGEST_NUM_CTX = 8192;
+
+/**
+ * Délai des appels de digest : chargement du modèle + éval de ~4 k tokens +
+ * longue réponse JSON dépassent facilement les 120 s par défaut sur ce GPU —
+ * c'est une tâche de fond quotidienne, on lui laisse le temps de finir.
+ */
+export const DIGEST_TIMEOUT_MS = 600_000;
+
+/** Options partagées des complétions de digest (journaux, sujets, synthèse). */
+export const DIGEST_LLM_OPTS = { numCtx: DIGEST_NUM_CTX, timeoutMs: DIGEST_TIMEOUT_MS } as const;
 
 /** Construit l'invite listant les articles d'un journal. Pur, exporté pour tests. */
 export function buildJournalPrompt(journal: string, items: NewsItem[]): string {
+  const budget = articleCharBudget(items.length);
   const lines = items.map((it, i) => {
     const parts = [`Article ${i + 1} — ${it.title}`];
-    // 600 couvre l'extrait entier (plafonné à 500 par toExcerpt) : le LLM a
-    // besoin de toute la matière disponible pour rédiger le paragraphe détaillé.
-    if (it.excerpt && it.excerpt.length > 0) parts.push(`Extrait : ${it.excerpt.slice(0, 600)}`);
+    // Corps de l'article téléchargé (enrichArticleTexts) de préférence, sinon
+    // extrait RSS : c'est la seule matière autorisée pour les détails.
+    const text = it.fullText && it.fullText.length > 0 ? it.fullText : it.excerpt;
+    if (text && text.length > 0) parts.push(`Texte : ${text.slice(0, budget)}`);
     return parts.join('\n');
   });
   return `Journal : ${journal}\nVoici les ${items.length} articles du jour :\n\n${lines.join('\n\n')}`;
@@ -113,13 +142,21 @@ export function buildJournalBody(
 }
 
 /** Accumule une complétion non-streamée. Partagé avec topicDigest. */
-export async function complete(llm: OllamaClient, model: string, system: string, user: string): Promise<string> {
+export async function complete(
+  llm: OllamaClient,
+  model: string,
+  system: string,
+  user: string,
+  opts: { numCtx?: number; timeoutMs?: number } = {},
+): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
     model,
     system,
     messages: [{ role: 'user', content: user }],
     temperature: 0.3,
+    ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
+    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
   });
   for await (const chunk of stream) {
     if (chunk.type === 'token') text += chunk.content;
@@ -150,7 +187,7 @@ export async function analyzeJournal(
 
   let raw: string;
   try {
-    raw = await complete(llm, model, SYSTEM, buildJournalPrompt(journal, items));
+    raw = await complete(llm, model, SYSTEM, buildJournalPrompt(journal, items), DIGEST_LLM_OPTS);
   } catch (err) {
     log.warn('Journal analysis failed — falling back to excerpts', { journal, error: String(err) });
     return fallback();
@@ -252,7 +289,7 @@ export async function buildGlobalSynthesis(
   if (entries.length === 0) return null;
   let raw: string;
   try {
-    raw = await complete(llm, model, GLOBAL_SYSTEM, buildGlobalPrompt(entries));
+    raw = await complete(llm, model, GLOBAL_SYSTEM, buildGlobalPrompt(entries), DIGEST_LLM_OPTS);
   } catch (err) {
     log.warn('Global synthesis failed', { error: String(err) });
     return null;
@@ -298,7 +335,7 @@ export async function buildPressDailies(deps: PressDigestDeps): Promise<JournalD
     }
     if (items.length === 0) continue;
 
-    await enrichExcerpts(items);
+    await enrichArticleTexts(items);
     const journal = NEWS_SOURCES[id]!.label;
     const { analysis, summaries, details } = await analyzeJournal(llm, model, journal, items);
 

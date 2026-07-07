@@ -1,7 +1,7 @@
 import type { PressFeed } from '@catdesk/shared-types';
 import type { OllamaClient } from '../llm/OllamaClient';
 import { aggregateNews, filterByRegex, type NewsItem } from '../tools/web/FetchTechNewsTool';
-import { enrichExcerpts } from '../tools/web/PostTechNewsDiscordTool';
+import { enrichArticleTexts } from '../tools/web/PostTechNewsDiscordTool';
 import { analyzeJournal, buildJournalBody, journalTitle, type JournalDraft } from './pressDigest';
 import { createLogger } from '../logger';
 
@@ -60,7 +60,7 @@ export async function buildCustomJournalDaily(
     return null;
   }
 
-  await enrichExcerpts(items);
+  await enrichArticleTexts(items);
   const { analysis, summaries, details } = await analyzeJournal(deps.llm, deps.model, feed.name, items);
 
   return {

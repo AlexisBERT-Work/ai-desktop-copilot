@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  articleCharBudget,
   buildGlobalBody,
   buildGlobalPrompt,
   buildJournalBody,
@@ -27,8 +28,35 @@ describe('buildJournalPrompt', () => {
     expect(p).toContain('Journal : Le Monde');
     expect(p).toContain('les 2 articles');
     expect(p).toContain('Titre A');
-    expect(p).toContain('Extrait : Extrait A');
+    expect(p).toContain('Texte : Extrait A');
     expect(p).toContain('Titre B');
+  });
+
+  it('préfère le corps téléchargé (fullText) à l’extrait RSS', () => {
+    const withBody: NewsItem = { ...item('Titre C', 'https://x/c', 'court extrait'), fullText: 'Corps complet de l’article.' };
+    const p = buildJournalPrompt('Le Monde', [withBody]);
+    expect(p).toContain('Texte : Corps complet de l’article.');
+    expect(p).not.toContain('court extrait');
+  });
+
+  it('tronque chaque texte au budget par article', () => {
+    const many = Array.from({ length: 20 }, (_, i) =>
+      ({ ...item(`T${i}`, `https://x/${i}`), fullText: 'x'.repeat(2000) }),
+    );
+    const p = buildJournalPrompt('Le Monde', many);
+    // 20 articles ⇒ 600 caractères chacun (plancher du budget).
+    expect(p).toContain('x'.repeat(600));
+    expect(p).not.toContain('x'.repeat(601));
+  });
+});
+
+describe('articleCharBudget', () => {
+  it('plafonne à 1500 pour peu d’articles et plancher à 600 pour beaucoup', () => {
+    expect(articleCharBudget(1)).toBe(1500);
+    expect(articleCharBudget(8)).toBe(1500);
+    expect(articleCharBudget(10)).toBe(1200);
+    expect(articleCharBudget(30)).toBe(600);
+    expect(articleCharBudget(0)).toBe(1500);
   });
 });
 
