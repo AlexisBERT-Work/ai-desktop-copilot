@@ -19,6 +19,11 @@ substitution de nom et chiffre inventé rejetés, détail fidèle conservé (3/3
 manquant est régénéré article par article (contexte mono-article, feedback,
 3 tentatives), puis repli verbatim « Extrait de l'article : "…" » — chaque
 article a TOUJOURS son « En savoir plus », jamais un texte inventé.
+Modèle des digests : la prod tourne sur qwen3:14b (choix VRAM du launcher,
+bridge.rs) — son mode raisonnement est désormais coupé (`think:false` dans
+DIGEST_LLM_OPTS, traversant OllamaClient). C'était l'autre cause des
+timeouts. Validé en réel : 122 s tout compris, 5/5 détails vérifiés, qualité
+nettement au-dessus du 7B, zéro résidu de thinking.
 67 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
 git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
 connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.

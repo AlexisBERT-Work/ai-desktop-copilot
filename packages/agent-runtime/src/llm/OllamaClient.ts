@@ -52,6 +52,12 @@ export interface ChatParams {
    * large : une longue génération n'est pas une panne.
    */
   timeoutMs?: number;
+  /**
+   * Mode raisonnement des modèles qui en ont un (qwen3…) : false le coupe —
+   * indispensable pour les sorties JSON strictes et la latence des digests.
+   * Ollama ignore/tolère le champ sur les modèles sans raisonnement.
+   */
+  think?: boolean;
   /** Signal d'abandon : interrompt la génération en cours (bouton Stop). */
   signal?: AbortSignal;
 }
@@ -85,6 +91,7 @@ export class OllamaClient {
       stream: true,
       tools: params.tools,
       keep_alive: keepAlive,
+      ...(params.think !== undefined ? { think: params.think } : {}),
       options: {
         temperature: params.temperature ?? 0.7,
         ...(params.maxTokens ? { num_predict: params.maxTokens } : {}),

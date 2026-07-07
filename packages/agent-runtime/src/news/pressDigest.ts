@@ -58,8 +58,17 @@ export const DIGEST_NUM_CTX = 8192;
  */
 export const DIGEST_TIMEOUT_MS = 600_000;
 
-/** Options partagées des complétions de digest (journaux, sujets, synthèse). */
-export const DIGEST_LLM_OPTS = { numCtx: DIGEST_NUM_CTX, timeoutMs: DIGEST_TIMEOUT_MS } as const;
+/**
+ * Options partagées des complétions de digest (journaux, sujets, synthèse).
+ * think:false — la prod tourne sur qwen3:14b (choix VRAM du launcher Tauri)
+ * dont le mode raisonnement ruine la latence et pollue les sorties JSON ;
+ * Ollama tolère le champ sur les modèles sans raisonnement (vérifié en 0.31).
+ */
+export const DIGEST_LLM_OPTS = {
+  numCtx: DIGEST_NUM_CTX,
+  timeoutMs: DIGEST_TIMEOUT_MS,
+  think: false,
+} as const;
 
 /** Construit l'invite listant les articles d'un journal. Pur, exporté pour tests. */
 export function buildJournalPrompt(journal: string, items: NewsItem[]): string {
@@ -147,7 +156,7 @@ export async function complete(
   model: string,
   system: string,
   user: string,
-  opts: { numCtx?: number; timeoutMs?: number; temperature?: number } = {},
+  opts: { numCtx?: number; timeoutMs?: number; temperature?: number; think?: boolean } = {},
 ): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
@@ -157,6 +166,7 @@ export async function complete(
     temperature: opts.temperature ?? 0.3,
     ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+    ...(opts.think !== undefined ? { think: opts.think } : {}),
   });
   for await (const chunk of stream) {
     if (chunk.type === 'token') text += chunk.content;
