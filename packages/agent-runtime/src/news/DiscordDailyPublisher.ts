@@ -64,9 +64,21 @@ export function batchEmbeds(embeds: DiscordEmbed[]): DiscordEmbed[][] {
 }
 
 /**
+ * Retire les blockquotes de détail (« En savoir plus » dans l'app) du corps
+ * d'une daily : sur Discord ils feraient exploser la taille des embeds sans
+ * possibilité de repli. Pur, exporté pour tests.
+ */
+export function stripDetails(body: string): string {
+  return body
+    .split('\n')
+    .filter((line) => !/^\s*>/.test(line))
+    .join('\n');
+}
+
+/**
  * Une daily (JournalDraft) → un embed Discord. Le corps Markdown devient la
- * description (liens `[titre](url)` rendus tels quels par Discord), tronquée à
- * la limite. Pur, exporté pour tests.
+ * description (liens `[titre](url)` rendus tels quels par Discord), sans les
+ * détails repliables, tronquée à la limite. Pur, exporté pour tests.
  */
 export function draftToEmbed(draft: JournalDraft): DiscordEmbed {
   const embed: DiscordEmbed = {
@@ -75,7 +87,7 @@ export function draftToEmbed(draft: JournalDraft): DiscordEmbed {
     footer: { text: DAILY_CATEGORY_LABEL[draft.category] ?? draft.category },
     timestamp: new Date().toISOString(),
   };
-  const body = draft.body.trim();
+  const body = stripDetails(draft.body).trim();
   if (body.length > 0) embed.description = truncate(body, MAX_DESC);
   return embed;
 }

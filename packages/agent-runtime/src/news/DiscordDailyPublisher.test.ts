@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { batchEmbeds, chunk, draftToEmbed, dailyHeader, embedSize } from './DiscordDailyPublisher';
+import { batchEmbeds, chunk, draftToEmbed, dailyHeader, embedSize, stripDetails } from './DiscordDailyPublisher';
 import type { DiscordEmbed } from '../tools/web/PostTechNewsDiscordTool';
 import type { JournalDraft } from './pressDigest';
 
@@ -84,6 +84,25 @@ describe('draftToEmbed', () => {
   it('falls back to blurple for an unknown category', () => {
     const embed = draftToEmbed(draft({ category: 'nope' as JournalDraft['category'] }));
     expect(embed.color).toBe(0x5865f2);
+  });
+
+  it('retire les blockquotes de détail du corps publié', () => {
+    const body = 'Analyse.\n\n- [A](https://x/a) — résumé\n  > Long détail réservé à l’app.';
+    const embed = draftToEmbed(draft({ body }));
+    expect(embed.description).toContain('- [A](https://x/a) — résumé');
+    expect(embed.description).not.toContain('Long détail');
+  });
+});
+
+describe('stripDetails', () => {
+  it('supprime les lignes blockquote (indentées ou non) et garde le reste', () => {
+    const md = 'Analyse.\n> détail racine\n- puce\n  > détail imbriqué\n- autre puce';
+    expect(stripDetails(md)).toBe('Analyse.\n- puce\n- autre puce');
+  });
+
+  it('laisse intact un corps sans détails', () => {
+    const md = 'Analyse.\n\n- [A](https://x/a) — résumé';
+    expect(stripDetails(md)).toBe(md);
   });
 });
 

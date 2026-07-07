@@ -37,12 +37,22 @@ describe('parseAnalysisJson', () => {
     expect(parseAnalysisJson('{"analyse":"Tendance X","resumes":["r1","r2"]}')).toEqual({
       analysis: 'Tendance X',
       summaries: ['r1', 'r2'],
+      details: [],
+    });
+  });
+
+  it('parse les détails par article quand présents', () => {
+    const raw = '{"analyse":"A","resumes":["r1","r2"],"details":["Long détail 1.",""]}';
+    expect(parseAnalysisJson(raw)).toEqual({
+      analysis: 'A',
+      summaries: ['r1', 'r2'],
+      details: ['Long détail 1.', ''],
     });
   });
 
   it('tolère les fences markdown et le texte autour', () => {
     const raw = 'Voici:\n```json\n{"analyse":"A","resumes":["r1"]}\n```\nFin.';
-    expect(parseAnalysisJson(raw)).toEqual({ analysis: 'A', summaries: ['r1'] });
+    expect(parseAnalysisJson(raw)).toEqual({ analysis: 'A', summaries: ['r1'], details: [] });
   });
 
   it('renvoie null si illisible ou vide', () => {
@@ -72,6 +82,25 @@ describe('buildJournalBody', () => {
   it('omet le bloc analyse si vide', () => {
     const body = buildJournalBody('', [item('T', 'https://x/t')], ['']);
     expect(body.startsWith('- [T]')).toBe(true);
+  });
+
+  it('ajoute le détail en blockquote imbriqué sous la puce', () => {
+    const body = buildJournalBody('', items, ['résumé A', 'résumé B'], ['Détail long A.', '']);
+    // A : détail présent → blockquote indenté sous la puce.
+    expect(body).toContain('- [Titre A](https://x/a) — résumé A\n  > Détail long A.');
+    // B : détail vide → puce seule, aucun blockquote.
+    expect(body).toContain('- [Titre B](https://x/b) — résumé B');
+    expect(body.match(/>/g)?.length).toBe(1);
+  });
+
+  it('aplatit les détails multi-lignes et omet ceux qui répètent le résumé', () => {
+    const body = buildJournalBody('', items, ['résumé A', 'résumé B'], [
+      'Ligne 1.\nLigne 2.',
+      'résumé B',
+    ]);
+    expect(body).toContain('  > Ligne 1. Ligne 2.');
+    // Détail identique au résumé → omis.
+    expect(body).not.toContain('> résumé B');
   });
 });
 

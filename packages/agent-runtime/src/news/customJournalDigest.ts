@@ -61,13 +61,13 @@ export async function buildCustomJournalDaily(
   }
 
   await enrichExcerpts(items);
-  const { analysis, summaries } = await analyzeJournal(deps.llm, deps.model, feed.name, items);
+  const { analysis, summaries, details } = await analyzeJournal(deps.llm, deps.model, feed.name, items);
 
   return {
     journal: feed.name,
     category: feed.category,
     title: journalTitle(feed.name, now),
-    body: buildJournalBody(analysis, items, summaries),
+    body: buildJournalBody(analysis, items, summaries, details),
   };
 }
 

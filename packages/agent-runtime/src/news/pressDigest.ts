@@ -22,20 +22,25 @@ export interface JournalDraft {
 export interface JournalAnalysis {
   analysis: string;
   summaries: string[];
+  /** Paragraphe détaillé par article ('' si le LLM n'a rien pu développer). */
+  details: string[];
 }
 
 const SYSTEM = `Tu es un analyste de presse francophone. On te donne les articles du jour publiés par UN SEUL journal.
 Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme :
-{"analyse": "...", "resumes": ["...", "..."]}
+{"analyse": "...", "resumes": ["...", "..."], "details": ["...", "..."]}
 - "analyse" : 2 à 4 phrases (en français) qui dégagent les thèmes saillants et l'angle éditorial de CE journal aujourd'hui.
 - "resumes" : un résumé d'UNE phrase par article, dans le MÊME ordre que la liste, en français, factuel et concis.
-Le tableau "resumes" doit contenir exactement autant d'éléments que d'articles.`;
+- "details" : pour CHAQUE article, dans le MÊME ordre, un paragraphe de 2 à 4 phrases en français qui développe le fond : ce qui s'est passé, les acteurs, les chiffres et le contexte. Appuie-toi UNIQUEMENT sur le titre et l'extrait fournis — n'invente aucun fait, aucun chiffre. Si l'extrait est trop maigre pour développer, mets une chaîne vide "".
+Les tableaux "resumes" et "details" doivent contenir exactement autant d'éléments que d'articles.`;
 
 /** Construit l'invite listant les articles d'un journal. Pur, exporté pour tests. */
 export function buildJournalPrompt(journal: string, items: NewsItem[]): string {
   const lines = items.map((it, i) => {
     const parts = [`Article ${i + 1} — ${it.title}`];
-    if (it.excerpt && it.excerpt.length > 0) parts.push(`Extrait : ${it.excerpt.slice(0, 400)}`);
+    // 600 couvre l'extrait entier (plafonné à 500 par toExcerpt) : le LLM a
+    // besoin de toute la matière disponible pour rédiger le paragraphe détaillé.
+    if (it.excerpt && it.excerpt.length > 0) parts.push(`Extrait : ${it.excerpt.slice(0, 600)}`);
     return parts.join('\n');
   });
   return `Journal : ${journal}\nVoici les ${items.length} articles du jour :\n\n${lines.join('\n\n')}`;
@@ -62,9 +67,13 @@ export function parseAnalysisJson(text: string): JournalAnalysis | null {
   const analysis = typeof obj['analyse'] === 'string' ? obj['analyse'].trim() : '';
   const rawResumes = Array.isArray(obj['resumes']) ? obj['resumes'] : [];
   const summaries = rawResumes.map((r) => (typeof r === 'string' ? r.trim() : ''));
+  // "details" est optionnel : les anciennes réponses (ou un modèle paresseux)
+  // n'en produisent pas — la daily reste valide, juste sans « En savoir plus ».
+  const rawDetails = Array.isArray(obj['details']) ? obj['details'] : [];
+  const details = rawDetails.map((d) => (typeof d === 'string' ? d.trim() : ''));
 
   if (analysis.length === 0 && summaries.length === 0) return null;
-  return { analysis, summaries };
+  return { analysis, summaries, details };
 }
 
 /** Titre lisible et daté d'une revue de journal. Pur. */
@@ -73,8 +82,17 @@ export function journalTitle(journal: string, now = new Date()): string {
   return `${journal} — revue du ${date}`;
 }
 
-/** Corps Markdown : analyse + liste d'articles (résumé + lien). Pur. */
-export function buildJournalBody(analysis: string, items: NewsItem[], summaries: string[]): string {
+/**
+ * Corps Markdown : analyse + liste d'articles (résumé + lien). Le paragraphe
+ * détaillé d'un article devient un blockquote imbriqué sous sa puce — l'UI le
+ * replie derrière « En savoir plus » (NewsMarkdown), Discord le retire. Pur.
+ */
+export function buildJournalBody(
+  analysis: string,
+  items: NewsItem[],
+  summaries: string[],
+  details: string[] = [],
+): string {
   const blocks: string[] = [];
   if (analysis.length > 0) blocks.push(analysis);
 
@@ -82,7 +100,11 @@ export function buildJournalBody(analysis: string, items: NewsItem[], summaries:
     .map((it, i) => {
       const s = typeof summaries[i] === 'string' ? summaries[i]!.trim() : '';
       const tail = s.length > 0 ? ` — ${s}` : '';
-      return `- [${it.title}](${it.url})${tail}`;
+      const line = `- [${it.title}](${it.url})${tail}`;
+      // Un détail multi-lignes casserait la liste : on l'aplatit. Un détail qui
+      // répète le résumé n'apporte rien : on l'omet.
+      const d = typeof details[i] === 'string' ? details[i]!.replace(/\s+/g, ' ').trim() : '';
+      return d.length > 0 && d !== s ? `${line}\n  > ${d}` : line;
     })
     .join('\n');
   if (bullets.length > 0) blocks.push(bullets);
@@ -116,12 +138,15 @@ export async function analyzeJournal(
   journal: string,
   items: NewsItem[],
 ): Promise<JournalAnalysis> {
+  // En repli, pas de "details" : un détail rédigé n'existe que si le LLM a pu
+  // le produire — recopier l'extrait brut ferait doublon avec le résumé.
   const fallback = (): JournalAnalysis => ({
     analysis: '',
     summaries: items.map((it) => (it.excerpt ? it.excerpt.slice(0, 200) : '')),
+    details: items.map(() => ''),
   });
 
-  if (items.length === 0) return { analysis: '', summaries: [] };
+  if (items.length === 0) return { analysis: '', summaries: [], details: [] };
 
   let raw: string;
   try {
@@ -142,7 +167,11 @@ export async function analyzeJournal(
     if (typeof s === 'string' && s.length > 0) return s;
     return it.excerpt ? it.excerpt.slice(0, 200) : '';
   });
-  return { analysis: parsed.analysis, summaries };
+  const details = items.map((_, i) => {
+    const d = parsed.details[i];
+    return typeof d === 'string' ? d : '';
+  });
+  return { analysis: parsed.analysis, summaries, details };
 }
 
 // ─── Synthèse transversale (tous journaux) ─────────────────────
@@ -271,13 +300,13 @@ export async function buildPressDailies(deps: PressDigestDeps): Promise<JournalD
 
     await enrichExcerpts(items);
     const journal = NEWS_SOURCES[id]!.label;
-    const { analysis, summaries } = await analyzeJournal(llm, model, journal, items);
+    const { analysis, summaries, details } = await analyzeJournal(llm, model, journal, items);
 
     drafts.push({
       journal,
       category: categoryForSourceLabel(journal),
       title: journalTitle(journal, now),
-      body: buildJournalBody(analysis, items, summaries),
+      body: buildJournalBody(analysis, items, summaries, details),
     });
     if (analysis.trim().length > 0) analysed.push({ journal, analysis });
   }

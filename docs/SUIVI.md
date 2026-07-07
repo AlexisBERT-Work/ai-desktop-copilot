@@ -1,9 +1,12 @@
 # SUIVI — Évolution de CatDesk
 
 > Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
-> Dernière mise à jour : 2026-07-02.
+> Dernière mise à jour : 2026-07-07.
 
 ## État actuel
+Dailys : chaque article a désormais un paragraphe détaillé (2-4 phrases,
+rédigé par le LLM) replié derrière un bouton « En savoir plus » dans le widget
+(convention : blockquote Markdown imbriqué sous la puce, retiré côté Discord).
 67 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
 git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
 connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.
