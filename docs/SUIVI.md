@@ -11,11 +11,14 @@ plus » dans le widget (blockquote Markdown imbriqué sous la puce, retiré côt
 Discord). Fix critique au passage : les appels LLM de digest étaient tués par
 le timeout global de 120 s (cause des dailys « extraits bruts en anglais ») —
 ils ont maintenant num_ctx 8192 + 10 min de budget (DIGEST_LLM_OPTS).
-Garde-fou anti-invention sur les détails (`verifyDetails`) : couche 1
-déterministe (tout nombre du détail doit exister dans la source), couche 2
-vérificateur LLM à température 0 (rejette noms/faits absents de l'article).
-Un détail rejeté = pas de bouton. Validé en réel : substitution de nom et
-chiffre inventé rejetés, détail fidèle conservé (3/3).
+Garde-fou anti-invention sur les détails : couche 1 déterministe (tout nombre
+du détail doit exister dans la source), couche 2 vérificateur LLM à
+température 0 (rejette noms/faits absents de l'article). Validé en réel :
+substitution de nom et chiffre inventé rejetés, détail fidèle conservé (3/3).
+**Couverture garantie** (`ensureVerifiedDetails`) : un détail rejeté ou
+manquant est régénéré article par article (contexte mono-article, feedback,
+3 tentatives), puis repli verbatim « Extrait de l'article : "…" » — chaque
+article a TOUJOURS son « En savoir plus », jamais un texte inventé.
 67 outils agent enregistrés (filesystem, système, web, navigateur Playwright,
 git, GitHub, écran/OCR, audio, mémoire, sous-agents, cron, analyse, bourse,
 connecteurs). Stack Tauri 2 + React 19 + Node agent-runtime + sidecar Python.

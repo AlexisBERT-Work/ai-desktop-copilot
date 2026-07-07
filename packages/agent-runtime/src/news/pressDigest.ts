@@ -175,43 +175,39 @@ export async function analyzeJournal(
   journal: string,
   items: NewsItem[],
 ): Promise<JournalAnalysis> {
-  // En repli, pas de "details" : un détail rédigé n'existe que si le LLM a pu
-  // le produire — recopier l'extrait brut ferait doublon avec le résumé.
-  const fallback = (): JournalAnalysis => ({
-    analysis: '',
-    summaries: items.map((it) => (it.excerpt ? it.excerpt.slice(0, 200) : '')),
-    details: items.map(() => ''),
-  });
-
   if (items.length === 0) return { analysis: '', summaries: [], details: [] };
 
-  let raw: string;
+  // Analyse groupée (une passe pour l'angle éditorial + résumés + premiers
+  // jets de détails). Son échec ne dispense PAS des détails : ils sont
+  // garantis plus bas, article par article.
+  let analysis = '';
+  let summaries = items.map((it) => (it.excerpt ? it.excerpt.slice(0, 200) : ''));
+  let drafted = items.map(() => '');
   try {
-    raw = await complete(llm, model, SYSTEM, buildJournalPrompt(journal, items), DIGEST_LLM_OPTS);
+    const raw = await complete(llm, model, SYSTEM, buildJournalPrompt(journal, items), DIGEST_LLM_OPTS);
+    const parsed = parseAnalysisJson(raw);
+    if (parsed === null) {
+      log.warn('Journal analysis JSON unparsable — falling back to excerpts', { journal });
+    } else {
+      analysis = parsed.analysis;
+      summaries = items.map((it, i) => {
+        const s = parsed.summaries[i];
+        if (typeof s === 'string' && s.length > 0) return s;
+        return it.excerpt ? it.excerpt.slice(0, 200) : '';
+      });
+      drafted = items.map((_, i) => {
+        const d = parsed.details[i];
+        return typeof d === 'string' ? d : '';
+      });
+    }
   } catch (err) {
     log.warn('Journal analysis failed — falling back to excerpts', { journal, error: String(err) });
-    return fallback();
   }
 
-  const parsed = parseAnalysisJson(raw);
-  if (parsed === null) {
-    log.warn('Journal analysis JSON unparsable — falling back to excerpts', { journal });
-    return fallback();
-  }
-
-  const summaries = items.map((it, i) => {
-    const s = parsed.summaries[i];
-    if (typeof s === 'string' && s.length > 0) return s;
-    return it.excerpt ? it.excerpt.slice(0, 200) : '';
-  });
-  const drafted = items.map((_, i) => {
-    const d = parsed.details[i];
-    return typeof d === 'string' ? d : '';
-  });
-  // Anti-invention : un détail qui cite un nombre ou un fait absent de son
-  // article est rejeté (l'UI n'affiche alors pas de « En savoir plus »).
-  const details = await verifyDetails(llm, model, items, drafted);
-  return { analysis: parsed.analysis, summaries, details };
+  // Garantie : un détail vérifié par article. Les jets rejetés (fait inventé)
+  // ou manquants sont régénérés un par un, repli verbatim en dernier recours.
+  const details = await ensureVerifiedDetails(llm, model, items, drafted);
+  return { analysis, summaries, details };
 }
 
 // ─── Vérification des détails (anti-invention) ─────────────────
@@ -295,9 +291,34 @@ export function parseVerifyJson(text: string, count: number): boolean[] | null {
 }
 
 /**
- * Rejette les détails non fidèles à leur article. Couche 1 (nombres) locale et
- * sûre ; couche 2 (LLM) best-effort : si l'appel échoue ou est illisible, on
- * garde les détails restants — la couche 1 a déjà filtré le plus flagrant.
+ * Jugement LLM (température 0 : on juge, on ne rédige pas) sur des paires
+ * (source, détail). Null si l'appel échoue ou si la réponse est illisible —
+ * un incident d'infra n'est pas un verdict.
+ */
+export async function llmFactCheck(
+  llm: OllamaClient,
+  model: string,
+  pairs: { source: string; detail: string }[],
+): Promise<boolean[] | null> {
+  if (pairs.length === 0) return [];
+  let raw: string;
+  try {
+    raw = await complete(llm, model, VERIFY_SYSTEM, buildVerifyPrompt(pairs), {
+      ...DIGEST_LLM_OPTS,
+      temperature: 0,
+    });
+  } catch (err) {
+    log.warn('Fact check call failed', { error: String(err) });
+    return null;
+  }
+  return parseVerifyJson(raw, pairs.length);
+}
+
+/**
+ * Marque les détails non fidèles à leur article ('' = à refaire). Couche 1
+ * (nombres) locale et sûre ; couche 2 (LLM) best-effort : si le juge est
+ * indisponible, on garde les détails restants — la couche 1 a déjà filtré le
+ * plus flagrant.
  */
 export async function verifyDetails(
   llm: OllamaClient,
@@ -310,7 +331,7 @@ export async function verifyDetails(
     const it = items[i];
     if (d.length === 0 || it === undefined) return d;
     if (numbersSupported(d, sourceTextOf(it))) return d;
-    log.warn('Detail dropped — unsupported number', { title: it.title.slice(0, 60) });
+    log.warn('Detail rejected — unsupported number', { title: it.title.slice(0, 60) });
     return '';
   });
 
@@ -323,30 +344,105 @@ export async function verifyDetails(
     detail: checked[i]!,
   }));
 
-  let raw: string;
-  try {
-    // Température 0 : on juge, on ne rédige pas.
-    raw = await complete(llm, model, VERIFY_SYSTEM, buildVerifyPrompt(pairs), {
-      ...DIGEST_LLM_OPTS,
-      temperature: 0,
-    });
-  } catch (err) {
-    log.warn('Detail verification failed — keeping unverified details', { error: String(err) });
-    return checked;
-  }
-  const verdicts = parseVerifyJson(raw, pairs.length);
-  if (verdicts === null) {
-    log.warn('Detail verification JSON unparsable — keeping unverified details');
-    return checked;
-  }
+  const verdicts = await llmFactCheck(llm, model, pairs);
+  if (verdicts === null) return checked;
 
   for (const [k, i] of idx.entries()) {
     if (verdicts[k] === false) {
-      log.info('Detail dropped — failed fact check', { title: items[i]!.title.slice(0, 60) });
+      log.info('Detail rejected — failed fact check', { title: items[i]!.title.slice(0, 60) });
       checked[i] = '';
     }
   }
   return checked;
+}
+
+// ─── Régénération article par article (garantie de couverture) ─
+// Le lot entier passe d'abord par verifyDetails ; chaque détail rejeté (ou
+// jamais produit) est réécrit ICI avec pour seul contexte SON article — c'est
+// le mélange d'articles dans une même invite qui produit les substitutions de
+// noms. En dernier recours, extrait verbatim : un texte toujours présent,
+// jamais inventé.
+
+const DETAIL_SYSTEM = `Tu es un journaliste francophone rigoureux. On te donne UN article (titre + texte).
+Rédige un paragraphe de 3 à 5 phrases en français qui développe le fond : ce qui s'est passé, les acteurs, les chiffres clés et le contexte.
+Règles STRICTES :
+- Appuie-toi UNIQUEMENT sur le titre et le texte fournis. N'ajoute AUCUNE information extérieure.
+- Reprends les noms propres et les nombres EXACTEMENT tels qu'ils apparaissent dans le texte.
+- Réponds avec le paragraphe seul, sans préambule ni commentaire.`;
+
+/** Invite mono-article pour la régénération d'un détail. Pur, exporté pour tests. */
+export function buildDetailPrompt(item: NewsItem): string {
+  const text = item.fullText ?? item.excerpt ?? '';
+  return `Titre : ${item.title}\n\nTexte de l'article :\n${text.slice(0, 1500)}`;
+}
+
+/**
+ * Repli garanti fidèle : extrait verbatim de l'article (langue d'origine),
+ * clairement présenté comme citation. L'extrait RSS (chapeau éditorial) est
+ * préféré au texte de page, qui charrie parfois des résidus de navigation.
+ * Renvoie '' si la matière est trop maigre pour valoir un bouton. Pur.
+ */
+export function verbatimDetail(item: NewsItem): string {
+  const text = (item.excerpt ?? item.fullText ?? '').replace(/\s+/g, ' ').trim();
+  if (text.length < 80) return '';
+  const cut = text.length <= 350 ? text : `${text.slice(0, 350).replace(/\s+\S*$/, '')}…`;
+  return `Extrait de l'article : « ${cut} »`;
+}
+
+const DETAIL_ATTEMPTS = 3;
+
+/**
+ * Produit un détail vérifié pour UN article : génération ciblée, contrôle des
+ * nombres, jugement LLM, et nouvelle tentative avec feedback en cas de rejet.
+ * Après DETAIL_ATTEMPTS échecs (ou LLM indisponible), repli verbatim — le
+ * détail existe TOUJOURS quand l'article a un minimum de matière.
+ */
+export async function draftVerifiedDetail(
+  llm: OllamaClient,
+  model: string,
+  item: NewsItem,
+): Promise<string> {
+  const source = sourceTextOf(item);
+  let feedback = '';
+  for (let attempt = 1; attempt <= DETAIL_ATTEMPTS; attempt++) {
+    let d: string;
+    try {
+      d = (await complete(llm, model, DETAIL_SYSTEM, buildDetailPrompt(item) + feedback, DIGEST_LLM_OPTS))
+        .replace(/\s+/g, ' ')
+        .trim();
+    } catch (err) {
+      log.warn('Detail generation failed — verbatim fallback', { title: item.title.slice(0, 60), error: String(err) });
+      break;
+    }
+    if (d.length >= 40 && numbersSupported(d, source)) {
+      const verdicts = await llmFactCheck(llm, model, [
+        { source: source.slice(0, 1500), detail: d },
+      ]);
+      // Juge indisponible ≠ détail infidèle : les nombres ont déjà été validés.
+      if (verdicts === null || verdicts[0] === true) return d;
+    }
+    log.info('Detail attempt rejected — retrying', { title: item.title.slice(0, 60), attempt });
+    feedback =
+      '\n\nATTENTION : ta version précédente citait des faits absents du texte. Recommence en n’utilisant QUE des informations présentes dans le titre et le texte ci-dessus.';
+  }
+  return verbatimDetail(item);
+}
+
+/**
+ * Garantit un détail par article : vérifie le lot issu de l'analyse groupée,
+ * puis régénère individuellement chaque détail rejeté ou manquant.
+ */
+export async function ensureVerifiedDetails(
+  llm: OllamaClient,
+  model: string,
+  items: NewsItem[],
+  drafted: string[],
+): Promise<string[]> {
+  const out = await verifyDetails(llm, model, items, drafted);
+  for (let i = 0; i < items.length; i++) {
+    if ((out[i] ?? '').length === 0) out[i] = await draftVerifiedDetail(llm, model, items[i]!);
+  }
+  return out;
 }
 
 // ─── Synthèse transversale (tous journaux) ─────────────────────

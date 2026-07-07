@@ -1,21 +1,38 @@
-import { describe, it, expect } from 'vitest';
+﻿import { describe, it, expect } from 'vitest';
 import {
   articleCharBudget,
+  buildDetailPrompt,
   buildGlobalBody,
   buildGlobalPrompt,
   buildJournalBody,
   buildJournalPrompt,
   buildVerifyPrompt,
   digitRuns,
+  draftVerifiedDetail,
   globalTitle,
   journalTitle,
   numbersSupported,
   parseAnalysisJson,
   parseSynthesisJson,
   parseVerifyJson,
+  verbatimDetail,
 } from './pressDigest';
 import { dayKey, isRunDue } from './PressDigestScheduler';
 import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import type { OllamaClient } from '../llm/OllamaClient';
+
+/** Faux client Ollama : rejoue une séquence de réponses (la dernière se répète). */
+function fakeLlm(responses: (string | Error)[]): OllamaClient {
+  let i = 0;
+  return {
+    streamChat: function* (): Generator<{ type: 'token'; content: string } | { type: 'error'; error: string }> {
+      const r = responses[Math.min(i, responses.length - 1)];
+      i++;
+      if (r instanceof Error) yield { type: 'error', error: r.message };
+      else if (r !== undefined) yield { type: 'token', content: r };
+    },
+  } as unknown as OllamaClient;
+}
 
 function item(title: string, url: string, excerpt?: string): NewsItem {
   return { title, url, source: 'Le Monde', ...(excerpt !== undefined ? { excerpt } : {}) };
@@ -179,6 +196,66 @@ describe('vérification des détails', () => {
     expect(parseVerifyJson('[false, true]', 2)).toEqual([false, true]);
     expect(parseVerifyJson('{"fidele":["true","false"]}', 2)).toEqual([true, false]);
     expect(parseVerifyJson('["true"]', 2)).toBeNull();
+  });
+});
+
+describe('garantie de détail par article', () => {
+  const rivian: NewsItem = {
+    title: 'Rivian stock falls nearly 15% as company sells 75 million shares',
+    url: 'https://x/r',
+    source: 'CNBC',
+    excerpt:
+      'Rivian shares fell nearly 15% after the electric vehicle maker announced it would sell 75 million shares to raise capital during extended hours trading.',
+    fullText:
+      'Rivian shares fell nearly 15% after the electric vehicle maker announced it would sell 75 million shares to raise capital. The raise occurred during extended hours trading.',
+  };
+
+  it('buildDetailPrompt inclut le titre et préfère le corps téléchargé', () => {
+    const p = buildDetailPrompt(rivian);
+    expect(p).toContain('Titre : Rivian stock falls');
+    expect(p).toContain('The raise occurred during extended hours trading.');
+  });
+
+  it('verbatimDetail cite l’extrait, coupe au mot et signale la citation', () => {
+    const v = verbatimDetail(rivian);
+    expect(v.startsWith("Extrait de l'article : « Rivian shares fell")).toBe(true);
+    expect(v.endsWith('»')).toBe(true);
+    // Matière trop maigre → pas de citation.
+    expect(verbatimDetail({ title: 'T', url: 'u', source: 's', excerpt: 'court' })).toBe('');
+  });
+
+  it('accepte un détail correct du premier coup', async () => {
+    const bon = 'Rivian a vendu 75 millions d’actions et son titre a perdu près de 15 %.';
+    const llm = fakeLlm([bon, '{"fidele":[true]}']);
+    expect(await draftVerifiedDetail(llm, 'm', rivian)).toBe(bon);
+  });
+
+  it('rejette un chiffre inventé puis accepte la version corrigée', async () => {
+    const faux = 'Rivian a vendu 85 millions d’actions pour lever des capitaux cette semaine.';
+    const bon = 'Rivian a vendu 75 millions d’actions pour lever des capitaux cette semaine.';
+    // faux → couche nombres (pas d'appel juge) → régénération → bon → juge OK.
+    const llm = fakeLlm([faux, bon, '{"fidele":[true]}']);
+    expect(await draftVerifiedDetail(llm, 'm', rivian)).toBe(bon);
+  });
+
+  it('rejette via le juge LLM puis accepte la version corrigée', async () => {
+    const douteux = 'Le PDG Marc Dupont a annoncé la vente de 75 millions d’actions Rivian.';
+    const bon = 'Rivian a annoncé la vente de 75 millions d’actions pour lever des capitaux.';
+    const llm = fakeLlm([douteux, '{"fidele":[false]}', bon, '{"fidele":[true]}']);
+    expect(await draftVerifiedDetail(llm, 'm', rivian)).toBe(bon);
+  });
+
+  it('retombe sur le verbatim après épuisement des tentatives', async () => {
+    const faux = 'Rivian a vendu 99 millions d’actions selon le modèle qui insiste lourdement.';
+    const llm = fakeLlm([faux]); // la dernière réponse se répète : toujours faux
+    const out = await draftVerifiedDetail(llm, 'm', rivian);
+    expect(out.startsWith("Extrait de l'article :")).toBe(true);
+  });
+
+  it('retombe sur le verbatim si Ollama est indisponible', async () => {
+    const llm = fakeLlm([new Error('connexion refusée')]);
+    const out = await draftVerifiedDetail(llm, 'm', rivian);
+    expect(out.startsWith("Extrait de l'article :")).toBe(true);
   });
 });
 
