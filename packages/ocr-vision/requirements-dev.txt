@@ -1,0 +1,3 @@
+# Dépendances de développement/test — pas embarquées dans l'installeur.
+-r requirements.txt
+pytest>=8.0
