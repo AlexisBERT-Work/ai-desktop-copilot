@@ -1,31 +1,32 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { isCommandBlocked, MAX_COMMAND_LEN } from '../../security/commandPolicy';
 
 const execFileAsync = promisify(execFile);
 
-interface Args {
-  command: string;
-  shell?: 'powershell' | 'cmd';
-  workdir?: string;
-  timeoutMs?: number;
-}
+const argsSchema = z.object({
+  command: z.string().min(1).describe('The command to execute'),
+  shell: z.enum(['powershell', 'cmd']).default('powershell'),
+  workdir: z.string().optional().describe('Working directory'),
+  timeoutMs: z.number().max(120_000).default(30_000),
+});
+type Args = z.infer<typeof argsSchema>;
 
-export class RunCommandTool extends BaseTool {
+export class RunCommandTool extends BaseTool<Args> {
   name = 'run_command';
-  description = 'Exécute une commande PowerShell ou CMD. ATTENTION: demande confirmation avant exécution.';
+  description =
+    'Exécute une commande PowerShell ou CMD. ATTENTION: demande confirmation avant exécution.';
   category = 'system' as const;
   riskLevel = 'high' as const;
   requiresConfirmation = true;
-  schema = TOOL_SCHEMAS.run_command;
+  override readonly argsSchema = argsSchema;
+  schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
-    if (!args.command) return this.fail('command est requis');
-
+  async execute(args: Args): Promise<ToolResult> {
     // Safety check (politique partagée — voir security/commandPolicy.ts)
     if (isCommandBlocked(args.command)) {
       return this.fail('Commande bloquée par politique de sécurité');
@@ -35,11 +36,10 @@ export class RunCommandTool extends BaseTool {
       return this.fail(`Commande trop longue (max ${MAX_COMMAND_LEN} chars)`);
     }
 
-    const shell = args.shell ?? 'powershell';
-    const timeoutMs = Math.min(args.timeoutMs ?? 30_000, 120_000);
-    const [program, flag] = shell === 'powershell'
-      ? ['powershell.exe', '-Command']
-      : ['cmd.exe', '/C'];
+    const shell = args.shell;
+    const timeoutMs = Math.min(args.timeoutMs, 120_000);
+    const [program, flag] =
+      shell === 'powershell' ? ['powershell.exe', '-Command'] : ['cmd.exe', '/C'];
 
     const started = Date.now();
 
@@ -61,15 +61,23 @@ export class RunCommandTool extends BaseTool {
         exitCode: 0,
         durationMs: Date.now() - started,
       });
-    } catch (err: any) {
+    } catch (err) {
       const durationMs = Date.now() - started;
-      if (err.killed) {
+      // Forme d'erreur d'execFile : killed/stdout/stderr/code s'ajoutent à Error.
+      const e = err as {
+        killed?: boolean;
+        stdout?: string;
+        stderr?: string;
+        code?: number | string;
+        message?: string;
+      };
+      if (e.killed) {
         return this.fail(`Timeout après ${timeoutMs}ms`, { durationMs });
       }
       return this.ok({
-        stdout: (err.stdout ?? '').trim(),
-        stderr: (err.stderr ?? err.message ?? '').trim(),
-        exitCode: err.code ?? -1,
+        stdout: (e.stdout ?? '').trim(),
+        stderr: (e.stderr ?? e.message ?? '').trim(),
+        exitCode: e.code ?? -1,
         durationMs,
       });
     }

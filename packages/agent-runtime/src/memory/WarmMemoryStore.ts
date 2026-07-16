@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { createLogger } from '../logger';
+import { loadSqlJs, type Database, type ParamsObject } from '../lib/sqljs';
 
 const log = createLogger('memory:warm');
 
@@ -37,20 +38,9 @@ export interface WarmFactInput {
   source?: string;
 }
 
-// sql.js (WASM) — loaded lazily, mirrors ConversationStore.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let SQL: any = null;
-async function getSqlJs(): Promise<unknown> {
-  if (!SQL) {
-    const sqljs = await import('sql.js');
-    SQL = await sqljs.default({ locateFile: () => require.resolve('sql.js/dist/sql-wasm.wasm') });
-  }
-  return SQL;
-}
-
 export class WarmMemoryStore {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private db: any = null;
+  // Affectée dans initialize() — tout accès avant est un bug d'ordre de démarrage.
+  private db!: Database;
   private readonly dbPath: string;
 
   constructor(dataDir?: string) {
@@ -60,8 +50,7 @@ export class WarmMemoryStore {
   }
 
   async initialize(): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SqlJs = (await getSqlJs()) as any;
+    const SqlJs = await loadSqlJs();
     this.db = existsSync(this.dbPath)
       ? new SqlJs.Database(readFileSync(this.dbPath))
       : new SqlJs.Database();
@@ -113,7 +102,16 @@ export class WarmMemoryStore {
     this.db.run(
       `INSERT INTO warm_facts (id, kind, subject, value, confidence, source, created_at, updated_at, active)
        VALUES (?,?,?,?,?,?,?,?,1)`,
-      [crypto.randomUUID(), input.kind, subject, value, input.confidence ?? 0.7, input.source ?? null, now, now],
+      [
+        crypto.randomUUID(),
+        input.kind,
+        subject,
+        value,
+        input.confidence ?? 0.7,
+        input.source ?? null,
+        now,
+        now,
+      ],
     );
     this.persist();
     return true;
@@ -195,15 +193,14 @@ export class WarmMemoryStore {
     return retired;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private rowToFact(row: any): WarmFact {
+  private rowToFact(row: ParamsObject): WarmFact {
     return {
-      id: row.id,
-      kind: row.kind,
-      subject: row.subject,
-      value: row.value,
+      id: row.id as string,
+      kind: row.kind as WarmFact['kind'],
+      subject: row.subject as string,
+      value: row.value as string,
       confidence: Number(row.confidence),
-      ...(row.source ? { source: row.source } : {}),
+      ...(row.source ? { source: row.source as string } : {}),
       createdAt: Number(row.created_at),
       updatedAt: Number(row.updated_at),
     };

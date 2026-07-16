@@ -1,15 +1,17 @@
 import { writeFile, appendFile, mkdir, stat } from 'fs/promises';
 import { dirname, resolve } from 'path';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface Args {
-  path: string;
-  content: string;
-  append?: boolean;
-  encoding?: 'utf-8' | 'base64';
-}
+const argsSchema = z.object({
+  path: z.string().min(1).describe('Absolute path to write'),
+  content: z.string().describe('Content to write'),
+  append: z.boolean().default(false),
+  encoding: z.enum(['utf-8', 'base64']).default('utf-8'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 const MAX_BYTES = 5_000_000;
 
@@ -27,30 +29,27 @@ export function isBlockedPath(path: string): boolean {
   return BLOCKED_PREFIXES.some(p => normalized === p || normalized.startsWith(p + '\\'));
 }
 
-export class WriteFileTool extends BaseTool {
+export class WriteFileTool extends BaseTool<Args> {
   name = 'write_file';
   description =
-    "Écrit ou ajoute du contenu dans un fichier local (crée les dossiers parents si besoin). Refuse les répertoires système.";
+    'Écrit ou ajoute du contenu dans un fichier local (crée les dossiers parents si besoin). Refuse les répertoires système.';
   category = 'filesystem' as const;
   riskLevel = 'medium' as const;
   requiresConfirmation = true;
-  schema = TOOL_SCHEMAS.write_file;
+  override readonly argsSchema = argsSchema;
+  schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
-    if (!args.path) return this.fail('path est requis');
-    if (typeof args.content !== 'string') return this.fail('content est requis');
+  async execute(args: Args): Promise<ToolResult> {
     if (isBlockedPath(args.path)) {
       return this.fail(`Écriture refusée dans un répertoire système: ${args.path}`);
     }
 
-    const encoding = args.encoding ?? 'utf-8';
     let data: string | Buffer;
-    if (encoding === 'base64') {
+    if (args.encoding === 'base64') {
       try {
         data = Buffer.from(args.content, 'base64');
       } catch {
-        return this.fail('content n\'est pas du base64 valide');
+        return this.fail("content n'est pas du base64 valide");
       }
     } else {
       data = args.content;
@@ -63,10 +62,12 @@ export class WriteFileTool extends BaseTool {
 
     try {
       const target = resolve(args.path);
-      const existedBefore = await stat(target).then(s => s.isFile()).catch(() => false);
+      const existedBefore = await stat(target)
+        .then(s => s.isFile())
+        .catch(() => false);
 
       await mkdir(dirname(target), { recursive: true });
-      if (args.append === true) {
+      if (args.append) {
         await appendFile(target, data);
       } else {
         await writeFile(target, data);
@@ -75,7 +76,7 @@ export class WriteFileTool extends BaseTool {
       return this.ok({
         path: target,
         bytesWritten: size,
-        mode: args.append === true ? 'append' : 'write',
+        mode: args.append ? 'append' : 'write',
         created: !existedBefore,
       });
     } catch (err) {

@@ -52,17 +52,20 @@ describe('QueryDatabaseTool', () => {
   });
 
   it('rejette une query vide', async () => {
-    expect((await tool.execute({ query: '  ' })).success).toBe(false);
+    expect((await tool.run({ query: '  ' })).success).toBe(false);
   });
 
   it('échoue sans dialect ni connection string déterminables', async () => {
-    const r = await tool.execute({ query: 'SELECT 1' });
+    const r = await tool.run({ query: 'SELECT 1' });
     expect(r.success).toBe(false);
     expect(r.error).toContain('dialect');
   });
 
   it('bloque une écriture en lecture seule avant toute connexion', async () => {
-    const r = await tool.execute({ query: 'DELETE FROM t', connection_string: 'postgres://u:p@127.0.0.1:1/db' });
+    const r = await tool.run({
+      query: 'DELETE FROM t',
+      connection_string: 'postgres://u:p@127.0.0.1:1/db',
+    });
     expect(r.success).toBe(false);
     expect(r.error).toContain('lecture seule');
   });

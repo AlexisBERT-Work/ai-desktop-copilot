@@ -1,3 +1,4 @@
+import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { ActivityTracker } from './ActivityTracker';
 import { detectSpiral, type SpiralVerdict } from './tools/productivity/DetectSpiralTool';
 import { createLogger } from './logger';
@@ -8,8 +9,8 @@ export type NotifyFn = (method: string, params: unknown) => void;
 
 export interface SpiralMonitorOptions {
   thresholdMinutes?: number; // minutes on the same signature before flagging
-  intervalMs?: number;       // how often to evaluate
-  cooldownMs?: number;       // minimum gap between notifications for the same signature
+  intervalMs?: number; // how often to evaluate
+  cooldownMs?: number; // minimum gap between notifications for the same signature
   now?: () => number;
 }
 
@@ -44,7 +45,10 @@ export class SpiralMonitor {
     this.timer = setInterval(() => this.tick(), this.intervalMs);
     // Don't keep the process alive just for the monitor.
     (this.timer as { unref?: () => void }).unref?.();
-    log.info('SpiralMonitor started', { thresholdMinutes: this.thresholdMinutes, intervalMs: this.intervalMs });
+    log.info('SpiralMonitor started', {
+      thresholdMinutes: this.thresholdMinutes,
+      intervalMs: this.intervalMs,
+    });
   }
 
   stop(): void {
@@ -60,7 +64,7 @@ export class SpiralMonitor {
     let notified = false;
 
     if (verdict.spiraling && this.shouldNotify(verdict.dominantSignature)) {
-      this.notify('proactive.suggestion', {
+      this.notify(RPC_NOTIFICATIONS.proactiveSuggestion, {
         kind: 'spiral',
         signature: verdict.dominantSignature,
         minutesOnTopic: verdict.minutesOnTopic,
@@ -72,7 +76,10 @@ export class SpiralMonitor {
       this.lastSignature = verdict.dominantSignature;
       this.lastNotifiedAt = this.now();
       notified = true;
-      log.info('Spiral detected — suggestion emitted', { signature: verdict.dominantSignature, minutes: verdict.minutesOnTopic });
+      log.info('Spiral detected — suggestion emitted', {
+        signature: verdict.dominantSignature,
+        minutes: verdict.minutesOnTopic,
+      });
     }
 
     return { verdict, notified };

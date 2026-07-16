@@ -9,7 +9,6 @@ import type { OllamaMessage } from '@catdesk/shared-types';
 /** Minimal OllamaClient stub whose streamChat emits a fixed reply as tokens. */
 function fakeLlm(reply: string) {
   return {
-    // eslint-disable-next-line require-yield
     async *streamChat() {
       // split into a couple of chunks to exercise accumulation
       yield { type: 'token' as const, content: reply.slice(0, reply.length / 2) };
@@ -20,13 +19,22 @@ function fakeLlm(reply: string) {
 
 describe('parseFacts', () => {
   it('parses a clean JSON array', () => {
-    const out = parseFacts('[{"kind":"preference","subject":"editeur","value":"VS Code","confidence":0.9}]');
+    const out = parseFacts(
+      '[{"kind":"preference","subject":"editeur","value":"VS Code","confidence":0.9}]',
+    );
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ kind: 'preference', subject: 'editeur', value: 'VS Code', confidence: 0.9 });
+    expect(out[0]).toMatchObject({
+      kind: 'preference',
+      subject: 'editeur',
+      value: 'VS Code',
+      confidence: 0.9,
+    });
   });
 
   it('extracts the array from surrounding prose / fences', () => {
-    const out = parseFacts('Voici les faits:\n```json\n[{"kind":"fact","subject":"s","value":"v"}]\n```\nVoilà.');
+    const out = parseFacts(
+      'Voici les faits:\n```json\n[{"kind":"fact","subject":"s","value":"v"}]\n```\nVoilà.',
+    );
     expect(out).toHaveLength(1);
     expect(out[0]?.confidence).toBe(0.7); // default when missing
   });
@@ -89,7 +97,7 @@ describe('FactExtractor.extractAndStore', () => {
 
   it('extracts facts from the reply and stores them', async () => {
     const reply = '[{"kind":"preference","subject":"editeur","value":"VS Code","confidence":0.9}]';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const fx = new FactExtractor(fakeLlm(reply) as any, 'm', store);
     const msgs: OllamaMessage[] = [{ role: 'user', content: 'je code tout le temps dans VS Code' }];
     const changed = await fx.extractAndStore(msgs, 'conv-1');
@@ -100,7 +108,7 @@ describe('FactExtractor.extractAndStore', () => {
 
   it('skips an empty transcript without calling the model', async () => {
     const streamChat = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const fx = new FactExtractor({ streamChat } as any, 'm', store);
     const changed = await fx.extractAndStore([{ role: 'tool', content: 'x' }]);
     expect(changed).toBe(0);
@@ -108,7 +116,6 @@ describe('FactExtractor.extractAndStore', () => {
   });
 
   it('returns 0 and stores nothing when the model emits no facts', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fx = new FactExtractor(fakeLlm('[]') as any, 'm', store);
     const changed = await fx.extractAndStore([{ role: 'user', content: 'quelle heure est-il ?' }]);
     expect(changed).toBe(0);

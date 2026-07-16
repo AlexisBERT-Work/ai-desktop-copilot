@@ -6,13 +6,14 @@ import type { ToolRegistry } from './ToolRegistry';
 function makeRunner() {
   const captured: { input?: string } = {};
   const orchestrator = {
-    // eslint-disable-next-line require-yield
     async *process(input: string) {
       captured.input = input;
       yield { type: 'done' as const, content: 'résultat' };
     },
   } as unknown as AgentOrchestrator;
-  const toolRegistry = { listNames: () => ['read_file', 'run_subagent'] } as unknown as ToolRegistry;
+  const toolRegistry = {
+    listNames: () => ['read_file', 'run_subagent'],
+  } as unknown as ToolRegistry;
   return { runner: new SubAgentRunner(orchestrator, toolRegistry, 'qwen2.5:7b'), captured };
 }
 
@@ -31,7 +32,9 @@ describe('SubAgentRunner curated context (§6)', () => {
     expect(captured.input).toContain('Le bug est dans parse() à la ligne 42.');
     expect(captured.input).toContain('corrige le bug');
     // context comes before the task
-    expect(captured.input!.indexOf('ligne 42')).toBeLessThan(captured.input!.indexOf('corrige le bug'));
+    expect(captured.input!.indexOf('ligne 42')).toBeLessThan(
+      captured.input!.indexOf('corrige le bug'),
+    );
   });
 
   it('ignores blank context', async () => {

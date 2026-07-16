@@ -6,10 +6,29 @@ import type {
   PressFeed,
   PressFeedInput,
 } from '@catdesk/shared-types';
+import { RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
 import { createLogger } from '../logger';
 
 const log = createLogger('ipc:bridge');
+
+/**
+ * Construit la notification `agent.step` (pure, exportée pour les tests).
+ * INVARIANT (corrélation UI) : chaque step porte conversationId + messageId —
+ * le bridge Rust et chatStore routent les tokens uniquement avec ces ids,
+ * sans heuristique de repli.
+ */
+export function buildStepNotification(
+  requestId: string | number,
+  step: Record<string, unknown>,
+  conversationId: string,
+  messageId: string | undefined,
+): { id: string | number; step: Record<string, unknown> } {
+  return {
+    id: requestId,
+    step: { ...step, conversationId, messageId: messageId ?? '' },
+  };
+}
 
 /** Pilotage des journaux personnalisés LOCAUX (par poste, sans rôle admin). */
 export interface LocalPressControl {
@@ -80,7 +99,7 @@ export class StdinBridge {
 
     // Interruption: stop the in-flight run (Stop button). Handled before the
     // typed switch since it's a control signal, not an AgentMethod.
-    if (request.method === 'agent.cancel') {
+    if (request.method === RPC_METHODS.agentCancel) {
       this.currentAbort?.abort();
       this.sendResponse(request.id, { ok: true });
       return;
@@ -90,7 +109,7 @@ export class StdinBridge {
     // de la console admin). No-op si le planificateur n'est pas actif (poste
     // client sans identifiants admin) — on répond ok sans rien faire. Le run est
     // lancé sans l'attendre (~1 min) : les dailys arrivent via Realtime.
-    if (request.method === 'press.run_now') {
+    if (request.method === RPC_METHODS.pressRunNow) {
       if (this.onRunPressDigest === undefined) {
         this.sendResponse(request.id, { ok: false, reason: 'press-digest-inactive' });
         return;
@@ -103,7 +122,7 @@ export class StdinBridge {
     // Journaux personnalisés LOCAUX (panneau « Mes journaux », tout utilisateur).
     // L'état complet est repoussé en notification `press.feeds` après chaque
     // écriture — l'UI n'a pas de canal requête/réponse, elle écoute les events.
-    if (request.method === 'press.feeds.save') {
+    if (request.method === RPC_METHODS.pressFeedsSave) {
       if (this.localPress === undefined) {
         this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
         return;
@@ -114,11 +133,11 @@ export class StdinBridge {
       } catch (err) {
         this.sendError(request.id, -32602, String(err));
       }
-      this.sendNotification('press.feeds', { feeds: this.localPress.listFeeds() });
+      this.sendNotification(RPC_NOTIFICATIONS.pressFeeds, { feeds: this.localPress.listFeeds() });
       return;
     }
 
-    if (request.method === 'press.feeds.delete') {
+    if (request.method === RPC_METHODS.pressFeedsDelete) {
       if (this.localPress === undefined) {
         this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
         return;
@@ -126,11 +145,11 @@ export class StdinBridge {
       const { id } = request.params as { id?: string };
       const removed = typeof id === 'string' ? this.localPress.deleteFeed(id) : false;
       this.sendResponse(request.id, { ok: removed });
-      this.sendNotification('press.feeds', { feeds: this.localPress.listFeeds() });
+      this.sendNotification(RPC_NOTIFICATIONS.pressFeeds, { feeds: this.localPress.listFeeds() });
       return;
     }
 
-    if (request.method === 'press.local.run_now') {
+    if (request.method === RPC_METHODS.pressLocalRunNow) {
       if (this.localPress === undefined) {
         this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
         return;
@@ -142,23 +161,25 @@ export class StdinBridge {
 
     // Resynchronisation à la demande (montage de l'UI) : repousse l'état complet
     // des journaux locaux et de leurs dailys déjà générées.
-    if (request.method === 'press.local.sync') {
+    if (request.method === RPC_METHODS.pressLocalSync) {
       if (this.localPress !== undefined) {
-        this.sendNotification('press.feeds', { feeds: this.localPress.listFeeds() });
-        this.sendNotification('dailies.local', { dailies: this.localPress.listDailies() });
+        this.sendNotification(RPC_NOTIFICATIONS.pressFeeds, { feeds: this.localPress.listFeeds() });
+        this.sendNotification(RPC_NOTIFICATIONS.dailiesLocal, {
+          dailies: this.localPress.listDailies(),
+        });
       }
       this.sendResponse(request.id, { ok: this.localPress !== undefined });
       return;
     }
 
     // Config bourse pilotée par l'UI (symboles + formules des widgets `stocks`).
-    if (request.method === 'market.set_watchlist') {
+    if (request.method === RPC_METHODS.marketSetWatchlist) {
       const params = request.params as { symbols?: unknown; formulas?: unknown };
       const symbols = Array.isArray(params.symbols)
         ? params.symbols.filter((s): s is string => typeof s === 'string')
         : [];
       const formulas = Array.isArray(params.formulas)
-        ? params.formulas.flatMap((f) => {
+        ? params.formulas.flatMap(f => {
             if (f === null || typeof f !== 'object') return [];
             const o = f as { name?: unknown; expression?: unknown };
             return typeof o.name === 'string' && typeof o.expression === 'string'
@@ -224,10 +245,10 @@ export class StdinBridge {
       )) {
         // Inject conversation/message ids so Tauri can route the event to the
         // right message (the orchestrator steps don't carry them).
-        this.sendNotification('agent.step', {
-          id: request.id,
-          step: { ...step, conversationId: params.conversationId, messageId: params.messageId },
-        });
+        this.sendNotification(
+          RPC_NOTIFICATIONS.agentStep,
+          buildStepNotification(request.id, step, params.conversationId, params.messageId),
+        );
       }
 
       // Final response

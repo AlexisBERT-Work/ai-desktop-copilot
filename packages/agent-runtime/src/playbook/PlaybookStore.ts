@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { createLogger } from '../logger';
+import { loadSqlJs, type Database } from '../lib/sqljs';
 
 const log = createLogger('playbook:store');
 
@@ -27,20 +28,9 @@ export interface StrategyRow {
   updatedAt: number;
 }
 
-// sql.js (WASM), loaded lazily — mirrors the other stores.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let SQL: any = null;
-async function getSqlJs(): Promise<unknown> {
-  if (!SQL) {
-    const sqljs = await import('sql.js');
-    SQL = await sqljs.default({ locateFile: () => require.resolve('sql.js/dist/sql-wasm.wasm') });
-  }
-  return SQL;
-}
-
 export class PlaybookStore {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private db: any = null;
+  // Affectée dans initialize() — tout accès avant est un bug d'ordre de démarrage.
+  private db!: Database;
   private readonly dbPath: string;
 
   constructor(dataDir?: string) {
@@ -50,8 +40,7 @@ export class PlaybookStore {
   }
 
   async initialize(): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SqlJs = (await getSqlJs()) as any;
+    const SqlJs = await loadSqlJs();
     this.db = existsSync(this.dbPath)
       ? new SqlJs.Database(readFileSync(this.dbPath))
       : new SqlJs.Database();
@@ -112,7 +101,11 @@ export class PlaybookStore {
     const rows: StrategyRow[] = [];
     while (stmt.step()) {
       const r = stmt.getAsObject() as {
-        task_type: string; approach: string; successes: number; failures: number; updated_at: number;
+        task_type: string;
+        approach: string;
+        successes: number;
+        failures: number;
+        updated_at: number;
       };
       rows.push({
         taskType: r.task_type,
@@ -144,7 +137,10 @@ export function approachSignature(tools: string[]): string {
   const seen = new Set<string>();
   const ordered: string[] = [];
   for (const t of tools) {
-    if (!seen.has(t)) { seen.add(t); ordered.push(t); }
+    if (!seen.has(t)) {
+      seen.add(t);
+      ordered.push(t);
+    }
   }
   return ordered.length > 0 ? ordered.join('>') : '(réponse directe)';
 }

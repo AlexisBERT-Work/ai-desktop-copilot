@@ -1,14 +1,22 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface AuditEnvArgs {
-  workdir?: string;
-  env_file?: string;
-  example_file?: string;
-}
+const argsSchema = z.object({
+  workdir: z
+    .string()
+    .optional()
+    .describe('Project root containing the env files (defaults to current directory)'),
+  env_file: z.string().default('.env').describe('Env file to audit, relative to workdir'),
+  example_file: z
+    .string()
+    .default('.env.example')
+    .describe('Template file to compare against, relative to workdir'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // ─── Parsing (pure, exported for tests) ────────────────────────
 
@@ -19,10 +27,16 @@ export function parseDotenv(content: string): Record<string, string> {
     if (line.length === 0 || line.startsWith('#')) continue;
     const eq = line.indexOf('=');
     if (eq === -1) continue;
-    const key = line.slice(0, eq).replace(/^export\s+/, '').trim();
+    const key = line
+      .slice(0, eq)
+      .replace(/^export\s+/, '')
+      .trim();
     let value = line.slice(eq + 1).trim();
     // Strip surrounding quotes
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     if (key.length > 0) out[key] = value;
@@ -34,10 +48,13 @@ export function parseDotenv(content: string): Record<string, string> {
 export function looksLikeSecret(key: string, value: string): boolean {
   if (value.length < 8) return false;
   // Common placeholders are not secrets.
-  if (/^(?:your[-_ ]?|changeme|xxx+|placeholder|todo|example|<.*>|\.\.\.)/i.test(value)) return false;
-  if (/^(?:true|false|localhost|127\.0\.0\.1|development|production|test)$/i.test(value)) return false;
+  if (/^(?:your[-_ ]?|changeme|xxx+|placeholder|todo|example|<.*>|\.\.\.)/i.test(value))
+    return false;
+  if (/^(?:true|false|localhost|127\.0\.0\.1|development|production|test)$/i.test(value))
+    return false;
 
-  const sensitiveKey = /(?:secret|token|key|password|passwd|pwd|api|auth|credential|private|cert|dsn|url)/i.test(key);
+  const sensitiveKey =
+    /(?:secret|token|key|password|passwd|pwd|api|auth|credential|private|cert|dsn|url)/i.test(key);
   const highEntropy = value.length >= 16 && /[A-Za-z]/.test(value) && /[0-9]/.test(value);
   const knownPrefix = /^(?:sk-|pk_|ghp_|gho_|xox[baprs]-|AKIA|AIza|eyJ)/.test(value);
   return knownPrefix || (sensitiveKey && value.length >= 8) || highEntropy;
@@ -45,23 +62,31 @@ export function looksLikeSecret(key: string, value: string): boolean {
 
 // ─── Tool ──────────────────────────────────────────────────────
 
-export class AuditEnvTool extends BaseTool {
+export class AuditEnvTool extends BaseTool<Args> {
   readonly name = 'audit_env';
   readonly description =
     "Compare un fichier .env à son .env.example : clés non documentées, clés manquantes (déclarées mais non définies), valeurs vides, valeurs ressemblant à de vrais secrets, et alerte si .env n'est pas dans .gitignore. Lecture seule, ne révèle jamais les valeurs secrètes.";
   readonly category = 'system' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.audit_env;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, env_file = '.env', example_file = '.env.example' } = args as AuditEnvArgs;
+  async execute({ workdir, env_file, example_file }: Args): Promise<ToolResult> {
     const cwd = workdir ?? process.cwd();
 
     let envContent: string | null = null;
     let exampleContent: string | null = null;
-    try { envContent = await readFile(join(cwd, env_file), 'utf-8'); } catch { /* missing */ }
-    try { exampleContent = await readFile(join(cwd, example_file), 'utf-8'); } catch { /* missing */ }
+    try {
+      envContent = await readFile(join(cwd, env_file), 'utf-8');
+    } catch {
+      /* missing */
+    }
+    try {
+      exampleContent = await readFile(join(cwd, example_file), 'utf-8');
+    } catch {
+      /* missing */
+    }
 
     if (envContent === null && exampleContent === null) {
       return this.fail(`Ni ${env_file} ni ${example_file} trouvés dans ${cwd}.`);
@@ -72,17 +97,20 @@ export class AuditEnvTool extends BaseTool {
     const envKeys = new Set(Object.keys(env));
     const exampleKeys = new Set(Object.keys(example));
 
-    const missingFromEnv = [...exampleKeys].filter((k) => !envKeys.has(k));       // declared but unset
-    const undocumented = [...envKeys].filter((k) => !exampleKeys.has(k));          // set but not in template
-    const emptyValues = [...envKeys].filter((k) => (env[k] ?? '').length === 0);
-    const secretKeys = [...envKeys].filter((k) => looksLikeSecret(k, env[k] ?? ''));
+    const missingFromEnv = [...exampleKeys].filter(k => !envKeys.has(k)); // declared but unset
+    const undocumented = [...envKeys].filter(k => !exampleKeys.has(k)); // set but not in template
+    const emptyValues = [...envKeys].filter(k => (env[k] ?? '').length === 0);
+    const secretKeys = [...envKeys].filter(k => looksLikeSecret(k, env[k] ?? ''));
 
     // Is .env gitignored?
     let gitignored: boolean | null = null;
     if (envContent !== null) {
       try {
         const gi = await readFile(join(cwd, '.gitignore'), 'utf-8');
-        gitignored = gi.split('\n').map((l) => l.trim()).some((l) => l === env_file || l === `${env_file}` || l === '.env' || l === '*.env');
+        gitignored = gi
+          .split('\n')
+          .map(l => l.trim())
+          .some(l => l === env_file || l === `${env_file}` || l === '.env' || l === '*.env');
       } catch {
         gitignored = false;
       }
@@ -99,9 +127,19 @@ export class AuditEnvTool extends BaseTool {
       secretKeys, // key names only — values never returned
       gitignored,
       warnings: [
-        ...(gitignored === false ? [`⚠ ${env_file} n'est pas ignoré par git — risque de fuite de secrets.`] : []),
-        ...(missingFromEnv.length > 0 ? [`${missingFromEnv.length} clé(s) déclarée(s) dans ${example_file} mais absente(s) de ${env_file}.`] : []),
-        ...(undocumented.length > 0 ? [`${undocumented.length} clé(s) dans ${env_file} non documentée(s) dans ${example_file}.`] : []),
+        ...(gitignored === false
+          ? [`⚠ ${env_file} n'est pas ignoré par git — risque de fuite de secrets.`]
+          : []),
+        ...(missingFromEnv.length > 0
+          ? [
+              `${missingFromEnv.length} clé(s) déclarée(s) dans ${example_file} mais absente(s) de ${env_file}.`,
+            ]
+          : []),
+        ...(undocumented.length > 0
+          ? [
+              `${undocumented.length} clé(s) dans ${env_file} non documentée(s) dans ${example_file}.`,
+            ]
+          : []),
       ],
     });
   }

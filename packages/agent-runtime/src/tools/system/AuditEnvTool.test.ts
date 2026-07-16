@@ -52,7 +52,7 @@ describe('AuditEnvTool', () => {
   });
 
   it('compare .env et .env.example', async () => {
-    const res: any = await tool.execute({ workdir: dir });
+    const res: any = await tool.run({ workdir: dir });
     expect(res.success).toBe(true);
     const d = res.data;
     expect(d.missingFromEnv).toContain('MISSING_ONE');
@@ -66,7 +66,7 @@ describe('AuditEnvTool', () => {
 
   it('échoue si aucun fichier', async () => {
     const empty = await mkdtemp(join(tmpdir(), 'ndenv-empty-'));
-    const res = await tool.execute({ workdir: empty });
+    const res = await tool.run({ workdir: empty });
     expect(res.success).toBe(false);
     await rm(empty, { recursive: true, force: true });
   });

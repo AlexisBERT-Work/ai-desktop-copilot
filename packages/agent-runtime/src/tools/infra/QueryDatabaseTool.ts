@@ -1,17 +1,41 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 export type Dialect = 'postgres' | 'mysql';
 
-interface QueryDatabaseArgs {
-  query: string;
-  dialect?: Dialect;
-  connection_string?: string;
-  read_only?: boolean;
-  max_rows?: number;
-  timeout_ms?: number;
-}
+const argsSchema = z.object({
+  query: z
+    .string()
+    .min(1)
+    .describe(
+      'SQL to execute. Read-only by default: only single-statement SELECT/WITH/EXPLAIN/SHOW are allowed.',
+    ),
+  dialect: z
+    .enum(['postgres', 'mysql'])
+    .optional()
+    .describe(
+      'Database engine. Optional if the connection string scheme makes it clear (postgres:// / mysql://).',
+    ),
+  connection_string: z
+    .string()
+    .optional()
+    .describe(
+      'DSN, e.g. postgres://user:pass@host:5432/db or mysql://user:pass@host:3306/db. Falls back to PG_URL/MYSQL_URL/DATABASE_URL env vars.',
+    ),
+  read_only: z
+    .boolean()
+    .default(true)
+    .describe('Reject writes (guard + DB-level READ ONLY transaction). Set false to allow writes.'),
+  max_rows: z.number().default(1000).describe('Maximum number of rows to return'),
+  timeout_ms: z
+    .number()
+    .max(60_000)
+    .default(15_000)
+    .describe('Query/connection timeout in milliseconds'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 /**
  * Only single-statement SELECT / WITH…SELECT / EXPLAIN / SHOW are read-only.
@@ -33,7 +57,10 @@ export function isReadOnlyDbQuery(sql: string): boolean {
 }
 
 /** Resolve the dialect from an explicit value or a connection-string scheme. */
-export function detectDialect(connectionString: string | undefined, explicit?: Dialect): Dialect | null {
+export function detectDialect(
+  connectionString: string | undefined,
+  explicit?: Dialect,
+): Dialect | null {
   if (explicit === 'postgres' || explicit === 'mysql') return explicit;
   const scheme = connectionString?.match(/^([a-z0-9+]+):\/\//i)?.[1]?.toLowerCase();
   if (!scheme) return null;
@@ -55,39 +82,44 @@ interface QueryOutcome {
   affectedRows?: number;
 }
 
-export class QueryDatabaseTool extends BaseTool {
+export class QueryDatabaseTool extends BaseTool<Args> {
   readonly name = 'query_database';
   readonly description =
     "Exécute du SQL sur une base Postgres ou MySQL/MariaDB (driver natif Node). En lecture seule par défaut : garde anti-écriture (SELECT/WITH/EXPLAIN/SHOW, une seule instruction) + transaction READ ONLY au niveau du SGBD. Connexion via connection_string (postgres://… / mysql://…) ou variables d'env (DATABASE_URL / PG_URL / MYSQL_URL). Mets read_only=false pour autoriser les écritures.";
   readonly category = 'system' as const;
   readonly riskLevel = 'medium' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.query_database;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
+  async execute(args: Args): Promise<ToolResult> {
     const {
       query,
       dialect: explicitDialect,
       connection_string,
-      read_only = true,
-      max_rows = 1000,
-      timeout_ms = 15_000,
-    } = rawArgs as QueryDatabaseArgs;
-
-    if (typeof query !== 'string' || query.trim().length === 0) return this.fail('query est requis.');
+      read_only,
+      max_rows,
+      timeout_ms,
+    } = args;
 
     const dialect = detectDialect(connection_string, explicitDialect);
     if (!dialect) {
-      return this.fail("Impossible de déterminer le SGBD. Fournis dialect ('postgres' ou 'mysql') ou une connection_string avec un schéma (postgres://… / mysql://…).");
+      return this.fail(
+        "Impossible de déterminer le SGBD. Fournis dialect ('postgres' ou 'mysql') ou une connection_string avec un schéma (postgres://… / mysql://…).",
+      );
     }
 
     const connectionString = connection_string ?? envConnString(dialect);
     if (!connectionString) {
-      return this.fail(`Aucune connexion. Fournis connection_string ou définis ${dialect === 'postgres' ? 'PG_URL/DATABASE_URL' : 'MYSQL_URL/DATABASE_URL'}.`);
+      return this.fail(
+        `Aucune connexion. Fournis connection_string ou définis ${dialect === 'postgres' ? 'PG_URL/DATABASE_URL' : 'MYSQL_URL/DATABASE_URL'}.`,
+      );
     }
 
     if (read_only && !isReadOnlyDbQuery(query)) {
-      return this.fail('Requête refusée en lecture seule. Seuls SELECT/WITH/EXPLAIN/SHOW (une seule instruction) sont permis. Mets read_only=false pour écrire.');
+      return this.fail(
+        'Requête refusée en lecture seule. Seuls SELECT/WITH/EXPLAIN/SHOW (une seule instruction) sont permis. Mets read_only=false pour écrire.',
+      );
     }
 
     const timeout = Math.min(Math.max(timeout_ms, 1_000), 60_000);
@@ -113,7 +145,12 @@ export class QueryDatabaseTool extends BaseTool {
     }
   }
 
-  private async runPostgres(connectionString: string, query: string, readOnly: boolean, timeout: number): Promise<QueryOutcome> {
+  private async runPostgres(
+    connectionString: string,
+    query: string,
+    readOnly: boolean,
+    timeout: number,
+  ): Promise<QueryOutcome> {
     const { Client } = await import('pg');
     const client = new Client({
       connectionString,
@@ -130,14 +167,21 @@ export class QueryDatabaseTool extends BaseTool {
       return {
         rows: r.rows ?? [],
         fields: (r.fields ?? []).map((f: { name: string }) => f.name),
-        ...(typeof r.rowCount === 'number' && (r.rows?.length ?? 0) === 0 ? { affectedRows: r.rowCount } : {}),
+        ...(typeof r.rowCount === 'number' && (r.rows?.length ?? 0) === 0
+          ? { affectedRows: r.rowCount }
+          : {}),
       };
     } finally {
       await client.end();
     }
   }
 
-  private async runMysql(connectionString: string, query: string, readOnly: boolean, timeout: number): Promise<QueryOutcome> {
+  private async runMysql(
+    connectionString: string,
+    query: string,
+    readOnly: boolean,
+    timeout: number,
+  ): Promise<QueryOutcome> {
     const { createConnection } = await import('mysql2/promise');
     const conn = await createConnection(connectionString);
     try {

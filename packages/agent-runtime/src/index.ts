@@ -3,7 +3,6 @@
  * Communicates with Tauri Rust core via JSON-RPC 2.0 over stdin/stdout.
  */
 
-import { join } from 'node:path';
 import { StdinBridge } from './ipc/StdinBridge';
 import { AgentOrchestrator } from './AgentOrchestrator';
 import { ToolRegistry } from './ToolRegistry';
@@ -26,82 +25,24 @@ import { Compactor } from './memory/Compactor';
 import { SemanticCache } from './memory/SemanticCache';
 import { PlaybookStore } from './playbook/PlaybookStore';
 import { EvolutionDaemon } from './playbook/EvolutionDaemon';
+import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
+// Premier import : charge le .env local puis fige la config du runtime.
+import { CONFIG, envNumber } from './config';
 import { createLogger } from './logger';
 
 // ─── Tools ────────────────────────────────────────────────────
-import { ReadFileTool } from './tools/filesystem/ReadFileTool';
-import { ListDirTool } from './tools/filesystem/ListDirTool';
-import { WriteFileTool } from './tools/filesystem/WriteFileTool';
-import { RunCommandTool } from './tools/system/RunCommandTool';
-import { OpenAppTool } from './tools/system/OpenAppTool';
-import { AuditEnvTool } from './tools/system/AuditEnvTool';
-import { InspectPortTool } from './tools/system/InspectPortTool';
-import { KillProcessTool } from './tools/system/KillProcessTool';
-import { DockerPsTool } from './tools/infra/DockerPsTool';
-import { DockerControlTool } from './tools/infra/DockerControlTool';
-import { RunSqliteTool } from './tools/infra/RunSqliteTool';
-import { QueryDatabaseTool } from './tools/infra/QueryDatabaseTool';
-import { ReadClipboardTool } from './tools/clipboard/ReadClipboardTool';
-import { WriteClipboardTool } from './tools/clipboard/WriteClipboardTool';
-import { SearchMemoryTool } from './tools/memory/SearchMemoryTool';
-import { StoreMemoryTool } from './tools/memory/StoreMemoryTool';
-import { AnalyzeStacktraceTool } from './tools/analysis/AnalyzeStacktraceTool';
-import { AnalyzeLogsTool } from './tools/analysis/AnalyzeLogsTool';
-import { GenerateUnitTestsTool } from './tools/analysis/GenerateUnitTestsTool';
-import { SuggestRefactorTool } from './tools/analysis/SuggestRefactorTool';
-import { AnalyzeDependenciesTool } from './tools/analysis/AnalyzeDependenciesTool';
-import { GitCommitTool } from './tools/git/GitCommitTool';
-import { GitPrTool } from './tools/git/GitPrTool';
-import { ReviewDiffTool } from './tools/git/ReviewDiffTool';
-import { SummarizeGitLogTool } from './tools/git/SummarizeGitLogTool';
-import { ResolveConflictsTool } from './tools/git/ResolveConflictsTool';
-import { BisectGuidedTool } from './tools/git/BisectGuidedTool';
-import { DetectSpiralTool } from './tools/productivity/DetectSpiralTool';
-import { GenerateStandupTool } from './tools/productivity/GenerateStandupTool';
-import { AnalyzeCodeStyleTool } from './tools/productivity/AnalyzeCodeStyleTool';
-import { LoadProjectContextTool } from './tools/productivity/LoadProjectContextTool';
-import { WatchCITool } from './tools/git/WatchCITool';
-import { SemanticSearchTool } from './tools/search/SemanticSearchTool';
-import { ReadWebpageTool } from './tools/web/ReadWebpageTool';
-import { FetchTechNewsTool } from './tools/web/FetchTechNewsTool';
-import { PostTechNewsDiscordTool } from './tools/web/PostTechNewsDiscordTool';
-import { ObsidianNotesTool } from './tools/connectors/ObsidianNotesTool';
-import { NotionSearchTool } from './tools/connectors/NotionSearchTool';
-import { SendWebhookMessageTool } from './tools/connectors/SendWebhookMessageTool';
-import { CallApiTool } from './tools/connectors/CallApiTool';
-import { ReadEmailTool } from './tools/connectors/ReadEmailTool';
-import { GitHubIssuesTool } from './tools/github/GitHubIssuesTool';
-import { GitHubPRTool } from './tools/github/GitHubPRTool';
-import { CaptureScreenTool } from './tools/screen/CaptureScreenTool';
-import { OcrRegionTool } from './tools/screen/OcrRegionTool';
-import { DescribeScreenTool } from './tools/screen/DescribeScreenTool';
-import { TranscribeAudioTool } from './tools/audio/TranscribeAudioTool';
-import { ParseDocumentTool } from './tools/files/ParseDocumentTool';
-import { AnalyzeDataTool } from './tools/files/AnalyzeDataTool';
-import { ExportDocumentTool } from './tools/files/ExportDocumentTool';
-import { ReadCalendarTool } from './tools/files/ReadCalendarTool';
+// Enregistrement centralisé (et testé) dans tools/registerTools.ts.
+import { registerCoreTools, registerAutomationTools } from './tools/registerTools';
 import { MarketService } from './market/MarketService';
 import { MarketPoller } from './market/MarketPoller';
 import { MarketHistoryStore } from './market/MarketHistoryStore';
-import { GetMarketTool } from './tools/market/GetMarketTool';
-import { AddToWatchlistTool } from './tools/market/AddToWatchlistTool';
-import { RemoveFromWatchlistTool } from './tools/market/RemoveFromWatchlistTool';
-import { SetFormulaTool } from './tools/market/SetFormulaTool';
-import { RemoveFormulaTool } from './tools/market/RemoveFormulaTool';
-import { RunSubAgentTool } from './tools/automation/RunSubAgentTool';
-import { RunParallelAgentsTool } from './tools/automation/RunParallelAgentsTool';
-import { ScheduleTaskTool } from './tools/automation/ScheduleTaskTool';
-import { ListScheduledTasksTool } from './tools/automation/ListScheduledTasksTool';
-import { CancelScheduledTaskTool } from './tools/automation/CancelScheduledTaskTool';
-import { BrowserNavigateTool } from './tools/browser/BrowserNavigateTool';
-import { BrowserScreenshotTool } from './tools/browser/BrowserScreenshotTool';
-import { BrowserGetTextTool } from './tools/browser/BrowserGetTextTool';
-import { BrowserClickTool } from './tools/browser/BrowserClickTool';
-import { BrowserTypeTool } from './tools/browser/BrowserTypeTool';
-import { BrowserCloseTool } from './tools/browser/BrowserCloseTool';
 import { SubAgentRunner } from './SubAgentRunner';
 import { CronScheduler } from './CronScheduler';
-import { PressDigestScheduler, type PressDigestConfig, type PressMode } from './news/PressDigestScheduler';
+import {
+  PressDigestScheduler,
+  type PressDigestConfig,
+  type PressMode,
+} from './news/PressDigestScheduler';
 import { LocalPressFeedStore } from './news/LocalPressFeedStore';
 import { LocalDailyStore } from './news/LocalDailyStore';
 import { LocalPressScheduler } from './news/LocalPressScheduler';
@@ -112,7 +53,15 @@ const log = createLogger('runtime:main');
 
 // Sélection de journaux par défaut pour la revue de presse quotidienne
 // (finance + généraliste FR + international). Surchargeable via CATDESK_PRESS_SOURCES.
-const DEFAULT_PRESS_SOURCES = ['latribune', 'cnbc', 'lemonde', 'lefigaro', 'france24', 'bbc', 'guardian'];
+const DEFAULT_PRESS_SOURCES = [
+  'latribune',
+  'cnbc',
+  'lemonde',
+  'lefigaro',
+  'france24',
+  'bbc',
+  'guardian',
+];
 
 /**
  * Config de la revue de presse auto-publiée (dailys). Renvoie null — donc le
@@ -135,35 +84,39 @@ function readPressDigestConfig(): PressDigestConfig | null {
     return null;
   }
   const csv = (v: string | undefined, fallback: string[]): string[] =>
-    v ? v.split(',').map((s) => s.trim()).filter((s) => s.length > 0) : fallback;
+    v
+      ? v
+          .split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0)
+      : fallback;
   return {
     sourceIds: csv(process.env['CATDESK_PRESS_SOURCES'], DEFAULT_PRESS_SOURCES),
     topics: csv(process.env['CATDESK_PRESS_TOPICS'], []),
-    sinceHours: Number(process.env['CATDESK_PRESS_SINCE_HOURS'] ?? 24),
-    perJournalLimit: Number(process.env['CATDESK_PRESS_LIMIT'] ?? 10),
+    sinceHours: envNumber('CATDESK_PRESS_SINCE_HOURS', 24),
+    perJournalLimit: envNumber('CATDESK_PRESS_LIMIT', 10),
     mode: readPressMode(process.env['CATDESK_PRESS_MODE']),
-    topicLimit: Number(process.env['CATDESK_PRESS_TOPIC_LIMIT'] ?? 40),
+    topicLimit: envNumber('CATDESK_PRESS_TOPIC_LIMIT', 40),
     synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
-    hour: Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
+    hour: CONFIG.pressHour,
     runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
     supabase: { url, anonKey, email, password },
     // Miroir Discord optionnel : réutilise DISCORD_WEBHOOK_URL par défaut, ou une
     // cible dédiée aux dailys via CATDESK_PRESS_DISCORD_WEBHOOK.
     ...(() => {
-      const hook = (process.env['CATDESK_PRESS_DISCORD_WEBHOOK'] ?? process.env['DISCORD_WEBHOOK_URL'] ?? '').trim();
+      const hook = (
+        process.env['CATDESK_PRESS_DISCORD_WEBHOOK'] ??
+        process.env['DISCORD_WEBHOOK_URL'] ??
+        ''
+      ).trim();
       return hook.length > 0 ? { discordWebhook: hook } : {};
     })(),
   };
 }
 
 async function main() {
-  // Load a local .env (gitignored) for connector secrets — DISCORD_WEBHOOK_URL,
-  // GITHUB_TOKEN, NOTION_TOKEN, etc. Falls back silently to the inherited
-  // environment when no file is present. loadEnvFile exists on Node ≥20.12.
-  try {
-    (process as { loadEnvFile?: (path?: string) => void }).loadEnvFile?.();
-  } catch { /* no .env file — rely on the inherited environment */ }
-
+  // Le .env local (secrets de connecteurs) est chargé par l'import de
+  // ./config, avant toute lecture d'environnement.
   log.info('CatDesk Agent Runtime starting', { pid: process.pid, node: process.version });
 
   // ─── Services ──────────────────────────────────────────────
@@ -171,8 +124,8 @@ async function main() {
   await db.initialize();
 
   const llm = new OllamaClient({
-    baseUrl: process.env['OLLAMA_URL'] ?? 'http://127.0.0.1:11434',
-    keepAlive: process.env['OLLAMA_KEEP_ALIVE'] ?? '10m',
+    baseUrl: CONFIG.ollamaBaseUrl,
+    keepAlive: CONFIG.ollamaKeepAlive,
   });
   const ollamaOk = await llm.isAvailable();
   log.info('Ollama status', { available: ollamaOk });
@@ -184,7 +137,7 @@ async function main() {
   // Warm memory : faits/préférences structurés sur l'utilisateur, instantanés
   // à interroger, alimentés en tâche de fond par le petit modèle. Désactivable
   // via CATDESK_WARM_MEMORY=0.
-  const warmEnabled = process.env['CATDESK_WARM_MEMORY'] !== '0';
+  const warmEnabled = CONFIG.warmMemory;
   const warmStore = new WarmMemoryStore();
   if (warmEnabled) await warmStore.initialize();
 
@@ -192,72 +145,12 @@ async function main() {
   const permissions = new PermissionEngine();
   const context = new ContextManager(db, vectorStore, warmEnabled ? warmStore : undefined);
 
-  // ─── Tool Registry ─────────────────────────────────────────
-  const tools = new ToolRegistry();
-  tools.register(new ReadFileTool());
-  tools.register(new ListDirTool());
-  tools.register(new WriteFileTool());
-  tools.register(new RunCommandTool());
-  tools.register(new OpenAppTool());
-  tools.register(new AuditEnvTool());
-  tools.register(new InspectPortTool());
-  tools.register(new KillProcessTool());
-  tools.register(new DockerPsTool());
-  tools.register(new DockerControlTool());
-  tools.register(new RunSqliteTool());
-  tools.register(new QueryDatabaseTool());
-  tools.register(new ReadClipboardTool());
-  tools.register(new WriteClipboardTool());
-  tools.register(new SearchMemoryTool(vectorStore));
-  tools.register(new StoreMemoryTool(vectorStore));
-  tools.register(new AnalyzeStacktraceTool());
-  tools.register(new AnalyzeLogsTool());
-  tools.register(new GenerateUnitTestsTool());
-  tools.register(new SuggestRefactorTool());
-  tools.register(new AnalyzeDependenciesTool());
-  tools.register(new GitCommitTool());
-  tools.register(new GitPrTool());
-  tools.register(new ReviewDiffTool());
-  tools.register(new SummarizeGitLogTool());
-  tools.register(new ResolveConflictsTool());
-  tools.register(new BisectGuidedTool());
-  tools.register(new DetectSpiralTool());
-  tools.register(new GenerateStandupTool());
-  tools.register(new AnalyzeCodeStyleTool());
-  tools.register(new LoadProjectContextTool());
-  tools.register(new WatchCITool());
-  tools.register(new SemanticSearchTool());
-  tools.register(new ReadWebpageTool());
-  tools.register(new FetchTechNewsTool());
-  tools.register(new PostTechNewsDiscordTool(llm, process.env['CATDESK_MODEL'] ?? 'qwen3:14b'));
-  tools.register(new ObsidianNotesTool());
-  tools.register(new NotionSearchTool());
-  tools.register(new SendWebhookMessageTool());
-  tools.register(new CallApiTool());
-  tools.register(new ReadEmailTool());
-  tools.register(new GitHubIssuesTool());
-  tools.register(new GitHubPRTool());
-  tools.register(new CaptureScreenTool());
-  tools.register(new OcrRegionTool());
-  // Vision model for describe_screen. Must load on this Windows/AMD setup via
-  // llama.cpp — NOT the 'mllama' arch (llama3.2-vision fails with "unknown model
-  // architecture: 'mllama'"). minicpm-v reads diagrams/charts/UIs accurately and
-  // grounded (llava-llama3 hallucinated badly — invented unrelated content).
-  // Verified: reads a labelled flowchart's boxes + notes with no hallucination,
-  // ~21s on the RX 6700. Override via CATDESK_VISION_MODEL.
-  tools.register(new DescribeScreenTool(llm, process.env['CATDESK_VISION_MODEL'] ?? 'minicpm-v'));
-  tools.register(new TranscribeAudioTool());
-  tools.register(new ParseDocumentTool());
-  tools.register(new AnalyzeDataTool());
-  tools.register(new ExportDocumentTool());
-  tools.register(new ReadCalendarTool());
-
   // ─── Market (bourse, P3) ───────────────────────────────────
   // Provider de cotations Yahoo + moteur de formules. Le poller pousse
   // périodiquement `market.update` (stdout → bras Rust → event UI). Watchlist
   // de départ via CATDESK_WATCHLIST, cadence via CATDESK_MARKET_INTERVAL_MS.
-  const marketSeed = (process.env['CATDESK_WATCHLIST'] ?? 'AAPL,MSFT,TSLA').split(',');
-  const market = new MarketService(marketSeed);
+  // Créé avant le registre : les outils bourse en dépendent.
+  const market = new MarketService([...CONFIG.watchlistSeed]);
   // B6 : historique persisté en SQLite (survit aux redémarrages, base des
   // futures formules glissantes). Échec non-fatal : le marché reste en mémoire.
   try {
@@ -269,21 +162,27 @@ async function main() {
       error: String(err),
     });
   }
-  tools.register(new GetMarketTool(market));
-  tools.register(new AddToWatchlistTool(market));
-  tools.register(new RemoveFromWatchlistTool(market));
-  tools.register(new SetFormulaTool(market));
-  tools.register(new RemoveFormulaTool(market));
-  const marketPoller = new MarketPoller(
+
+  // ─── Tool Registry ─────────────────────────────────────────
+  const defaultModel = CONFIG.model;
+  const tools = new ToolRegistry();
+  registerCoreTools(tools, {
+    llm,
+    vectorStore,
     market,
-    Number(process.env['CATDESK_MARKET_INTERVAL_MS'] ?? 30_000),
-  );
+    defaultModel,
+    // Vision : minicpm-v — PAS llava ni l'arch 'mllama' (voir SUIVI.md, choix
+    // validé sur RX 6700). Override via CATDESK_VISION_MODEL.
+    visionModel: CONFIG.visionModel,
+  });
+
+  const marketPoller = new MarketPoller(market, CONFIG.marketIntervalMs);
   marketPoller.start();
 
   // ─── Agent ─────────────────────────────────────────────────
   // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
   // pour les tâches triviales (gain ressources). Absent => pas de routage.
-  const smallModel = process.env['CATDESK_MODEL_SMALL'];
+  const smallModel = CONFIG.modelSmall;
   // Planificateur opt-in (utilisé seulement si la requête a usePlanning=true).
   const planner = new Planner(llm);
   // Suivi d'activité → alimente la détection de spirale en arrière-plan.
@@ -292,36 +191,47 @@ async function main() {
   // pour rendre le GPU aux autres applis (jeux, etc.). Désactivable via
   // CATDESK_PASSIVE_MODE=0 ; fenêtre réglable via CATDESK_IDLE_UNLOAD_MS.
   const idleUnloader = new IdleUnloader(llm, {
-    enabled: process.env['CATDESK_PASSIVE_MODE'] !== '0',
-    idleMs: Number(process.env['CATDESK_IDLE_UNLOAD_MS'] ?? 5 * 60 * 1000),
+    enabled: CONFIG.passiveMode,
+    idleMs: CONFIG.idleUnloadMs,
   });
-  // Extraction des faits warm. NB : un 3B est trop faible pour cette tâche
-  // (testé : il renvoie []), donc on extrait avec le modèle PRINCIPAL par
-  // défaut, indépendamment du petit modèle de routage. Surchargeable via
-  // CATDESK_EXTRACT_MODEL (ex. un 14B dédié sur une grosse machine).
-  const extractModel = process.env['CATDESK_EXTRACT_MODEL'] ?? process.env['CATDESK_MODEL'] ?? 'qwen3:14b';
-  const factExtractor = warmEnabled ? new FactExtractor(llm, extractModel, warmStore) : undefined;
+  // Extraction des faits warm — modèle capable requis (cf. config.extractModel).
+  const factExtractor = warmEnabled
+    ? new FactExtractor(llm, CONFIG.extractModel, warmStore)
+    : undefined;
   // Compaction : replie l'historique ancien en résumé glissant (long sessions).
   // Utilise le modèle d'extraction (capable) ; désactivable via CATDESK_COMPACTION=0.
-  const compactor = process.env['CATDESK_COMPACTION'] !== '0'
-    ? new Compactor(db, new ConversationSummarizer(llm, extractModel))
+  const compactor = CONFIG.compaction
+    ? new Compactor(db, new ConversationSummarizer(llm, CONFIG.extractModel))
     : undefined;
   // Playbook : mémoire de stratégie (quelle approche marche par type de tâche).
   // Désactivable via CATDESK_PLAYBOOK=0.
-  const playbookEnabled = process.env['CATDESK_PLAYBOOK'] !== '0';
-  const playbook = playbookEnabled ? new PlaybookStore() : undefined;
+  const playbook = CONFIG.playbook ? new PlaybookStore() : undefined;
   if (playbook) await playbook.initialize();
   // Cache sémantique : sert sans LLM une réponse déjà calculée pour une question
   // équivalente (gros gain de latence). Désactivable via CATDESK_SEMANTIC_CACHE=0.
   // Seuil/TTL réglables via CATDESK_CACHE_THRESHOLD / CATDESK_CACHE_TTL_MS.
-  const cache = process.env['CATDESK_SEMANTIC_CACHE'] !== '0'
+  const cache = CONFIG.semanticCache
     ? new SemanticCache(llm, {
-        threshold: Number(process.env['CATDESK_CACHE_THRESHOLD'] ?? 0.95),
-        ttlMs: Number(process.env['CATDESK_CACHE_TTL_MS'] ?? 24 * 60 * 60 * 1000),
+        threshold: CONFIG.cacheThreshold,
+        ttlMs: CONFIG.cacheTtlMs,
       })
     : undefined;
   if (cache) cache.initialize();
-  const orchestrator = new AgentOrchestrator(llm, tools, permissions, context, audit, smallModel, planner, activity, idleUnloader, factExtractor, compactor, playbook, cache);
+  const orchestrator = new AgentOrchestrator(
+    llm,
+    tools,
+    permissions,
+    context,
+    audit,
+    smallModel,
+    planner,
+    activity,
+    idleUnloader,
+    factExtractor,
+    compactor,
+    playbook,
+    cache,
+  );
 
   // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
   // doublons inter-clés, purge des faits périmés et peu fiables). Déterministe,
@@ -333,63 +243,46 @@ async function main() {
   // repère les échecs récurrents et les approches gagnantes, et écrit un rapport
   // de PROPOSITIONS (evolution-proposals.json) — jamais appliquées d'office :
   // l'humain reste dans la boucle. Désactivable via CATDESK_EVOLUTION=0.
-  const evolution = playbook && process.env['CATDESK_EVOLUTION'] !== '0'
-    ? new EvolutionDaemon(playbook)
-    : undefined;
+  const evolution = playbook && CONFIG.evolution ? new EvolutionDaemon(playbook) : undefined;
   evolution?.start();
 
   // ─── Spiral monitor (proactive nudge) ──────────────────────
   // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur
   // boucle sur le même problème. Le bridge Rust la transforme en event Tauri.
   const spiralMonitor = new SpiralMonitor(activity, stdoutNotifier, {
-    thresholdMinutes: Number(process.env['CATDESK_SPIRAL_THRESHOLD_MIN'] ?? 45),
+    thresholdMinutes: CONFIG.spiralThresholdMin,
   });
   spiralMonitor.start();
 
-  // ─── Sub-agent tools (need orchestrator reference) ─────────
-  const defaultModel = process.env['CATDESK_MODEL'] ?? 'qwen3:14b';
+  // ─── Sub-agent + cron tools (need orchestrator reference) ──
   const subAgentRunner = new SubAgentRunner(orchestrator, tools, defaultModel);
-  tools.register(new RunSubAgentTool(subAgentRunner));
-  tools.register(new RunParallelAgentsTool(subAgentRunner));
-
-  // ─── Cron scheduler (needs SubAgentRunner) ─────────────────
   const cron = new CronScheduler(db, subAgentRunner);
   await cron.initialize();
-  tools.register(new ScheduleTaskTool(cron));
-  tools.register(new ListScheduledTasksTool(cron));
-  tools.register(new CancelScheduledTaskTool(cron));
+  registerAutomationTools(tools, subAgentRunner, cron);
 
   // ─── Revue de presse → dailys (poste de référence uniquement) ──
   // Agrège plusieurs journaux, analyse intra-journal (LLM local) et publie une
   // daily par journal dans Supabase. Inactif sans config admin (cf. ci-dessus).
   const pressCfg = readPressDigestConfig();
-  const pressScheduler = pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
+  const pressScheduler =
+    pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
   pressScheduler?.start();
 
   // ─── Journaux personnalisés LOCAUX (tout utilisateur) ──────
   // Chaque poste peut définir ses propres journaux (panneau « Mes journaux »),
   // générés quotidiennement par SON agent et stockés localement — ils viennent
   // s'ajouter aux dailys partagées dans le widget. Aucun rôle admin requis.
-  const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-  const localFeeds = new LocalPressFeedStore(dataDir);
-  const localDailies = new LocalDailyStore(dataDir);
+  const localFeeds = new LocalPressFeedStore(CONFIG.dataDir);
+  const localDailies = new LocalDailyStore(CONFIG.dataDir);
   const localPress = new LocalPressScheduler(
     llm,
     defaultModel,
     localFeeds,
     localDailies,
-    Number(process.env['CATDESK_PRESS_HOUR'] ?? 7),
-    (dailies) => stdoutNotifier('dailies.local', { dailies }),
+    CONFIG.pressHour,
+    dailies => stdoutNotifier(RPC_NOTIFICATIONS.dailiesLocal, { dailies }),
   );
   localPress.start();
-
-  // ─── Browser tools (playwright-core, lazy-launch) ──────────
-  tools.register(new BrowserNavigateTool());
-  tools.register(new BrowserScreenshotTool());
-  tools.register(new BrowserGetTextTool());
-  tools.register(new BrowserClickTool());
-  tools.register(new BrowserTypeTool());
-  tools.register(new BrowserCloseTool());
 
   log.info('Tools registered', { tools: tools.listNames() });
 
@@ -411,8 +304,8 @@ async function main() {
       : undefined,
     {
       listFeeds: () => localFeeds.list(),
-      saveFeed: (input) => localFeeds.save(input),
-      deleteFeed: (id) => localFeeds.delete(id),
+      saveFeed: input => localFeeds.save(input),
+      deleteFeed: id => localFeeds.delete(id),
       listDailies: () => localDailies.list(),
       runNow: () => localPress.runOnce(),
     },
@@ -422,8 +315,8 @@ async function main() {
   // État initial des journaux/dailys locaux — l'UI peut aussi le redemander via
   // `press.local.sync` (les notifications émises avant le chargement de la
   // fenêtre sont perdues).
-  stdoutNotifier('press.feeds', { feeds: localFeeds.list() });
-  stdoutNotifier('dailies.local', { dailies: localDailies.list() });
+  stdoutNotifier(RPC_NOTIFICATIONS.pressFeeds, { feeds: localFeeds.list() });
+  stdoutNotifier(RPC_NOTIFICATIONS.dailiesLocal, { dailies: localDailies.list() });
 
   log.info('Agent Runtime ready and listening on stdin');
 
@@ -446,12 +339,14 @@ async function main() {
     log.error('Uncaught exception', { message: err.message, stack: err.stack });
   });
 
-  process.on('unhandledRejection', (reason) => {
+  process.on('unhandledRejection', reason => {
     log.error('Unhandled rejection', { reason: String(reason) });
   });
 }
 
 main().catch(err => {
-  process.stderr.write(JSON.stringify({ ts: new Date().toISOString(), level: 'FATAL', msg: String(err) }) + '\n');
+  process.stderr.write(
+    JSON.stringify({ ts: new Date().toISOString(), level: 'FATAL', msg: String(err) }) + '\n',
+  );
   process.exit(1);
 });

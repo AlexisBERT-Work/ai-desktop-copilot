@@ -1,21 +1,36 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-type Action = 'start' | 'stop' | 'restart' | 'up' | 'down';
+const argsSchema = z.object({
+  action: z
+    .enum(['start', 'stop', 'restart', 'up', 'down'])
+    .describe('start/stop/restart a container, or compose up/down a project'),
+  target: z
+    .string()
+    .optional()
+    .describe(
+      'Container name/id (start/stop/restart) or compose file path (up/down, defaults to ./docker-compose.yml)',
+    ),
+  workdir: z
+    .string()
+    .optional()
+    .describe('Working directory for compose commands (defaults to current directory)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
-interface DockerControlArgs {
-  action: Action;
-  target?: string;
-  workdir?: string;
-}
+export type Action = Args['action'];
 
 // Build the docker CLI argv for a given action (pure, exported for tests).
-export function buildDockerArgs(action: Action, target: string | undefined): { ok: true; args: string[] } | { ok: false; error: string } {
+export function buildDockerArgs(
+  action: Action,
+  target: string | undefined,
+): { ok: true; args: string[] } | { ok: false; error: string } {
   switch (action) {
     case 'start':
     case 'stop':
@@ -38,18 +53,17 @@ export function buildDockerArgs(action: Action, target: string | undefined): { o
   }
 }
 
-export class DockerControlTool extends BaseTool {
+export class DockerControlTool extends BaseTool<Args> {
   readonly name = 'docker_control';
   readonly description =
-    "Démarre/arrête/redémarre un conteneur Docker, ou fait un compose up/down sur un projet. Action avec effet de bord — confirmation requise. Pour up/down, `target` est le fichier compose (défaut docker-compose.yml).";
+    'Démarre/arrête/redémarre un conteneur Docker, ou fait un compose up/down sur un projet. Action avec effet de bord — confirmation requise. Pour up/down, `target` est le fichier compose (défaut docker-compose.yml).';
   readonly category = 'system' as const;
   readonly riskLevel = 'high' as const;
   readonly requiresConfirmation = true;
-  readonly schema = TOOL_SCHEMAS.docker_control;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { action, target, workdir } = args as DockerControlArgs;
-
+  async execute({ action, target, workdir }: Args): Promise<ToolResult> {
     const built = buildDockerArgs(action, target);
     if (!built.ok) return this.fail(built.error);
 

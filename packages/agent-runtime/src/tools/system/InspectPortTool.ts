@@ -1,14 +1,20 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-interface InspectPortArgs {
-  port?: number;
-}
+const argsSchema = z.object({
+  port: z
+    .number()
+    .int()
+    .optional()
+    .describe('TCP port to inspect (optional — lists all listening ports if omitted)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export interface Listener {
   proto: string;
@@ -63,24 +69,28 @@ export function parseTasklist(output: string): Map<number, string> {
   return map;
 }
 
-export class InspectPortTool extends BaseTool {
+export class InspectPortTool extends BaseTool<Args> {
   readonly name = 'inspect_port';
   readonly description =
-    "Liste les ports TCP en écoute et les processus associés (« qui tourne sur le port 3000 ? »). Donne `port` pour cibler un port, sinon liste tout. Lecture seule — utilise kill_process pour libérer un port.";
+    'Liste les ports TCP en écoute et les processus associés (« qui tourne sur le port 3000 ? »). Donne `port` pour cibler un port, sinon liste tout. Lecture seule — utilise kill_process pour libérer un port.';
   readonly category = 'system' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.inspect_port;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { port } = args as InspectPortArgs;
-
+  async execute({ port }: Args): Promise<ToolResult> {
     let netstatOut: string;
     try {
-      const { stdout } = await exec('netstat', ['-ano'], { maxBuffer: 4_000_000, windowsHide: true });
+      const { stdout } = await exec('netstat', ['-ano'], {
+        maxBuffer: 4_000_000,
+        windowsHide: true,
+      });
       netstatOut = stdout;
     } catch (err) {
-      return this.fail(`Impossible d'exécuter netstat: ${err instanceof Error ? err.message : String(err)}`);
+      return this.fail(
+        `Impossible d'exécuter netstat: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     const listeners = parseNetstat(netstatOut, port);
@@ -89,14 +99,17 @@ export class InspectPortTool extends BaseTool {
     let names = new Map<number, string>();
     if (listeners.length > 0) {
       try {
-        const { stdout } = await exec('tasklist', ['/fo', 'csv', '/nh'], { maxBuffer: 8_000_000, windowsHide: true });
+        const { stdout } = await exec('tasklist', ['/fo', 'csv', '/nh'], {
+          maxBuffer: 8_000_000,
+          windowsHide: true,
+        });
         names = parseTasklist(stdout);
       } catch {
         // names stay empty
       }
     }
 
-    const result = listeners.map((l) => ({ ...l, process: names.get(l.pid) ?? null }));
+    const result = listeners.map(l => ({ ...l, process: names.get(l.pid) ?? null }));
 
     return this.ok({
       ...(port !== undefined ? { port } : {}),
@@ -106,7 +119,7 @@ export class InspectPortTool extends BaseTool {
         port !== undefined
           ? result.length === 0
             ? `Aucun processus en écoute sur le port ${port}.`
-            : `Port ${port} : ${result.map((r) => `${r.process ?? 'pid ' + r.pid} (pid ${r.pid})`).join(', ')}.`
+            : `Port ${port} : ${result.map(r => `${r.process ?? 'pid ' + r.pid} (pid ${r.pid})`).join(', ')}.`
           : `${result.length} port(s) TCP en écoute.`,
     });
   }

@@ -1,4 +1,4 @@
-import { readdir, readFile, access } from 'fs/promises';
+import { readdir, readFile } from 'fs/promises';
 import { join, basename } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
 import { TOOL_SCHEMAS } from '@catdesk/shared-types';
@@ -8,17 +8,17 @@ interface LoadProjectContextArgs {
   workdir?: string;
 }
 
-async function exists(p: string): Promise<boolean> {
-  try { await access(p); return true; } catch { return false; }
-}
-
 // Detect stack/package-manager signals from a set of present filenames (pure).
-export function detectStack(files: Set<string>): { stack: string[]; packageManager: string | null } {
+export function detectStack(files: Set<string>): {
+  stack: string[];
+  packageManager: string | null;
+} {
   const stack: string[] = [];
   if (files.has('package.json')) stack.push('Node.js/JS');
   if (files.has('tsconfig.json')) stack.push('TypeScript');
   if (files.has('Cargo.toml')) stack.push('Rust');
-  if (files.has('requirements.txt') || files.has('pyproject.toml') || files.has('setup.py')) stack.push('Python');
+  if (files.has('requirements.txt') || files.has('pyproject.toml') || files.has('setup.py'))
+    stack.push('Python');
   if (files.has('go.mod')) stack.push('Go');
   if (files.has('Dockerfile') || files.has('docker-compose.yml')) stack.push('Docker');
   if (files.has('tauri.conf.json')) stack.push('Tauri');
@@ -65,40 +65,54 @@ export class LoadProjectContextTool extends BaseTool {
       return this.fail(`Dossier introuvable: ${root}`);
     }
 
-    const topLevelFiles = new Set(entries.filter((e) => e.isFile()).map((e) => e.name));
-    const topLevelDirs = entries.filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules').map((e) => e.name);
+    const topLevelFiles = new Set(entries.filter(e => e.isFile()).map(e => e.name));
+    const topLevelDirs = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
+      .map(e => e.name);
 
     const { stack, packageManager } = detectStack(topLevelFiles);
 
     // package.json details
     let scripts: string[] = [];
     let keyDeps: string[] = [];
-    let entryPoints: string[] = [];
+    const entryPoints: string[] = [];
     let projectName = basename(root);
     if (topLevelFiles.has('package.json')) {
       try {
         const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf-8')) as {
-          name?: string; scripts?: Record<string, string>; main?: string; bin?: unknown;
+          name?: string;
+          scripts?: Record<string, string>;
+          main?: string;
+          bin?: unknown;
           dependencies?: Record<string, string>;
         };
         if (pkg.name) projectName = pkg.name;
         scripts = Object.keys(pkg.scripts ?? {});
         keyDeps = Object.keys(pkg.dependencies ?? {}).slice(0, 15);
         if (pkg.main) entryPoints.push(pkg.main);
-        if (pkg.bin && typeof pkg.bin === 'object') entryPoints.push(...Object.values(pkg.bin as Record<string, string>));
-      } catch { /* malformed */ }
+        if (pkg.bin && typeof pkg.bin === 'object')
+          entryPoints.push(...Object.values(pkg.bin as Record<string, string>));
+      } catch {
+        /* malformed */
+      }
     }
 
     // README summary
     let readme: string | null = null;
     for (const name of ['README.md', 'readme.md', 'README.MD', 'Readme.md']) {
       if (topLevelFiles.has(name)) {
-        try { readme = summarizeReadme(await readFile(join(root, name), 'utf-8')); } catch { /* skip */ }
+        try {
+          readme = summarizeReadme(await readFile(join(root, name), 'utf-8'));
+        } catch {
+          /* skip */
+        }
         break;
       }
     }
 
-    const docs = ['CLAUDE.md', 'CONTRIBUTING.md', 'AGENTS.md', 'ARCHITECTURE.md'].filter((d) => topLevelFiles.has(d));
+    const docs = ['CLAUDE.md', 'CONTRIBUTING.md', 'AGENTS.md', 'ARCHITECTURE.md'].filter(d =>
+      topLevelFiles.has(d),
+    );
 
     return this.ok({
       project: projectName,
@@ -111,7 +125,11 @@ export class LoadProjectContextTool extends BaseTool {
       entryPoints,
       docs,
       readmeSummary: readme,
-      howToRun: scripts.includes('dev') ? `${packageManager ?? 'npm'} run dev` : scripts.includes('start') ? `${packageManager ?? 'npm'} start` : null,
+      howToRun: scripts.includes('dev')
+        ? `${packageManager ?? 'npm'} run dev`
+        : scripts.includes('start')
+          ? `${packageManager ?? 'npm'} start`
+          : null,
       note: 'Contexte projet — à mémoriser pour les prochaines sessions (mémoire de projet).',
     });
   }

@@ -1,23 +1,47 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface Args {
-  name: string;
-  args?: string;
-}
+const argsSchema = z.object({
+  name: z.string().min(1).describe('Application name or executable path'),
+  args: z.string().optional().describe('Command line arguments'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // Interpréteurs et LOLBins qui exécutent du code arbitraire : les autoriser via
 // open_app en ferait un contournement de run_command (qui est `high` + blocklist).
 // On les refuse ici — pour exécuter une commande, il y a run_command.
 const BLOCKED_EXECUTABLES = new Set([
-  'powershell', 'powershell_ise', 'pwsh',
-  'cmd', 'command',
-  'wscript', 'cscript', 'mshta', 'hh',
-  'rundll32', 'regsvr32', 'regasm', 'regsvcs', 'installutil',
-  'msbuild', 'cmstp', 'msiexec', 'conhost',
-  'bash', 'sh', 'wsl', 'busybox',
-  'python', 'python3', 'py', 'node', 'ruby', 'perl', 'php',
+  'powershell',
+  'powershell_ise',
+  'pwsh',
+  'cmd',
+  'command',
+  'wscript',
+  'cscript',
+  'mshta',
+  'hh',
+  'rundll32',
+  'regsvr32',
+  'regasm',
+  'regsvcs',
+  'installutil',
+  'msbuild',
+  'cmstp',
+  'msiexec',
+  'conhost',
+  'bash',
+  'sh',
+  'wsl',
+  'busybox',
+  'python',
+  'python3',
+  'py',
+  'node',
+  'ruby',
+  'perl',
+  'php',
 ]);
 
 /** Basename sans dossier ni extension `.exe`, en minuscules. */
@@ -37,7 +61,7 @@ export function validateAppName(name: string): string | null {
   return null;
 }
 
-export class OpenAppTool extends BaseTool {
+export class OpenAppTool extends BaseTool<Args> {
   name = 'open_app';
   description =
     "Ouvre une application Windows (nom d'exécutable, chemin, ou nom d'app: notepad, code, chrome…)";
@@ -46,11 +70,11 @@ export class OpenAppTool extends BaseTool {
   // run_command. `high` retire aussi l'auto-approbation « se souvenir » de session.
   riskLevel = 'high' as const;
   requiresConfirmation = true;
-  schema = TOOL_SCHEMAS.open_app;
+  override readonly argsSchema = argsSchema;
+  schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
-    const invalid = validateAppName(args.name ?? '');
+  async execute(args: Args): Promise<ToolResult> {
+    const invalid = validateAppName(args.name);
     if (invalid) return this.fail(invalid);
     if (args.args !== undefined && /[\r\n\0]/.test(args.args)) {
       return this.fail('args contient des caractères interdits');

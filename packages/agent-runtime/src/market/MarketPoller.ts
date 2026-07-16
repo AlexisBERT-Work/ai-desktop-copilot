@@ -1,3 +1,4 @@
+import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { MarketService } from './MarketService';
 import { stdoutNotifier } from '../ipc/Notifier';
 import { createLogger } from '../logger';
@@ -37,7 +38,7 @@ export class MarketPoller {
   private async tick(): Promise<void> {
     try {
       const snapshot = await this.service.refresh();
-      stdoutNotifier('market.update', snapshot);
+      stdoutNotifier(RPC_NOTIFICATIONS.marketUpdate, snapshot);
     } catch (err) {
       log.error('market refresh failed', { error: String(err) });
     }

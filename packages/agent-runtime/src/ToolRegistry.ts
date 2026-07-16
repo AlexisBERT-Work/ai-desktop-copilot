@@ -6,6 +6,8 @@ const log = createLogger('agent:tools');
 // Tool interface that registry works with
 export interface RegisteredTool extends ToolDefinition {
   execute(args: unknown): Promise<ToolResult>;
+  /** Valide (zod, si l'outil en a un) puis exécute — le chemin du LLM. */
+  run(rawArgs: unknown): Promise<ToolResult>;
   toOllamaSchema(): OllamaToolSchema;
 }
 
@@ -41,7 +43,7 @@ export class ToolRegistry {
     log.debug('Executing tool', { name, args });
 
     try {
-      const result = await tool.execute(args);
+      const result = await tool.run(args);
       const durationMs = Date.now() - startMs;
       log.debug('Tool complete', { name, success: result.success, durationMs });
       return { ...result, metadata: { ...result.metadata, durationMs } };

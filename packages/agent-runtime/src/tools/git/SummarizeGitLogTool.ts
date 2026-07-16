@@ -1,10 +1,7 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 interface SummarizeGitLogArgs {
   workdir?: string;
@@ -66,13 +63,18 @@ export class SummarizeGitLogTool extends BaseTool {
     const cwd = workdir ?? process.cwd();
 
     // hash \x1f author \x1f ISO date \x1f subject
-    const logArgs = ['log', `--pretty=format:%h\x1f%an\x1f%ad\x1f%s`, '--date=short', `-n${Math.max(1, max)}`];
+    const logArgs = [
+      'log',
+      `--pretty=format:%h\x1f%an\x1f%ad\x1f%s`,
+      '--date=short',
+      `-n${Math.max(1, max)}`,
+    ];
     if (typeof since === 'string' && since.length > 0) logArgs.push(`--since=${since}`);
     if (typeof author === 'string' && author.length > 0) logArgs.push(`--author=${author}`);
     if (typeof path === 'string' && path.length > 0) logArgs.push('--', path);
 
     try {
-      const { stdout: logOut } = await exec('git', logArgs, { cwd, maxBuffer: 2_000_000 });
+      const { stdout: logOut } = await runGit(logArgs, { cwd, maxBuffer: 2_000_000 });
 
       if (logOut.trim().length === 0) {
         return this.ok({ commitCount: 0, summary: 'Aucun commit ne correspond aux critères.' });
@@ -87,16 +89,23 @@ export class SummarizeGitLogTool extends BaseTool {
         if (typeof since === 'string' && since.length > 0) statArgs.push(`--since=${since}`);
         if (typeof author === 'string' && author.length > 0) statArgs.push(`--author=${author}`);
         if (typeof path === 'string' && path.length > 0) statArgs.push('--', path);
-        const { stdout: filesOut } = await exec('git', statArgs, { cwd, maxBuffer: 4_000_000 });
-        const counts = tally(filesOut.split('\n').map((l) => l.trim()).filter((l) => l.length > 0));
-        topFiles = Object.entries(counts).slice(0, 10).map(([file, changes]) => ({ file, changes }));
+        const { stdout: filesOut } = await runGit(statArgs, { cwd, maxBuffer: 4_000_000 });
+        const counts = tally(
+          filesOut
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0),
+        );
+        topFiles = Object.entries(counts)
+          .slice(0, 10)
+          .map(([file, changes]) => ({ file, changes }));
       } catch {
         // non-fatal
       }
 
-      const byType = tally(commits.map((c) => c.type));
-      const byAuthor = tally(commits.map((c) => c.author));
-      const byScope = tally(commits.map((c) => c.scope));
+      const byType = tally(commits.map(c => c.type));
+      const byAuthor = tally(commits.map(c => c.author));
+      const byScope = tally(commits.map(c => c.scope));
 
       return this.ok({
         scope: {
@@ -113,12 +122,21 @@ export class SummarizeGitLogTool extends BaseTool {
         byAuthor,
         byScope,
         topFiles,
-        commits: commits.slice(0, 50).map((c) => ({ hash: c.hash, type: c.type, subject: c.subject, author: c.author, date: c.date })),
+        commits: commits
+          .slice(0, 50)
+          .map(c => ({
+            hash: c.hash,
+            type: c.type,
+            subject: c.subject,
+            author: c.author,
+            date: c.date,
+          })),
         note: 'Données agrégées — le LLM doit en tirer un résumé narratif (thèmes principaux, points notables) à partir des subjects.',
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('not a git repository')) return this.fail('Ce répertoire n\'est pas un dépôt git.');
+      if (msg.includes('not a git repository'))
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       return this.fail(`Erreur git: ${msg}`);
     }
   }

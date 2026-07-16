@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { OllamaMessage, ConversationSummary } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
+import { loadSqlJs, type Database } from '../lib/sqljs';
 
 export interface ScheduledJob {
   id: string;
@@ -19,19 +20,9 @@ export interface ScheduledJob {
 
 const log = createLogger('memory:sqlite');
 
-// sql.js is loaded lazily (WASM module)
-let SQL: any = null;
-
-async function getSqlJs() {
-  if (!SQL) {
-    const sqljs = await import('sql.js');
-    SQL = await sqljs.default({ locateFile: () => require.resolve('sql.js/dist/sql-wasm.wasm') });
-  }
-  return SQL;
-}
-
 export class ConversationStore {
-  private db: any = null;
+  // Affectée dans initialize() — tout accès avant est un bug d'ordre de démarrage.
+  private db!: Database;
   private dbPath: string;
 
   constructor() {
@@ -41,7 +32,7 @@ export class ConversationStore {
   }
 
   async initialize(): Promise<void> {
-    const SqlJs = await getSqlJs();
+    const SqlJs = await loadSqlJs();
 
     // Load existing DB from file, or create new
     if (existsSync(this.dbPath)) {
@@ -111,19 +102,25 @@ export class ConversationStore {
     this.persist();
   }
 
-  addMessage(conversationId: string, msg: {
-    id: string;
-    role: string;
-    content: string;
-    toolCalls?: unknown;
-    toolCallId?: string;
-  }): void {
+  addMessage(
+    conversationId: string,
+    msg: {
+      id: string;
+      role: string;
+      content: string;
+      toolCalls?: unknown;
+      toolCallId?: string;
+    },
+  ): void {
     const now = Date.now();
     this.db.run(
       `INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_call_id, created_at)
        VALUES (?,?,?,?,?,?,?)`,
       [
-        msg.id, conversationId, msg.role, msg.content,
+        msg.id,
+        conversationId,
+        msg.role,
+        msg.content,
         msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
         msg.toolCallId ?? null,
         now,
@@ -140,9 +137,19 @@ export class ConversationStore {
     );
     stmt.bind([conversationId, limit]);
 
-    const rows: Array<{ role: string; content: string; tool_calls: string | null; tool_call_id: string | null }> = [];
+    const rows: Array<{
+      role: string;
+      content: string;
+      tool_calls: string | null;
+      tool_call_id: string | null;
+    }> = [];
     while (stmt.step()) {
-      const row = stmt.getAsObject() as any;
+      const row = stmt.getAsObject() as {
+        role: string;
+        content: string;
+        tool_calls: string | null;
+        tool_call_id: string | null;
+      };
       rows.push(row);
     }
     stmt.free();
@@ -164,7 +171,7 @@ export class ConversationStore {
     stmt.bind([limit]);
     const rows: ConversationSummary[] = [];
     while (stmt.step()) {
-      rows.push(stmt.getAsObject() as any);
+      rows.push(stmt.getAsObject() as unknown as ConversationSummary);
     }
     stmt.free();
     return rows;
@@ -178,7 +185,10 @@ export class ConversationStore {
        (id, name, task, schedule, enabled, created_at, last_run_at, next_run_at, last_result, last_error, run_count)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        job.id, job.name, job.task, job.schedule,
+        job.id,
+        job.name,
+        job.task,
+        job.schedule,
         job.enabled ? 1 : 0,
         job.createdAt,
         job.lastRunAt ?? null,
@@ -198,7 +208,7 @@ export class ConversationStore {
     );
     const rows: ScheduledJob[] = [];
     while (stmt.step()) {
-      const r = stmt.getAsObject() as any;
+      const r = stmt.getAsObject();
       rows.push({
         id: r.id as string,
         name: r.name as string,
@@ -222,7 +232,10 @@ export class ConversationStore {
     this.persist();
   }
 
-  updateScheduledTaskRun(id: string, opts: { lastRunAt: number; nextRunAt: number; lastResult?: string; lastError?: string }): void {
+  updateScheduledTaskRun(
+    id: string,
+    opts: { lastRunAt: number; nextRunAt: number; lastResult?: string; lastError?: string },
+  ): void {
     this.db.run(
       `UPDATE scheduled_tasks
        SET last_run_at=?, next_run_at=?, last_result=?, last_error=?, run_count=run_count+1
@@ -235,7 +248,11 @@ export class ConversationStore {
   // ─── Conversation compaction (rolling summary) ─────────────────
 
   /** Messages created strictly after `sinceTs`, oldest first, with timestamps. */
-  getMessagesSince(conversationId: string, sinceTs: number, limit = 100): Array<{ role: string; content: string; createdAt: number }> {
+  getMessagesSince(
+    conversationId: string,
+    sinceTs: number,
+    limit = 100,
+  ): Array<{ role: string; content: string; createdAt: number }> {
     const stmt = this.db.prepare(
       `SELECT role, content, created_at FROM messages
        WHERE conversation_id=? AND created_at > ? ORDER BY created_at ASC LIMIT ?`,
@@ -255,7 +272,9 @@ export class ConversationStore {
       `SELECT summary, through_ts FROM conversation_summaries WHERE conversation_id=?`,
     );
     stmt.bind([conversationId]);
-    const row = stmt.step() ? (stmt.getAsObject() as { summary: string; through_ts: number }) : null;
+    const row = stmt.step()
+      ? (stmt.getAsObject() as { summary: string; through_ts: number })
+      : null;
     stmt.free();
     return row ? { summary: row.summary, throughTs: row.through_ts } : null;
   }

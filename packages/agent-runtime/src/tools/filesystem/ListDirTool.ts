@@ -1,15 +1,17 @@
 import { readdir, stat } from 'fs/promises';
 import { join, extname } from 'path';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface Args {
-  path: string;
-  recursive?: boolean;
-  includeHidden?: boolean;
-  filter?: string;
-}
+const argsSchema = z.object({
+  path: z.string().min(1).describe('Directory path to list'),
+  recursive: z.boolean().default(false),
+  includeHidden: z.boolean().default(false),
+  filter: z.string().optional().describe('Glob pattern filter'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface DirEntry {
   name: string;
@@ -19,18 +21,16 @@ interface DirEntry {
   extension?: string;
 }
 
-export class ListDirTool extends BaseTool {
+export class ListDirTool extends BaseTool<Args> {
   name = 'list_directory';
-  description = 'Liste le contenu d\'un répertoire avec métadonnées';
+  description = "Liste le contenu d'un répertoire avec métadonnées";
   category = 'filesystem' as const;
   riskLevel = 'low' as const;
   requiresConfirmation = false;
-  schema = TOOL_SCHEMAS.list_directory;
+  override readonly argsSchema = argsSchema;
+  schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
-    if (!args.path) return this.fail('path est requis');
-
+  async execute(args: Args): Promise<ToolResult> {
     try {
       const entries = await this.list(args.path, args);
       return this.ok({

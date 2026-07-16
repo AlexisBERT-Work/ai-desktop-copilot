@@ -1,16 +1,21 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-interface DockerPsArgs {
-  all?: boolean;
-  logs_for?: string;
-  tail?: number;
-}
+const argsSchema = z.object({
+  all: z.boolean().default(false).describe('Include stopped containers (docker ps -a)'),
+  logs_for: z
+    .string()
+    .optional()
+    .describe('Also fetch recent logs for this container name/id (optional)'),
+  tail: z.number().default(50).describe('Number of log lines when logs_for is set'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export interface Container {
   id: string;
@@ -48,18 +53,17 @@ function dockerMissing(msg: string): boolean {
   return /ENOENT|not recognized|introuvable|command not found|cannot find the file/i.test(msg);
 }
 
-export class DockerPsTool extends BaseTool {
+export class DockerPsTool extends BaseTool<Args> {
   readonly name = 'docker_ps';
   readonly description =
     "Liste les conteneurs Docker (en cours, ou tous avec `all`) : nom, image, statut, ports. Donne `logs_for` pour récupérer aussi les dernières lignes de logs d'un conteneur. Lecture seule.";
   readonly category = 'system' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.docker_ps;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { all = false, logs_for, tail = 50 } = args as DockerPsArgs;
-
+  async execute({ all, logs_for, tail }: Args): Promise<ToolResult> {
     const psArgs = ['ps', '--format', '{{json .}}'];
     if (all) psArgs.push('-a');
 
@@ -69,8 +73,10 @@ export class DockerPsTool extends BaseTool {
       containers = parseDockerPs(stdout);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (dockerMissing(msg)) return this.fail('Docker introuvable. Vérifie que Docker Desktop est installé et démarré.');
-      if (/cannot connect to the docker daemon|daemon/i.test(msg)) return this.fail('Le daemon Docker ne répond pas. Démarre Docker Desktop.');
+      if (dockerMissing(msg))
+        return this.fail('Docker introuvable. Vérifie que Docker Desktop est installé et démarré.');
+      if (/cannot connect to the docker daemon|daemon/i.test(msg))
+        return this.fail('Le daemon Docker ne répond pas. Démarre Docker Desktop.');
       return this.fail(`Erreur docker ps: ${msg}`);
     }
 

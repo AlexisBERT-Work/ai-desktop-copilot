@@ -1,5 +1,7 @@
 import type { OllamaMessage, OllamaToolSchema, StreamChunk } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
+import { CONFIG } from '../config';
+import { withRetry } from '../lib/retry';
 
 const log = createLogger('llm:ollama');
 
@@ -13,11 +15,15 @@ function normalizeToolCallArgs(m: OllamaMessage): OllamaMessage {
   if (!m.tool_calls?.length) return m;
   return {
     ...m,
-    tool_calls: m.tool_calls.map((tc) => {
+    tool_calls: m.tool_calls.map(tc => {
       const args = tc.function.arguments;
       if (typeof args !== 'string') return tc;
       let parsed: Record<string, unknown> = {};
-      try { parsed = JSON.parse(args) as Record<string, unknown>; } catch { /* keep {} */ }
+      try {
+        parsed = JSON.parse(args) as Record<string, unknown>;
+      } catch {
+        /* keep {} */
+      }
       return { ...tc, function: { ...tc.function, arguments: parsed } };
     }),
   };
@@ -99,13 +105,17 @@ export class OllamaClient {
       },
     };
 
-    log.debug('Chat request', { model: params.model, messageCount: body.messages.length, keepAlive });
+    log.debug('Chat request', {
+      model: params.model,
+      messageCount: body.messages.length,
+      keepAlive,
+    });
 
     // Abort on either the request timeout or the caller's signal (Stop button).
-    const timeoutSignal = AbortSignal.timeout(params.timeoutMs ?? this.config.requestTimeout ?? 120_000);
-    const signal = params.signal
-      ? AbortSignal.any([timeoutSignal, params.signal])
-      : timeoutSignal;
+    const timeoutSignal = AbortSignal.timeout(
+      params.timeoutMs ?? this.config.requestTimeout ?? 120_000,
+    );
+    const signal = params.signal ? AbortSignal.any([timeoutSignal, params.signal]) : timeoutSignal;
 
     let response: Response;
     try {
@@ -116,10 +126,15 @@ export class OllamaClient {
         signal,
       });
     } catch (err) {
-      if (params.signal?.aborted) { return; } // interrupted by the user — stay silent
+      if (params.signal?.aborted) {
+        return;
+      } // interrupted by the user — stay silent
       const error = err instanceof Error ? err.message : 'Network error';
       log.error('Ollama connection failed', { error, url });
-      yield { type: 'error', error: `Ollama non disponible: ${error}. Assurez-vous qu'Ollama tourne sur le port 11434.` };
+      yield {
+        type: 'error',
+        error: `Ollama non disponible: ${error}. Assurez-vous qu'Ollama tourne sur le port 11434.`,
+      };
       return;
     }
 
@@ -154,7 +169,10 @@ export class OllamaClient {
 
           try {
             const data = JSON.parse(line) as {
-              message?: { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> };
+              message?: {
+                content?: string;
+                tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+              };
               done?: boolean;
               eval_count?: number;
             };
@@ -172,9 +190,10 @@ export class OllamaClient {
                     type: 'function',
                     function: {
                       name: tc.function.name,
-                      arguments: typeof tc.function.arguments === 'string'
-                        ? tc.function.arguments
-                        : JSON.stringify(tc.function.arguments),
+                      arguments:
+                        typeof tc.function.arguments === 'string'
+                          ? tc.function.arguments
+                          : JSON.stringify(tc.function.arguments),
                     },
                   },
                 };
@@ -206,7 +225,7 @@ export class OllamaClient {
     try {
       const response = await fetch(`${this.config.baseUrl}/api/tags`);
       if (!response.ok) return [];
-      const data = await response.json() as { models: OllamaModel[] };
+      const data = (await response.json()) as { models: OllamaModel[] };
       return data.models ?? [];
     } catch {
       return [];
@@ -239,19 +258,33 @@ export class OllamaClient {
       });
       log.info('Model unloaded (passive mode)', { model });
     } catch (err) {
-      log.debug('Unload failed (ignored)', { model, error: err instanceof Error ? err.message : String(err) });
+      log.debug('Unload failed (ignored)', {
+        model,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
-  async embed(text: string, model = 'nomic-embed-text'): Promise<number[]> {
-    const response = await fetch(`${this.config.baseUrl}/api/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt: text }),
-    });
+  /**
+   * Embedding avec timeout + un retry court : sans timeout, un Ollama qui ne
+   * répond pas gelait tout le pipeline embeddings (vector store, cache
+   * sémantique). Les appelants gèrent l'échec par un repli mots-clés.
+   */
+  async embed(text: string, model = CONFIG.embedModel): Promise<number[]> {
+    return withRetry(
+      async () => {
+        const response = await fetch(`${this.config.baseUrl}/api/embeddings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, prompt: text }),
+          signal: AbortSignal.timeout(30_000),
+        });
 
-    if (!response.ok) throw new Error(`Embedding failed: ${response.statusText}`);
-    const data = await response.json() as { embedding: number[] };
-    return data.embedding;
+        if (!response.ok) throw new Error(`Embedding failed: ${response.statusText}`);
+        const data = (await response.json()) as { embedding: number[] };
+        return data.embedding;
+      },
+      { retries: 1, delayMs: 300 },
+    );
   }
 }

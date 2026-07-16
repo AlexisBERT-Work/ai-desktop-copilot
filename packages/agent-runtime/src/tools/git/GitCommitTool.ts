@@ -1,10 +1,7 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 interface GitCommitArgs {
   workdir?: string;
@@ -17,7 +14,8 @@ export function inferCommitType(diff: string, stats: string): string {
 
   if (/test|spec|\.test\.|\.spec\./.test(lower)) return 'test';
   if (/readme|\.md|docs?\/|documentation/.test(lower)) return 'docs';
-  if (/package\.json|cargo\.toml|requirements\.txt|go\.mod/.test(lower) && /\"version\"/.test(lower)) return 'chore';
+  if (/package\.json|cargo\.toml|requirements\.txt|go\.mod/.test(lower) && /"version"/.test(lower))
+    return 'chore';
   if (/refactor|rename|move|extract/.test(lower)) return 'refactor';
   if (/perf|performance|optim|faster|speed/.test(lower)) return 'perf';
   if (/style|format|lint|prettier|eslint/.test(lower)) return 'style';
@@ -29,10 +27,12 @@ export function inferScope(files: string[]): string | null {
   if (files.length === 0) return null;
 
   // Group by top-level directory after packages/ or src/
-  const dirs = files.map(f => {
-    const m = f.match(/^(?:packages\/([^/]+)|apps\/([^/]+)|src\/([^/]+))/);
-    return m?.[1] ?? m?.[2] ?? m?.[3] ?? null;
-  }).filter((d): d is string => d !== null);
+  const dirs = files
+    .map(f => {
+      const m = f.match(/^(?:packages\/([^/]+)|apps\/([^/]+)|src\/([^/]+))/);
+      return m?.[1] ?? m?.[2] ?? m?.[3] ?? null;
+    })
+    .filter((d): d is string => d !== null);
 
   if (dirs.length === 0) return null;
 
@@ -48,7 +48,8 @@ export function inferScope(files: string[]): string | null {
 
 export class GitCommitTool extends BaseTool {
   readonly name = 'generate_commit_message';
-  readonly description = 'Lit le git diff stagé et génère un message de commit Conventional Commits';
+  readonly description =
+    'Lit le git diff stagé et génère un message de commit Conventional Commits';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
@@ -65,15 +66,17 @@ export class GitCommitTool extends BaseTool {
         : ['diff', 'HEAD', '--unified=3'];
 
       const [{ stdout: diff }, { stdout: statOut }, { stdout: logOut }] = await Promise.all([
-        exec('git', diffArgs, { cwd, maxBuffer: 500_000 }),
-        exec('git', ['diff', '--staged', '--stat'], { cwd }),
-        exec('git', ['log', '--oneline', '-5'], { cwd }),
+        runGit(diffArgs, { cwd, maxBuffer: 500_000 }),
+        runGit(['diff', '--staged', '--stat'], { cwd }),
+        runGit(['log', '--oneline', '-5'], { cwd }),
       ]);
 
       if (diff.trim().length === 0) {
-        return this.fail(staged_only
-          ? 'Aucun changement stagé. Lance `git add` avant.'
-          : 'Aucun changement détecté dans le working tree.');
+        return this.fail(
+          staged_only
+            ? 'Aucun changement stagé. Lance `git add` avant.'
+            : 'Aucun changement détecté dans le working tree.',
+        );
       }
 
       // Extract changed file paths from stat output
@@ -94,9 +97,7 @@ export class GitCommitTool extends BaseTool {
         suggestedType: type,
         suggestedScope: scope,
         // Template the user/LLM can fill in
-        template: scope
-          ? `${type}(${scope}): <description>`
-          : `${type}: <description>`,
+        template: scope ? `${type}(${scope}): <description>` : `${type}: <description>`,
         changedFiles,
         fileSummary: moreCount > 0 ? `${fileList} (+${moreCount} autres)` : fileList,
         diffPreview: diff.slice(0, 3000),
@@ -106,7 +107,7 @@ export class GitCommitTool extends BaseTool {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('not a git repository')) {
-        return this.fail('Ce répertoire n\'est pas un dépôt git.');
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       }
       return this.fail(`Erreur git: ${msg}`);
     }

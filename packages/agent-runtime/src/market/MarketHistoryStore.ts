@@ -1,19 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { createLogger } from '../logger';
+import { loadSqlJs, type Database } from '../lib/sqljs';
 
 const log = createLogger('market:history');
-
-// sql.js is loaded lazily (WASM module)
-let SQL: any = null;
-
-async function getSqlJs() {
-  if (!SQL) {
-    const sqljs = await import('sql.js');
-    SQL = await sqljs.default({ locateFile: () => require.resolve('sql.js/dist/sql-wasm.wasm') });
-  }
-  return SQL;
-}
 
 export interface PricePoint {
   ts: number;
@@ -29,7 +19,7 @@ export interface PricePoint {
  * symbole réglable via CATDESK_MARKET_HISTORY_CAP (défaut 2880 ≈ 24 h à 30 s).
  */
 export class MarketHistoryStore {
-  private db: any = null;
+  private db: Database | null = null;
   private readonly dbPath: string;
   private readonly capPerSymbol: number;
 
@@ -44,7 +34,7 @@ export class MarketHistoryStore {
   }
 
   async initialize(): Promise<void> {
-    const SqlJs = await getSqlJs();
+    const SqlJs = await loadSqlJs();
     if (existsSync(this.dbPath)) {
       this.db = new SqlJs.Database(readFileSync(this.dbPath));
     } else {
@@ -109,7 +99,11 @@ export class MarketHistoryStore {
     stmt.free();
     for (const s of symbols) {
       const points = this.load(s, limitPerSymbol);
-      if (points.length > 0) result.set(s, points.map(p => p.price));
+      if (points.length > 0)
+        result.set(
+          s,
+          points.map(p => p.price),
+        );
     }
     return result;
   }
@@ -122,6 +116,7 @@ export class MarketHistoryStore {
   }
 
   private prune(symbol: string): void {
+    if (this.db === null) return;
     this.db.run(
       `DELETE FROM price_history WHERE symbol=? AND ts NOT IN (
          SELECT ts FROM price_history WHERE symbol=? ORDER BY ts DESC LIMIT ?
@@ -131,6 +126,7 @@ export class MarketHistoryStore {
   }
 
   private persist(): void {
+    if (this.db === null) return;
     try {
       writeFileSync(this.dbPath, Buffer.from(this.db.export()));
     } catch {

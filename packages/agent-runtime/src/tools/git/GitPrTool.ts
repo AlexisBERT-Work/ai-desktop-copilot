@@ -27,7 +27,7 @@ async function getCommitsSince(cwd: string, base: string): Promise<CommitInfo[]>
   const { stdout } = await exec(
     'git',
     ['log', `${base}..HEAD`, '--format=%H|%s|%an|%ad', '--date=short'],
-    { cwd }
+    { cwd },
   );
   return stdout
     .trim()
@@ -57,7 +57,9 @@ function derivePrTitle(commits: CommitInfo[], branch: string): string {
     .replace(/\b\w/g, c => c.toUpperCase());
 
   // Find dominant commit type
-  const types = commits.map(c => c.subject.match(/^(\w+)[\(:]/) ? c.subject.match(/^(\w+)[\(:]/)?.[1] : null).filter(Boolean);
+  const types = commits
+    .map(c => (c.subject.match(/^(\w+)[(:]/) ? c.subject.match(/^(\w+)[(:]/)?.[1] : null))
+    .filter(Boolean);
   const typeCounts = new Map<string, number>();
   for (const t of types) {
     if (t) typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
@@ -69,7 +71,8 @@ function derivePrTitle(commits: CommitInfo[], branch: string): string {
 
 export class GitPrTool extends BaseTool {
   readonly name = 'generate_pr_description';
-  readonly description = 'Génère un titre et une description de PR à partir des commits et du diff par rapport à la branche de base';
+  readonly description =
+    'Génère un titre et une description de PR à partir des commits et du diff par rapport à la branche de base';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
@@ -90,11 +93,10 @@ export class GitPrTool extends BaseTool {
       }
 
       // Diff stat for changed files
-      const { stdout: statOut } = await exec(
-        'git',
-        ['diff', `${base_branch}...HEAD`, '--stat'],
-        { cwd, maxBuffer: 200_000 }
-      );
+      const { stdout: statOut } = await exec('git', ['diff', `${base_branch}...HEAD`, '--stat'], {
+        cwd,
+        maxBuffer: 200_000,
+      });
 
       const changedFiles = statOut
         .split('\n')
@@ -106,10 +108,15 @@ export class GitPrTool extends BaseTool {
 
       // Categorize commits for the description
       const breaking = commits.filter(c => c.subject.includes('!')).map(c => c.subject);
-      const features = commits.filter(c => /^feat[\(:!]/.test(c.subject)).map(c => c.subject);
-      const fixes = commits.filter(c => /^fix[\(:!]/.test(c.subject)).map(c => c.subject);
+      const features = commits.filter(c => /^feat[(:!]/.test(c.subject)).map(c => c.subject);
+      const fixes = commits.filter(c => /^fix[(:!]/.test(c.subject)).map(c => c.subject);
       const others = commits
-        .filter(c => !breaking.includes(c.subject) && !features.includes(c.subject) && !fixes.includes(c.subject))
+        .filter(
+          c =>
+            !breaking.includes(c.subject) &&
+            !features.includes(c.subject) &&
+            !fixes.includes(c.subject),
+        )
         .map(c => c.subject);
 
       return this.ok({
@@ -130,10 +137,12 @@ export class GitPrTool extends BaseTool {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('not a git repository')) {
-        return this.fail('Ce répertoire n\'est pas un dépôt git.');
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       }
       if (msg.includes('unknown revision')) {
-        return this.fail(`Branche de base "${base_branch}" introuvable. Essaie avec "master" ou le nom exact.`);
+        return this.fail(
+          `Branche de base "${base_branch}" introuvable. Essaie avec "master" ou le nom exact.`,
+        );
       }
       return this.fail(`Erreur git: ${msg}`);
     }
