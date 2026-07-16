@@ -1,7 +1,8 @@
 use serde::Deserialize;
-use tauri::AppHandle;
+use serde_json::json;
 use tracing::info;
 
+use crate::core::audit;
 use crate::ipc::bridge::send_permission_response;
 
 #[derive(Debug, Deserialize)]
@@ -15,10 +16,7 @@ pub struct PermissionResponseArgs {
 /// Called from React UI when user responds to a permission dialog.
 /// Forwards the decision to the Node.js agent runtime.
 #[tauri::command]
-pub async fn permission_respond(
-    app: AppHandle,
-    args: PermissionResponseArgs,
-) -> Result<(), String> {
+pub async fn permission_respond(args: PermissionResponseArgs) -> Result<(), String> {
     info!(
         request_id = %args.request_id,
         granted = args.granted,
@@ -26,11 +24,20 @@ pub async fn permission_respond(
     );
 
     send_permission_response(
-        &app,
         &args.request_id,
         args.granted,
         args.remember.unwrap_or(false),
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    audit::log(
+        "PERMISSION_DECISION",
+        json!({
+            "requestId": args.request_id,
+            "granted": args.granted,
+            "remember": args.remember.unwrap_or(false),
+        }),
+    );
+    Ok(())
 }

@@ -46,7 +46,10 @@ pub fn is_managed() -> bool {
 // ─── KV-cache setting (persisted, applied when we spawn Ollama) ───────────────
 
 fn kv_cache_file(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_local_data_dir().ok().map(|d| d.join("ollama-kv-cache.txt"))
+    app.path()
+        .app_local_data_dir()
+        .ok()
+        .map(|d| d.join("ollama-kv-cache.txt"))
 }
 
 /// The persisted KV-cache type CatDesk applies when spawning Ollama. "f16" (the
@@ -71,7 +74,10 @@ pub fn kv_cache_decided(app: &AppHandle) -> bool {
 /// (managed only) for it to take effect now; otherwise it applies next launch.
 pub fn set_kv_cache_setting(app: &AppHandle, value: &str) -> std::io::Result<()> {
     if value != "f16" && value != "q4_0" {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "kv cache type must be f16 or q4_0"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "kv cache type must be f16 or q4_0",
+        ));
     }
     let path = kv_cache_file(app)
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no app data dir"))?;
@@ -130,7 +136,9 @@ pub fn restart(app: &AppHandle) -> bool {
         warn!("restart() ignored — Ollama is external/unmanaged");
         return false;
     }
-    let Some(dir) = resource_subdir(app, "ollama") else { return false };
+    let Some(dir) = resource_subdir(app, "ollama") else {
+        return false;
+    };
     let bin = dir.join("ollama.exe");
     if !bin.exists() {
         return false;
@@ -163,7 +171,10 @@ fn stop_managed_ollama() {
     }
     #[cfg(not(windows))]
     {
-        let _ = std::process::Command::new("pkill").arg("-f").arg("ollama").status();
+        let _ = std::process::Command::new("pkill")
+            .arg("-f")
+            .arg("ollama")
+            .status();
     }
 }
 
@@ -213,7 +224,10 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 fn spawn_serve(bin: &PathBuf, models: &Path, kv_cache: &str) {
-    info!("Starting bundled Ollama: {} (kv_cache={kv_cache})", bin.display());
+    info!(
+        "Starting bundled Ollama: {} (kv_cache={kv_cache})",
+        bin.display()
+    );
 
     let mut cmd = std::process::Command::new(bin);
     cmd.arg("serve")
@@ -225,13 +239,17 @@ fn spawn_serve(bin: &PathBuf, models: &Path, kv_cache: &str) {
     // KV-cache quantization (auto-tune): q4_0 frees VRAM so a VRAM-tight model
     // keeps more layers on the GPU. Requires flash attention, so enable it too.
     if kv_cache == "q4_0" {
-        cmd.env("OLLAMA_KV_CACHE_TYPE", "q4_0").env("OLLAMA_FLASH_ATTENTION", "1");
+        cmd.env("OLLAMA_KV_CACHE_TYPE", "q4_0")
+            .env("OLLAMA_FLASH_ATTENTION", "1");
     }
 
     if models.exists() {
         cmd.env("OLLAMA_MODELS", models);
     } else {
-        warn!("Ollama models dir missing: {} (models must be pulled)", models.display());
+        warn!(
+            "Ollama models dir missing: {} (models must be pulled)",
+            models.display()
+        );
     }
 
     #[cfg(windows)]

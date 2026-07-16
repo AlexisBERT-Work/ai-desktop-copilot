@@ -31,6 +31,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+dunce = "1"
 regex = "1"
 base64 = "0.22"
 reqwest = { version = "0.12", features = ["json"] }

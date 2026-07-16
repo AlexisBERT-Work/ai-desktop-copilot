@@ -1,6 +1,9 @@
+use serde_json::json;
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tracing::info;
+
+use crate::core::audit;
 
 #[tauri::command]
 pub async fn clipboard_read(app: AppHandle) -> Result<String, String> {
@@ -10,8 +13,12 @@ pub async fn clipboard_read(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn clipboard_write(app: AppHandle, content: String) -> Result<(), String> {
-    info!(len = content.len(), "Clipboard write");
+    let len = content.len();
+    info!(len, "Clipboard write");
     app.clipboard()
         .write_text(content)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Le contenu du presse-papiers n'est jamais journalisé (donnée sensible).
+    audit::log("CLIPBOARD_WRITE", json!({ "bytes": len }));
+    Ok(())
 }

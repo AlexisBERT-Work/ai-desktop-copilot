@@ -7,6 +7,8 @@ use tokio::process::ChildStdin;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
+use super::protocol;
+
 /// Shared stdin handle to the Node.js agent sidecar process.
 static AGENT_STDIN: tokio::sync::OnceCell<Arc<Mutex<ChildStdin>>> =
     tokio::sync::OnceCell::const_new();
@@ -54,7 +56,10 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
     let _ = std::fs::create_dir_all(&data_dir);
 
     let mut env: Vec<(String, String)> = vec![
-        ("CATDESK_DATA_DIR".into(), data_dir.to_string_lossy().into_owned()),
+        (
+            "CATDESK_DATA_DIR".into(),
+            data_dir.to_string_lossy().into_owned(),
+        ),
         ("OLLAMA_URL".into(), "http://127.0.0.1:11434".into()),
     ];
 
@@ -62,11 +67,17 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
     if let Some(ocr) = resource_subdir(app, "ocr") {
         let ocr_bin = ocr.join("ocr-sidecar.exe");
         if ocr_bin.exists() {
-            env.push(("OCR_SIDECAR_BIN".into(), ocr_bin.to_string_lossy().into_owned()));
+            env.push((
+                "OCR_SIDECAR_BIN".into(),
+                ocr_bin.to_string_lossy().into_owned(),
+            ));
         }
         let tessdata = ocr.join("tessdata");
         if tessdata.exists() {
-            env.push(("TESSDATA_PREFIX".into(), tessdata.to_string_lossy().into_owned()));
+            env.push((
+                "TESSDATA_PREFIX".into(),
+                tessdata.to_string_lossy().into_owned(),
+            ));
         }
     }
 
@@ -92,7 +103,10 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
         .join("..")
         .join("packages")
         .join("agent-runtime");
-    info!("Launching dev agent runtime (tsx) from {}", agent_dir.display());
+    info!(
+        "Launching dev agent runtime (tsx) from {}",
+        agent_dir.display()
+    );
     Ok(AgentLaunch {
         program: std::path::PathBuf::from("node"),
         args: vec!["--import".into(), "tsx".into(), "src/index.ts".into()],
@@ -109,10 +123,12 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
     // hard-coded model that may not even be installed (tools, sub-agents, fact
     // extraction). CATDESK_MODEL_SMALL is the light tier it can downgrade to.
     let model = crate::commands::tuning::recommend_default_model(
-        crate::commands::chat::detect_vram_bytes().await,
+        crate::commands::models::detect_vram_bytes().await,
     );
     launch.env.push(("CATDESK_MODEL".into(), model.into()));
-    launch.env.push(("CATDESK_MODEL_SMALL".into(), "qwen2.5:7b".into()));
+    launch
+        .env
+        .push(("CATDESK_MODEL_SMALL".into(), "qwen2.5:7b".into()));
 
     let mut cmd = tokio::process::Command::new(&launch.program);
     cmd.current_dir(&launch.work_dir)
@@ -134,13 +150,20 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut child = cmd
-        .spawn()
-        .context("Failed to start agent runtime")?;
+    let mut child = cmd.spawn().context("Failed to start agent runtime")?;
 
-    let stdin = child.stdin.take().expect("agent stdin");
-    let stdout = child.stdout.take().expect("agent stdout");
-    let stderr = child.stderr.take().expect("agent stderr");
+    let stdin = child
+        .stdin
+        .take()
+        .context("stdin de l'agent indisponible")?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("stdout de l'agent indisponible")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("stderr de l'agent indisponible")?;
 
     AGENT_STDIN
         .set(Arc::new(Mutex::new(stdin)))
@@ -210,39 +233,38 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
         let params = value.get("params").cloned().unwrap_or(Value::Null);
 
         match method {
-            "agent.step" => {
+            protocol::NOTIF_AGENT_STEP => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let id = params.get("id").cloned();
                     if let Some(step) = params.get("step") {
-                        dispatch_agent_step(window, step, id).await?;
+                        dispatch_agent_step(window, step).await?;
                     }
                 }
             }
-            "permission.request" => {
+            protocol::NOTIF_PERMISSION_REQUEST => {
                 if let Some(window) = app.get_webview_window("main") {
-                    window.emit("permission:request", params)?;
+                    window.emit(protocol::EVENT_PERMISSION_REQUEST, params)?;
                 }
             }
-            "proactive.suggestion" => {
+            protocol::NOTIF_PROACTIVE_SUGGESTION => {
                 // Agent-initiated nudge (e.g. spiral detection). Surface it in the UI.
                 if let Some(window) = app.get_webview_window("main") {
-                    window.emit("proactive:suggestion", params)?;
+                    window.emit(protocol::EVENT_PROACTIVE_SUGGESTION, params)?;
                 }
             }
-            "market.update" => {
+            protocol::NOTIF_MARKET_UPDATE => {
                 // Live market snapshot — broadcast to all windows (incl. the
                 // separate dashboard window).
-                app.emit("market:update", params)?;
+                app.emit(protocol::EVENT_MARKET_UPDATE, params)?;
             }
-            "press.feeds" => {
+            protocol::NOTIF_PRESS_FEEDS => {
                 // Journaux personnalisés locaux (état complet, poussé après
                 // chaque écriture ou au sync). Broadcast : le panneau vit dans
                 // la fenêtre dashboard.
-                app.emit("press:feeds", params)?;
+                app.emit(protocol::EVENT_PRESS_FEEDS, params)?;
             }
-            "dailies.local" => {
+            protocol::NOTIF_DAILIES_LOCAL => {
                 // Dailys générées localement par les journaux personnalisés.
-                app.emit("dailies:local", params)?;
+                app.emit(protocol::EVENT_DAILIES_LOCAL, params)?;
             }
             _ => {
                 warn!("Unknown agent notification: {method}");
@@ -253,27 +275,26 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
     Ok(())
 }
 
-async fn dispatch_agent_step(
-    window: tauri::WebviewWindow,
-    step: &Value,
-    _request_id: Option<Value>,
-) -> Result<()> {
+async fn dispatch_agent_step(window: tauri::WebviewWindow, step: &Value) -> Result<()> {
     let step_type = step.get("type").and_then(Value::as_str).unwrap_or("");
 
+    // INVARIANT : le sidecar (buildStepNotification) met conversationId +
+    // messageId dans chaque step. S'ils manquent, c'est un bug de contrat —
+    // on le signale au lieu d'inventer des valeurs qui masqueraient le défaut.
     let conv_id = step
         .get("conversationId")
         .and_then(Value::as_str)
-        .unwrap_or("default");
-    let msg_id = step
-        .get("messageId")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
+        .unwrap_or("");
+    let msg_id = step.get("messageId").and_then(Value::as_str).unwrap_or("");
+    if conv_id.is_empty() || msg_id.is_empty() {
+        warn!("agent.step sans ids de corrélation (type: {step_type})");
+    }
 
     match step_type {
         "token" => {
             let token = step.get("content").and_then(Value::as_str).unwrap_or("");
             window.emit(
-                "chat:token",
+                protocol::EVENT_CHAT_TOKEN,
                 serde_json::json!({
                     "conversationId": conv_id,
                     "messageId": msg_id,
@@ -283,7 +304,7 @@ async fn dispatch_agent_step(
         }
         "done" => {
             window.emit(
-                "chat:done",
+                protocol::EVENT_CHAT_DONE,
                 serde_json::json!({
                     "conversationId": conv_id,
                     "messageId": msg_id,
@@ -293,7 +314,7 @@ async fn dispatch_agent_step(
         }
         "error" => {
             window.emit(
-                "chat:error",
+                protocol::EVENT_CHAT_ERROR,
                 serde_json::json!({
                     "conversationId": conv_id,
                     "code": step.get("code").and_then(Value::as_str).unwrap_or("ERROR"),
@@ -302,11 +323,11 @@ async fn dispatch_agent_step(
             )?;
         }
         "tool_start" | "tool_result" | "tool_error" | "tool_blocked" => {
-            window.emit("agent:tool_call", step)?;
+            window.emit(protocol::EVENT_AGENT_TOOL_CALL, step)?;
         }
         "plan" => {
             window.emit(
-                "agent:plan",
+                protocol::EVENT_AGENT_PLAN,
                 serde_json::json!({
                     "conversationId": conv_id,
                     "messageId": msg_id,
@@ -321,12 +342,7 @@ async fn dispatch_agent_step(
 }
 
 /// Send a message to the agent runtime via stdin.
-pub async fn send_to_agent(
-    _app: &AppHandle,
-    payload: Value,
-    _conversation_id: String,
-    _message_id: String,
-) -> Result<()> {
+pub async fn send_to_agent(payload: Value) -> Result<()> {
     let stdin_lock = AGENT_STDIN.get().context("Agent not started")?;
 
     let mut line = serde_json::to_string(&payload)?;
@@ -341,19 +357,17 @@ pub async fn send_to_agent(
 
 /// Forward a permission response from React UI to the agent runtime.
 pub async fn send_permission_response(
-    app: &AppHandle,
     request_id: &str,
     granted: bool,
     remember: bool,
 ) -> Result<()> {
-    let payload = serde_json::json!({
-        "jsonrpc": "2.0",
-        "method": "permission.response",
-        "params": {
+    let payload = protocol::rpc_notification(
+        protocol::RPC_PERMISSION_RESPONSE,
+        serde_json::json!({
             "requestId": request_id,
             "granted": granted,
             "remember": remember
-        }
-    });
-    send_to_agent(app, payload, String::new(), String::new()).await
+        }),
+    );
+    send_to_agent(payload).await
 }

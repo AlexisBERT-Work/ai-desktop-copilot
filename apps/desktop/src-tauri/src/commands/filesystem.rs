@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::fs;
 use std::path::Path;
 use tracing::info;
 
-use crate::core::sandbox;
+use crate::core::{audit, sandbox};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,10 +41,12 @@ pub struct DirEntry {
 
 #[tauri::command]
 pub async fn file_read(args: FileReadArgs) -> Result<String, String> {
-    sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
+    // On travaille ensuite sur le chemin canonique retourné par la sandbox,
+    // jamais sur la chaîne fournie (symlinks/casse résolus une seule fois).
+    let path = sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
 
     let max = args.max_bytes.unwrap_or(1_000_000).min(5_000_000);
-    let metadata = fs::metadata(&args.path).map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
 
     if metadata.len() as usize > max {
         return Err(format!(
@@ -53,42 +56,52 @@ pub async fn file_read(args: FileReadArgs) -> Result<String, String> {
         ));
     }
 
-    info!(path = %args.path, "Reading file");
-    fs::read_to_string(&args.path).map_err(|e| e.to_string())
+    info!(path = %path.display(), "Reading file");
+    fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn file_write(args: FileWriteArgs) -> Result<(), String> {
-    sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
+    let path = sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
 
-    let path = Path::new(&args.path);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    info!(path = %args.path, append = args.append.unwrap_or(false), "Writing file");
+    let append = args.append.unwrap_or(false);
+    info!(path = %path.display(), append, "Writing file");
 
-    if args.append.unwrap_or(false) {
+    if append {
         use std::io::Write;
         let mut file = fs::OpenOptions::new()
             .append(true)
             .create(true)
-            .open(&args.path)
+            .open(&path)
             .map_err(|e| e.to_string())?;
-        write!(file, "{}", args.content).map_err(|e| e.to_string())
+        write!(file, "{}", args.content).map_err(|e| e.to_string())?;
     } else {
-        fs::write(&args.path, &args.content).map_err(|e| e.to_string())
+        fs::write(&path, &args.content).map_err(|e| e.to_string())?;
     }
+
+    audit::log(
+        "FILE_WRITE",
+        json!({
+            "path": path.display().to_string(),
+            "bytes": args.content.len(),
+            "append": append,
+        }),
+    );
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn dir_list(args: DirListArgs) -> Result<Vec<DirEntry>, String> {
-    sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
+    let path = sandbox::check_path(&args.path).map_err(|e| e.to_string())?;
 
     let include_hidden = args.include_hidden.unwrap_or(false);
     let mut entries = Vec::new();
 
-    let read_dir = fs::read_dir(&args.path).map_err(|e| e.to_string())?;
+    let read_dir = fs::read_dir(&path).map_err(|e| e.to_string())?;
 
     for entry in read_dir.take(500) {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -100,7 +113,9 @@ pub async fn dir_list(args: DirListArgs) -> Result<Vec<DirEntry>, String> {
 
         let meta = entry.metadata().ok();
         let is_dir = meta.as_ref().map(|m| m.is_dir()).unwrap_or(false);
-        let size = meta.as_ref().and_then(|m| if m.is_file() { Some(m.len()) } else { None });
+        let size = meta
+            .as_ref()
+            .and_then(|m| if m.is_file() { Some(m.len()) } else { None });
         let extension = if !is_dir {
             Path::new(&name)
                 .extension()
@@ -119,9 +134,7 @@ pub async fn dir_list(args: DirListArgs) -> Result<Vec<DirEntry>, String> {
     }
 
     // Directories first, then files, both alphabetical
-    entries.sort_by(|a, b| {
-        b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name))
-    });
+    entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
 
     Ok(entries)
 }

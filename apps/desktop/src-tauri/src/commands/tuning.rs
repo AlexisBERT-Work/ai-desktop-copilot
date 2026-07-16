@@ -11,7 +11,7 @@ use serde::Serialize;
 use tauri::AppHandle;
 use tracing::info;
 
-use crate::commands::chat::{detect_vram_bytes, heaviest_model};
+use crate::commands::models::{detect_vram_bytes, heaviest_model};
 use crate::core::ollama;
 
 /// Heuristic: which KV-cache type suits a model of `model_bytes` on a GPU with

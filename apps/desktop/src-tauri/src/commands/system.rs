@@ -3,7 +3,7 @@ use std::process::Stdio;
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::timeout;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::core::{audit, sandbox};
 
@@ -26,14 +26,12 @@ pub struct CommandOutput {
 }
 
 #[tauri::command]
-pub async fn system_run_command(
-    args: RunCommandArgs,
-) -> Result<CommandOutput, String> {
+pub async fn system_run_command(args: RunCommandArgs) -> Result<CommandOutput, String> {
     // Validate shell
     let (program, flag) = match args.shell.as_str() {
         "powershell" => ("powershell.exe", "-Command"),
-        "cmd"        => ("cmd.exe", "/C"),
-        other        => return Err(format!("Shell non supporté: {other}")),
+        "cmd" => ("cmd.exe", "/C"),
+        other => return Err(format!("Shell non supporté: {other}")),
     };
 
     // Safety check
@@ -56,7 +54,10 @@ pub async fn system_run_command(
             .envs([
                 ("PATH", std::env::var("PATH").unwrap_or_default()),
                 ("TEMP", std::env::temp_dir().to_string_lossy().to_string()),
-                ("USERPROFILE", std::env::var("USERPROFILE").unwrap_or_default()),
+                (
+                    "USERPROFILE",
+                    std::env::var("USERPROFILE").unwrap_or_default(),
+                ),
             ])
             .current_dir(args.workdir.as_deref().unwrap_or("."))
             .output(),
@@ -91,5 +92,9 @@ pub async fn open_application(args: OpenAppArgs) -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("Impossible d'ouvrir {}: {e}", args.name))?;
 
+    audit::log(
+        "APP_OPEN",
+        serde_json::json!({ "app": args.name, "args": args.args }),
+    );
     Ok(())
 }

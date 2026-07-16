@@ -1,7 +1,7 @@
 use tauri::{
-    App, Emitter, Manager,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    App, Emitter, Manager,
 };
 use tracing::info;
 

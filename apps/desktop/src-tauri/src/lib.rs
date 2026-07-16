@@ -7,9 +7,7 @@ use tracing::info;
 
 pub fn run() {
     tracing_subscriber::fmt()
-        .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "catdesk=info".to_string()),
-        )
+        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "catdesk=info".to_string()))
         .init();
 
     let builder = tauri::Builder::default()
@@ -20,7 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             info!("Second instance launched; revealing existing window");
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.emit("ui:overlay-toggle", ());
+                let _ = window.emit(ipc::protocol::EVENT_UI_OVERLAY_TOGGLE, ());
             }
         }))
         .plugin(tauri_plugin_shell::init())
@@ -40,14 +38,14 @@ pub fn run() {
             commands::chat::chat_send,
             commands::chat::chat_cancel,
             commands::chat::set_market_watchlist,
-            commands::chat::run_press_digest,
-            commands::chat::save_local_press_feed,
-            commands::chat::delete_local_press_feed,
-            commands::chat::run_local_press_now,
-            commands::chat::sync_local_press,
-            commands::chat::get_ollama_models,
-            commands::chat::get_ollama_models_info,
-            commands::chat::get_gpu_vram_bytes,
+            commands::press::run_press_digest,
+            commands::press::save_local_press_feed,
+            commands::press::delete_local_press_feed,
+            commands::press::run_local_press_now,
+            commands::press::sync_local_press,
+            commands::models::get_ollama_models,
+            commands::models::get_ollama_models_info,
+            commands::models::get_gpu_vram_bytes,
             commands::screen::screen_capture,
             commands::screen::screen_capture_active_window,
             commands::filesystem::file_read,
