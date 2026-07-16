@@ -1,26 +1,33 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { BrowserManager } from '../../lib/browserManager';
 
-interface BrowserScreenshotArgs {
-  full_page?: boolean;
-  selector?: string;
-}
+const argsSchema = z.object({
+  full_page: z
+    .boolean()
+    .default(false)
+    .describe('Capture entire scrollable page (default: visible viewport only)'),
+  selector: z.string().optional().describe('CSS selector of element to screenshot (optional)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
-export class BrowserScreenshotTool extends BaseTool {
+export class BrowserScreenshotTool extends BaseTool<Args> {
   readonly name = 'browser_screenshot';
-  readonly description = 'Prend une capture d\'écran de la page actuelle dans le navigateur headless. Retourne une image base64 PNG.';
+  readonly description =
+    "Prend une capture d'écran de la page actuelle dans le navigateur headless. Retourne une image base64 PNG.";
   readonly category = 'browser' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.browser_screenshot;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { full_page, selector } = rawArgs as BrowserScreenshotArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { full_page, selector } = rawArgs;
 
     if (!BrowserManager.get().isOpen()) {
-      return this.fail('Aucune page ouverte — utilise browser_navigate d\'abord');
+      return this.fail("Aucune page ouverte — utilise browser_navigate d'abord");
     }
 
     try {

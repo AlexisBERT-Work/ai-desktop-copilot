@@ -1,33 +1,77 @@
+import { z } from 'zod';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, extname, relative } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const DEFAULT_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
-  '.md', '.txt', '.rst',
-  '.json', '.jsonc', '.yaml', '.yml', '.toml',
-  '.py', '.rs', '.go', '.java', '.c', '.cpp', '.h',
-  '.css', '.scss', '.html', '.vue', '.svelte',
-  '.sh', '.ps1', '.env.example',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.md',
+  '.txt',
+  '.rst',
+  '.json',
+  '.jsonc',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.py',
+  '.rs',
+  '.go',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+  '.css',
+  '.scss',
+  '.html',
+  '.vue',
+  '.svelte',
+  '.sh',
+  '.ps1',
+  '.env.example',
 ]);
 
 // Directories that are never searched
 const SKIP_DIRS = new Set([
-  'node_modules', 'target', '.git', '__pycache__', '.venv', 'venv',
-  'dist', 'build', '.next', '.nuxt', '.turbo', 'coverage', '.cache',
+  'node_modules',
+  'target',
+  '.git',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'dist',
+  'build',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  'coverage',
+  '.cache',
 ]);
 
 const SNIPPET_RADIUS = 160;
 
-interface SemanticSearchArgs {
-  query: string;
-  paths?: string[];
-  extensions?: string[];
-  limit?: number;
-  max_file_size?: number;
-}
+const argsSchema = z.object({
+  query: z.string().min(1).describe('What to search for in local files'),
+  paths: z
+    .array(z.string())
+    .optional()
+    .describe('Directories to search (defaults to current working directory)'),
+  extensions: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'File extensions to include, e.g. [".ts", ".md"] (defaults to common text/code types)',
+    ),
+  limit: z.number().default(10).describe('Max results to return'),
+  max_file_size: z.number().default(500000).describe('Skip files larger than this size in bytes'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface SearchResult {
   file: string;
@@ -86,7 +130,10 @@ function scoreDocument(
 
 function extractSnippet(content: string, pos: number, radius: number): string {
   if (pos < 0) {
-    return content.slice(0, radius * 2).replace(/\s+/g, ' ').trim();
+    return content
+      .slice(0, radius * 2)
+      .replace(/\s+/g, ' ')
+      .trim();
   }
   const start = Math.max(0, pos - radius);
   const end = Math.min(content.length, pos + radius);
@@ -130,27 +177,28 @@ async function walkDir(
   return results;
 }
 
-export class SemanticSearchTool extends BaseTool {
+export class SemanticSearchTool extends BaseTool<Args> {
   readonly name = 'semantic_search';
-  readonly description = 'Cherche dans les fichiers locaux par similarité de contenu (keyword scoring). Retourne les fichiers les plus pertinents avec un extrait du passage correspondant.';
+  readonly description =
+    'Cherche dans les fichiers locaux par similarité de contenu (keyword scoring). Retourne les fichiers les plus pertinents avec un extrait du passage correspondant.';
   readonly category = 'filesystem' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.semantic_search;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as SemanticSearchArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
     const { query, limit = 10, max_file_size = 500_000 } = args;
 
     if (!query?.trim()) return this.fail('query est requis');
 
-    const searchPaths = (args.paths?.length ?? 0) > 0
-      ? (args.paths as string[])
-      : [process.cwd()];
+    const searchPaths = (args.paths?.length ?? 0) > 0 ? (args.paths as string[]) : [process.cwd()];
 
-    const exts = (args.extensions?.length ?? 0) > 0
-      ? new Set((args.extensions as string[]).map(e => e.startsWith('.') ? e : `.${e}`))
-      : DEFAULT_EXTENSIONS;
+    const exts =
+      (args.extensions?.length ?? 0) > 0
+        ? new Set((args.extensions as string[]).map(e => (e.startsWith('.') ? e : `.${e}`)))
+        : DEFAULT_EXTENSIONS;
 
     const queryTerms = tokenize(query);
     if (queryTerms.length === 0) return this.fail('La requête ne contient aucun terme exploitable');
@@ -163,7 +211,12 @@ export class SemanticSearchTool extends BaseTool {
     }
 
     if (allFiles.length === 0) {
-      return this.ok({ query, results: [], totalScanned: 0, message: 'Aucun fichier trouvé dans les chemins spécifiés' });
+      return this.ok({
+        query,
+        results: [],
+        totalScanned: 0,
+        message: 'Aucun fichier trouvé dans les chemins spécifiés',
+      });
     }
 
     // Score each file
@@ -193,7 +246,13 @@ export class SemanticSearchTool extends BaseTool {
     // Make paths relative for readability
     const cwd = process.cwd();
     const results = top.map(r => ({
-      file: (() => { try { return relative(cwd, r.file); } catch { return r.file; } })(),
+      file: (() => {
+        try {
+          return relative(cwd, r.file);
+        } catch {
+          return r.file;
+        }
+      })(),
       absolutePath: r.file,
       score: Math.round(r.score * 1000) / 1000,
       matchCount: r.matchCount,

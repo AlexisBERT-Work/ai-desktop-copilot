@@ -1,13 +1,23 @@
+import { z } from 'zod';
 import { readFile, access } from 'fs/promises';
 import { join, basename } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface AnalyzeDependenciesArgs {
-  workdir?: string;
-  manifest?: string;
-}
+const argsSchema = z.object({
+  workdir: z
+    .string()
+    .optional()
+    .describe(
+      'Project root containing package.json / Cargo.toml / requirements.txt (defaults to current directory)',
+    ),
+  manifest: z
+    .string()
+    .optional()
+    .describe('Specific manifest file to analyze (optional, auto-detected otherwise)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 type Ecosystem = 'npm' | 'cargo' | 'pip';
 
@@ -27,7 +37,10 @@ function flagVersion(version: string): string[] {
   if (v === '' || v === '*' || /^latest$/i.test(v) || /^x(\.x)*$/i.test(v)) {
     flags.push('wildcard'); // unbounded — non-reproducible builds
   }
-  if (/^(?:git\+|git:|path:|https?:\/\/|file:|github:|link:|workspace:)/i.test(v) || v.includes('://')) {
+  if (
+    /^(?:git\+|git:|path:|https?:\/\/|file:|github:|link:|workspace:)/i.test(v) ||
+    v.includes('://')
+  ) {
     flags.push('non-registry');
   }
   // 0.x — pre-1.0, semver allows breaking changes on minor bumps
@@ -139,28 +152,36 @@ const MANIFESTS: Array<{ file: string; eco: Ecosystem; check: string }> = [
 ];
 
 async function fileExists(p: string): Promise<boolean> {
-  try { await access(p); return true; } catch { return false; }
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export class AnalyzeDependenciesTool extends BaseTool {
+export class AnalyzeDependenciesTool extends BaseTool<Args> {
   readonly name = 'analyze_dependencies';
   readonly description =
-    "Parse les manifestes de dépendances (package.json, Cargo.toml, requirements.txt) et signale les specs de version à risque : wildcard, pré-1.0, prerelease, source non-registry, non épinglé. Suggère la commande pour vérifier les versions obsolètes en live.";
+    'Parse les manifestes de dépendances (package.json, Cargo.toml, requirements.txt) et signale les specs de version à risque : wildcard, pré-1.0, prerelease, source non-registry, non épinglé. Suggère la commande pour vérifier les versions obsolètes en live.';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.analyze_dependencies;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, manifest } = args as AnalyzeDependenciesArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, manifest } = args;
     const cwd = workdir ?? process.cwd();
 
     // Resolve which manifest(s) to analyze.
     let targets: Array<{ path: string; eco: Ecosystem; check: string }> = [];
     if (typeof manifest === 'string' && manifest.length > 0) {
-      const known = MANIFESTS.find((m) => basename(manifest) === m.file);
+      const known = MANIFESTS.find(m => basename(manifest) === m.file);
       if (known === undefined) {
-        return this.fail(`Manifeste non supporté: ${manifest}. Supporté: package.json, Cargo.toml, requirements.txt`);
+        return this.fail(
+          `Manifeste non supporté: ${manifest}. Supporté: package.json, Cargo.toml, requirements.txt`,
+        );
       }
       targets = [{ path: manifest, eco: known.eco, check: known.check }];
     } else {
@@ -169,7 +190,9 @@ export class AnalyzeDependenciesTool extends BaseTool {
         if (await fileExists(p)) targets.push({ path: p, eco: m.eco, check: m.check });
       }
       if (targets.length === 0) {
-        return this.fail(`Aucun manifeste trouvé dans ${cwd} (package.json / Cargo.toml / requirements.txt).`);
+        return this.fail(
+          `Aucun manifeste trouvé dans ${cwd} (package.json / Cargo.toml / requirements.txt).`,
+        );
       }
     }
 
@@ -179,19 +202,26 @@ export class AnalyzeDependenciesTool extends BaseTool {
       try {
         content = await readFile(t.path, 'utf-8');
       } catch (err) {
-        return this.fail(`Impossible de lire ${t.path}: ${err instanceof Error ? err.message : String(err)}`);
+        return this.fail(
+          `Impossible de lire ${t.path}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
 
       let deps: Dependency[];
       try {
-        deps = t.eco === 'npm' ? parsePackageJson(content)
-          : t.eco === 'cargo' ? parseCargoToml(content)
-          : parseRequirements(content);
+        deps =
+          t.eco === 'npm'
+            ? parsePackageJson(content)
+            : t.eco === 'cargo'
+              ? parseCargoToml(content)
+              : parseRequirements(content);
       } catch (err) {
-        return this.fail(`Erreur de parsing ${basename(t.path)}: ${err instanceof Error ? err.message : String(err)}`);
+        return this.fail(
+          `Erreur de parsing ${basename(t.path)}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
 
-      const flagged = deps.filter((d) => d.flags.length > 0);
+      const flagged = deps.filter(d => d.flags.length > 0);
       const byFlag: Record<string, number> = {};
       for (const d of flagged) for (const f of d.flags) byFlag[f] = (byFlag[f] ?? 0) + 1;
 
@@ -199,19 +229,23 @@ export class AnalyzeDependenciesTool extends BaseTool {
         manifest: basename(t.path),
         ecosystem: t.eco,
         total: deps.length,
-        prod: deps.filter((d) => !d.dev).length,
-        dev: deps.filter((d) => d.dev).length,
+        prod: deps.filter(d => !d.dev).length,
+        dev: deps.filter(d => d.dev).length,
         flaggedCount: flagged.length,
         byFlag,
-        flagged: flagged.map((d) => ({ name: d.name, version: d.version, dev: d.dev, flags: d.flags })),
+        flagged: flagged.map(d => ({
+          name: d.name,
+          version: d.version,
+          dev: d.dev,
+          flags: d.flags,
+        })),
         liveCheckCommand: t.check,
       });
     }
 
     return this.ok({
       manifests,
-      note:
-        'Analyse statique des specs de version. Pour les vraies versions obsolètes/vulnérables, lance la commande `liveCheckCommand` (ex. `npm outdated`, `npm audit`, `cargo audit`, `pip-audit`) via run_command.',
+      note: 'Analyse statique des specs de version. Pour les vraies versions obsolètes/vulnérables, lance la commande `liveCheckCommand` (ex. `npm outdated`, `npm audit`, `cargo audit`, `pip-audit`) via run_command.',
     });
   }
 }

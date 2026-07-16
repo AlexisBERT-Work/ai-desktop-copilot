@@ -1,14 +1,19 @@
+import { z } from 'zod';
 import { readFile } from 'fs/promises';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface AnalyzeLogsArgs {
-  path: string;
-  max_lines?: number;
-  pattern?: string;
-  top_errors?: number;
-}
+const argsSchema = z.object({
+  path: z.string().min(1).describe('Absolute path to a local log file'),
+  max_lines: z.number().max(100000).default(5000).describe('Analyze only the last N lines'),
+  pattern: z
+    .string()
+    .optional()
+    .describe('Keep only lines containing this text (case-insensitive) before analyzing'),
+  top_errors: z.number().default(10).describe('Number of grouped error clusters to return'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export type LogLevel = 'FATAL' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
 
@@ -82,17 +87,24 @@ export function analyzeLogLines(lines: string[], topErrors = 10): LogAnalysis {
       const key = normalizeLogLine(line);
       const existing = groups.get(key);
       if (existing) existing.count += 1;
-      else groups.set(key, { count: 1, sample: line.trim().slice(0, 300), normalized: key.slice(0, 200) });
+      else
+        groups.set(key, {
+          count: 1,
+          sample: line.trim().slice(0, 300),
+          normalized: key.slice(0, 200),
+        });
 
       recentErrors.push(line.trim().slice(0, 300));
       if (recentErrors.length > 5) recentErrors.shift();
     }
   }
 
-  const top = [...groups.values()].sort((a, b) => b.count - a.count).slice(0, Math.max(1, topErrors));
+  const top = [...groups.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, Math.max(1, topErrors));
 
   return {
-    linesAnalyzed: lines.filter((l) => l.trim()).length,
+    linesAnalyzed: lines.filter(l => l.trim()).length,
     levelCounts,
     timeRange: first && last ? { first, last } : null,
     topErrors: top,
@@ -104,17 +116,18 @@ export function analyzeLogLines(lines: string[], topErrors = 10): LogAnalysis {
  * Analyze a local log file: counts per level, grouped recurring errors, the
  * observed time range and the most recent errors. Fully local, read-only.
  */
-export class AnalyzeLogsTool extends BaseTool {
+export class AnalyzeLogsTool extends BaseTool<Args> {
   readonly name = 'analyze_logs';
   readonly description =
-    "Analyse un fichier de log local : comptage par niveau (ERROR/WARN/INFO…), regroupement des erreurs récurrentes similaires (top N), plage temporelle détectée et dernières erreurs. Lecture seule, 100% local. Filtre optionnel par motif (pattern), analyse des dernières max_lines lignes.";
+    'Analyse un fichier de log local : comptage par niveau (ERROR/WARN/INFO…), regroupement des erreurs récurrentes similaires (top N), plage temporelle détectée et dernières erreurs. Lecture seule, 100% local. Filtre optionnel par motif (pattern), analyse des dernières max_lines lignes.';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.analyze_logs;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { path, max_lines = 5000, pattern, top_errors = 10 } = rawArgs as AnalyzeLogsArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { path, max_lines = 5000, pattern, top_errors = 10 } = rawArgs;
 
     if (!path?.trim()) return this.fail('path est requis.');
 
@@ -132,7 +145,7 @@ export class AnalyzeLogsTool extends BaseTool {
 
     if (pattern?.trim()) {
       const needle = pattern.toLowerCase();
-      lines = lines.filter((l) => l.toLowerCase().includes(needle));
+      lines = lines.filter(l => l.toLowerCase().includes(needle));
     }
 
     const cap = Math.min(Math.max(max_lines, 1), 100_000);

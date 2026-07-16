@@ -24,11 +24,11 @@ describe('ParseDocumentTool', () => {
   });
 
   it('rejette un path vide', async () => {
-    expect((await tool.execute({ path: '  ' })).success).toBe(false);
+    expect((await tool.run({ path: '  ' })).success).toBe(false);
   });
 
   it('rejette un format non supporté avant tout appel au sidecar', async () => {
-    const r = await tool.execute({ path: 'photo.png' });
+    const r = await tool.run({ path: 'photo.png' });
     expect(r.success).toBe(false);
     expect(r.error).toContain('.pdf');
   });

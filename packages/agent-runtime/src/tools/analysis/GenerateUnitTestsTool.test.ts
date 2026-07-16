@@ -7,10 +7,14 @@ import { GenerateUnitTestsTool } from './GenerateUnitTestsTool';
 const tool = new GenerateUnitTestsTool();
 let dir = '';
 
-async function gen(file: string, content: string, extra: Record<string, unknown> = {}): Promise<any> {
+async function gen(
+  file: string,
+  content: string,
+  extra: Record<string, unknown> = {},
+): Promise<any> {
   const path = join(dir, file);
   await writeFile(path, content, 'utf-8');
-  const res = await tool.execute({ path, ...extra });
+  const res = await tool.run({ path, ...extra });
   return res;
 }
 
@@ -48,7 +52,8 @@ function helper() {} // not exported
     expect(names).toEqual(['Calculator', 'add', 'fetchAll', 'mul']);
     expect(d.scaffold).toContain("from 'vitest'");
     // all exported names appear in the source import line
-    const importLine = d.scaffold.split('\n').find((l: string) => l.includes("from './math'")) ?? '';
+    const importLine =
+      d.scaffold.split('\n').find((l: string) => l.includes("from './math'")) ?? '';
     for (const n of ['add', 'mul', 'fetchAll', 'Calculator']) expect(importLine).toContain(n);
     // async symbol gets an async test callback
     expect(d.scaffold).toContain('async () =>');
@@ -125,7 +130,7 @@ fn private_helper() {}
       'utf-8',
     );
     await writeFile(join(sub, 'thing.ts'), 'export function go() {}', 'utf-8');
-    const res: any = await tool.execute({ path: join(sub, 'thing.ts') });
+    const res: any = await tool.run({ path: join(sub, 'thing.ts') });
     expect(res.success).toBe(true);
     expect(res.data.framework).toBe('jest');
     expect(res.data.scaffold).toContain('@jest/globals');

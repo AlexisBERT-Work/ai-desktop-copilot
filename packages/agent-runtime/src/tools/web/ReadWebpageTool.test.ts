@@ -30,7 +30,7 @@ describe('extractBySelector', () => {
     expect(extractBySelector(html, 'h1')).toBe('Titre');
   });
 
-  it('extrait par id (sélecteur naïf : s\'arrête au premier </)', () => {
+  it("extrait par id (sélecteur naïf : s'arrête au premier </)", () => {
     // Limitation assumée : la capture est non-greedy et stoppe au 1er "</",
     // donc on récupère le début du contenu, pas le bloc fermé complet.
     expect(extractBySelector(html, '#main')).toBe('<h1>Titre');
@@ -49,18 +49,18 @@ describe('ReadWebpageTool.execute (validation, sans réseau)', () => {
   const tool = new ReadWebpageTool();
 
   it('échoue sans url', async () => {
-    const res = await tool.execute({ url: '   ' });
+    const res = await tool.run({ url: '   ' });
     expect(res.success).toBe(false);
   });
 
   it('échoue sur une url invalide', async () => {
-    const res = await tool.execute({ url: 'pas une url' });
+    const res = await tool.run({ url: 'pas une url' });
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/invalide/i);
   });
 
   it('rejette les protocoles non http(s)', async () => {
-    const res = await tool.execute({ url: 'ftp://example.com/file' });
+    const res = await tool.run({ url: 'ftp://example.com/file' });
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/http/i);
   });

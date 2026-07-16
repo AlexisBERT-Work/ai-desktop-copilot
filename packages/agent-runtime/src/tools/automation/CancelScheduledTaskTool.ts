@@ -1,26 +1,30 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import type { CronScheduler } from '../../CronScheduler';
 
-interface CancelScheduledTaskArgs {
-  id: string;
-}
+const argsSchema = z.object({
+  id: z.string().min(1).describe('Job ID to cancel — get IDs from list_scheduled_tasks'),
+});
+type Args = z.infer<typeof argsSchema>;
 
-export class CancelScheduledTaskTool extends BaseTool {
+export class CancelScheduledTaskTool extends BaseTool<Args> {
   readonly name = 'cancel_scheduled_task';
-  readonly description = 'Annule et supprime définitivement une tâche planifiée. Utilise list_scheduled_tasks pour obtenir les IDs.';
+  readonly description =
+    'Annule et supprime définitivement une tâche planifiée. Utilise list_scheduled_tasks pour obtenir les IDs.';
   readonly category = 'automation' as const;
   readonly riskLevel = 'medium' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.cancel_scheduled_task;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
   constructor(private scheduler: CronScheduler) {
     super();
   }
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { id } = rawArgs as CancelScheduledTaskArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { id } = rawArgs;
 
     if (!id?.trim()) return this.fail('id est requis');
 

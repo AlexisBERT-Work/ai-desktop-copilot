@@ -1,21 +1,27 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import type { CronScheduler } from '../../CronScheduler';
 
-export class ListScheduledTasksTool extends BaseTool {
+const argsSchema = z.object({});
+type Args = z.infer<typeof argsSchema>;
+
+export class ListScheduledTasksTool extends BaseTool<Args> {
   readonly name = 'list_scheduled_tasks';
-  readonly description = 'Liste toutes les tâches planifiées avec leur statut, dernière exécution, prochain déclenchement et résultat.';
+  readonly description =
+    'Liste toutes les tâches planifiées avec leur statut, dernière exécution, prochain déclenchement et résultat.';
   readonly category = 'automation' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.list_scheduled_tasks;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
   constructor(private scheduler: CronScheduler) {
     super();
   }
 
-  async execute(_rawArgs: unknown): Promise<ToolResult> {
+  async execute(_rawArgs: Args): Promise<ToolResult> {
     const jobs = this.scheduler.listJobs();
 
     return this.ok({

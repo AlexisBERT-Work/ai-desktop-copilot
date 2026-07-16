@@ -1,17 +1,35 @@
+import { z } from 'zod';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, extname } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface AnalyzeCodeStyleArgs {
-  workdir?: string;
-  extensions?: string[];
-  max_files?: number;
-}
+const argsSchema = z.object({
+  workdir: z
+    .string()
+    .optional()
+    .describe('Directory to sample source files from (defaults to current directory)'),
+  extensions: z
+    .array(z.string())
+    .optional()
+    .describe('File extensions to sample, e.g. [".ts", ".py"] (defaults to common code types)'),
+  max_files: z.number().default(40).describe('Max files to sample'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 const DEFAULT_EXT = ['.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go'];
-const SKIP_DIRS = new Set(['node_modules', 'target', '.git', 'dist', 'build', '.next', '__pycache__', '.venv', 'coverage']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  'target',
+  '.git',
+  'dist',
+  'build',
+  '.next',
+  '__pycache__',
+  '.venv',
+  'coverage',
+]);
 
 interface StyleTally {
   files: number;
@@ -30,8 +48,18 @@ interface StyleTally {
 
 function emptyTally(): StyleTally {
   return {
-    files: 0, indentTabs: 0, indentSpaces: 0, spaceWidths: {}, singleQuotes: 0, doubleQuotes: 0,
-    semicolons: 0, noSemicolons: 0, camelCase: 0, snakeCase: 0, longLines: 0, totalLines: 0,
+    files: 0,
+    indentTabs: 0,
+    indentSpaces: 0,
+    spaceWidths: {},
+    singleQuotes: 0,
+    doubleQuotes: 0,
+    semicolons: 0,
+    noSemicolons: 0,
+    camelCase: 0,
+    snakeCase: 0,
+    longLines: 0,
+    totalLines: 0,
   };
 }
 
@@ -86,7 +114,8 @@ function summarize(t: StyleTally) {
     quotes,
     semicolons,
     naming,
-    avgLineLength: t.totalLines > 0 ? Math.round((t.totalLines - t.longLines) / t.totalLines * 100) / 100 : 0,
+    avgLineLength:
+      t.totalLines > 0 ? Math.round(((t.totalLines - t.longLines) / t.totalLines) * 100) / 100 : 0,
     longLineRatio: t.totalLines > 0 ? Math.round((t.longLines / t.totalLines) * 1000) / 1000 : 0,
   };
 }
@@ -96,12 +125,21 @@ async function sampleFiles(root: string, exts: Set<string>, max: number): Promis
   async function recurse(dir: string): Promise<void> {
     if (out.length >= max) return;
     let entries;
-    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const e of entries) {
       if (out.length >= max) return;
       if (e.isDirectory()) {
         if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) await recurse(join(dir, e.name));
-      } else if (e.isFile() && exts.has(extname(e.name).toLowerCase()) && !e.name.endsWith('.test.ts') && !e.name.endsWith('.d.ts')) {
+      } else if (
+        e.isFile() &&
+        exts.has(extname(e.name).toLowerCase()) &&
+        !e.name.endsWith('.test.ts') &&
+        !e.name.endsWith('.d.ts')
+      ) {
         out.push(join(dir, e.name));
       }
     }
@@ -110,19 +148,22 @@ async function sampleFiles(root: string, exts: Set<string>, max: number): Promis
   return out;
 }
 
-export class AnalyzeCodeStyleTool extends BaseTool {
+export class AnalyzeCodeStyleTool extends BaseTool<Args> {
   readonly name = 'analyze_code_style';
   readonly description =
     "Déduit les conventions de style du projet (indentation tabs/espaces + largeur, guillemets, point-virgules, camelCase vs snake_case, longueur de ligne) en échantillonnant les fichiers source. Sert à écrire du code cohérent avec l'existant.";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.analyze_code_style;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, extensions, max_files = 40 } = args as AnalyzeCodeStyleArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, extensions, max_files = 40 } = args;
     const root = workdir ?? process.cwd();
-    const exts = new Set((extensions && extensions.length > 0 ? extensions : DEFAULT_EXT).map((e) => e.toLowerCase()));
+    const exts = new Set(
+      (extensions && extensions.length > 0 ? extensions : DEFAULT_EXT).map(e => e.toLowerCase()),
+    );
 
     try {
       const s = await stat(root);
@@ -132,11 +173,16 @@ export class AnalyzeCodeStyleTool extends BaseTool {
     }
 
     const files = await sampleFiles(root, exts, Math.max(1, max_files));
-    if (files.length === 0) return this.fail('Aucun fichier source à analyser pour les extensions données.');
+    if (files.length === 0)
+      return this.fail('Aucun fichier source à analyser pour les extensions données.');
 
     const tally = emptyTally();
     for (const f of files) {
-      try { tallyFile(await readFile(f, 'utf-8'), tally); } catch { /* skip */ }
+      try {
+        tallyFile(await readFile(f, 'utf-8'), tally);
+      } catch {
+        /* skip */
+      }
     }
 
     return this.ok({

@@ -1,6 +1,7 @@
+import { z } from 'zod';
 import type { DailyCategory, ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -15,14 +16,36 @@ export interface NewsItem {
   fullText?: string; // article body fetched from the page (enrichArticleTexts), capped
 }
 
-interface FetchTechNewsArgs {
-  sources?: string[];
-  feeds?: string[];
-  topics?: string[];
-  since_hours?: number;
-  limit?: number;
-  lang?: 'fr' | 'en' | 'all';
-}
+const argsSchema = z.object({
+  sources: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Source ids to query (defaults to a balanced mix). Available: hackernews, devto, theverge, arstechnica, techcrunch, hackernoon, numerama, nextinpact, lesnumeriques',
+    ),
+  feeds: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]. Added on top of (or instead of) the predefined sources',
+    ),
+  topics: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Keywords to filter by (matches title or excerpt), e.g. ["AI", "rust", "react"] (optional — no filter if omitted)',
+    ),
+  since_hours: z
+    .number()
+    .default(24)
+    .describe('Only keep articles published within this many hours (0 = no limit)'),
+  limit: z.number().default(15).describe('Max number of articles to return (1-50)'),
+  lang: z
+    .enum(['fr', 'en', 'all'])
+    .default('all')
+    .describe('Restrict predefined sources to a language (custom feeds are always included)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // ─── Source registry ──────────────────────────────────────────
 // Toutes les sources sont gratuites et sans clé API. `kind` indique au
@@ -42,38 +65,199 @@ interface SourceDef {
 
 export const NEWS_SOURCES: Record<string, SourceDef> = {
   // ─── Tech ────────────────────────────────────────────────────
-  hackernews: { id: 'hackernews', label: 'Hacker News', lang: 'en', kind: 'hn', url: 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=30', category: 'tech' },
-  devto: { id: 'devto', label: 'DEV.to', lang: 'en', kind: 'devto', url: 'https://dev.to/api/articles?top=1&per_page=30', category: 'tech' },
-  theverge: { id: 'theverge', label: 'The Verge', lang: 'en', kind: 'feed', url: 'https://www.theverge.com/rss/index.xml', category: 'tech' },
-  arstechnica: { id: 'arstechnica', label: 'Ars Technica', lang: 'en', kind: 'feed', url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'tech' },
-  techcrunch: { id: 'techcrunch', label: 'TechCrunch', lang: 'en', kind: 'feed', url: 'https://techcrunch.com/feed/', category: 'tech' },
-  hackernoon: { id: 'hackernoon', label: 'HackerNoon', lang: 'en', kind: 'feed', url: 'https://hackernoon.com/feed', category: 'tech' },
-  numerama: { id: 'numerama', label: 'Numerama', lang: 'fr', kind: 'feed', url: 'https://www.numerama.com/feed/', category: 'tech' },
-  nextinpact: { id: 'nextinpact', label: 'Next', lang: 'fr', kind: 'feed', url: 'https://next.ink/feed/', category: 'tech' },
-  lesnumeriques: { id: 'lesnumeriques', label: 'Les Numériques', lang: 'fr', kind: 'feed', url: 'https://www.lesnumeriques.com/rss.xml', category: 'tech' },
+  hackernews: {
+    id: 'hackernews',
+    label: 'Hacker News',
+    lang: 'en',
+    kind: 'hn',
+    url: 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=30',
+    category: 'tech',
+  },
+  devto: {
+    id: 'devto',
+    label: 'DEV.to',
+    lang: 'en',
+    kind: 'devto',
+    url: 'https://dev.to/api/articles?top=1&per_page=30',
+    category: 'tech',
+  },
+  theverge: {
+    id: 'theverge',
+    label: 'The Verge',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.theverge.com/rss/index.xml',
+    category: 'tech',
+  },
+  arstechnica: {
+    id: 'arstechnica',
+    label: 'Ars Technica',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://feeds.arstechnica.com/arstechnica/index',
+    category: 'tech',
+  },
+  techcrunch: {
+    id: 'techcrunch',
+    label: 'TechCrunch',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://techcrunch.com/feed/',
+    category: 'tech',
+  },
+  hackernoon: {
+    id: 'hackernoon',
+    label: 'HackerNoon',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://hackernoon.com/feed',
+    category: 'tech',
+  },
+  numerama: {
+    id: 'numerama',
+    label: 'Numerama',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.numerama.com/feed/',
+    category: 'tech',
+  },
+  nextinpact: {
+    id: 'nextinpact',
+    label: 'Next',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://next.ink/feed/',
+    category: 'tech',
+  },
+  lesnumeriques: {
+    id: 'lesnumeriques',
+    label: 'Les Numériques',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.lesnumeriques.com/rss.xml',
+    category: 'tech',
+  },
 
   // ─── Finance / marchés ───────────────────────────────────────
   // (Les Échos retiré : flux en 403 systématique. La Tribune + Yahoo Finance OK.)
-  latribune: { id: 'latribune', label: 'La Tribune', lang: 'fr', kind: 'feed', url: 'https://www.latribune.fr/feed.xml', category: 'markets' },
-  yahoofinance: { id: 'yahoofinance', label: 'Yahoo Finance', lang: 'en', kind: 'feed', url: 'https://finance.yahoo.com/news/rssindex', category: 'markets' },
-  investing: { id: 'investing', label: 'Investing.com', lang: 'en', kind: 'feed', url: 'https://www.investing.com/rss/news_25.rss', category: 'markets' },
-  marketwatch: { id: 'marketwatch', label: 'MarketWatch', lang: 'en', kind: 'feed', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', category: 'markets' },
-  ft: { id: 'ft', label: 'Financial Times', lang: 'en', kind: 'feed', url: 'https://www.ft.com/rss/home', category: 'markets' },
-  cnbc: { id: 'cnbc', label: 'CNBC', lang: 'en', kind: 'feed', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114', category: 'markets' },
+  latribune: {
+    id: 'latribune',
+    label: 'La Tribune',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.latribune.fr/feed.xml',
+    category: 'markets',
+  },
+  yahoofinance: {
+    id: 'yahoofinance',
+    label: 'Yahoo Finance',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://finance.yahoo.com/news/rssindex',
+    category: 'markets',
+  },
+  investing: {
+    id: 'investing',
+    label: 'Investing.com',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.investing.com/rss/news_25.rss',
+    category: 'markets',
+  },
+  marketwatch: {
+    id: 'marketwatch',
+    label: 'MarketWatch',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',
+    category: 'markets',
+  },
+  ft: {
+    id: 'ft',
+    label: 'Financial Times',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.ft.com/rss/home',
+    category: 'markets',
+  },
+  cnbc: {
+    id: 'cnbc',
+    label: 'CNBC',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114',
+    category: 'markets',
+  },
 
   // ─── Macro / économie ────────────────────────────────────────
-  lemonde_eco: { id: 'lemonde_eco', label: 'Le Monde — Économie', lang: 'fr', kind: 'feed', url: 'https://www.lemonde.fr/economie/rss_full.xml', category: 'macro' },
+  lemonde_eco: {
+    id: 'lemonde_eco',
+    label: 'Le Monde — Économie',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.lemonde.fr/economie/rss_full.xml',
+    category: 'macro',
+  },
 
   // ─── Généraliste FR ──────────────────────────────────────────
-  lemonde: { id: 'lemonde', label: 'Le Monde', lang: 'fr', kind: 'feed', url: 'https://www.lemonde.fr/rss/une.xml', category: 'misc' },
-  lefigaro: { id: 'lefigaro', label: 'Le Figaro', lang: 'fr', kind: 'feed', url: 'https://www.lefigaro.fr/rss/figaro_actualites.xml', category: 'misc' },
-  liberation: { id: 'liberation', label: 'Libération', lang: 'fr', kind: 'feed', url: 'https://www.liberation.fr/arc/outboundfeeds/rss/?outputType=xml', category: 'misc' },
-  france24: { id: 'france24', label: 'France 24', lang: 'fr', kind: 'feed', url: 'https://www.france24.com/fr/rss', category: 'misc' },
+  lemonde: {
+    id: 'lemonde',
+    label: 'Le Monde',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.lemonde.fr/rss/une.xml',
+    category: 'misc',
+  },
+  lefigaro: {
+    id: 'lefigaro',
+    label: 'Le Figaro',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.lefigaro.fr/rss/figaro_actualites.xml',
+    category: 'misc',
+  },
+  liberation: {
+    id: 'liberation',
+    label: 'Libération',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.liberation.fr/arc/outboundfeeds/rss/?outputType=xml',
+    category: 'misc',
+  },
+  france24: {
+    id: 'france24',
+    label: 'France 24',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.france24.com/fr/rss',
+    category: 'misc',
+  },
 
   // ─── International (EN) ───────────────────────────────────────
-  bbc: { id: 'bbc', label: 'BBC News', lang: 'en', kind: 'feed', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', category: 'misc' },
-  guardian: { id: 'guardian', label: 'The Guardian', lang: 'en', kind: 'feed', url: 'https://www.theguardian.com/world/rss', category: 'misc' },
-  aljazeera: { id: 'aljazeera', label: 'Al Jazeera', lang: 'en', kind: 'feed', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'misc' },
+  bbc: {
+    id: 'bbc',
+    label: 'BBC News',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://feeds.bbci.co.uk/news/world/rss.xml',
+    category: 'misc',
+  },
+  guardian: {
+    id: 'guardian',
+    label: 'The Guardian',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.theguardian.com/world/rss',
+    category: 'misc',
+  },
+  aljazeera: {
+    id: 'aljazeera',
+    label: 'Al Jazeera',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.aljazeera.com/xml/rss/all.xml',
+    category: 'misc',
+  },
 };
 
 const DEFAULT_SOURCES = ['hackernews', 'theverge', 'techcrunch', 'devto'];
@@ -101,11 +285,12 @@ export async function httpGet(rawUrl: string, timeoutMs = 12_000, redirects = 3)
         path: url.pathname + url.search,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; CatDesk-Agent/1.0)',
-          Accept: 'application/json, application/rss+xml, application/atom+xml, text/xml;q=0.9, */*;q=0.8',
+          Accept:
+            'application/json, application/rss+xml, application/atom+xml, text/xml;q=0.9, */*;q=0.8',
           'Accept-Language': 'fr,en;q=0.8',
         },
       },
-      (res) => {
+      res => {
         const status = res.statusCode ?? 0;
         if (status >= 300 && status < 400 && res.headers.location && redirects > 0) {
           req.destroy();
@@ -131,7 +316,10 @@ export async function httpGet(rawUrl: string, timeoutMs = 12_000, redirects = 3)
       },
     );
     req.on('error', reject);
-    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      reject(new Error('Timeout'));
+    });
   });
 }
 
@@ -158,7 +346,10 @@ function tagContent(block: string, tag: string): string | null {
 
 // Strip residual HTML from a feed description into a short plain-text teaser.
 export function toExcerpt(raw: string, max = 500): string {
-  const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = raw
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
 }
 
@@ -167,7 +358,8 @@ export function parseFeed(xml: string, source: string): NewsItem[] {
   const items: NewsItem[] = [];
 
   // RSS <item> first, fall back to Atom <entry>.
-  const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) ?? xml.match(/<entry\b[\s\S]*?<\/entry>/gi) ?? [];
+  const blocks =
+    xml.match(/<item\b[\s\S]*?<\/item>/gi) ?? xml.match(/<entry\b[\s\S]*?<\/entry>/gi) ?? [];
 
   for (const block of blocks) {
     const title = tagContent(block, 'title');
@@ -214,7 +406,10 @@ function parseHackerNews(json: string): NewsItem[] {
       const title = typeof h['title'] === 'string' ? h['title'] : null;
       if (!title) return null;
       const objectID = String(h['objectID'] ?? '');
-      const url = typeof h['url'] === 'string' && h['url'] ? h['url'] : `https://news.ycombinator.com/item?id=${objectID}`;
+      const url =
+        typeof h['url'] === 'string' && h['url']
+          ? h['url']
+          : `https://news.ycombinator.com/item?id=${objectID}`;
       const created = typeof h['created_at'] === 'string' ? h['created_at'] : undefined;
       return {
         title,
@@ -241,7 +436,9 @@ function parseDevto(json: string): NewsItem[] {
         title,
         url,
         source: 'DEV.to',
-        ...(typeof a['positive_reactions_count'] === 'number' ? { points: a['positive_reactions_count'] } : {}),
+        ...(typeof a['positive_reactions_count'] === 'number'
+          ? { points: a['positive_reactions_count'] }
+          : {}),
         ...(typeof a['comments_count'] === 'number' ? { comments: a['comments_count'] } : {}),
         ...(published ? { publishedAt: new Date(published).toISOString() } : {}),
         ...(desc.length > 0 ? { excerpt: toExcerpt(desc) } : {}),
@@ -253,7 +450,10 @@ function parseDevto(json: string): NewsItem[] {
 // ─── Aggregation helpers (pure, exported for tests) ───────────
 
 function normalizeTitle(t: string): string {
-  return t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return t
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
 
 /** Drop duplicates by URL (host+path) or near-identical title, keeping the first. */
@@ -266,7 +466,9 @@ export function dedupeItems(items: NewsItem[]): NewsItem[] {
     try {
       const u = new URL(item.url);
       urlKey = `${u.hostname}${u.pathname}`.replace(/\/$/, '');
-    } catch { /* keep raw */ }
+    } catch {
+      /* keep raw */
+    }
     const titleKey = normalizeTitle(item.title);
     if (seenUrl.has(urlKey) || (titleKey.length > 0 && seenTitle.has(titleKey))) continue;
     seenUrl.add(urlKey);
@@ -279,11 +481,11 @@ export function dedupeItems(items: NewsItem[]): NewsItem[] {
 /** Keep items whose title OR excerpt matches any topic keyword (case-insensitive). */
 export function filterByTopics(items: NewsItem[], topics: string[]): NewsItem[] {
   if (topics.length === 0) return items;
-  const needles = topics.map((t) => t.toLowerCase()).filter((t) => t.length > 0);
+  const needles = topics.map(t => t.toLowerCase()).filter(t => t.length > 0);
   if (needles.length === 0) return items;
-  return items.filter((i) => {
+  return items.filter(i => {
     const hay = `${i.title}\n${i.excerpt ?? ''}`.toLowerCase();
-    return needles.some((n) => hay.includes(n));
+    return needles.some(n => hay.includes(n));
   });
 }
 
@@ -315,7 +517,7 @@ export function filterByRegex(
   const inc = safeRegex(include);
   const exc = safeRegex(exclude);
   if (inc === null && exc === null) return items;
-  return items.filter((i) => {
+  return items.filter(i => {
     const hay = `${i.title}\n${i.excerpt ?? ''}`;
     if (inc !== null && !inc.test(hay)) return false;
     if (exc !== null && exc.test(hay)) return false;
@@ -336,7 +538,7 @@ export function feedLabelFromUrl(rawUrl: string): string {
 export function filterByAge(items: NewsItem[], sinceHours: number, now = Date.now()): NewsItem[] {
   if (sinceHours <= 0) return items;
   const cutoff = now - sinceHours * 60 * 60 * 1000;
-  return items.filter((i) => {
+  return items.filter(i => {
     if (!i.publishedAt) return true;
     const ts = Date.parse(i.publishedAt);
     return Number.isNaN(ts) || ts >= cutoff;
@@ -390,22 +592,27 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
   // Predefined sources. If the caller gave neither sources nor custom feeds,
   // fall back to the default mix; if they gave only custom feeds, skip defaults.
   const customFeeds = (Array.isArray(feeds) ? feeds : [])
-    .map((f) => f.trim())
-    .filter((f) => /^https?:\/\//i.test(f));
+    .map(f => f.trim())
+    .filter(f => /^https?:\/\//i.test(f));
 
-  let ids = Array.isArray(sources) && sources.length > 0
-    ? sources
-    : customFeeds.length > 0 ? [] : DEFAULT_SOURCES;
-  ids = ids.filter((id) => id in NEWS_SOURCES);
-  if (lang !== 'all') ids = ids.filter((id) => NEWS_SOURCES[id]!.lang === lang);
+  let ids =
+    Array.isArray(sources) && sources.length > 0
+      ? sources
+      : customFeeds.length > 0
+        ? []
+        : DEFAULT_SOURCES;
+  ids = ids.filter(id => id in NEWS_SOURCES);
+  if (lang !== 'all') ids = ids.filter(id => NEWS_SOURCES[id]!.lang === lang);
 
   if (ids.length === 0 && customFeeds.length === 0) {
-    throw new Error(`Aucune source valide. Sources disponibles: ${Object.keys(NEWS_SOURCES).join(', ')}. Ou passe des URLs RSS/Atom via "feeds".`);
+    throw new Error(
+      `Aucune source valide. Sources disponibles: ${Object.keys(NEWS_SOURCES).join(', ')}. Ou passe des URLs RSS/Atom via "feeds".`,
+    );
   }
 
   // Unified fetch task list: predefined sources + custom feeds.
   const tasks: Array<{ label: string; run: () => Promise<NewsItem[]> }> = [
-    ...ids.map((id) => {
+    ...ids.map(id => {
       const def = NEWS_SOURCES[id]!;
       return {
         label: def.label,
@@ -417,19 +624,22 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
         },
       };
     }),
-    ...customFeeds.map((url) => {
+    ...customFeeds.map(url => {
       const label = feedLabelFromUrl(url);
       return { label, run: async () => parseFeed(await httpGet(url), label) };
     }),
   ];
 
-  const results = await Promise.allSettled(tasks.map((t) => t.run()));
+  const results = await Promise.allSettled(tasks.map(t => t.run()));
 
   const collected: NewsItem[] = [];
   const failed: string[] = [];
   results.forEach((r, idx) => {
     if (r.status === 'fulfilled') collected.push(...r.value);
-    else failed.push(`${tasks[idx]!.label}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
+    else
+      failed.push(
+        `${tasks[idx]!.label}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+      );
   });
 
   // Plafond haut pour laisser de la marge aux digests volumineux (des centaines
@@ -448,26 +658,34 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
     ),
   ).slice(0, cappedLimit);
 
-  return { items, sourceLabels: tasks.map((t) => t.label), failed, totalFetched: collected.length };
+  return { items, sourceLabels: tasks.map(t => t.label), failed, totalFetched: collected.length };
 }
 
 // ─── Tool ─────────────────────────────────────────────────────
 
-export class FetchTechNewsTool extends BaseTool {
+export class FetchTechNewsTool extends BaseTool<Args> {
   readonly name = 'fetch_tech_news';
   readonly description =
-    "Agrège les actualités tech du jour depuis plusieurs sources gratuites (Hacker News, The Verge, TechCrunch, DEV.to, Ars Technica + sources FR : Numerama, Next, Les Numériques) et/ou des flux RSS/Atom personnalisés via `feeds`. Filtre par sujets (titre ou extrait) et fenêtre temporelle, déduplique et classe les articles. Le LLM rédige ensuite une synthèse + un résumé par article.";
+    'Agrège les actualités tech du jour depuis plusieurs sources gratuites (Hacker News, The Verge, TechCrunch, DEV.to, Ars Technica + sources FR : Numerama, Next, Les Numériques) et/ou des flux RSS/Atom personnalisés via `feeds`. Filtre par sujets (titre ou extrait) et fenêtre temporelle, déduplique et classe les articles. Le LLM rédige ensuite une synthèse + un résumé par article.';
   readonly category = 'web' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.fetch_tech_news;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { sources, feeds, topics = [], since_hours = 24, limit = 15, lang = 'all' } = (args ?? {}) as FetchTechNewsArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { sources, feeds, topics = [], since_hours = 24, limit = 15, lang = 'all' } = args;
 
     let result: AggregateResult;
     try {
-      result = await aggregateNews({ sources, feeds, topics, sinceHours: since_hours, limit, lang });
+      result = await aggregateNews({
+        sources,
+        feeds,
+        topics,
+        sinceHours: since_hours,
+        limit,
+        lang,
+      });
     } catch (err) {
       return this.fail(err instanceof Error ? err.message : String(err));
     }

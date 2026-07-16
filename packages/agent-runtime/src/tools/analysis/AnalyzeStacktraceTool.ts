@@ -1,6 +1,7 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -24,10 +25,14 @@ interface AnalysisResult {
   context?: string;
 }
 
-interface StacktraceArgs {
-  stacktrace: string;
-  context?: string;
-}
+const argsSchema = z.object({
+  stacktrace: z.string().min(1).describe('The stacktrace or error output to analyze'),
+  context: z
+    .string()
+    .optional()
+    .describe('Optional context about what was happening when the error occurred'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // ─── Runtime detection ─────────────────────────────────────────
 
@@ -44,7 +49,14 @@ function detectLanguage(s: string): string {
 // ─── Internal frame detection ──────────────────────────────────
 
 const INTERNAL: Record<string, RegExp[]> = {
-  nodejs: [/node_modules[\\/]/, /node:internal\//, /\(node:/, /^internal\//, /timers\.js/, /events\.js/],
+  nodejs: [
+    /node_modules[\\/]/,
+    /node:internal\//,
+    /\(node:/,
+    /^internal\//,
+    /timers\.js/,
+    /events\.js/,
+  ],
   typescript: [/node_modules[\\/]/, /node:internal\//, /\(node:/],
   python: [/site-packages[\\/]/, /\/lib\/python/, /importlib/, /<frozen /],
   java: [/^java\./, /^javax\./, /^sun\./, /^com\.sun\./, /^org\.springframework\./],
@@ -58,12 +70,16 @@ function isInternal(file: string, lang: string): boolean {
 
 // ─── Per-runtime parsers ───────────────────────────────────────
 
-function parseNodeish(stacktrace: string, lang: string): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
+function parseNodeish(
+  stacktrace: string,
+  lang: string,
+): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
   const lines = stacktrace.trim().split('\n');
   const firstLine = lines[0] ?? '';
 
-  const errMatch = firstLine.match(/^([A-Za-z][\w.]*(?:Error|Exception|Fault)?\b):? (.+)$/) ??
-                   firstLine.match(/^([A-Za-z][\w.]*):(.+)$/);
+  const errMatch =
+    firstLine.match(/^([A-Za-z][\w.]*(?:Error|Exception|Fault)?\b):? (.+)$/) ??
+    firstLine.match(/^([A-Za-z][\w.]*):(.+)$/);
   const errorType = errMatch?.[1]?.trim() ?? 'Error';
   const errorMessage = errMatch?.[2]?.trim() ?? firstLine;
 
@@ -80,19 +96,29 @@ function parseNodeish(stacktrace: string, lang: string): Omit<AnalysisResult, 'l
     const lineNum = parseInt(m[3] ?? m[6] ?? '0', 10);
     const col = parseInt(m[4] ?? m[7] ?? '0', 10);
 
-    frames.push({ raw: line.trim(), functionName, file, line: lineNum, column: col, isInternal: isInternal(file, lang) });
+    frames.push({
+      raw: line.trim(),
+      functionName,
+      file,
+      line: lineNum,
+      column: col,
+      isInternal: isInternal(file, lang),
+    });
   }
 
   return { errorType, errorMessage, frames };
 }
 
-function parsePython(stacktrace: string): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
+function parsePython(
+  stacktrace: string,
+): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
   const lines = stacktrace.trim().split('\n');
 
   // Last non-indented, non-empty line is "ErrorType: message"
   const lastLine = [...lines].reverse().find(l => l.trim().length > 0 && !l.startsWith(' ')) ?? '';
-  const errMatch = lastLine.match(/^([\w.]+(?:Error|Exception|Warning)[\w]*):?\s*(.*)$/) ??
-                   lastLine.match(/^([\w.]+):\s*(.+)$/);
+  const errMatch =
+    lastLine.match(/^([\w.]+(?:Error|Exception|Warning)[\w]*):?\s*(.*)$/) ??
+    lastLine.match(/^([\w.]+):\s*(.+)$/);
   const errorType = errMatch?.[1] ?? 'Exception';
   const errorMessage = errMatch?.[2]?.trim() ?? lastLine;
 
@@ -105,15 +131,24 @@ function parsePython(stacktrace: string): Omit<AnalysisResult, 'language' | 'use
     const file = m[1] ?? '';
     const lineNum = parseInt(m[2] ?? '0', 10);
     const functionName = m[3] ?? '';
-    frames.push({ raw: line.trim(), file, line: lineNum, functionName, isInternal: isInternal(file, 'python') });
+    frames.push({
+      raw: line.trim(),
+      file,
+      line: lineNum,
+      functionName,
+      isInternal: isInternal(file, 'python'),
+    });
   }
 
   return { errorType, errorMessage, frames };
 }
 
-function parseRust(stacktrace: string): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
-  const panicMatch = stacktrace.match(/thread '(.+?)' panicked at '(.+?)',\s*(.+?):(\d+)/s) ??
-                     stacktrace.match(/thread '(.+?)' panicked at (.+?):(\d+):\d+[\s\n]+'(.+?)'/s);
+function parseRust(
+  stacktrace: string,
+): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
+  const panicMatch =
+    stacktrace.match(/thread '(.+?)' panicked at '(.+?)',\s*(.+?):(\d+)/s) ??
+    stacktrace.match(/thread '(.+?)' panicked at (.+?):(\d+):\d+[\s\n]+'(.+?)'/s);
   const errorMessage = panicMatch?.[2]?.trim() ?? panicMatch?.[4]?.trim() ?? 'panic';
 
   const frames: StackFrame[] = [];
@@ -131,11 +166,14 @@ function parseRust(stacktrace: string): Omit<AnalysisResult, 'language' | 'userF
   return { errorType: 'panic', errorMessage, frames };
 }
 
-function parseJava(stacktrace: string): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
+function parseJava(
+  stacktrace: string,
+): Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'> {
   const lines = stacktrace.trim().split('\n');
   const firstLine = lines[0] ?? '';
-  const errMatch = firstLine.match(/^([\w.]+(?:Exception|Error)[\w]*): (.+)$/) ??
-                   firstLine.match(/^([\w.]+): (.+)$/);
+  const errMatch =
+    firstLine.match(/^([\w.]+(?:Exception|Error)[\w]*): (.+)$/) ??
+    firstLine.match(/^([\w.]+): (.+)$/);
   const errorType = errMatch?.[1] ?? 'Exception';
   const errorMessage = errMatch?.[2] ?? firstLine;
 
@@ -148,7 +186,13 @@ function parseJava(stacktrace: string): Omit<AnalysisResult, 'language' | 'userF
     const functionName = m[1] ?? '';
     const file = m[2] ?? '';
     const lineNum = parseInt(m[3] ?? '0', 10);
-    frames.push({ raw: line.trim(), functionName, file, line: lineNum, isInternal: isInternal(functionName, 'java') });
+    frames.push({
+      raw: line.trim(),
+      functionName,
+      file,
+      line: lineNum,
+      isInternal: isInternal(functionName, 'java'),
+    });
   }
 
   return { errorType, errorMessage, frames };
@@ -168,16 +212,18 @@ function findRootCause(frames: StackFrame[], lang: string): StackFrame | null {
 
 // ─── Tool ──────────────────────────────────────────────────────
 
-export class AnalyzeStacktraceTool extends BaseTool {
+export class AnalyzeStacktraceTool extends BaseTool<Args> {
   readonly name = 'analyze_stacktrace';
-  readonly description = "Analyse une stacktrace pour extraire le type d'erreur, le message et les frames clés";
+  readonly description =
+    "Analyse une stacktrace pour extraire le type d'erreur, le message et les frames clés";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.analyze_stacktrace;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { stacktrace, context } = args as StacktraceArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { stacktrace, context } = args;
 
     if (typeof stacktrace !== 'string' || stacktrace.trim().length === 0) {
       return this.fail('stacktrace est requis et ne peut pas être vide');
@@ -188,10 +234,18 @@ export class AnalyzeStacktraceTool extends BaseTool {
 
     let parsed: Omit<AnalysisResult, 'language' | 'userFrames' | 'rootCauseFrame' | 'totalFrames'>;
     switch (language) {
-      case 'python':    parsed = parsePython(trimmed); break;
-      case 'rust':      parsed = parseRust(trimmed); break;
-      case 'java':      parsed = parseJava(trimmed); break;
-      default:          parsed = parseNodeish(trimmed, language); break;
+      case 'python':
+        parsed = parsePython(trimmed);
+        break;
+      case 'rust':
+        parsed = parseRust(trimmed);
+        break;
+      case 'java':
+        parsed = parseJava(trimmed);
+        break;
+      default:
+        parsed = parseNodeish(trimmed, language);
+        break;
     }
 
     const userFrames = parsed.frames.filter(f => !f.isInternal);

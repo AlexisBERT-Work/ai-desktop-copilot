@@ -1,30 +1,33 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import type { VectorStore } from '../../memory/VectorStore';
 
-interface Args {
-  content: string;
-  tags?: string[];
-}
+const argsSchema = z.object({
+  content: z.string().min(1).describe('Information to store in memory'),
+  tags: z.array(z.string()).optional().describe('Tags for retrieval'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 const MAX_CHARS = 10_000;
 
-export class StoreMemoryTool extends BaseTool {
+export class StoreMemoryTool extends BaseTool<Args> {
   name = 'store_memory';
   description =
     'Stocke une information en mémoire sémantique persistante (préférences, faits, contexte projet) pour les sessions futures';
   category = 'memory' as const;
   riskLevel = 'medium' as const;
   requiresConfirmation = false;
-  schema = TOOL_SCHEMAS.store_memory;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
   constructor(private vectorStore: VectorStore) {
     super();
   }
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
     if (typeof args.content !== 'string' || args.content.trim().length === 0) {
       return this.fail('content est requis');
     }

@@ -1,12 +1,14 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface ReadWebpageArgs {
-  url: string;
-  selector?: string;
-  max_chars?: number;
-}
+const argsSchema = z.object({
+  url: z.string().min(1).describe('URL to fetch and extract text from'),
+  selector: z.string().optional().describe('CSS selector to extract specific element (optional)'),
+  max_chars: z.number().default(20000).describe('Max characters of extracted text to return'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // Minimal HTML-to-text extractor — removes tags, scripts, styles, decodes entities
 export function htmlToText(html: string): string {
@@ -45,7 +47,10 @@ export function extractBySelector(html: string, selector: string): string | null
   return m?.[1] ?? null;
 }
 
-async function fetchUrl(url: string, timeoutMs = 15_000): Promise<{ body: string; statusCode: number; contentType: string }> {
+async function fetchUrl(
+  url: string,
+  timeoutMs = 15_000,
+): Promise<{ body: string; statusCode: number; contentType: string }> {
   const parsedUrl = new URL(url);
   const isHttps = parsedUrl.protocol === 'https:';
   const { default: transport } = await import(isHttps ? 'https' : 'http');
@@ -58,7 +63,7 @@ async function fetchUrl(url: string, timeoutMs = 15_000): Promise<{ body: string
         path: parsedUrl.pathname + parsedUrl.search,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; CatDesk-Agent/1.0)',
-          'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9',
+          Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9',
           'Accept-Language': 'fr,en;q=0.8',
         },
       },
@@ -75,31 +80,41 @@ async function fetchUrl(url: string, timeoutMs = 15_000): Promise<{ body: string
           chunks.push(c);
           // Abort if body exceeds 4MB to avoid memory bloat
           const total = chunks.reduce((s, b) => s + b.length, 0);
-          if (total > 4_000_000) { req.destroy(); reject(new Error('Réponse trop volumineuse (>4MB)')); }
+          if (total > 4_000_000) {
+            req.destroy();
+            reject(new Error('Réponse trop volumineuse (>4MB)'));
+          }
         });
-        res.on('end', () => resolve({
-          body: Buffer.concat(chunks).toString('utf-8'),
-          statusCode: res.statusCode ?? 0,
-          contentType: res.headers['content-type'] ?? '',
-        }));
+        res.on('end', () =>
+          resolve({
+            body: Buffer.concat(chunks).toString('utf-8'),
+            statusCode: res.statusCode ?? 0,
+            contentType: res.headers['content-type'] ?? '',
+          }),
+        );
         res.on('error', reject);
       },
     );
     req.on('error', reject);
-    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('Timeout lors de la requête')); });
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      reject(new Error('Timeout lors de la requête'));
+    });
   });
 }
 
-export class ReadWebpageTool extends BaseTool {
+export class ReadWebpageTool extends BaseTool<Args> {
   readonly name = 'read_webpage';
-  readonly description = "Récupère une page web et en extrait le texte (HTTP simple, sans exécuter le JavaScript). Idéal pour doc, articles, README, issues GitHub. Si la page est une application JavaScript (SPA) ou renvoie peu de texte, utilise plutôt browser_navigate + browser_get_text.";
+  readonly description =
+    'Récupère une page web et en extrait le texte (HTTP simple, sans exécuter le JavaScript). Idéal pour doc, articles, README, issues GitHub. Si la page est une application JavaScript (SPA) ou renvoie peu de texte, utilise plutôt browser_navigate + browser_get_text.';
   readonly category = 'web' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.read_webpage;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { url, selector, max_chars = 20_000 } = rawArgs as ReadWebpageArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { url, selector, max_chars = 20_000 } = rawArgs;
 
     if (!url?.trim()) return this.fail('url est requis');
 

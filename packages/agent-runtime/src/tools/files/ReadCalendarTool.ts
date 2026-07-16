@@ -1,15 +1,19 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 
-interface ReadCalendarArgs {
-  path: string;
-  from?: string;
-  to?: string;
-  days?: number;
-  limit?: number;
-}
+const argsSchema = z.object({
+  path: z.string().min(1).describe('Absolute path to a local .ics (iCalendar) file'),
+  from: z.string().optional().describe('Window start as YYYY-MM-DD (defaults to today)'),
+  to: z.string().optional().describe('Window end as YYYY-MM-DD (defaults to from + days)'),
+  days: z.number().default(30).describe('Window length in days when "to" is omitted'),
+  limit: z.number().default(50).describe('Maximum number of events to return'),
+});
+type Args = z.infer<typeof argsSchema>;
+/** Forme d'entree (avant defauts zod) - celle des helpers purs et des tests. */
+type ArgsInput = z.input<typeof argsSchema>;
 
 interface CalendarParams {
   path: string;
@@ -20,7 +24,7 @@ interface CalendarParams {
 }
 
 /** Build the sidecar params, applying defaults. Pure — unit-testable. */
-export function buildCalendarParams(args: ReadCalendarArgs): CalendarParams {
+export function buildCalendarParams(args: ArgsInput): CalendarParams {
   const params: CalendarParams = {
     path: args.path,
     days: args.days ?? 30,
@@ -55,17 +59,18 @@ interface CalendarResult {
  * expanding recurring events. Fully local — no network, no credentials.
  * Defaults to the next 30 days when no window is given.
  */
-export class ReadCalendarTool extends BaseTool {
+export class ReadCalendarTool extends BaseTool<Args> {
   readonly name = 'read_calendar';
   readonly description =
-    "Lit un fichier calendrier .ics local et liste les événements sur une fenêtre de dates (par défaut : 30 prochains jours). Développe les événements récurrents. 100% local, sans réseau ni identifiants. Fenêtre réglable via from/to (YYYY-MM-DD) ou days.";
+    'Lit un fichier calendrier .ics local et liste les événements sur une fenêtre de dates (par défaut : 30 prochains jours). Développe les événements récurrents. 100% local, sans réseau ni identifiants. Fenêtre réglable via from/to (YYYY-MM-DD) ou days.';
   readonly category = 'filesystem' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.read_calendar;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as ReadCalendarArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
 
     if (!args.path?.trim()) return this.fail('path est requis (chemin du fichier .ics).');
 
@@ -86,7 +91,9 @@ export class ReadCalendarTool extends BaseTool {
     } catch (err) {
       const msg = String(err);
       if (msg.includes('not installed') || msg.includes('No module named')) {
-        return this.fail('Dépendance Python manquante. Dans le sidecar : pip install icalendar recurring-ical-events');
+        return this.fail(
+          'Dépendance Python manquante. Dans le sidecar : pip install icalendar recurring-ical-events',
+        );
       }
       if (msg.includes('No such file') || msg.includes('Errno 2') || msg.includes('cannot find')) {
         return this.fail(`Fichier .ics introuvable : ${args.path}`);

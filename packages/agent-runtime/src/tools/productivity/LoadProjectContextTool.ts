@@ -1,12 +1,17 @@
+import { z } from 'zod';
 import { readdir, readFile } from 'fs/promises';
 import { join, basename } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface LoadProjectContextArgs {
-  workdir?: string;
-}
+const argsSchema = z.object({
+  workdir: z
+    .string()
+    .optional()
+    .describe('Project root to profile (defaults to current directory)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // Detect stack/package-manager signals from a set of present filenames (pure).
 export function detectStack(files: Set<string>): {
@@ -45,17 +50,18 @@ export function summarizeReadme(content: string): string {
   return out.join(' ').slice(0, 300);
 }
 
-export class LoadProjectContextTool extends BaseTool {
+export class LoadProjectContextTool extends BaseTool<Args> {
   readonly name = 'load_project_context';
   readonly description =
     "Profile un projet à l'ouverture : stack détectée, gestionnaire de paquets, scripts disponibles, dépendances clés, structure des dossiers, points d'entrée, et résumé du README. À stocker en mémoire de projet pour charger le contexte au démarrage.";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.load_project_context;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir } = args as LoadProjectContextArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir } = args;
     const root = workdir ?? process.cwd();
 
     let entries;

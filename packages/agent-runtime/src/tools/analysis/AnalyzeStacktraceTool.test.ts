@@ -5,14 +5,14 @@ const tool = new AnalyzeStacktraceTool();
 
 /** Helper : exécute et renvoie data typé librement. */
 async function analyze(stacktrace: string, context?: string): Promise<any> {
-  const res = await tool.execute({ stacktrace, ...(context ? { context } : {}) });
+  const res = await tool.run({ stacktrace, ...(context ? { context } : {}) });
   expect(res.success).toBe(true);
   return res.data;
 }
 
 describe('AnalyzeStacktraceTool', () => {
   it('rejette une stacktrace vide', async () => {
-    const res = await tool.execute({ stacktrace: '   ' });
+    const res = await tool.run({ stacktrace: '   ' });
     expect(res.success).toBe(false);
   });
 

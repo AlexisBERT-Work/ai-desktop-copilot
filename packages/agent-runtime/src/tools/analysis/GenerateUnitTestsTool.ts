@@ -1,16 +1,24 @@
+import { z } from 'zod';
 import { readFile, access } from 'fs/promises';
 import { dirname, basename, extname, join } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 type Framework = 'vitest' | 'jest' | 'pytest' | 'cargo' | 'go';
 
-interface GenerateUnitTestsArgs {
-  path: string;
-  framework?: 'auto' | Framework;
-  symbol?: string;
-}
+const argsSchema = z.object({
+  path: z.string().min(1).describe('Absolute path to the source file to generate tests for'),
+  framework: z
+    .enum(['auto', 'vitest', 'jest', 'pytest', 'cargo', 'go'])
+    .default('auto')
+    .describe('Test framework to target — "auto" detects from the project'),
+  symbol: z
+    .string()
+    .optional()
+    .describe('Only scaffold tests for this exported function/class (optional)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface ExportedSymbol {
   name: string;
@@ -20,8 +28,14 @@ interface ExportedSymbol {
 }
 
 const LANG_BY_EXT: Record<string, 'ts' | 'js' | 'py' | 'rust' | 'go'> = {
-  '.ts': 'ts', '.tsx': 'ts', '.mts': 'ts', '.cts': 'ts',
-  '.js': 'js', '.jsx': 'js', '.mjs': 'js', '.cjs': 'js',
+  '.ts': 'ts',
+  '.tsx': 'ts',
+  '.mts': 'ts',
+  '.cts': 'ts',
+  '.js': 'js',
+  '.jsx': 'js',
+  '.mjs': 'js',
+  '.cjs': 'js',
   '.py': 'py',
   '.rs': 'rust',
   '.go': 'go',
@@ -77,7 +91,12 @@ function extractJsSymbols(src: string): ExportedSymbol[] {
   const symbols: ExportedSymbol[] = [];
   const seen = new Set<string>();
 
-  const push = (name: string, kind: ExportedSymbol['kind'], isAsync: boolean, isDefault: boolean) => {
+  const push = (
+    name: string,
+    kind: ExportedSymbol['kind'],
+    isAsync: boolean,
+    isDefault: boolean,
+  ) => {
     if (name.length === 0 || seen.has(name)) return;
     seen.add(name);
     symbols.push({ name, kind, isAsync, isDefault });
@@ -97,7 +116,8 @@ function extractJsSymbols(src: string): ExportedSymbol[] {
   }
 
   // export const foo = [async] (  →  arrow function
-  const arrowRe = /export\s+const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/g;
+  const arrowRe =
+    /export\s+const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/g;
   while ((m = arrowRe.exec(src)) !== null) {
     push(m[1] ?? '', 'function', m[2] !== undefined, false);
   }
@@ -106,7 +126,11 @@ function extractJsSymbols(src: string): ExportedSymbol[] {
   const reExportRe = /export\s*\{([^}]+)\}/g;
   while ((m = reExportRe.exec(src)) !== null) {
     for (const part of (m[1] ?? '').split(',')) {
-      const name = part.split(/\s+as\s+/).pop()?.trim() ?? '';
+      const name =
+        part
+          .split(/\s+as\s+/)
+          .pop()
+          ?.trim() ?? '';
       if (name.length > 0 && name !== 'default') push(name, 'const', false, false);
     }
   }
@@ -192,8 +216,8 @@ function jsScaffold(symbols: ExportedSymbol[], stem: string, framework: Framewor
       ? "import { describe, it, expect } from 'vitest';"
       : "import { describe, it, expect } from '@jest/globals';";
 
-  const named = symbols.filter((s) => !s.isDefault).map((s) => s.name);
-  const def = symbols.find((s) => s.isDefault);
+  const named = symbols.filter(s => !s.isDefault).map(s => s.name);
+  const def = symbols.find(s => s.isDefault);
   const importParts: string[] = [];
   if (def) importParts.push(def.name);
   if (named.length > 0) importParts.push(`{ ${named.join(', ')} }`);
@@ -202,7 +226,7 @@ function jsScaffold(symbols: ExportedSymbol[], stem: string, framework: Framewor
       ? `import ${importParts.join(', ')} from './${stem}';`
       : `import * as mod from './${stem}';`;
 
-  const blocks = symbols.map((s) => {
+  const blocks = symbols.map(s => {
     const call = s.isAsync ? `await ${s.name}(/* args */)` : `${s.name}(/* args */)`;
     const kindHint = s.kind === 'class' ? `new ${s.name}(/* args */)` : call;
     return `  describe('${s.name}', () => {
@@ -224,9 +248,9 @@ ${blocks.join('\n\n')}
 }
 
 function pyScaffold(symbols: ExportedSymbol[], stem: string): string {
-  const names = symbols.map((s) => s.name).join(', ');
+  const names = symbols.map(s => s.name).join(', ');
   const blocks = symbols.map(
-    (s) => `def test_${s.name}():
+    s => `def test_${s.name}():
     # TODO: describe expected behaviour
     # result = ${s.kind === 'class' ? `${s.name}(...)` : `${s.name}(...)`}
     assert True`,
@@ -242,7 +266,7 @@ ${blocks.join('\n\n\n')}
 
 function rustScaffold(symbols: ExportedSymbol[]): string {
   const blocks = symbols.map(
-    (s) => `    #[test]
+    s => `    #[test]
     fn test_${s.name}() {
         // TODO: describe expected behaviour
         // assert_eq!(${s.name}(/* args */), /* expected */);
@@ -260,7 +284,7 @@ ${blocks.join('\n\n')}
 
 function goScaffold(symbols: ExportedSymbol[]): string {
   const blocks = symbols.map(
-    (s) => `func Test${s.name}(t *testing.T) {
+    s => `func Test${s.name}(t *testing.T) {
 \t// TODO: describe expected behaviour
 \t// got := ${s.name}(/* args */)
 \t// if got != want { t.Errorf("got %v, want %v", got, want) }
@@ -274,17 +298,18 @@ ${blocks.join('\n\n')}
 
 // ─── Tool ──────────────────────────────────────────────────────
 
-export class GenerateUnitTestsTool extends BaseTool {
+export class GenerateUnitTestsTool extends BaseTool<Args> {
   readonly name = 'generate_unit_tests';
   readonly description =
-    "Détecte le framework de test du projet et génère un squelette de tests unitaires pour un fichier source (vitest/jest/pytest/cargo/go). Extrait les symboles exportés et propose un scaffold + le chemin du fichier de test.";
+    'Détecte le framework de test du projet et génère un squelette de tests unitaires pour un fichier source (vitest/jest/pytest/cargo/go). Extrait les symboles exportés et propose un scaffold + le chemin du fichier de test.';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.generate_unit_tests;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { path, framework = 'auto', symbol } = args as GenerateUnitTestsArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { path, framework = 'auto', symbol } = args;
 
     if (typeof path !== 'string' || path.trim().length === 0) {
       return this.fail('path est requis');
@@ -293,14 +318,18 @@ export class GenerateUnitTestsTool extends BaseTool {
     const ext = extname(path).toLowerCase();
     const lang = LANG_BY_EXT[ext];
     if (lang === undefined) {
-      return this.fail(`Extension non supportée: ${ext || '(aucune)'}. Supporté: .ts/.tsx/.js/.py/.rs/.go`);
+      return this.fail(
+        `Extension non supportée: ${ext || '(aucune)'}. Supporté: .ts/.tsx/.js/.py/.rs/.go`,
+      );
     }
 
     let src: string;
     try {
       src = await readFile(path, 'utf-8');
     } catch (err) {
-      return this.fail(`Impossible de lire le fichier: ${err instanceof Error ? err.message : String(err)}`);
+      return this.fail(
+        `Impossible de lire le fichier: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     const resolvedFramework: Framework =
@@ -309,14 +338,22 @@ export class GenerateUnitTestsTool extends BaseTool {
     let symbols: ExportedSymbol[];
     switch (lang) {
       case 'ts':
-      case 'js': symbols = extractJsSymbols(src); break;
-      case 'py': symbols = extractPySymbols(src); break;
-      case 'rust': symbols = extractRustSymbols(src); break;
-      case 'go': symbols = extractGoSymbols(src); break;
+      case 'js':
+        symbols = extractJsSymbols(src);
+        break;
+      case 'py':
+        symbols = extractPySymbols(src);
+        break;
+      case 'rust':
+        symbols = extractRustSymbols(src);
+        break;
+      case 'go':
+        symbols = extractGoSymbols(src);
+        break;
     }
 
     if (typeof symbol === 'string' && symbol.length > 0) {
-      symbols = symbols.filter((s) => s.name === symbol);
+      symbols = symbols.filter(s => s.name === symbol);
       if (symbols.length === 0) {
         return this.fail(`Symbole "${symbol}" introuvable parmi les exports du fichier.`);
       }
@@ -333,10 +370,18 @@ export class GenerateUnitTestsTool extends BaseTool {
     let scaffold: string;
     switch (resolvedFramework) {
       case 'vitest':
-      case 'jest': scaffold = jsScaffold(symbols, stem, resolvedFramework); break;
-      case 'pytest': scaffold = pyScaffold(symbols, stem); break;
-      case 'cargo': scaffold = rustScaffold(symbols); break;
-      case 'go': scaffold = goScaffold(symbols); break;
+      case 'jest':
+        scaffold = jsScaffold(symbols, stem, resolvedFramework);
+        break;
+      case 'pytest':
+        scaffold = pyScaffold(symbols, stem);
+        break;
+      case 'cargo':
+        scaffold = rustScaffold(symbols);
+        break;
+      case 'go':
+        scaffold = goScaffold(symbols);
+        break;
     }
 
     return this.ok({
@@ -344,7 +389,7 @@ export class GenerateUnitTestsTool extends BaseTool {
       language: lang,
       testFilePath,
       appendToSource: resolvedFramework === 'cargo',
-      symbols: symbols.map((s) => ({ name: s.name, kind: s.kind, isAsync: s.isAsync })),
+      symbols: symbols.map(s => ({ name: s.name, kind: s.kind, isAsync: s.isAsync })),
       symbolCount: symbols.length,
       scaffold,
       note: 'Squelette à compléter : remplace les TODO/placeholders par de vrais cas (nominal, limites, erreurs). Le LLM doit raffiner les assertions à partir du code source.',

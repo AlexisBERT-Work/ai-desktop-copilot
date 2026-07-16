@@ -22,7 +22,11 @@ See [[Other Note]] and [[Third|alias]].`;
 
 describe('searchNotes', () => {
   const docs: NoteDoc[] = [
-    { path: 'a.md', title: 'Rust tips', content: '---\ntags: rust\n---\nBorrow checker and lifetimes.' },
+    {
+      path: 'a.md',
+      title: 'Rust tips',
+      content: '---\ntags: rust\n---\nBorrow checker and lifetimes.',
+    },
     { path: 'b.md', title: 'Cooking', content: 'How to make pasta. Nothing technical here.' },
     { path: 'c.md', title: 'Async', content: '#rust async await tokio runtime.' },
   ];
@@ -30,12 +34,12 @@ describe('searchNotes', () => {
   it('classe par pertinence (titre pèse plus)', () => {
     const hits = searchNotes(docs, 'rust', undefined, 10);
     expect(hits[0]?.title).toBe('Rust tips');
-    expect(hits.map((h) => h.path)).not.toContain('b.md');
+    expect(hits.map(h => h.path)).not.toContain('b.md');
   });
 
   it('filtre par tag', () => {
     const hits = searchNotes(docs, '', 'rust', 10);
-    const paths = hits.map((h) => h.path).sort();
+    const paths = hits.map(h => h.path).sort();
     expect(paths).toEqual(['a.md', 'c.md']);
   });
 
@@ -53,7 +57,10 @@ describe('ObsidianNotesTool (vault réel)', () => {
     await mkdir(join(vault, '.obsidian'), { recursive: true });
     await writeFile(join(vault, '.obsidian', 'app.json'), '{}'); // must be ignored
     await mkdir(join(vault, 'sub'), { recursive: true });
-    await writeFile(join(vault, 'Welcome.md'), '---\ntags: intro\n---\nWelcome to the vault. [[Welcome]]');
+    await writeFile(
+      join(vault, 'Welcome.md'),
+      '---\ntags: intro\n---\nWelcome to the vault. [[Welcome]]',
+    );
     await writeFile(join(vault, 'sub', 'Deep.md'), 'Some deep note about tokio runtime.');
   });
 
@@ -62,26 +69,26 @@ describe('ObsidianNotesTool (vault réel)', () => {
   });
 
   it('échoue sans coffre', async () => {
-    const res = await tool.execute({ query: 'x' });
+    const res = await tool.run({ query: 'x' });
     expect(res.success).toBe(false);
   });
 
   it('cherche dans les sous-dossiers et ignore .obsidian', async () => {
-    const res: any = await tool.execute({ vault, query: 'tokio' });
+    const res: any = await tool.run({ vault, query: 'tokio' });
     expect(res.success).toBe(true);
     expect(res.data.noteCount).toBe(2); // app.json not counted
     expect(res.data.results[0].path).toBe('sub/Deep.md');
   });
 
   it('lit une note entière par titre', async () => {
-    const res: any = await tool.execute({ vault, note: 'Welcome' });
+    const res: any = await tool.run({ vault, note: 'Welcome' });
     expect(res.success).toBe(true);
     expect(res.data.tags).toContain('intro');
     expect(res.data.content).toContain('Welcome to the vault');
   });
 
   it('retourne une erreur pour une note absente', async () => {
-    const res = await tool.execute({ vault, note: 'Nope' });
+    const res = await tool.run({ vault, note: 'Nope' });
     expect(res.success).toBe(false);
   });
 });

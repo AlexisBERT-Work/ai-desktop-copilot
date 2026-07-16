@@ -1,14 +1,21 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { extname } from 'path';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 
-interface ParseDocumentArgs {
-  path: string;
-  max_pages?: number;
-  max_rows?: number;
-}
+const argsSchema = z.object({
+  path: z
+    .string()
+    .min(1)
+    .describe(
+      'Absolute path to a local .pdf, .docx or .csv file. The format is detected from the extension.',
+    ),
+  max_pages: z.number().default(50).describe('PDF only: maximum number of pages to extract'),
+  max_rows: z.number().default(1000).describe('CSV only: maximum number of rows to parse'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export type DocumentFormat = 'pdf' | 'docx' | 'csv';
 
@@ -41,17 +48,18 @@ export function detectFormat(path: string): DocumentFormat | null {
  * JSON-RPC methods. Fully local — nothing leaves the machine. The format is
  * picked from the file extension.
  */
-export class ParseDocumentTool extends BaseTool {
+export class ParseDocumentTool extends BaseTool<Args> {
   readonly name = 'parse_document';
   readonly description =
     "Extrait le texte et les métadonnées d'un document local (PDF, Word .docx ou CSV) via le sidecar Python. 100% local, aucune donnée envoyée dans le cloud. Le format est détecté par l'extension du fichier.";
   readonly category = 'filesystem' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.parse_document;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { path, max_pages = 50, max_rows = 1000 } = rawArgs as ParseDocumentArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { path, max_pages = 50, max_rows = 1000 } = rawArgs;
 
     if (!path?.trim()) return this.fail('path est requis');
 
@@ -77,8 +85,15 @@ export class ParseDocumentTool extends BaseTool {
       return this.ok({ format, ...result });
     } catch (err) {
       const msg = String(err);
-      if (msg.includes('not installed') || msg.includes('No module named') || msg.includes('pypdf') || msg.includes('python-docx')) {
-        return this.fail(`Dépendance Python manquante pour ${format}. Dans le sidecar : ${DEP_HINT[format]}`);
+      if (
+        msg.includes('not installed') ||
+        msg.includes('No module named') ||
+        msg.includes('pypdf') ||
+        msg.includes('python-docx')
+      ) {
+        return this.fail(
+          `Dépendance Python manquante pour ${format}. Dans le sidecar : ${DEP_HINT[format]}`,
+        );
       }
       if (msg.includes('No such file') || msg.includes('Errno 2') || msg.includes('cannot find')) {
         return this.fail(`Fichier introuvable : ${path}`);

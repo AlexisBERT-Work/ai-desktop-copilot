@@ -1,13 +1,22 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 
-interface OcrRegionArgs {
-  region?: { x: number; y: number; width: number; height: number };
-  fullScreen?: boolean;
-  language?: string;
-}
+const argsSchema = z.object({
+  region: z
+    .object({
+      x: z.number().optional(),
+      y: z.number().optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+    })
+    .optional(),
+  fullScreen: z.boolean().default(false),
+  language: z.string().default('fra+eng').describe('Tesseract language codes'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface OcrResult {
   text: string;
@@ -15,20 +24,22 @@ interface OcrResult {
   imageBase64: string;
 }
 
-export class OcrRegionTool extends BaseTool {
+export class OcrRegionTool extends BaseTool<Args> {
   readonly name = 'ocr_region';
-  readonly description = 'Lit le texte visible à l\'écran via OCR Tesseract. Capture l\'écran (ou une région) et en extrait tout le texte reconnu avec son niveau de confiance.';
+  readonly description =
+    "Lit le texte visible à l'écran via OCR Tesseract. Capture l'écran (ou une région) et en extrait tout le texte reconnu avec son niveau de confiance.";
   readonly category = 'screen' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.ocr_region;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as OcrRegionArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
     const client = OcrSidecarClient.get();
 
     try {
-      const result = await client.call(
+      const result = (await client.call(
         'ocr.capture_and_read',
         {
           ...(args.region ? { region: args.region } : {}),
@@ -36,7 +47,7 @@ export class OcrRegionTool extends BaseTool {
           language: args.language ?? 'fra+eng',
         },
         45_000, // OCR can take a few seconds on large screens
-      ) as OcrResult;
+      )) as OcrResult;
 
       return this.ok({
         text: result.text,

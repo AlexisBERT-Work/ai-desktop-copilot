@@ -1,21 +1,39 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { extname } from 'path';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 
 export type DataOperation = 'profile' | 'aggregate';
 export type AggFunc = 'sum' | 'mean' | 'median' | 'min' | 'max' | 'count' | 'std' | 'nunique';
 
-interface AnalyzeDataArgs {
-  path: string;
-  operation?: DataOperation;
-  group_by?: string[];
-  value_column?: string;
-  agg?: AggFunc;
-  sheet?: string;
-  max_rows?: number;
-}
+const argsSchema = z.object({
+  path: z.string().min(1).describe('Absolute path to a local .csv, .xlsx or .xls file'),
+  operation: z
+    .enum(['profile', 'aggregate'])
+    .default('profile')
+    .describe(
+      "'profile' = structure + summary stats + preview; 'aggregate' = group_by + an aggregation",
+    ),
+  group_by: z
+    .array(z.string())
+    .optional()
+    .describe('aggregate only: one or more column names to group by'),
+  value_column: z
+    .string()
+    .optional()
+    .describe("aggregate only: numeric column to aggregate (omit when agg='count')"),
+  agg: z
+    .enum(['sum', 'mean', 'median', 'min', 'max', 'count', 'std', 'nunique'])
+    .default('sum')
+    .describe('aggregate only: aggregation function'),
+  sheet: z.string().optional().describe('Excel only: sheet name (defaults to the first sheet)'),
+  max_rows: z.number().default(100000).describe('Max rows to load into memory'),
+});
+type Args = z.infer<typeof argsSchema>;
+/** Forme d'entree (avant defauts zod) - celle des helpers purs et des tests. */
+type ArgsInput = z.input<typeof argsSchema>;
 
 const SUPPORTED_EXT = new Set(['.csv', '.xlsx', '.xlsm', '.xls']);
 
@@ -25,9 +43,7 @@ export function isSupportedDataFile(path: string): boolean {
 }
 
 /** Validate args before touching the sidecar. Pure — unit-testable. */
-export function validateAnalyzeArgs(
-  args: AnalyzeDataArgs,
-): { ok: true } | { ok: false; error: string } {
+export function validateAnalyzeArgs(args: ArgsInput): { ok: true } | { ok: false; error: string } {
   if (!args.path?.trim()) return { ok: false, error: 'path est requis' };
   if (!isSupportedDataFile(args.path)) {
     return { ok: false, error: 'Format non supporté. Extensions acceptées : .csv, .xlsx, .xls' };
@@ -56,17 +72,18 @@ export function validateAnalyzeArgs(
  * - aggregate: group_by one or more columns and apply an aggregation
  *   (sum/mean/median/min/max/count/std/nunique) to a value column.
  */
-export class AnalyzeDataTool extends BaseTool {
+export class AnalyzeDataTool extends BaseTool<Args> {
   readonly name = 'analyze_data';
   readonly description =
     "Analyse un tableau local (CSV ou Excel) via pandas dans le sidecar Python. 100% local. operation='profile' (structure + stats + aperçu) ou 'aggregate' (group_by + somme/moyenne/min/max/count…). Aucune exécution de code arbitraire.";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.analyze_data;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as AnalyzeDataArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
 
     const valid = validateAnalyzeArgs(args);
     if (!valid.ok) return this.fail(valid.error);
@@ -92,7 +109,9 @@ export class AnalyzeDataTool extends BaseTool {
     } catch (err) {
       const msg = String(err);
       if (msg.includes('not installed') || msg.includes('No module named')) {
-        return this.fail('Dépendance Python manquante. Dans le sidecar : pip install pandas openpyxl');
+        return this.fail(
+          'Dépendance Python manquante. Dans le sidecar : pip install pandas openpyxl',
+        );
       }
       if (msg.includes('No such file') || msg.includes('Errno 2') || msg.includes('cannot find')) {
         return this.fail(`Fichier introuvable : ${args.path}`);

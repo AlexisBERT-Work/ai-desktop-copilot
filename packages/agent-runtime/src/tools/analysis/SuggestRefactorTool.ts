@@ -1,13 +1,18 @@
+import { z } from 'zod';
 import { readFile } from 'fs/promises';
 import { extname, basename } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface SuggestRefactorArgs {
-  path: string;
-  max_findings?: number;
-}
+const argsSchema = z.object({
+  path: z
+    .string()
+    .min(1)
+    .describe('Absolute path to the source file to analyze for refactoring opportunities'),
+  max_findings: z.number().default(12).describe('Max number of refactoring findings to return'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 type Severity = 'info' | 'warning';
 
@@ -18,23 +23,38 @@ interface Finding {
   message: string;
 }
 
-const BRACE_LANGS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.rs', '.go', '.java', '.c', '.cpp']);
+const BRACE_LANGS = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.rs',
+  '.go',
+  '.java',
+  '.c',
+  '.cpp',
+]);
 const PY_EXT = new Set(['.py']);
 
 // Tunable thresholds.
-const LONG_FUNCTION = 50;       // lines in a function body
-const MANY_PARAMS = 5;          // parameters in a signature
-const DEEP_NESTING = 4;         // nesting depth
-const LONG_FILE = 400;          // lines in a file
-const LONG_LINE = 120;          // characters
-const DUP_BLOCK_MIN = 6;        // consecutive identical lines to flag
+const LONG_FUNCTION = 50; // lines in a function body
+const MANY_PARAMS = 5; // parameters in a signature
+const DEEP_NESTING = 4; // nesting depth
+const LONG_FILE = 400; // lines in a file
+const LONG_LINE = 120; // characters
+const DUP_BLOCK_MIN = 6; // consecutive identical lines to flag
 
 // ─── Function detection (brace languages) ──────────────────────
 
-function findFunctionsBrace(lines: string[]): Array<{ line: number; name: string; bodyLines: number; params: number }> {
+function findFunctionsBrace(
+  lines: string[],
+): Array<{ line: number; name: string; bodyLines: number; params: number }> {
   const out: Array<{ line: number; name: string; bodyLines: number; params: number }> = [];
   // Matches: function foo(...) | foo(...) { | const foo = (...) => | pub fn foo(...) | func Foo(...)
-  const sigRe = /(?:function\s+([A-Za-z_$][\w$]*)|(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_$][\w$]*)|func\s+(?:\([^)]*\)\s+)?([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?\([^)]*\)\s*(?::[^=]+)?=>|\b([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{)/;
+  const sigRe =
+    /(?:function\s+([A-Za-z_$][\w$]*)|(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_$][\w$]*)|func\s+(?:\([^)]*\)\s+)?([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?\([^)]*\)\s*(?::[^=]+)?=>|\b([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{)/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
@@ -61,7 +81,11 @@ function findFunctionsBrace(lines: string[]): Array<{ line: number; name: string
         if (ch === '{') depth++;
         else if (ch === '}') {
           depth--;
-          if (depth === 0) { bodyLines = j - i; closed = true; break; }
+          if (depth === 0) {
+            bodyLines = j - i;
+            closed = true;
+            break;
+          }
         }
       }
       if (closed) break;
@@ -73,7 +97,9 @@ function findFunctionsBrace(lines: string[]): Array<{ line: number; name: string
 
 // ─── Function detection (Python, indentation) ──────────────────
 
-function findFunctionsPython(lines: string[]): Array<{ line: number; name: string; bodyLines: number; params: number }> {
+function findFunctionsPython(
+  lines: string[],
+): Array<{ line: number; name: string; bodyLines: number; params: number }> {
   const out: Array<{ line: number; name: string; bodyLines: number; params: number }> = [];
   const defRe = /^(\s*)(?:async\s+)?def\s+([A-Za-z_][\w]*)\s*\(([^)]*)\)/;
   for (let i = 0; i < lines.length; i++) {
@@ -82,7 +108,7 @@ function findFunctionsPython(lines: string[]): Array<{ line: number; name: strin
     const indent = (m[1] ?? '').length;
     const name = m[2] ?? '';
     const params = m[3]?.trim()
-      ? m[3].split(',').filter((p) => p.trim() && p.trim() !== 'self' && p.trim() !== 'cls').length
+      ? m[3].split(',').filter(p => p.trim() && p.trim() !== 'self' && p.trim() !== 'cls').length
       : 0;
 
     // Body runs until a line at the same-or-lower indentation (ignoring blanks).
@@ -109,7 +135,10 @@ function maxBraceNesting(lines: string[]): { depth: number; line: number } {
     for (const ch of lines[i] ?? '') {
       if (ch === '{') {
         depth++;
-        if (depth > max) { max = depth; maxLine = i + 1; }
+        if (depth > max) {
+          max = depth;
+          maxLine = i + 1;
+        }
       } else if (ch === '}') {
         if (depth > 0) depth--;
       }
@@ -122,14 +151,14 @@ function maxBraceNesting(lines: string[]): { depth: number; line: number } {
 
 function findDuplicateBlocks(lines: string[]): Finding[] {
   const findings: Finding[] = [];
-  const norm = lines.map((l) => l.trim());
+  const norm = lines.map(l => l.trim());
   const seen = new Map<string, number>(); // block key -> first line (1-based)
   const flaggedAt = new Set<number>();
 
   for (let i = 0; i + DUP_BLOCK_MIN <= norm.length; i++) {
     const slice = norm.slice(i, i + DUP_BLOCK_MIN);
     // Ignore blocks that are mostly blank/braces — too noisy.
-    const meaningful = slice.filter((l) => l.length > 3 && l !== '}' && l !== '{').length;
+    const meaningful = slice.filter(l => l.length > 3 && l !== '}' && l !== '{').length;
     if (meaningful < DUP_BLOCK_MIN - 1) continue;
 
     const key = slice.join('\n');
@@ -151,17 +180,18 @@ function findDuplicateBlocks(lines: string[]): Finding[] {
 
 // ─── Tool ──────────────────────────────────────────────────────
 
-export class SuggestRefactorTool extends BaseTool {
+export class SuggestRefactorTool extends BaseTool<Args> {
   readonly name = 'suggest_refactor';
   readonly description =
-    "Analyse un fichier source et détecte des opportunités de refactoring (fonctions trop longues, trop de paramètres, imbrication profonde, duplication, fichier trop gros, lignes trop longues). Retourne des findings localisés à raffiner par le LLM.";
+    'Analyse un fichier source et détecte des opportunités de refactoring (fonctions trop longues, trop de paramètres, imbrication profonde, duplication, fichier trop gros, lignes trop longues). Retourne des findings localisés à raffiner par le LLM.';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.suggest_refactor;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { path, max_findings = 12 } = args as SuggestRefactorArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { path, max_findings = 12 } = args;
 
     if (typeof path !== 'string' || path.trim().length === 0) {
       return this.fail('path est requis');
@@ -171,14 +201,18 @@ export class SuggestRefactorTool extends BaseTool {
     const isBrace = BRACE_LANGS.has(ext);
     const isPy = PY_EXT.has(ext);
     if (!isBrace && !isPy) {
-      return this.fail(`Extension non supportée pour l'analyse de refactoring: ${ext || '(aucune)'}`);
+      return this.fail(
+        `Extension non supportée pour l'analyse de refactoring: ${ext || '(aucune)'}`,
+      );
     }
 
     let src: string;
     try {
       src = await readFile(path, 'utf-8');
     } catch (err) {
-      return this.fail(`Impossible de lire le fichier: ${err instanceof Error ? err.message : String(err)}`);
+      return this.fail(
+        `Impossible de lire le fichier: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     const lines = src.split('\n');

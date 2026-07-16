@@ -7,7 +7,11 @@ describe('buildCalendarParams', () => {
   });
 
   it('respecte les valeurs fournies', () => {
-    expect(buildCalendarParams({ path: 'a.ics', days: 7, limit: 10 })).toEqual({ path: 'a.ics', days: 7, limit: 10 });
+    expect(buildCalendarParams({ path: 'a.ics', days: 7, limit: 10 })).toEqual({
+      path: 'a.ics',
+      days: 7,
+      limit: 10,
+    });
   });
 
   it('inclut from/to seulement si présents', () => {
@@ -31,6 +35,6 @@ describe('ReadCalendarTool', () => {
   });
 
   it('rejette un path vide', async () => {
-    expect((await tool.execute({ path: '  ' })).success).toBe(false);
+    expect((await tool.run({ path: '  ' })).success).toBe(false);
   });
 });

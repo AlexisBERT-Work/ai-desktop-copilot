@@ -1,6 +1,7 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { aggregateNews, httpGet, toExcerpt, type NewsItem } from './FetchTechNewsTool';
 import { htmlToText } from './ReadWebpageTool';
 import type { OllamaClient } from '../../llm/OllamaClient';
@@ -9,17 +10,38 @@ import { createLogger } from '../../logger';
 
 const log = createLogger('tool:tech-news-discord');
 
-interface PostTechNewsArgs {
-  sources?: string[];
-  feeds?: string[];
-  topics?: string[];
-  since_hours?: number;
-  limit?: number;
-  lang?: 'fr' | 'en' | 'all';
-  intro?: string;
-  webhook_url?: string;
-  username?: string;
-}
+const argsSchema = z.object({
+  sources: z
+    .array(z.string())
+    .optional()
+    .describe('Source ids (defaults to a balanced mix). Same ids as fetch_tech_news'),
+  feeds: z
+    .array(z.string())
+    .optional()
+    .describe('Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]'),
+  topics: z
+    .array(z.string())
+    .optional()
+    .describe('Keywords to filter by (matches title or excerpt) (optional)'),
+  since_hours: z
+    .number()
+    .default(24)
+    .describe('Only keep articles published within this many hours (0 = no limit)'),
+  limit: z.number().default(8).describe('Number of articles to post as Discord embeds (1-10)'),
+  lang: z.enum(['fr', 'en', 'all']).default('all').describe('Restrict sources to a language'),
+  intro: z
+    .string()
+    .optional()
+    .describe(
+      'Short intro line posted above the articles (optional — a default header is used otherwise)',
+    ),
+  webhook_url: z
+    .string()
+    .optional()
+    .describe('Discord incoming webhook URL (falls back to DISCORD_WEBHOOK_URL env var)'),
+  username: z.string().optional().describe('Override the displayed sender name (optional)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // Discord hard limits we must respect.
 const MAX_EMBEDS = 10;
@@ -61,7 +83,11 @@ export function relativeAge(iso: string | undefined, now = Date.now()): string |
  * the per-article summary (when provided, aligned by index) followed by a meta
  * line. Pure, exported for tests.
  */
-export function buildDiscordEmbeds(items: NewsItem[], summaries: string[] = [], now = Date.now()): DiscordEmbed[] {
+export function buildDiscordEmbeds(
+  items: NewsItem[],
+  summaries: string[] = [],
+  now = Date.now(),
+): DiscordEmbed[] {
   return items.slice(0, MAX_EMBEDS).map((item, i) => {
     const meta: string[] = [];
     const age = relativeAge(item.publishedAt, now);
@@ -96,13 +122,15 @@ export function buildDiscordEmbeds(items: NewsItem[], summaries: string[] = [], 
  */
 export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
   await Promise.allSettled(
-    items.map(async (item) => {
+    items.map(async item => {
       if (item.excerpt && item.excerpt.length > 0) return;
       try {
         const html = await httpGet(item.url, 8_000);
         const text = htmlToText(html);
         if (text.length > 80) item.excerpt = toExcerpt(text, 500);
-      } catch { /* leave without excerpt */ }
+      } catch {
+        /* leave without excerpt */
+      }
     }),
   );
   return items;
@@ -117,7 +145,7 @@ export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
  */
 export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Promise<NewsItem[]> {
   await Promise.allSettled(
-    items.map(async (item) => {
+    items.map(async item => {
       try {
         const html = await httpGet(item.url, 8_000);
         const text = htmlToText(html);
@@ -126,13 +154,18 @@ export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Pr
         if (text.length < 200) return;
         item.fullText = toExcerpt(text, maxChars);
         if (!item.excerpt || item.excerpt.length === 0) item.excerpt = toExcerpt(text, 500);
-      } catch { /* garde l'extrait RSS */ }
+      } catch {
+        /* garde l'extrait RSS */
+      }
     }),
   );
   return items;
 }
 
-export async function postToDiscord(url: string, payload: unknown): Promise<{ status: number; text: string }> {
+export async function postToDiscord(
+  url: string,
+  payload: unknown,
+): Promise<{ status: number; text: string }> {
   const { default: https } = await import('https');
   const body = JSON.stringify(payload);
   return new Promise((resolve, reject) => {
@@ -148,14 +181,19 @@ export async function postToDiscord(url: string, payload: unknown): Promise<{ st
           'User-Agent': 'catdesk-agent/1.0',
         },
       },
-      (res) => {
+      res => {
         const chunks: Buffer[] = [];
         res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf-8') }));
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf-8') }),
+        );
       },
     );
     req.on('error', reject);
-    req.setTimeout(10_000, () => { req.destroy(); reject(new Error('Webhook timeout')); });
+    req.setTimeout(10_000, () => {
+      req.destroy();
+      reject(new Error('Webhook timeout'));
+    });
     req.write(body);
     req.end();
   });
@@ -167,14 +205,15 @@ export async function postToDiscord(url: string, payload: unknown): Promise<{ st
  * is bounded to posting a news digest to the pre-configured webhook only —
  * hence `medium` risk without a blocking confirmation prompt.
  */
-export class PostTechNewsDiscordTool extends BaseTool {
+export class PostTechNewsDiscordTool extends BaseTool<Args> {
   readonly name = 'post_tech_news_discord';
   readonly description =
-    "Récupère les actualités tech du jour, génère une synthèse quotidienne et un résumé par article (via le LLM local), et les publie en embeds cliquables sur un webhook Discord. Tout-en-un (fetch + résumés + envoi) — idéal pour une revue de presse quotidienne planifiée. URL via `webhook_url` ou la variable DISCORD_WEBHOOK_URL.";
+    'Récupère les actualités tech du jour, génère une synthèse quotidienne et un résumé par article (via le LLM local), et les publie en embeds cliquables sur un webhook Discord. Tout-en-un (fetch + résumés + envoi) — idéal pour une revue de presse quotidienne planifiée. URL via `webhook_url` ou la variable DISCORD_WEBHOOK_URL.';
   readonly category = 'web' as const;
   readonly riskLevel = 'medium' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.post_tech_news_discord;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
   constructor(
     private readonly llm: OllamaClient,
@@ -183,14 +222,23 @@ export class PostTechNewsDiscordTool extends BaseTool {
     super();
   }
 
-  async execute(args: unknown): Promise<ToolResult> {
+  async execute(args: Args): Promise<ToolResult> {
     const {
-      sources, feeds, topics = [], since_hours = 24, limit = 8, lang = 'all', intro, username,
-    } = (args ?? {}) as PostTechNewsArgs;
+      sources,
+      feeds,
+      topics = [],
+      since_hours = 24,
+      limit = 8,
+      lang = 'all',
+      intro,
+      username,
+    } = args;
 
-    const webhookUrl = ((args as PostTechNewsArgs).webhook_url ?? process.env['DISCORD_WEBHOOK_URL'] ?? '').trim();
+    const webhookUrl = (args.webhook_url ?? process.env['DISCORD_WEBHOOK_URL'] ?? '').trim();
     if (webhookUrl.length === 0) {
-      return this.fail('URL de webhook Discord manquante. Passe webhook_url ou définis DISCORD_WEBHOOK_URL.');
+      return this.fail(
+        'URL de webhook Discord manquante. Passe webhook_url ou définis DISCORD_WEBHOOK_URL.',
+      );
     }
     if (!/^https:\/\//i.test(webhookUrl)) {
       return this.fail('webhook_url doit être une URL https valide.');
@@ -198,14 +246,21 @@ export class PostTechNewsDiscordTool extends BaseTool {
 
     let result;
     try {
-      result = await aggregateNews({ sources, feeds, topics, sinceHours: since_hours, limit: Math.min(Math.max(1, limit), MAX_EMBEDS), lang });
+      result = await aggregateNews({
+        sources,
+        feeds,
+        topics,
+        sinceHours: since_hours,
+        limit: Math.min(Math.max(1, limit), MAX_EMBEDS),
+        lang,
+      });
     } catch (err) {
       return this.fail(err instanceof Error ? err.message : String(err));
     }
 
     if (result.items.length === 0) {
       return this.fail(
-        `Aucun article à publier. ${result.failed.length > 0 ? `Erreurs sources: ${result.failed.join(' | ')}` : 'Essaie d\'élargir since_hours ou de retirer les filtres topics.'}`.trim(),
+        `Aucun article à publier. ${result.failed.length > 0 ? `Erreurs sources: ${result.failed.join(' | ')}` : "Essaie d'élargir since_hours ou de retirer les filtres topics."}`.trim(),
       );
     }
 
@@ -216,10 +271,14 @@ export class PostTechNewsDiscordTool extends BaseTool {
     const { synthesis, summaries } = await summarizeDigest(this.llm, this.model, result.items);
 
     const embeds = buildDiscordEmbeds(result.items, summaries);
-    const header = typeof intro === 'string' && intro.trim().length > 0
-      ? intro.trim()
-      : `📰 **Revue de presse tech** — ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${embeds.length} articles`;
-    const content = truncate(synthesis.length > 0 ? `${header}\n\n${synthesis}` : header, MAX_CONTENT);
+    const header =
+      typeof intro === 'string' && intro.trim().length > 0
+        ? intro.trim()
+        : `📰 **Revue de presse tech** — ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${embeds.length} articles`;
+    const content = truncate(
+      synthesis.length > 0 ? `${header}\n\n${synthesis}` : header,
+      MAX_CONTENT,
+    );
 
     const payload: Record<string, unknown> = {
       content,
@@ -235,7 +294,10 @@ export class PostTechNewsDiscordTool extends BaseTool {
     }
 
     if (res.status >= 200 && res.status < 300) {
-      log.info('Tech news digest posted to Discord', { posted: embeds.length, hadSynthesis: synthesis.length > 0 });
+      log.info('Tech news digest posted to Discord', {
+        posted: embeds.length,
+        hadSynthesis: synthesis.length > 0,
+      });
       return this.ok({
         delivered: true,
         status: res.status,

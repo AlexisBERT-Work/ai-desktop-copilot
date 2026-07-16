@@ -7,10 +7,14 @@ import { SuggestRefactorTool } from './SuggestRefactorTool';
 const tool = new SuggestRefactorTool();
 let dir = '';
 
-async function analyze(file: string, content: string, extra: Record<string, unknown> = {}): Promise<any> {
+async function analyze(
+  file: string,
+  content: string,
+  extra: Record<string, unknown> = {},
+): Promise<any> {
   const path = join(dir, file);
   await writeFile(path, content, 'utf-8');
-  return tool.execute({ path, ...extra });
+  return tool.run({ path, ...extra });
 }
 
 function findingTypes(data: any): string[] {
@@ -32,7 +36,10 @@ describe('SuggestRefactorTool', () => {
   });
 
   it('ne signale rien sur du code propre', async () => {
-    const res = await analyze('clean.ts', `export function add(a: number, b: number) {\n  return a + b;\n}\n`);
+    const res = await analyze(
+      'clean.ts',
+      `export function add(a: number, b: number) {\n  return a + b;\n}\n`,
+    );
     expect(res.success).toBe(true);
     expect(res.data.findingCount).toBe(0);
   });
@@ -61,7 +68,10 @@ describe('SuggestRefactorTool', () => {
 
   it('détecte un bloc dupliqué', async () => {
     const block = `  const a = compute(1);\n  const b = compute(2);\n  const c = compute(3);\n  const d = compute(4);\n  const e = compute(5);\n  const f = compute(6);`;
-    const res = await analyze('dup.ts', `function one() {\n${block}\n}\nfunction two() {\n${block}\n}\n`);
+    const res = await analyze(
+      'dup.ts',
+      `function one() {\n${block}\n}\nfunction two() {\n${block}\n}\n`,
+    );
     expect(res.success).toBe(true);
     expect(findingTypes(res.data)).toContain('duplicate-block');
   });

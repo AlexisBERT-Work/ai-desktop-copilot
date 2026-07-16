@@ -1,14 +1,26 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 import type { OllamaClient } from '../../llm/OllamaClient';
 
-interface Args {
-  prompt?: string;
-  region?: { x: number; y: number; width: number; height: number };
-  activeWindowOnly?: boolean;
-}
+const argsSchema = z.object({
+  prompt: z
+    .string()
+    .optional()
+    .describe("Question ou consigne sur ce qui est affiché (ex. 'Que montre cet écran ?')"),
+  region: z
+    .object({
+      x: z.number().optional(),
+      y: z.number().optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+    })
+    .optional(),
+  activeWindowOnly: z.boolean().default(false),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // English on purpose: LLaVA-family vision models describe far better in English
 // and tend to refuse French ("je ne parle pas français") instead of describing.
@@ -20,7 +32,7 @@ const DEFAULT_PROMPT = 'Describe in detail what is shown on this screen.';
  * (ex. llava). Complète `ocr_region` (texte) en comprenant la mise en page,
  * les images, les éléments d'interface.
  */
-export class DescribeScreenTool extends BaseTool {
+export class DescribeScreenTool extends BaseTool<Args> {
   name = 'describe_screen';
   description =
     "Capture l'écran (ou une région / la fenêtre active) et le décrit visuellement " +
@@ -28,14 +40,18 @@ export class DescribeScreenTool extends BaseTool {
   category = 'screen' as const;
   riskLevel = 'low' as const;
   requiresConfirmation = false;
-  schema = TOOL_SCHEMAS.describe_screen;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  constructor(private llm: OllamaClient, private visionModel: string) {
+  constructor(
+    private llm: OllamaClient,
+    private visionModel: string,
+  ) {
     super();
   }
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
     // Force English output even when the caller (agent) passes a French prompt:
     // see DEFAULT_PROMPT. The orchestrator translates the result for the user.
     const ask = args.prompt?.trim();
@@ -77,8 +93,12 @@ export class DescribeScreenTool extends BaseTool {
       }
 
       const text = description.trim();
-      if (!text) return this.fail('Le modèle de vision n\'a rien renvoyé');
-      return this.ok({ description: text, model: this.visionModel, source: args.region ? 'region' : args.activeWindowOnly ? 'active_window' : 'fullscreen' });
+      if (!text) return this.fail("Le modèle de vision n'a rien renvoyé");
+      return this.ok({
+        description: text,
+        model: this.visionModel,
+        source: args.region ? 'region' : args.activeWindowOnly ? 'active_window' : 'fullscreen',
+      });
     } catch (err) {
       return this.fail(`Description impossible: ${String(err)}`);
     }

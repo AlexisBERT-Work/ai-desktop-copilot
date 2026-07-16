@@ -1,17 +1,25 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { extname } from 'path';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { OcrSidecarClient } from '../../lib/ocrSidecar';
 
 export type ExportFormat = 'pdf' | 'docx' | 'html' | 'md';
 
-interface ExportDocumentArgs {
-  content: string;
-  path: string;
-  format?: ExportFormat;
-  title?: string;
-}
+const argsSchema = z.object({
+  content: z.string().min(1).describe('Markdown or plain text to render into the document'),
+  path: z
+    .string()
+    .min(1)
+    .describe('Absolute output path. The extension picks the format unless "format" is set.'),
+  format: z
+    .enum(['pdf', 'docx', 'html', 'md'])
+    .optional()
+    .describe('Output format. Optional — inferred from the path extension otherwise.'),
+  title: z.string().optional().describe('Optional document title rendered as a top heading'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 const EXT_TO_FORMAT: Record<string, ExportFormat> = {
   '.pdf': 'pdf',
@@ -40,24 +48,28 @@ interface ExportResult {
  * text via the Python sidecar. Fully local. The inverse of parse_document.
  * Writes a file to disk, so it is gated behind a confirmation.
  */
-export class ExportDocumentTool extends BaseTool {
+export class ExportDocumentTool extends BaseTool<Args> {
   readonly name = 'export_document';
   readonly description =
     "Génère un document local (PDF, Word .docx, HTML ou Markdown) à partir de texte/Markdown, via le sidecar Python. 100% local. Le format est déduit de l'extension du chemin (ou forcé via 'format'). Écrit un fichier sur le disque.";
   readonly category = 'filesystem' as const;
   readonly riskLevel = 'medium' as const;
   readonly requiresConfirmation = true;
-  readonly schema = TOOL_SCHEMAS.export_document;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { content, path, format, title } = rawArgs as ExportDocumentArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { content, path, format, title } = rawArgs;
 
-    if (typeof content !== 'string' || content.length === 0) return this.fail('content est requis.');
+    if (typeof content !== 'string' || content.length === 0)
+      return this.fail('content est requis.');
     if (!path?.trim()) return this.fail('path est requis.');
 
     const resolved = resolveExportFormat(path, format);
     if (!resolved) {
-      return this.fail('Format indéterminé. Donne une extension .pdf/.docx/.html/.md ou précise format.');
+      return this.fail(
+        'Format indéterminé. Donne une extension .pdf/.docx/.html/.md ou précise format.',
+      );
     }
 
     try {
@@ -76,7 +88,9 @@ export class ExportDocumentTool extends BaseTool {
     } catch (err) {
       const msg = String(err);
       if (msg.includes('not installed') || msg.includes('No module named')) {
-        return this.fail(`Dépendance Python manquante pour ${resolved}. Dans le sidecar : pip install markdown xhtml2pdf python-docx`);
+        return this.fail(
+          `Dépendance Python manquante pour ${resolved}. Dans le sidecar : pip install markdown xhtml2pdf python-docx`,
+        );
       }
       if (msg.includes('Permission denied') || msg.includes('Errno 13')) {
         return this.fail(`Écriture refusée (permission) : ${path}`);

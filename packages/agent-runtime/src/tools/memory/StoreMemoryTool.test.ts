@@ -11,26 +11,33 @@ function makeStore() {
 describe('StoreMemoryTool', () => {
   it('refuse un content vide ou absent', async () => {
     const tool = new StoreMemoryTool(makeStore());
-    expect((await tool.execute({})).success).toBe(false);
-    expect((await tool.execute({ content: '   ' })).success).toBe(false);
+    expect((await tool.run({})).success).toBe(false);
+    expect((await tool.run({ content: '   ' })).success).toBe(false);
   });
 
   it('refuse un content trop long', async () => {
     const tool = new StoreMemoryTool(makeStore());
-    const res = await tool.execute({ content: 'a'.repeat(10_001) });
+    const res = await tool.run({ content: 'a'.repeat(10_001) });
     expect(res.success).toBe(false);
     expect(res.error).toContain('trop long');
   });
 
   it('refuse des tags non-tableau', async () => {
     const tool = new StoreMemoryTool(makeStore());
-    expect((await tool.execute({ content: 'x', tags: 'oops' })).success).toBe(false);
+    expect((await tool.run({ content: 'x', tags: 'oops' })).success).toBe(false);
   });
 
-  it('stocke avec métadonnées source + tags filtrés', async () => {
+  it('refuse un tag non-string (validation zod)', async () => {
+    const tool = new StoreMemoryTool(makeStore());
+    const res = await tool.run({ content: 'x', tags: ['a', 42] });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('Arguments invalides');
+  });
+
+  it('stocke avec métadonnées source + tags vides filtrés', async () => {
     const store = makeStore();
     const tool = new StoreMemoryTool(store);
-    const res = await tool.execute({ content: '  fait important  ', tags: ['projet', '', 42] });
+    const res = await tool.run({ content: '  fait important  ', tags: ['projet', ''] });
     expect(res.success).toBe(true);
     expect((res.data as { id: string }).id).toBe('id-123');
     expect(store.store).toHaveBeenCalledWith(
@@ -43,7 +50,7 @@ describe('StoreMemoryTool', () => {
     const store = makeStore();
     store.store.mockRejectedValueOnce(new Error('disque plein'));
     const tool = new StoreMemoryTool(store);
-    const res = await tool.execute({ content: 'x' });
+    const res = await tool.run({ content: 'x' });
     expect(res.success).toBe(false);
     expect(res.error).toContain('disque plein');
   });

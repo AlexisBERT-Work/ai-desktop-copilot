@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { resolveExportFormat, ExportDocumentTool } from './ExportDocumentTool';
 
 describe('resolveExportFormat', () => {
-  it('déduit le format depuis l\'extension', () => {
+  it("déduit le format depuis l'extension", () => {
     expect(resolveExportFormat('/out/rapport.pdf')).toBe('pdf');
     expect(resolveExportFormat('C:\\x\\Lettre.DOCX')).toBe('docx');
     expect(resolveExportFormat('page.html')).toBe('html');
@@ -29,15 +29,15 @@ describe('ExportDocumentTool', () => {
   });
 
   it('rejette content vide', async () => {
-    expect((await tool.execute({ content: '', path: 'a.pdf' })).success).toBe(false);
+    expect((await tool.run({ content: '', path: 'a.pdf' })).success).toBe(false);
   });
 
   it('rejette path vide', async () => {
-    expect((await tool.execute({ content: 'x', path: '  ' })).success).toBe(false);
+    expect((await tool.run({ content: 'x', path: '  ' })).success).toBe(false);
   });
 
   it('rejette un format indéterminable avant le sidecar', async () => {
-    const r = await tool.execute({ content: 'x', path: 'archive.zip' });
+    const r = await tool.run({ content: 'x', path: 'archive.zip' });
     expect(r.success).toBe(false);
     expect(r.error).toContain('Format');
   });

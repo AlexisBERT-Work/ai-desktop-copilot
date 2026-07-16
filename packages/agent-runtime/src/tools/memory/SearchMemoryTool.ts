@@ -1,28 +1,31 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import type { VectorStore } from '../../memory/VectorStore';
 
-interface Args {
-  query: string;
-  limit?: number;
-  minScore?: number;
-}
+const argsSchema = z.object({
+  query: z.string().min(1).describe('Search query'),
+  limit: z.number().max(20).default(5),
+  minScore: z.number().min(0).max(1).default(0.6),
+});
+type Args = z.infer<typeof argsSchema>;
 
-export class SearchMemoryTool extends BaseTool {
+export class SearchMemoryTool extends BaseTool<Args> {
   name = 'search_memory';
   description = 'Cherche dans la mémoire sémantique des informations pertinentes à la requête';
   category = 'memory' as const;
   riskLevel = 'low' as const;
   requiresConfirmation = false;
-  schema = TOOL_SCHEMAS.search_memory;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
   constructor(private vectorStore: VectorStore) {
     super();
   }
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as Args;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
     if (!args.query) return this.fail('query est requis');
 
     try {

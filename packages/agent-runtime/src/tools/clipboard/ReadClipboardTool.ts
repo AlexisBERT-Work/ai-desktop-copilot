@@ -1,25 +1,30 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-export class ReadClipboardTool extends BaseTool {
+const argsSchema = z.object({});
+type Args = z.infer<typeof argsSchema>;
+
+export class ReadClipboardTool extends BaseTool<Args> {
   name = 'read_clipboard';
   description = 'Lit le contenu actuel du presse-papier';
   category = 'clipboard' as const;
   riskLevel = 'low' as const;
   requiresConfirmation = false;
-  schema = TOOL_SCHEMAS.read_clipboard;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(_args: unknown): Promise<ToolResult> {
+  async execute(_args: Args): Promise<ToolResult> {
     try {
       // On Windows, use PowerShell to read clipboard
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const exec = promisify(execFile);
 
-      const { stdout } = await exec('powershell.exe', [
-        '-NoProfile', '-Command', 'Get-Clipboard'
-      ], { timeout: 5000 });
+      const { stdout } = await exec('powershell.exe', ['-NoProfile', '-Command', 'Get-Clipboard'], {
+        timeout: 5000,
+      });
 
       const content = stdout.trim();
       return this.ok({

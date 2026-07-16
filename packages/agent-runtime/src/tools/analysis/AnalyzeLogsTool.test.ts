@@ -52,7 +52,7 @@ describe('analyzeLogLines', () => {
 
   it('regroupe les erreurs similaires', () => {
     const r = analyzeLogLines(lines);
-    const dbGroup = r.topErrors.find((g) => g.normalized.includes('connection to db'));
+    const dbGroup = r.topErrors.find(g => g.normalized.includes('connection to db'));
     expect(dbGroup?.count).toBe(2);
   });
 
@@ -74,11 +74,11 @@ describe('AnalyzeLogsTool', () => {
   });
 
   it('rejette un path vide', async () => {
-    expect((await tool.execute({ path: '  ' })).success).toBe(false);
+    expect((await tool.run({ path: '  ' })).success).toBe(false);
   });
 
   it('renvoie une erreur claire si le fichier est absent', async () => {
-    const r = await tool.execute({ path: 'C:/nope/does-not-exist.log' });
+    const r = await tool.run({ path: 'C:/nope/does-not-exist.log' });
     expect(r.success).toBe(false);
     expect(r.error).toContain('introuvable');
   });

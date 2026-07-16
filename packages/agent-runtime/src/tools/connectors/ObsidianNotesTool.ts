@@ -1,16 +1,27 @@
+import { z } from 'zod';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, relative, basename, extname } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface ObsidianNotesArgs {
-  vault?: string;
-  query?: string;
-  note?: string;
-  tag?: string;
-  limit?: number;
-}
+const argsSchema = z.object({
+  vault: z
+    .string()
+    .optional()
+    .describe('Path to the Obsidian vault folder (falls back to OBSIDIAN_VAULT env var)'),
+  query: z.string().optional().describe('Text to search across note titles and content (optional)'),
+  note: z
+    .string()
+    .optional()
+    .describe('Read a specific note in full by relative path or title (optional)'),
+  tag: z
+    .string()
+    .optional()
+    .describe('Filter to notes carrying this tag (frontmatter or #inline), without the leading #'),
+  limit: z.number().default(15).describe('Max notes to return when searching'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface ParsedNote {
   frontmatter: Record<string, string>;
@@ -87,7 +98,7 @@ async function walkMarkdown(root: string): Promise<string[]> {
 // ─── Search scoring (pure, exported for tests) ─────────────────
 
 export interface NoteDoc {
-  path: string;   // relative path for display
+  path: string; // relative path for display
   title: string;
   content: string;
 }
@@ -100,7 +111,12 @@ export interface SearchHit {
   tags: string[];
 }
 
-export function searchNotes(docs: NoteDoc[], query: string, tag: string | undefined, limit: number): SearchHit[] {
+export function searchNotes(
+  docs: NoteDoc[],
+  query: string,
+  tag: string | undefined,
+  limit: number,
+): SearchHit[] {
   const q = query.trim().toLowerCase();
   const terms = q.split(/\s+/).filter(Boolean);
   const hits: SearchHit[] = [];
@@ -110,7 +126,7 @@ export function searchNotes(docs: NoteDoc[], query: string, tag: string | undefi
 
     if (tag !== undefined && tag.length > 0) {
       const want = tag.replace(/^#/, '').toLowerCase();
-      if (!parsed.tags.some((t) => t.toLowerCase() === want)) continue;
+      if (!parsed.tags.some(t => t.toLowerCase() === want)) continue;
     }
 
     const titleLower = doc.title.toLowerCase();
@@ -134,7 +150,13 @@ export function searchNotes(docs: NoteDoc[], query: string, tag: string | undefi
       const idx = bodyLower.indexOf(firstTerm);
       if (idx >= 0) {
         const start = Math.max(0, idx - 60);
-        snippet = (start > 0 ? '…' : '') + parsed.body.slice(start, idx + 100).replace(/\s+/g, ' ').trim() + '…';
+        snippet =
+          (start > 0 ? '…' : '') +
+          parsed.body
+            .slice(start, idx + 100)
+            .replace(/\s+/g, ' ')
+            .trim() +
+          '…';
       }
     }
 
@@ -147,17 +169,18 @@ export function searchNotes(docs: NoteDoc[], query: string, tag: string | undefi
 
 // ─── Tool ──────────────────────────────────────────────────────
 
-export class ObsidianNotesTool extends BaseTool {
+export class ObsidianNotesTool extends BaseTool<Args> {
   readonly name = 'obsidian_notes';
   readonly description =
     "Recherche et lit les notes d'un coffre Obsidian local (markdown). Sans réseau : parcourt les fichiers .md, parse frontmatter/tags/liens [[wiki]]. Donne `note` pour lire une note entière, sinon `query`/`tag` pour chercher.";
   readonly category = 'filesystem' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.obsidian_notes;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { vault, query, note, tag, limit = 15 } = args as ObsidianNotesArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { vault, query, note, tag, limit = 15 } = args;
     const root = vault ?? process.env['OBSIDIAN_VAULT'] ?? '';
 
     if (root.length === 0) {
@@ -172,19 +195,25 @@ export class ObsidianNotesTool extends BaseTool {
 
     const files = await walkMarkdown(root);
     if (files.length === 0) {
-      return this.ok({ vault: root, noteCount: 0, summary: 'Aucune note markdown dans ce coffre.' });
+      return this.ok({
+        vault: root,
+        noteCount: 0,
+        summary: 'Aucune note markdown dans ce coffre.',
+      });
     }
 
     // ── Read a specific note ──
     if (typeof note === 'string' && note.length > 0) {
       const wanted = note.toLowerCase().replace(/\.md$/, '');
-      const match = files.find((f) => {
+      const match = files.find(f => {
         const rel = relative(root, f).replace(/\\/g, '/').toLowerCase();
         const title = basename(f, '.md').toLowerCase();
         return rel === `${wanted}.md` || rel === wanted || title === wanted;
       });
       if (match === undefined) {
-        return this.fail(`Note introuvable: "${note}". Cherche d'abord avec query pour trouver le bon titre.`);
+        return this.fail(
+          `Note introuvable: "${note}". Cherche d'abord avec query pour trouver le bon titre.`,
+        );
       }
       const content = await readFile(match, 'utf-8');
       const parsed = parseNote(content);
@@ -201,15 +230,24 @@ export class ObsidianNotesTool extends BaseTool {
     }
 
     // ── Search ──
-    if ((typeof query !== 'string' || query.trim().length === 0) && (typeof tag !== 'string' || tag.length === 0)) {
-      return this.fail('Fournis `query` (texte à chercher), `tag`, ou `note` (lecture d\'une note).');
+    if (
+      (typeof query !== 'string' || query.trim().length === 0) &&
+      (typeof tag !== 'string' || tag.length === 0)
+    ) {
+      return this.fail(
+        "Fournis `query` (texte à chercher), `tag`, ou `note` (lecture d'une note).",
+      );
     }
 
     const docs: NoteDoc[] = [];
     for (const f of files) {
       try {
         const content = await readFile(f, 'utf-8');
-        docs.push({ path: relative(root, f).replace(/\\/g, '/'), title: basename(f, '.md'), content });
+        docs.push({
+          path: relative(root, f).replace(/\\/g, '/'),
+          title: basename(f, '.md'),
+          content,
+        });
       } catch {
         // skip unreadable files
       }

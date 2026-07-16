@@ -10,7 +10,7 @@ describe('tallyFile / analyze_code_style', () => {
     const dir = await mkdtemp(join(tmpdir(), 'ndstyle-'));
     const code = `const myVar = 'hello';\nfunction doThing() {\n  const innerValue = 'x';\n  return innerValue;\n}\n`;
     await writeFile(join(dir, 'a.ts'), code);
-    const res: any = await new AnalyzeCodeStyleTool().execute({ workdir: dir });
+    const res: any = await new AnalyzeCodeStyleTool().run({ workdir: dir });
     expect(res.success).toBe(true);
     expect(res.data.conventions.indentation).toBe('2 spaces');
     expect(res.data.conventions.quotes).toBe('single');
@@ -21,9 +21,18 @@ describe('tallyFile / analyze_code_style', () => {
 
   it('détecte snake_case et 4 espaces (Python)', () => {
     const t = {
-      files: 0, indentTabs: 0, indentSpaces: 0, spaceWidths: {} as Record<number, number>,
-      singleQuotes: 0, doubleQuotes: 0, semicolons: 0, noSemicolons: 0,
-      camelCase: 0, snakeCase: 0, longLines: 0, totalLines: 0,
+      files: 0,
+      indentTabs: 0,
+      indentSpaces: 0,
+      spaceWidths: {} as Record<number, number>,
+      singleQuotes: 0,
+      doubleQuotes: 0,
+      semicolons: 0,
+      noSemicolons: 0,
+      camelCase: 0,
+      snakeCase: 0,
+      longLines: 0,
+      totalLines: 0,
     };
     tallyFile('def my_func():\n    inner_value = 1\n    return inner_value\n', t);
     expect(t.snakeCase).toBeGreaterThan(0);
@@ -33,7 +42,9 @@ describe('tallyFile / analyze_code_style', () => {
 
 describe('detectStack', () => {
   it('reconnaît la stack et le gestionnaire de paquets', () => {
-    const r = detectStack(new Set(['package.json', 'tsconfig.json', 'pnpm-lock.yaml', 'Cargo.toml']));
+    const r = detectStack(
+      new Set(['package.json', 'tsconfig.json', 'pnpm-lock.yaml', 'Cargo.toml']),
+    );
     expect(r.stack).toEqual(expect.arrayContaining(['Node.js/JS', 'TypeScript', 'Rust']));
     expect(r.packageManager).toBe('pnpm');
   });
@@ -56,17 +67,25 @@ describe('LoadProjectContextTool', () => {
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), 'ndproj-'));
     await mkdir(join(dir, 'src'), { recursive: true });
-    await writeFile(join(dir, 'package.json'), JSON.stringify({
-      name: 'cool-app', scripts: { dev: 'vite', build: 'vite build' }, dependencies: { react: '^19' }, main: 'src/index.ts',
-    }));
+    await writeFile(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'cool-app',
+        scripts: { dev: 'vite', build: 'vite build' },
+        dependencies: { react: '^19' },
+        main: 'src/index.ts',
+      }),
+    );
     await writeFile(join(dir, 'pnpm-lock.yaml'), '');
     await writeFile(join(dir, 'README.md'), '# Cool App\n\nDoes cool things locally.\n');
   });
 
-  afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
+  afterAll(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
 
   it('profile le projet', async () => {
-    const res: any = await tool.execute({ workdir: dir });
+    const res: any = await tool.run({ workdir: dir });
     expect(res.success).toBe(true);
     const d = res.data;
     expect(d.project).toBe('cool-app');

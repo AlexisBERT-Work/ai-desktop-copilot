@@ -1,18 +1,20 @@
+import { z } from 'zod';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { parseLog, type Commit } from '../git/SummarizeGitLogTool';
 
 const exec = promisify(execFile);
 
-interface GenerateStandupArgs {
-  workdir?: string;
-  since?: string;
-  author?: string;
-  blockers?: string;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  since: z.string().default('1 day ago').describe('How far back "yesterday" reaches'),
+  author: z.string().optional().describe('Filter to one author (defaults to the git user)'),
+  blockers: z.string().optional().describe('Free-text blockers to include (optional)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // Turn commits into human standup bullets (pure, exported for tests).
 export function commitsToBullets(commits: Commit[]): string[] {
@@ -32,17 +34,18 @@ export function commitsToBullets(commits: Commit[]): string[] {
   return bullets;
 }
 
-export class GenerateStandupTool extends BaseTool {
+export class GenerateStandupTool extends BaseTool<Args> {
   readonly name = 'generate_standup';
   readonly description =
     "Prépare un standup quotidien (hier / aujourd'hui / blocages) à partir de l'activité git récente. « Hier » = commits depuis `since`. Le LLM affine « aujourd'hui » à partir de la branche/des fichiers en cours.";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.generate_standup;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, since = '1 day ago', author, blockers } = args as GenerateStandupArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, since = '1 day ago', author, blockers } = args;
     const cwd = workdir ?? process.cwd();
 
     try {
@@ -52,10 +55,17 @@ export class GenerateStandupTool extends BaseTool {
         try {
           const { stdout } = await exec('git', ['config', 'user.name'], { cwd });
           who = stdout.trim() || undefined;
-        } catch { /* leave undefined → all authors */ }
+        } catch {
+          /* leave undefined → all authors */
+        }
       }
 
-      const logArgs = ['log', `--since=${since}`, '--pretty=format:%h\x1f%an\x1f%ad\x1f%s', '--date=short'];
+      const logArgs = [
+        'log',
+        `--since=${since}`,
+        '--pretty=format:%h\x1f%an\x1f%ad\x1f%s',
+        '--date=short',
+      ];
       if (who) logArgs.push(`--author=${who}`);
       const { stdout: logOut } = await exec('git', logArgs, { cwd, maxBuffer: 2_000_000 });
 
@@ -69,8 +79,14 @@ export class GenerateStandupTool extends BaseTool {
         const { stdout: b } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
         branch = b.trim();
         const { stdout: st } = await exec('git', ['status', '--porcelain'], { cwd });
-        inProgress = st.split('\n').map((l) => l.slice(3).trim()).filter((l) => l.length > 0).slice(0, 10);
-      } catch { /* non-fatal */ }
+        inProgress = st
+          .split('\n')
+          .map(l => l.slice(3).trim())
+          .filter(l => l.length > 0)
+          .slice(0, 10);
+      } catch {
+        /* non-fatal */
+      }
 
       return this.ok({
         since,
@@ -79,9 +95,10 @@ export class GenerateStandupTool extends BaseTool {
         today: {
           branch,
           uncommittedFiles: inProgress,
-          hint: inProgress.length > 0
-            ? 'Poursuivre le travail en cours sur les fichiers non commités ci-dessus.'
-            : 'À préciser — pas de travail non commité détecté.',
+          hint:
+            inProgress.length > 0
+              ? 'Poursuivre le travail en cours sur les fichiers non commités ci-dessus.'
+              : 'À préciser — pas de travail non commité détecté.',
         },
         blockers: typeof blockers === 'string' && blockers.length > 0 ? [blockers] : [],
         note:
@@ -91,7 +108,8 @@ export class GenerateStandupTool extends BaseTool {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('not a git repository')) return this.fail('Ce répertoire n\'est pas un dépôt git.');
+      if (msg.includes('not a git repository'))
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       return this.fail(`Erreur git: ${msg}`);
     }
   }

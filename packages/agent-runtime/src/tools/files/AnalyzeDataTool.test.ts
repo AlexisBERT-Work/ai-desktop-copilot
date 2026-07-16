@@ -31,9 +31,26 @@ describe('validateAnalyzeArgs', () => {
   });
 
   it('aggregate exige value_column sauf si agg=count', () => {
-    expect(validateAnalyzeArgs({ path: 'a.csv', operation: 'aggregate', group_by: ['cat'] }).ok).toBe(false);
-    expect(validateAnalyzeArgs({ path: 'a.csv', operation: 'aggregate', group_by: ['cat'], agg: 'count' }).ok).toBe(true);
-    expect(validateAnalyzeArgs({ path: 'a.csv', operation: 'aggregate', group_by: ['cat'], value_column: 'amount', agg: 'sum' }).ok).toBe(true);
+    expect(
+      validateAnalyzeArgs({ path: 'a.csv', operation: 'aggregate', group_by: ['cat'] }).ok,
+    ).toBe(false);
+    expect(
+      validateAnalyzeArgs({
+        path: 'a.csv',
+        operation: 'aggregate',
+        group_by: ['cat'],
+        agg: 'count',
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateAnalyzeArgs({
+        path: 'a.csv',
+        operation: 'aggregate',
+        group_by: ['cat'],
+        value_column: 'amount',
+        agg: 'sum',
+      }).ok,
+    ).toBe(true);
   });
 
   it('rejette une operation inconnue', () => {
@@ -51,7 +68,7 @@ describe('AnalyzeDataTool', () => {
   });
 
   it('échoue proprement sur des args invalides avant le sidecar', async () => {
-    const r = await tool.execute({ path: 'a.csv', operation: 'aggregate' });
+    const r = await tool.run({ path: 'a.csv', operation: 'aggregate' });
     expect(r.success).toBe(false);
   });
 });
