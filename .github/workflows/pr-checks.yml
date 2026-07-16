@@ -2,11 +2,11 @@ name: PR Checks
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [master, main, dev]
 
 jobs:
-  size-check:
-    name: Bundle Size Check
+  build-agent:
+    name: Agent Runtime Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +18,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build --filter=@catdesk/shared-types
+      - run: pnpm build --filter=@catdesk/agent-runtime
 
   security-audit:
     name: Security Audit

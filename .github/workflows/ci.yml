@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [master, main, dev]
   pull_request:
-    branches: [main, dev]
+    branches: [master, main, dev]
 
 jobs:
   # ─── TypeScript checks ──────────────────────────────────────
@@ -49,6 +49,28 @@ jobs:
 
       - run: pnpm test
 
+  # ─── Rust backend (fmt + tests) ────────────────────────────
+  # windows-latest : cible réelle de l'app, et Tauri n'y demande
+  # aucune dépendance système (webkit requis sous Linux).
+  rust:
+    name: Rust Backend
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96"
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - run: cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+      - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+
   # ─── Python OCR sidecar ────────────────────────────────────
   python:
     name: Python Sidecar
@@ -64,8 +86,10 @@ jobs:
 
       - working-directory: packages/ocr-vision
         run: |
-          pip install -r requirements.txt
-          python -c "import sys; print(f'Python {sys.version}')"
+          pip install -r requirements-dev.txt
+          # Erreurs de syntaxe/imports sur tous les modules, puis tests.
+          python -m compileall -q main.py vision ocr audio files
+          python -m pytest -q
 
   # ─── Tauri Build (Windows only, on tags) ──────────────────
   build-tauri:
@@ -88,6 +112,8 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96"
 
       - run: pnpm install --frozen-lockfile
 
