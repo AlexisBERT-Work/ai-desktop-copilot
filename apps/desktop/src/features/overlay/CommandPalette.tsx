@@ -1,5 +1,14 @@
-import { useState, useMemo } from 'react';
-import { Search, Terminal, FileText, Camera, Clipboard, Settings, LayoutDashboard, X } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import {
+  Search,
+  Terminal,
+  FileText,
+  Camera,
+  Clipboard,
+  Settings,
+  LayoutDashboard,
+  X,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
@@ -19,55 +28,63 @@ export function CommandPalette() {
   const { sendMessage, activeConversationId } = useChatStore();
   const [selected, setSelected] = useState(0);
 
-  const sendAndExpand = async (text: string) => {
-    setMode('chat');
-    await sendMessage(text, activeConversationId);
-  };
+  const sendAndExpand = useCallback(
+    async (text: string) => {
+      setMode('chat');
+      await sendMessage(text, activeConversationId);
+    },
+    [setMode, sendMessage, activeConversationId],
+  );
 
-  const commands: Command[] = [
-    {
-      id: 'screenshot',
-      label: 'Capture & analyze screen',
-      description: 'Take a screenshot and describe what\'s on screen',
-      icon: <Camera className="w-4 h-4" />,
-      action: () => sendAndExpand('Capture mon écran et décris ce que tu vois en détail.'),
-    },
-    {
-      id: 'clipboard',
-      label: 'Analyze clipboard',
-      description: 'Read and summarize clipboard content',
-      icon: <Clipboard className="w-4 h-4" />,
-      action: () => sendAndExpand('Lis mon presse-papier et résume ou améliore le contenu.'),
-    },
-    {
-      id: 'run-cmd',
-      label: 'Run a command',
-      description: 'Execute PowerShell or CMD',
-      icon: <Terminal className="w-4 h-4" />,
-      action: () => sendAndExpand('Je veux exécuter une commande. Aide-moi.'),
-    },
-    {
-      id: 'file',
-      label: 'Analyze a file',
-      description: 'Open and analyze a document',
-      icon: <FileText className="w-4 h-4" />,
-      action: () => sendAndExpand('Analyse un fichier pour moi.'),
-    },
-    {
-      id: 'dashboard',
-      label: 'Marchés & News',
-      description: 'Open the markets & news dashboard (separate window)',
-      icon: <LayoutDashboard className="w-4 h-4" />,
-      action: () => void openDashboardWindow(),
-    },
-    {
-      id: 'settings',
-      label: 'Open settings',
-      description: 'Configure models, permissions, and hotkeys',
-      icon: <Settings className="w-4 h-4" />,
-      action: () => setMode('settings'),
-    },
-  ];
+  // Mémoïsé : sinon le tableau serait recréé à chaque render et invaliderait
+  // le useMemo `filtered` (c'était la cause du warning exhaustive-deps).
+  const commands: Command[] = useMemo(
+    () => [
+      {
+        id: 'screenshot',
+        label: 'Capture & analyze screen',
+        description: "Take a screenshot and describe what's on screen",
+        icon: <Camera className="w-4 h-4" />,
+        action: () => sendAndExpand('Capture mon écran et décris ce que tu vois en détail.'),
+      },
+      {
+        id: 'clipboard',
+        label: 'Analyze clipboard',
+        description: 'Read and summarize clipboard content',
+        icon: <Clipboard className="w-4 h-4" />,
+        action: () => sendAndExpand('Lis mon presse-papier et résume ou améliore le contenu.'),
+      },
+      {
+        id: 'run-cmd',
+        label: 'Run a command',
+        description: 'Execute PowerShell or CMD',
+        icon: <Terminal className="w-4 h-4" />,
+        action: () => sendAndExpand('Je veux exécuter une commande. Aide-moi.'),
+      },
+      {
+        id: 'file',
+        label: 'Analyze a file',
+        description: 'Open and analyze a document',
+        icon: <FileText className="w-4 h-4" />,
+        action: () => sendAndExpand('Analyse un fichier pour moi.'),
+      },
+      {
+        id: 'dashboard',
+        label: 'Marchés & News',
+        description: 'Open the markets & news dashboard (separate window)',
+        icon: <LayoutDashboard className="w-4 h-4" />,
+        action: () => void openDashboardWindow(),
+      },
+      {
+        id: 'settings',
+        label: 'Open settings',
+        description: 'Configure models, permissions, and hotkeys',
+        icon: <Settings className="w-4 h-4" />,
+        action: () => setMode('settings'),
+      },
+    ],
+    [sendAndExpand, setMode],
+  );
 
   const filtered = useMemo(() => {
     if (!query) return commands;
@@ -75,7 +92,7 @@ export function CommandPalette() {
     return commands.filter(
       c => c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, commands]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -103,7 +120,10 @@ export function CommandPalette() {
         <input
           autoFocus
           value={query}
-          onChange={e => { setQuery(e.target.value); setSelected(0); }}
+          onChange={e => {
+            setQuery(e.target.value);
+            setSelected(0);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Search commands..."
           className="flex-1 bg-transparent text-white placeholder-white/30 outline-none text-sm"
@@ -126,7 +146,9 @@ export function CommandPalette() {
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-left
                          transition-colors ${i === selected ? 'bg-white/8' : 'hover:bg-white/5'}`}
             >
-              <span className={`p-1.5 rounded-lg ${i === selected ? 'text-brand-400 bg-brand-400/10' : 'text-white/40 bg-white/5'}`}>
+              <span
+                className={`p-1.5 rounded-lg ${i === selected ? 'text-brand-400 bg-brand-400/10' : 'text-white/40 bg-white/5'}`}
+              >
                 {cmd.icon}
               </span>
               <div>
@@ -134,7 +156,9 @@ export function CommandPalette() {
                 <p className="text-xs text-white/40">{cmd.description}</p>
               </div>
               {i === selected && (
-                <kbd className="ml-auto text-xs text-white/20 bg-white/5 px-1.5 py-0.5 rounded">↵</kbd>
+                <kbd className="ml-auto text-xs text-white/20 bg-white/5 px-1.5 py-0.5 rounded">
+                  ↵
+                </kbd>
               )}
             </button>
           ))

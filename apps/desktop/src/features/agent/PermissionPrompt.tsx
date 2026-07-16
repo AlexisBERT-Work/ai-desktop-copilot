@@ -2,33 +2,52 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
 import type { PermissionRequestEvent } from '@catdesk/shared-types';
+import { TAURI_EVENTS } from '@catdesk/shared-types';
+import { respondToPermission } from '../../shared/api/permissions';
 
 const RISK_CONFIG = {
-  low:      { color: 'text-green-400',  bg: 'bg-green-400/10',  border: 'border-green-400/20',  Icon: ShieldCheck },
-  medium:   { color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20', Icon: ShieldAlert },
-  high:     { color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/20', Icon: ShieldAlert },
-  critical: { color: 'text-red-400',    bg: 'bg-red-400/10',    border: 'border-red-400/20',    Icon: ShieldX },
+  low: {
+    color: 'text-green-400',
+    bg: 'bg-green-400/10',
+    border: 'border-green-400/20',
+    Icon: ShieldCheck,
+  },
+  medium: {
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-400/10',
+    border: 'border-yellow-400/20',
+    Icon: ShieldAlert,
+  },
+  high: {
+    color: 'text-orange-400',
+    bg: 'bg-orange-400/10',
+    border: 'border-orange-400/20',
+    Icon: ShieldAlert,
+  },
+  critical: {
+    color: 'text-red-400',
+    bg: 'bg-red-400/10',
+    border: 'border-red-400/20',
+    Icon: ShieldX,
+  },
 } as const;
 
 export function PermissionPrompt() {
   const [request, setRequest] = useState<PermissionRequestEvent | null>(null);
 
   useEffect(() => {
-    const unlisten = listen<PermissionRequestEvent>('permission:request', e => {
+    const unlisten = listen<PermissionRequestEvent>(TAURI_EVENTS.permissionRequest, e => {
       setRequest(e.payload);
     });
-    return () => { unlisten.then(fn => fn()); };
+    return () => {
+      unlisten.then(fn => fn());
+    };
   }, []);
 
   const respond = async (granted: boolean, remember = false) => {
     if (!request) return;
-    await invoke('permission_respond', {
-      requestId: request.requestId,
-      granted,
-      remember,
-    });
+    await respondToPermission(request.requestId, granted, remember);
     setRequest(null);
   };
 
@@ -52,9 +71,10 @@ export function PermissionPrompt() {
             exit={{ opacity: 0, scale: 0.95, y: 8 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
-            <div className="w-full max-w-md rounded-2xl border border-white/10
-                            bg-gray-950/98 shadow-2xl overflow-hidden">
-
+            <div
+              className="w-full max-w-md rounded-2xl border border-white/10
+                            bg-gray-950/98 shadow-2xl overflow-hidden"
+            >
               {/* Risk header */}
               <PermissionHeader riskLevel={request.riskLevel} tool={request.tool} />
 
@@ -91,7 +111,7 @@ export function PermissionPrompt() {
                     Autoriser
                   </button>
                 </div>
-                {(request.riskLevel === 'medium') && (
+                {request.riskLevel === 'medium' && (
                   <button
                     onClick={() => respond(true, true)}
                     className="w-full py-2 text-xs text-white/30 hover:text-white/60 transition-colors"

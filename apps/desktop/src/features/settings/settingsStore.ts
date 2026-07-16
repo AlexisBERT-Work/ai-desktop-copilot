@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { invoke } from '@tauri-apps/api/core';
+import { updateRuntimeSettings } from '../../shared/api/settings';
 
 interface SettingsState {
   defaultModel: string;
@@ -26,23 +26,22 @@ export const useSettingsStore = create<SettingsState>()(
       safeMode: false,
       streamingEnabled: true,
 
-      setDefaultModel: (model) => set({ defaultModel: model }),
-      setTemperature: (value) => set({ temperature: value }),
-      setMaxIterations: (value) => set({ maxIterations: value }),
+      setDefaultModel: model => set({ defaultModel: model }),
+      setTemperature: value => set({ temperature: value }),
+      setMaxIterations: value => set({ maxIterations: value }),
 
-      setSafeMode: (enabled) => {
+      setSafeMode: enabled => {
         set({ safeMode: enabled });
-        // La commande Rust prend `args: UpdateSettingsArgs` → envelopper sous `args`.
-        void invoke('update_settings', { args: { safeMode: enabled } }).catch(() => {
+        void updateRuntimeSettings({ safeMode: enabled }).catch(() => {
           // Agent not yet running — will sync on next start via syncToRuntime
         });
       },
 
-      setStreamingEnabled: (enabled) => set({ streamingEnabled: enabled }),
+      setStreamingEnabled: enabled => set({ streamingEnabled: enabled }),
 
       syncToRuntime: () => {
         const { safeMode } = get();
-        void invoke('update_settings', { args: { safeMode } }).catch(() => {});
+        void updateRuntimeSettings({ safeMode }).catch(() => {});
       },
     }),
     { name: 'catdesk-settings' },

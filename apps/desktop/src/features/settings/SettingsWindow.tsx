@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { X, Cat, Cpu, Shield, Keyboard, Info, AlertTriangle, Zap, Check, Loader2 } from 'lucide-react';
+import {
+  X,
+  Cat,
+  Cpu,
+  Shield,
+  Keyboard,
+  Info,
+  AlertTriangle,
+  Zap,
+  Check,
+  Loader2,
+} from 'lucide-react';
+import { getKvCacheStatus, setKvCacheType, type KvCacheStatus } from '../../shared/api/settings';
 import { useSettingsStore } from './settingsStore';
 import { useOverlayStore } from '../overlay/overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
@@ -25,15 +36,6 @@ const RISK_DOT: Record<RiskLevel, string> = {
 
 // ─── GPU auto-tune (KV cache) ─────────────────────────────────
 
-interface KvCacheStatus {
-  current: 'f16' | 'q4_0';
-  recommended: 'f16' | 'q4_0';
-  managed: boolean;
-  vramBytes: number | null;
-  modelName: string | null;
-  modelBytes: number;
-}
-
 const KV_LABEL: Record<'f16' | 'q4_0', string> = {
   f16: 'Standard (f16)',
   q4_0: 'Compact 4-bit (q4_0)',
@@ -56,29 +58,36 @@ function KvCacheCard() {
 
   const refresh = useCallback(async () => {
     try {
-      setStatus(await invoke<KvCacheStatus>('get_kv_cache_status'));
+      setStatus(await getKvCacheStatus());
     } catch {
       setStatus(null); // Ollama unreachable → hide the card
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
-
-  const apply = useCallback(async (value: 'f16' | 'q4_0') => {
-    setBusy(true);
-    setNote(null);
-    try {
-      const res = await invoke<{ restarted: boolean }>('set_kv_cache_type', { value });
-      setNote(res.restarted
-        ? 'Appliqué — Ollama redémarré.'
-        : 'Enregistré — actif au prochain démarrage de CatDesk.');
-      await refresh();
-    } catch (e) {
-      setNote(`Échec : ${String(e)}`);
-    } finally {
-      setBusy(false);
-    }
+  useEffect(() => {
+    void refresh();
   }, [refresh]);
+
+  const apply = useCallback(
+    async (value: 'f16' | 'q4_0') => {
+      setBusy(true);
+      setNote(null);
+      try {
+        const res = await setKvCacheType(value);
+        setNote(
+          res.restarted
+            ? 'Appliqué — Ollama redémarré.'
+            : 'Enregistré — actif au prochain démarrage de CatDesk.',
+        );
+        await refresh();
+      } catch (e) {
+        setNote(`Échec : ${String(e)}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
 
   if (!status) return null;
 
@@ -118,8 +127,8 @@ function KvCacheCard() {
         <p className="text-xs text-white/55 leading-relaxed">
           {recBoost
             ? `Ton modèle lourd est à l'étroit en VRAM. Le cache 4-bit libère de la mémoire pour garder plus de couches sur le GPU (jusqu'à ~+50 % de vitesse sur ce modèle, ~−6 % sur les petits).`
-            : `Tu as assez de VRAM : le cache standard f16 est le plus rapide ici (le 4-bit coûterait ~6 % pour rien).`}
-          {' '}Reco : <span className="font-medium text-white/80">{KV_LABEL[recommended]}</span>.
+            : `Tu as assez de VRAM : le cache standard f16 est le plus rapide ici (le 4-bit coûterait ~6 % pour rien).`}{' '}
+          Reco : <span className="font-medium text-white/80">{KV_LABEL[recommended]}</span>.
         </p>
       )}
 
@@ -130,9 +139,11 @@ function KvCacheCard() {
             disabled={busy || optimal}
             onClick={() => apply(recommended)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-              ${optimal
-                ? 'bg-white/5 text-white/30 cursor-default'
-                : 'bg-brand-500/20 text-brand-300 hover:bg-brand-500/30'}`}
+              ${
+                optimal
+                  ? 'bg-white/5 text-white/30 cursor-default'
+                  : 'bg-brand-500/20 text-brand-300 hover:bg-brand-500/30'
+              }`}
           >
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {optimal ? 'Déjà appliqué' : `Appliquer la reco (${KV_LABEL[recommended]})`}
@@ -170,8 +181,14 @@ function KvCacheCard() {
 function ModelTab() {
   const { availableModels } = useChatStore();
   const {
-    defaultModel, temperature, maxIterations, streamingEnabled,
-    setDefaultModel, setTemperature, setMaxIterations, setStreamingEnabled,
+    defaultModel,
+    temperature,
+    maxIterations,
+    streamingEnabled,
+    setDefaultModel,
+    setTemperature,
+    setMaxIterations,
+    setStreamingEnabled,
   } = useSettingsStore();
 
   const models = availableModels.length > 0 ? availableModels : [defaultModel];
@@ -241,7 +258,9 @@ function ModelTab() {
             min={1}
             max={25}
             value={maxIterations}
-            onChange={e => setMaxIterations(Math.max(1, Math.min(25, parseInt(e.target.value, 10) || 1)))}
+            onChange={e =>
+              setMaxIterations(Math.max(1, Math.min(25, parseInt(e.target.value, 10) || 1)))
+            }
             className="w-20 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90
                        text-center focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20"
           />
@@ -290,17 +309,18 @@ function SecurityTab() {
   return (
     <div className="space-y-5">
       {/* Safe mode toggle */}
-      <div className={`flex items-start gap-4 p-4 rounded-xl border transition-colors
-        ${safeMode
-          ? 'bg-orange-500/8 border-orange-500/25'
-          : 'bg-white/3 border-white/8'
-        }`}>
-        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${safeMode ? 'text-orange-400' : 'text-white/30'}`} />
+      <div
+        className={`flex items-start gap-4 p-4 rounded-xl border transition-colors
+        ${safeMode ? 'bg-orange-500/8 border-orange-500/25' : 'bg-white/3 border-white/8'}`}
+      >
+        <AlertTriangle
+          className={`w-5 h-5 mt-0.5 shrink-0 ${safeMode ? 'text-orange-400' : 'text-white/30'}`}
+        />
         <div className="flex-1">
           <p className="text-sm font-medium text-white/90">Mode sans danger</p>
           <p className="text-xs text-white/45 mt-0.5">
-            Bloque automatiquement tous les outils à risque moyen, élevé et critique.
-            Seules les opérations de lecture restent autorisées.
+            Bloque automatiquement tous les outils à risque moyen, élevé et critique. Seules les
+            opérations de lecture restent autorisées.
           </p>
         </div>
         <button
@@ -323,36 +343,45 @@ function SecurityTab() {
           Catalogue des outils ({tools.length} outils)
         </p>
         <div className="space-y-3">
-          {(['low', 'medium', 'high', 'critical'] as RiskLevel[]).map(risk => (
-            byRisk[risk].length > 0 && (
-              <div key={risk}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${RISK_DOT[risk]}`} />
-                  <span className="text-xs text-white/35 capitalize">
-                    {risk === 'low' ? 'Faible' : risk === 'medium' ? 'Moyen' : risk === 'high' ? 'Élevé' : 'Critique'}
-                    {' '}— {byRisk[risk].length} outil{byRisk[risk].length > 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="space-y-0.5 pl-3.5">
-                  {byRisk[risk].map(tool => (
-                    <div
-                      key={tool.name}
-                      className={`flex items-center gap-2 py-1.5 px-2.5 rounded-lg
+          {(['low', 'medium', 'high', 'critical'] as RiskLevel[]).map(
+            risk =>
+              byRisk[risk].length > 0 && (
+                <div key={risk}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${RISK_DOT[risk]}`} />
+                    <span className="text-xs text-white/35 capitalize">
+                      {risk === 'low'
+                        ? 'Faible'
+                        : risk === 'medium'
+                          ? 'Moyen'
+                          : risk === 'high'
+                            ? 'Élevé'
+                            : 'Critique'}{' '}
+                      — {byRisk[risk].length} outil{byRisk[risk].length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5 pl-3.5">
+                    {byRisk[risk].map(tool => (
+                      <div
+                        key={tool.name}
+                        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-lg
                         ${safeMode && risk !== 'low' ? 'opacity-40' : ''}`}
-                    >
-                      <code className="text-xs text-white/70 font-mono w-44 shrink-0 truncate">
-                        {tool.name}
-                      </code>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${RISK_COLORS[risk]}`}>
-                        {risk}
-                      </span>
-                      <span className="text-xs text-white/30 truncate">{tool.description}</span>
-                    </div>
-                  ))}
+                      >
+                        <code className="text-xs text-white/70 font-mono w-44 shrink-0 truncate">
+                          {tool.name}
+                        </code>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${RISK_COLORS[risk]}`}
+                        >
+                          {risk}
+                        </span>
+                        <span className="text-xs text-white/30 truncate">{tool.description}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          ))}
+              ),
+          )}
         </div>
       </div>
     </div>
@@ -360,14 +389,12 @@ function SecurityTab() {
 }
 
 function HotkeysTab() {
-  const global = [
-    { keys: 'Ctrl+Space', action: 'Ouvrir / fermer CatDesk' },
-  ];
+  const global = [{ keys: 'Ctrl+Space', action: 'Ouvrir / fermer CatDesk' }];
   const local = [
     { keys: 'Ctrl+K', action: 'Palette de commandes' },
     { keys: 'Ctrl+,', action: 'Ouvrir les paramètres' },
     { keys: 'Ctrl+N', action: 'Nouvelle conversation' },
-    { keys: 'Escape', action: 'Fermer l\'overlay' },
+    { keys: 'Escape', action: "Fermer l'overlay" },
   ];
 
   return (
@@ -378,7 +405,10 @@ function HotkeysTab() {
         </p>
         <div className="space-y-1">
           {global.map(({ keys, action }) => (
-            <div key={keys} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/3">
+            <div
+              key={keys}
+              className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/3"
+            >
               <span className="text-sm text-white/70">{action}</span>
               <Keybind keys={keys} />
             </div>
@@ -392,7 +422,10 @@ function HotkeysTab() {
         </p>
         <div className="space-y-1">
           {local.map(({ keys, action }) => (
-            <div key={keys} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/3">
+            <div
+              key={keys}
+              className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/3"
+            >
               <span className="text-sm text-white/70">{action}</span>
               <Keybind keys={keys} />
             </div>
@@ -436,18 +469,24 @@ function AboutTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/30
-                        flex items-center justify-center">
+        <div
+          className="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/30
+                        flex items-center justify-center"
+        >
           <Cat className="h-6 w-6 text-brand-300" aria-hidden />
         </div>
         <div>
           <h3 className="text-base font-semibold text-white/90">CatDesk</h3>
-          <p className="text-xs text-white/40 mt-0.5">Version 0.1.0 — Local-first AI Desktop Copilot</p>
+          <p className="text-xs text-white/40 mt-0.5">
+            Version 0.1.0 — Local-first AI Desktop Copilot
+          </p>
         </div>
       </div>
 
       <div>
-        <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-3">Stack technique</p>
+        <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-3">
+          Stack technique
+        </p>
         <div className="grid grid-cols-2 gap-1.5">
           {stack.map(({ label, value }) => (
             <div key={label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/3">
@@ -481,8 +520,10 @@ export function SettingsWindow() {
   ];
 
   return (
-    <div className="w-[720px] h-[540px] rounded-2xl border border-white/10 bg-gray-950/97
-                    shadow-2xl shadow-black/60 backdrop-blur-2xl overflow-hidden flex flex-col">
+    <div
+      className="w-[720px] h-[540px] rounded-2xl border border-white/10 bg-gray-950/97
+                    shadow-2xl shadow-black/60 backdrop-blur-2xl overflow-hidden flex flex-col"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5 shrink-0">
         <h2 className="text-sm font-semibold text-white/90">Paramètres</h2>
@@ -504,9 +545,11 @@ export function SettingsWindow() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors
-                ${activeTab === tab.id
-                  ? 'bg-brand-500/15 text-brand-400'
-                  : 'text-white/50 hover:text-white/70 hover:bg-white/5'}`}
+                ${
+                  activeTab === tab.id
+                    ? 'bg-brand-500/15 text-brand-400'
+                    : 'text-white/50 hover:text-white/70 hover:bg-white/5'
+                }`}
             >
               {tab.icon}
               {tab.label}

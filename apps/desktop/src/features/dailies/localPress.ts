@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Daily, PressFeed, PressFeedInput } from '@catdesk/shared-types';
+import { TAURI_EVENTS } from '@catdesk/shared-types';
+import * as pressApi from '../../shared/api/press';
 
 /**
  * Journaux personnalisés LOCAUX — propres à ce poste, gérés par l'agent local
@@ -17,33 +18,34 @@ interface LocalPressState {
   setDailies: (dailies: Daily[]) => void;
 }
 
-export const useLocalPressStore = create<LocalPressState>()((set) => ({
+export const useLocalPressStore = create<LocalPressState>()(set => ({
   feeds: [],
   dailies: [],
-  setFeeds: (feeds) => set({ feeds }),
-  setDailies: (dailies) => set({ dailies }),
+  setFeeds: feeds => set({ feeds }),
+  setDailies: dailies => set({ dailies }),
 }));
 
 /** Branche les events agent → store et demande l'état initial. Renvoie le cleanup. */
 export function connectLocalPress(): () => void {
-  const un1 = listen<{ feeds?: PressFeed[] }>('press:feeds', (e) => {
+  const un1 = listen<{ feeds?: PressFeed[] }>(TAURI_EVENTS.pressFeeds, e => {
     useLocalPressStore.getState().setFeeds(e.payload.feeds ?? []);
   });
-  const un2 = listen<{ dailies?: Daily[] }>('dailies:local', (e) => {
+  const un2 = listen<{ dailies?: Daily[] }>(TAURI_EVENTS.dailiesLocal, e => {
     useLocalPressStore.getState().setDailies(e.payload.dailies ?? []);
   });
   // Resynchronisation : les notifications émises avant le chargement de la
   // fenêtre sont perdues — on redemande l'état complet à l'agent.
-  void invoke('sync_local_press').catch(() => {});
+  void pressApi.syncLocalPress().catch(() => {});
   return () => {
-    void un1.then((off) => off());
-    void un2.then((off) => off());
+    void un1.then(off => off());
+    void un2.then(off => off());
   };
 }
 
-async function fire(cmd: string, args?: Record<string, unknown>): Promise<{ error: string | null }> {
+/** Enrobe un appel API en résultat `{ error }` consommable par les formulaires. */
+async function fire(call: () => Promise<void>): Promise<{ error: string | null }> {
   try {
-    await invoke(cmd, args);
+    await call();
     return { error: null };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
@@ -53,13 +55,13 @@ async function fire(cmd: string, args?: Record<string, unknown>): Promise<{ erro
 export async function saveLocalFeed(
   input: PressFeedInput & { id?: string },
 ): Promise<{ error: string | null }> {
-  return fire('save_local_press_feed', { feed: input });
+  return fire(() => pressApi.saveLocalPressFeed(input));
 }
 
 export async function deleteLocalFeed(id: string): Promise<{ error: string | null }> {
-  return fire('delete_local_press_feed', { id });
+  return fire(() => pressApi.deleteLocalPressFeed(id));
 }
 
 export async function runLocalPressNow(): Promise<{ error: string | null }> {
-  return fire('run_local_press_now');
+  return fire(() => pressApi.runLocalPressNow());
 }

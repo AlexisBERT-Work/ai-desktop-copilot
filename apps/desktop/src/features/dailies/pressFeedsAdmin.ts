@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { runPressDigest as apiRunPressDigest } from '../../shared/api/press';
 import {
   isDailyCategory,
   type DailyCategory,
@@ -100,7 +100,7 @@ export async function deletePressFeed(id: string): Promise<{ error: string | nul
  */
 export async function runPressDigestNow(): Promise<{ error: string | null }> {
   try {
-    await invoke('run_press_digest');
+    await apiRunPressDigest();
     return { error: null };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };

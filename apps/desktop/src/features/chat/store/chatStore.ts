@@ -1,14 +1,19 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { invoke } from '@tauri-apps/api/core';
 import type { Message, Conversation } from '@catdesk/shared-types';
+import { chatSend, chatCancel } from '../../../shared/api/chat';
+import {
+  getOllamaModelsInfo,
+  getGpuVramBytes,
+  getRecommendedModel,
+} from '../../../shared/api/models';
 
 /** État courant de l'agent, affiché comme petit texte sous le chat. */
 export type AgentStatus =
   | 'idle'
-  | 'thinking'    // requête envoyée, en attente du LLM
-  | 'responding'  // tokens en cours de streaming
-  | 'tool'        // un outil s'exécute (voir activeTool)
+  | 'thinking' // requête envoyée, en attente du LLM
+  | 'responding' // tokens en cours de streaming
+  | 'tool' // un outil s'exécute (voir activeTool)
   | 'interrupted' // arrêté par l'utilisateur
   | 'error';
 
@@ -117,20 +122,16 @@ export const useChatStore = create<ChatState>()(
       });
 
       try {
-        // Invoke Tauri — streaming tokens come via events
-        // La commande Rust prend un seul paramètre `args: ChatSendArgs`,
-        // donc Tauri exige d'envelopper les champs sous la clé `args`.
-        await invoke('chat_send', {
-          args: {
-            conversationId,
-            message: content,
-            messageId: assistantMessageId,
-            modelId: selectedModel,
-            useTools: true,
-            modelMode,
-            lightModel,
-            codeModel,
-          },
+        // Appel Tauri via la couche API — les tokens reviennent en événements.
+        await chatSend({
+          conversationId,
+          message: content,
+          messageId: assistantMessageId,
+          modelId: selectedModel,
+          useTools: true,
+          modelMode,
+          lightModel,
+          codeModel,
         });
       } catch (err) {
         set(s => {
@@ -149,11 +150,9 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         // Ignore les tokens tardifs après une interruption / fin.
         if (!s.isStreaming) return;
-        // Repli robuste si le routage d'id est imprécis : conversation active
-        // + message en cours de streaming.
-        const msgs = s.messages[conversationId] ?? s.messages[s.activeConversationId];
-        const msg = msgs?.find(m => m.id === messageId)
-          ?? msgs?.find(m => m.id === s.streamingMessageId);
+        // Routage strict : chaque step porte ses ids de bout en bout
+        // (buildStepNotification côté agent, dispatch_agent_step côté Rust).
+        const msg = s.messages[conversationId]?.find(m => m.id === messageId);
         if (msg) {
           msg.content += token;
           // Premier token reçu → on passe de « réfléchit » à « écrit ».
@@ -196,17 +195,17 @@ export const useChatStore = create<ChatState>()(
         s.activeTool = null;
       });
       // Demande au backend d'arrêter réellement la génération en cours.
-      try { await invoke('chat_cancel'); } catch { /* best-effort */ }
+      try {
+        await chatCancel();
+      } catch {
+        /* best-effort */
+      }
     },
 
     setPlan: (conversationId, messageId, steps) => {
       if (!Array.isArray(steps) || steps.length === 0) return;
       set(s => {
-        // Le routage du messageId est peu fiable côté bridge : on rattache au
-        // message ciblé si trouvé, sinon au message en cours de streaming.
-        const msgs = s.messages[conversationId] ?? s.messages[s.activeConversationId];
-        const msg = msgs?.find(m => m.id === messageId)
-          ?? msgs?.find(m => m.id === s.streamingMessageId);
+        const msg = s.messages[conversationId]?.find(m => m.id === messageId);
         if (msg) msg.plan = steps;
       });
     },
@@ -221,7 +220,7 @@ export const useChatStore = create<ChatState>()(
         const conv = s.conversations.find(c => c.id === conversationId);
         if (conv) {
           conv.updatedAt = Date.now();
-          conv.messageCount = (s.messages[conversationId]?.length ?? 0);
+          conv.messageCount = s.messages[conversationId]?.length ?? 0;
         }
       });
     },
@@ -243,20 +242,27 @@ export const useChatStore = create<ChatState>()(
     },
 
     selectConversation: id => {
-      set(s => { s.activeConversationId = id; });
+      set(s => {
+        s.activeConversationId = id;
+      });
     },
 
     setModel: model => {
-      set(s => { s.selectedModel = model; s.userPickedModel = true; });
+      set(s => {
+        s.selectedModel = model;
+        s.userPickedModel = true;
+      });
     },
 
     setModelMode: mode => {
-      set(s => { s.modelMode = mode; });
+      set(s => {
+        s.modelMode = mode;
+      });
     },
 
     loadModels: async () => {
       try {
-        const info = await invoke<{ name: string; sizeBytes: number }[]>('get_ollama_models_info');
+        const info = await getOllamaModelsInfo();
         set(s => {
           s.availableModels = info.map(m => m.name);
           s.modelSizes = Object.fromEntries(info.map(m => [m.name, m.sizeBytes]));
@@ -265,8 +271,10 @@ export const useChatStore = create<ChatState>()(
         // Keep defaults if Ollama not available
       }
       try {
-        const vram = await invoke<number | null>('get_gpu_vram_bytes');
-        set(s => { s.vramBytes = vram; });
+        const vram = await getGpuVramBytes();
+        set(s => {
+          s.vramBytes = vram;
+        });
       } catch {
         // VRAM undetectable → leave null, warnings stay off.
       }
@@ -275,7 +283,7 @@ export const useChatStore = create<ChatState>()(
       // manually chosen a model. Falls back to an installed model if the
       // recommendation isn't present.
       try {
-        const recommended = await invoke<string>('get_recommended_model');
+        const recommended = await getRecommendedModel();
         set(s => {
           if (s.userPickedModel) return;
           s.selectedModel = s.availableModels.includes(recommended)

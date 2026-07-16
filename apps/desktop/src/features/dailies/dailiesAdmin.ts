@@ -1,5 +1,6 @@
-import { isDailyCategory, type Daily, type DailyCategory } from '@catdesk/shared-types';
+import type { Daily, DailyCategory } from '@catdesk/shared-types';
 import { supabase } from '../news/supabaseClient';
+import { rowToDaily, type DailyRow } from './model';
 
 /** Données saisies à la création/édition d'une daily. */
 export interface DailyInput {
@@ -8,26 +9,6 @@ export interface DailyInput {
   category: DailyCategory;
   /** ISO 8601 ou null (pas d'expiration). */
   expiresAt: string | null;
-}
-
-interface DailyRow {
-  id: string;
-  title: string;
-  body: string;
-  category: string;
-  published_at: string;
-  expires_at: string | null;
-}
-
-function rowToDaily(r: DailyRow): Daily {
-  return {
-    id: r.id,
-    title: r.title,
-    body: r.body,
-    category: isDailyCategory(r.category) ? r.category : 'misc',
-    publishedAt: r.published_at,
-    expiresAt: r.expires_at,
-  };
 }
 
 const NOT_CONFIGURED = 'Supabase non configuré.';
@@ -57,7 +38,10 @@ export async function createDaily(input: DailyInput): Promise<{ error: string | 
   return { error: error?.message ?? null };
 }
 
-export async function updateDaily(id: string, input: DailyInput): Promise<{ error: string | null }> {
+export async function updateDaily(
+  id: string,
+  input: DailyInput,
+): Promise<{ error: string | null }> {
   if (supabase === null) return { error: NOT_CONFIGURED };
   const { error } = await supabase
     .from('dailies')

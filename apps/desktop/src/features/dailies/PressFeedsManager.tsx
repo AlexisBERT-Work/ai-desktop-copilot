@@ -11,6 +11,17 @@ import {
   type PressFeedInput,
   type PressSourceGroup,
 } from '@catdesk/shared-types';
+import {
+  EMPTY_DRAFT as EMPTY,
+  csv,
+  draftToInput,
+  feedToDraft,
+  fold,
+  lines,
+  regexError,
+  sourceSummary,
+  type Draft,
+} from './pressFeedsModel';
 /**
  * Backend d'un gestionnaire de journaux personnalisés. Deux implémentations :
  * - admin (Supabase) : journaux PARTAGÉS, publiés pour tous les clients ;
@@ -95,89 +106,25 @@ function OptSection({
   );
 }
 
-/** Brouillon d'édition : les champs listes sont saisis en texte, convertis au save. */
-interface Draft {
-  name: string;
-  category: DailyCategory;
-  sourceIds: string[]; // sélection dans le catalogue intégré
-  feedUrls: string; // une URL par ligne
-  includeKeywords: string; // séparés par des virgules
-  includeRegex: string;
-  excludeRegex: string;
-  sinceHours: number;
-  articleLimit: number;
-  enabled: boolean;
-}
-
-const EMPTY: Draft = {
-  name: '',
-  category: 'misc',
-  sourceIds: [],
-  feedUrls: '',
-  includeKeywords: '',
-  includeRegex: '',
-  excludeRegex: '',
-  sinceHours: EMPTY_PRESS_FEED.sinceHours,
-  articleLimit: EMPTY_PRESS_FEED.articleLimit,
-  enabled: true,
-};
-
-const csv = (s: string): string[] => s.split(',').map((x) => x.trim()).filter((x) => x.length > 0);
-const lines = (s: string): string[] => s.split(/\r?\n/).map((x) => x.trim()).filter((x) => x.length > 0);
-
-function feedToDraft(f: PressFeed): Draft {
-  return {
-    name: f.name,
-    category: f.category,
-    sourceIds: f.sourceIds,
-    feedUrls: f.feedUrls.join('\n'),
-    includeKeywords: f.includeKeywords.join(', '),
-    includeRegex: f.includeRegex ?? '',
-    excludeRegex: f.excludeRegex ?? '',
-    sinceHours: f.sinceHours,
-    articleLimit: f.articleLimit,
-    enabled: f.enabled,
-  };
-}
-
-function draftToInput(d: Draft): PressFeedInput {
-  return {
-    name: d.name.trim(),
-    category: d.category,
-    sourceIds: d.sourceIds,
-    feedUrls: lines(d.feedUrls),
-    includeKeywords: csv(d.includeKeywords),
-    includeRegex: d.includeRegex.trim() === '' ? null : d.includeRegex.trim(),
-    excludeRegex: d.excludeRegex.trim() === '' ? null : d.excludeRegex.trim(),
-    sinceHours: d.sinceHours,
-    articleLimit: d.articleLimit,
-    enabled: d.enabled,
-  };
-}
-
-/** Minuscules sans accents, pour une recherche tolérante (« libe » → Libération). */
-const fold = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-
-const SOURCE_LABEL = new Map(PRESS_SOURCE_CATALOG.map((s) => [s.id, s.label]));
-
-/** Résumé lisible des sources d'un journal (labels du catalogue + nb de flux perso). */
-function sourceSummary(f: PressFeed): string {
-  const parts = f.sourceIds.map((id) => SOURCE_LABEL.get(id) ?? id);
-  if (f.feedUrls.length > 0) parts.push(`${f.feedUrls.length} flux perso`);
-  return parts.length > 0 ? parts.join(', ') : 'aucune source';
-}
+// Logique métier (brouillon ↔ modèle, parsing, validation) : pressFeedsModel.ts (testé).
 
 /**
  * Sélecteur de sources intégrées : recherche + pastilles par famille. Les ids
  * inconnus du catalogue (sources retirées) restent listés pour être retirables.
  */
-function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+function SourcePicker({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
   const [query, setQuery] = useState('');
   const q = fold(query.trim());
 
   const groups = useMemo(() => {
     const matches = PRESS_SOURCE_CATALOG.filter(
-      (s) => q === '' || fold(s.label).includes(q) || fold(s.id).includes(q),
+      s => q === '' || fold(s.label).includes(q) || fold(s.id).includes(q),
     );
     const byGroup = new Map<PressSourceGroup, typeof matches>();
     for (const s of matches) {
@@ -188,10 +135,10 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
     return byGroup;
   }, [q]);
 
-  const known = new Set(PRESS_SOURCE_CATALOG.map((s) => s.id));
-  const unknown = selected.filter((id) => !known.has(id));
+  const known = new Set(PRESS_SOURCE_CATALOG.map(s => s.id));
+  const unknown = selected.filter(id => !known.has(id));
   const toggle = (id: string) =>
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
 
   return (
     <div>
@@ -200,7 +147,7 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
         <input
           className={`${FIELD} pl-8`}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={e => setQuery(e.target.value)}
           placeholder="Rechercher une source (Le Monde, CNBC, Numerama…)"
         />
       </div>
@@ -211,7 +158,7 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
               {PRESS_SOURCE_GROUP_LABEL[group]}
             </p>
             <div className="flex flex-wrap gap-1">
-              {sources.map((s) => {
+              {sources.map(s => {
                 const on = selected.includes(s.id);
                 return (
                   <button
@@ -226,7 +173,9 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
                     }`}
                   >
                     {s.label}
-                    <span className={`ml-1 text-[9px] uppercase ${on ? 'text-white/60' : 'text-white/30'}`}>
+                    <span
+                      className={`ml-1 text-[9px] uppercase ${on ? 'text-white/60' : 'text-white/30'}`}
+                    >
                       {s.lang}
                     </span>
                   </button>
@@ -235,10 +184,12 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
             </div>
           </div>
         ))}
-        {groups.size === 0 && <p className="text-xs text-white/30">Aucune source pour « {query.trim()} ».</p>}
+        {groups.size === 0 && (
+          <p className="text-xs text-white/30">Aucune source pour « {query.trim()} ».</p>
+        )}
         {unknown.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {unknown.map((id) => (
+            {unknown.map(id => (
               <button
                 key={id}
                 type="button"
@@ -258,16 +209,6 @@ function SourcePicker({ selected, onChange }: { selected: string[]; onChange: (i
 }
 
 /** Valide un motif regex saisi ; renvoie un message d'erreur ou null. */
-function regexError(pattern: string): string | null {
-  if (pattern.trim() === '') return null;
-  try {
-    new RegExp(pattern, 'iu');
-    return null;
-  } catch (err) {
-    return err instanceof Error ? err.message : 'motif invalide';
-  }
-}
-
 /**
  * Gestion générique des journaux personnalisés : recettes de collecte (sources +
  * URLs de flux + mots-clés/regex) transformées chaque jour en dailys. Le backend
@@ -379,7 +320,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
               <input
                 className={FIELD}
                 value={draft.name}
-                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
                 placeholder="Veille IA, Revue crypto…"
               />
             </label>
@@ -388,9 +329,9 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
               <select
                 className={FIELD}
                 value={draft.category}
-                onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value as DailyCategory }))}
+                onChange={e => setDraft(d => ({ ...d, category: e.target.value as DailyCategory }))}
               >
-                {DAILY_CATEGORIES.map((c) => (
+                {DAILY_CATEGORIES.map(c => (
                   <option key={c} value={c} className={OPTION}>
                     {DAILY_CATEGORY_LABEL[c]}
                   </option>
@@ -413,7 +354,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
               </span>
               <SourcePicker
                 selected={draft.sourceIds}
-                onChange={(ids) => setDraft((d) => ({ ...d, sourceIds: ids }))}
+                onChange={ids => setDraft(d => ({ ...d, sourceIds: ids }))}
               />
             </div>
 
@@ -432,7 +373,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                 <input
                   className={FIELD}
                   value={draft.includeKeywords}
-                  onChange={(e) => setDraft((d) => ({ ...d, includeKeywords: e.target.value }))}
+                  onChange={e => setDraft(d => ({ ...d, includeKeywords: e.target.value }))}
                   placeholder="IA, intelligence artificielle, LLM"
                 />
               </label>
@@ -441,7 +382,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                 <input
                   className={`${FIELD} font-mono text-xs`}
                   value={draft.includeRegex}
-                  onChange={(e) => setDraft((d) => ({ ...d, includeRegex: e.target.value }))}
+                  onChange={e => setDraft(d => ({ ...d, includeRegex: e.target.value }))}
                   placeholder="\b(IA|LLM|ChatGPT)\b"
                 />
               </label>
@@ -450,7 +391,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                 <input
                   className={`${FIELD} font-mono text-xs`}
                   value={draft.excludeRegex}
-                  onChange={(e) => setDraft((d) => ({ ...d, excludeRegex: e.target.value }))}
+                  onChange={e => setDraft(d => ({ ...d, excludeRegex: e.target.value }))}
                   placeholder="(publi.?rédactionnel|sponsorisé)"
                 />
               </label>
@@ -472,7 +413,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                   className={`${FIELD} resize-y font-mono text-xs`}
                   rows={2}
                   value={draft.feedUrls}
-                  onChange={(e) => setDraft((d) => ({ ...d, feedUrls: e.target.value }))}
+                  onChange={e => setDraft(d => ({ ...d, feedUrls: e.target.value }))}
                   placeholder={'https://hnrss.org/frontpage\nhttps://blog.rust-lang.org/feed.xml'}
                 />
               </label>
@@ -485,7 +426,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                     min={1}
                     max={168}
                     value={draft.sinceHours}
-                    onChange={(e) => setDraft((d) => ({ ...d, sinceHours: Number(e.target.value) }))}
+                    onChange={e => setDraft(d => ({ ...d, sinceHours: Number(e.target.value) }))}
                   />
                 </label>
                 <label className={LABEL}>
@@ -496,7 +437,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                     min={1}
                     max={200}
                     value={draft.articleLimit}
-                    onChange={(e) => setDraft((d) => ({ ...d, articleLimit: Number(e.target.value) }))}
+                    onChange={e => setDraft(d => ({ ...d, articleLimit: Number(e.target.value) }))}
                   />
                 </label>
               </div>
@@ -509,7 +450,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                   type="checkbox"
                   className="peer sr-only"
                   checked={draft.enabled}
-                  onChange={(e) => setDraft((d) => ({ ...d, enabled: e.target.checked }))}
+                  onChange={e => setDraft(d => ({ ...d, enabled: e.target.checked }))}
                 />
                 <span className="absolute inset-0 rounded-full bg-white/10 transition-colors duration-200 peer-checked:bg-brand-600" />
                 <span className="absolute left-0.5 h-4 w-4 rounded-full bg-white/60 transition-all duration-200 peer-checked:translate-x-4 peer-checked:bg-white" />
@@ -518,8 +459,8 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
             </label>
 
             <p className="text-[10px] text-white/30">
-              <span className="text-brand-300">*</span> champs requis — le reste a des valeurs par défaut
-              sensées.
+              <span className="text-brand-300">*</span> champs requis — le reste a des valeurs par
+              défaut sensées.
             </p>
 
             {err !== null && (
@@ -551,7 +492,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
             <p className="text-sm text-white/35">Aucun journal personnalisé pour l'instant.</p>
           ) : (
             <ul className="space-y-2">
-              {items.map((f) => {
+              {items.map(f => {
                 return (
                   <li
                     key={f.id}
@@ -562,7 +503,9 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                       <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
                         {DAILY_CATEGORY_LABEL[f.category]}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">{f.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
+                        {f.name}
+                      </span>
                       {!f.enabled && (
                         <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/40">
                           inactif
@@ -571,7 +514,8 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                     </div>
                     <p className="mt-1 text-[11px] text-white/40">
                       {sourceSummary(f)}
-                      {f.includeKeywords.length > 0 && ` · mots-clés : ${f.includeKeywords.join(', ')}`}
+                      {f.includeKeywords.length > 0 &&
+                        ` · mots-clés : ${f.includeKeywords.join(', ')}`}
                       {f.includeRegex !== null && ` · regex+`}
                       {f.excludeRegex !== null && ` · regex−`}
                     </p>
@@ -584,8 +528,10 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
                         Éditer
                       </button>
                       <button
-                        onClick={() => (confirmId === f.id ? void remove(f.id) : setConfirmId(f.id))}
-                        onBlur={() => setConfirmId((id) => (id === f.id ? null : id))}
+                        onClick={() =>
+                          confirmId === f.id ? void remove(f.id) : setConfirmId(f.id)
+                        }
+                        onBlur={() => setConfirmId(id => (id === f.id ? null : id))}
                         disabled={busy}
                         className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
                           confirmId === f.id

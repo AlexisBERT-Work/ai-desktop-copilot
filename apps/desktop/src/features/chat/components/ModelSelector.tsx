@@ -3,11 +3,15 @@ import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import { useChatStore, modelVramWarning } from '../store/chatStore';
 
 export function ModelSelector() {
-  const { selectedModel, availableModels, setModel, loadModels, modelSizes, vramBytes } = useChatStore();
+  const { selectedModel, availableModels, setModel, loadModels, modelSizes, vramBytes } =
+    useChatStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { loadModels(); }, []);
+  // loadModels est une action zustand : identité stable → l'effet ne tourne qu'au montage.
+  useEffect(() => {
+    void loadModels();
+  }, [loadModels]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -20,8 +24,8 @@ export function ModelSelector() {
   const shortName = (m: string) => m.split(':')[0] ?? m;
   const warningFor = (m: string) => modelVramWarning(modelSizes[m], vramBytes);
   const tip = (w: { modelGb: number; vramGb: number }) =>
-    `Ce modèle (~${w.modelGb} Go) dépasse la VRAM de cette machine (${w.vramGb} Go) : `
-    + `il débordera sur le CPU et sera nettement plus lent.`;
+    `Ce modèle (~${w.modelGb} Go) dépasse la VRAM de cette machine (${w.vramGb} Go) : ` +
+    `il débordera sur le CPU et sera nettement plus lent.`;
 
   const selectedWarning = warningFor(selectedModel);
 
@@ -40,14 +44,19 @@ export function ModelSelector() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-56 rounded-xl border border-white/10
-                        bg-gray-950/98 shadow-xl py-1 z-50">
+        <div
+          className="absolute top-full left-0 mt-1 w-56 rounded-xl border border-white/10
+                        bg-gray-950/98 shadow-xl py-1 z-50"
+        >
           {availableModels.map(m => {
             const w = warningFor(m);
             return (
               <button
                 key={m}
-                onClick={() => { setModel(m); setOpen(false); }}
+                onClick={() => {
+                  setModel(m);
+                  setOpen(false);
+                }}
                 title={w ? tip(w) : undefined}
                 className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs
                            text-white/70 hover:text-white hover:bg-white/5 transition-colors"
@@ -62,8 +71,8 @@ export function ModelSelector() {
           })}
           {vramBytes !== null && (
             <p className="px-3 pt-1.5 pb-1 text-[10px] text-white/25 border-t border-white/5 mt-1">
-              <AlertTriangle className="inline w-2.5 h-2.5 text-amber-400 mr-1" />
-              = trop lourd pour les {Math.round((vramBytes / 1e9) * 10) / 10} Go de VRAM détectés
+              <AlertTriangle className="inline w-2.5 h-2.5 text-amber-400 mr-1" />= trop lourd pour
+              les {Math.round((vramBytes / 1e9) * 10) / 10} Go de VRAM détectés
             </p>
           )}
         </div>

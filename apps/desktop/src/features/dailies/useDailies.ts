@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { isDailyCategory, type Daily } from '@catdesk/shared-types';
 import { isNewsConfigured as isSupabaseConfigured, supabase } from '../news/supabaseClient';
 import { useDailiesStore } from './dailiesStore';
+import { rowToDaily, type DailyRow } from './model';
 
 /**
  * Taille d'une page de dailys. La fenêtre chargée démarre à cette taille et
@@ -10,27 +10,6 @@ import { useDailiesStore } from './dailiesStore';
  */
 export const PAGE_SIZE = 50;
 
-/** Forme brute d'une ligne `dailies` (colonnes Postgres en snake_case). */
-interface DailyRow {
-  id: string;
-  title: string;
-  body: string;
-  category: string;
-  published_at: string;
-  expires_at: string | null;
-}
-
-function rowToDaily(r: DailyRow): Daily {
-  return {
-    id: r.id,
-    title: r.title,
-    body: r.body,
-    category: isDailyCategory(r.category) ? r.category : 'misc',
-    publishedAt: r.published_at,
-    expiresAt: r.expires_at,
-  };
-}
-
 /**
  * Charge les dailys au montage : auth anonyme (identité d'installation stable)
  * → fetch → abonnement Realtime. No-op (status 'unconfigured') si Supabase n'est
@@ -38,11 +17,11 @@ function rowToDaily(r: DailyRow): Daily {
  * centre d'intérêt est appliqué localement (voir dailiesStore).
  */
 export function useDailies(): void {
-  const setItems = useDailiesStore((s) => s.setItems);
-  const setStatus = useDailiesStore((s) => s.setStatus);
-  const setHasMore = useDailiesStore((s) => s.setHasMore);
-  const setLoadingMore = useDailiesStore((s) => s.setLoadingMore);
-  const setLoadMore = useDailiesStore((s) => s.setLoadMore);
+  const setItems = useDailiesStore(s => s.setItems);
+  const setStatus = useDailiesStore(s => s.setStatus);
+  const setHasMore = useDailiesStore(s => s.setHasMore);
+  const setLoadingMore = useDailiesStore(s => s.setLoadingMore);
+  const setLoadMore = useDailiesStore(s => s.setLoadMore);
 
   // Taille courante de la fenêtre chargée (offset 0 → window-1). Grandit via loadMore.
   const windowRef = useRef(PAGE_SIZE);

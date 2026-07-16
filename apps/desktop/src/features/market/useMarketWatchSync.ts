@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { setMarketWatchlist } from '../../shared/api/market';
 import { useDashboardStore } from '../dashboard/dashboardStore';
 import type { Widget, WidgetFormula } from '@catdesk/shared-types';
 
@@ -49,13 +49,12 @@ function collectFormulas(widgets: Widget[]): WidgetFormula[] {
  * différé couvre le cas où le sidecar n'est pas encore prêt au démarrage.
  */
 export function useMarketWatchSync(): void {
-  const widgets = useDashboardStore((s) => s.config.widgets);
+  const widgets = useDashboardStore(s => s.config.widgets);
 
   useEffect(() => {
     const symbols = collectSymbols(widgets);
     const formulas = collectFormulas(widgets);
-    const send = () =>
-      void invoke('set_market_watchlist', { symbols, formulas }).catch(() => {});
+    const send = () => void setMarketWatchlist(symbols, formulas).catch(() => {});
     send();
     const retry = setTimeout(send, 3500);
     return () => clearTimeout(retry);
