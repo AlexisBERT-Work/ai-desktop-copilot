@@ -30,7 +30,7 @@ describe('buildHeaders', () => {
     expect(h['Accept']).toBe('application/json');
   });
 
-  it('n\'écrase pas une Authorization fournie', () => {
+  it("n'écrase pas une Authorization fournie", () => {
     const h = buildHeaders({ Authorization: 'Basic xyz' }, 'abc', false);
     expect(h['Authorization']).toBe('Basic xyz');
   });
@@ -38,7 +38,9 @@ describe('buildHeaders', () => {
   it('ajoute Content-Type json seulement si body et pas déjà présent', () => {
     expect(buildHeaders(undefined, undefined, true)['Content-Type']).toBe('application/json');
     expect(buildHeaders(undefined, undefined, false)['Content-Type']).toBeUndefined();
-    expect(buildHeaders({ 'content-type': 'text/xml' }, undefined, true)['content-type']).toBe('text/xml');
+    expect(buildHeaders({ 'content-type': 'text/xml' }, undefined, true)['content-type']).toBe(
+      'text/xml',
+    );
   });
 });
 
@@ -51,10 +53,10 @@ describe('CallApiTool', () => {
   });
 
   it('rejette une url vide', async () => {
-    expect((await tool.execute({ url: '  ' })).success).toBe(false);
+    expect((await tool.run({ url: '  ' })).success).toBe(false);
   });
 
   it('rejette http distant', async () => {
-    expect((await tool.execute({ url: 'http://example.com' })).success).toBe(false);
+    expect((await tool.run({ url: 'http://example.com' })).success).toBe(false);
   });
 });

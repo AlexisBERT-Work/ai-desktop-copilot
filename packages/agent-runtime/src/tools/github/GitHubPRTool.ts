@@ -1,15 +1,17 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { ghFetch, ghFetchText, resolveToken, validateRepo } from '../../lib/githubApi';
 
-interface GitHubGetPRArgs {
-  repo: string;
-  pr_number: number;
-  token?: string;
-  include_diff?: boolean;
-  include_comments?: boolean;
-}
+const argsSchema = z.object({
+  repo: z.string().min(1).describe('GitHub repo in "owner/name" format'),
+  pr_number: z.number().describe('Pull request number'),
+  token: z.string().optional().describe('GitHub PAT (falls back to GITHUB_TOKEN env var)'),
+  include_diff: z.boolean().default(false).describe('Include the full unified diff (can be large)'),
+  include_comments: z.boolean().default(true).describe('Include review comments and PR comments'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface RawPR {
   number: number;
@@ -62,22 +64,25 @@ interface RawReview {
   submitted_at: string;
 }
 
-export class GitHubPRTool extends BaseTool {
+export class GitHubPRTool extends BaseTool<Args> {
   readonly name = 'github_get_pr';
-  readonly description = 'Récupère les détails complets d\'une pull request GitHub : description, fichiers modifiés, commentaires, statut de review, et optionnellement le diff complet.';
+  readonly description =
+    "Récupère les détails complets d'une pull request GitHub : description, fichiers modifiés, commentaires, statut de review, et optionnellement le diff complet.";
   readonly category = 'github' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.github_get_pr;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { repo, pr_number, include_diff = false, include_comments = true } = rawArgs as GitHubGetPRArgs;
-    const token = resolveToken((rawArgs as GitHubGetPRArgs).token);
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { repo, pr_number, include_diff, include_comments } = rawArgs;
+    const token = resolveToken(rawArgs.token);
 
     if (!repo) return this.fail('repo est requis');
     if (!pr_number) return this.fail('pr_number est requis');
     if (!validateRepo(repo)) return this.fail('Format repo invalide. Utilise "owner/nom-du-repo".');
-    if (!token) return this.fail('Token GitHub manquant. Passe token en argument ou définis GITHUB_TOKEN.');
+    if (!token)
+      return this.fail('Token GitHub manquant. Passe token en argument ou définis GITHUB_TOKEN.');
 
     // Fetch PR, files (and optionally comments + reviews) in parallel
     let pr: RawPR;
@@ -129,7 +134,9 @@ export class GitHubPRTool extends BaseTool {
       additions: f.additions,
       deletions: f.deletions,
       changes: f.changes,
-      ...(f.patch && !include_diff ? { patchPreview: f.patch.slice(0, 400) + (f.patch.length > 400 ? '…' : '') } : {}),
+      ...(f.patch && !include_diff
+        ? { patchPreview: f.patch.slice(0, 400) + (f.patch.length > 400 ? '…' : '') }
+        : {}),
     }));
 
     const formattedComments = comments.map(c => ({
@@ -185,7 +192,9 @@ export class GitHubPRTool extends BaseTool {
       url: pr.html_url,
       files: formattedFiles,
       ...(include_comments ? { comments: formattedComments, reviews: formattedReviews } : {}),
-      ...(diff !== null ? { diff: diff.slice(0, 50_000) + (diff.length > 50_000 ? '\n… (diff truncated)' : '') } : {}),
+      ...(diff !== null
+        ? { diff: diff.slice(0, 50_000) + (diff.length > 50_000 ? '\n… (diff truncated)' : '') }
+        : {}),
     });
   }
 }

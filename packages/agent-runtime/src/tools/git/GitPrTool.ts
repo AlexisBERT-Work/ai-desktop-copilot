@@ -1,15 +1,17 @@
+import { z } from 'zod';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-interface GitPrArgs {
-  workdir?: string;
-  base_branch?: string;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  base_branch: z.string().default('main').describe('Base branch to compare against'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface CommitInfo {
   hash: string;
@@ -69,17 +71,18 @@ function derivePrTitle(commits: CommitInfo[], branch: string): string {
   return dominantType ? `${dominantType}: ${branchTitle}` : branchTitle;
 }
 
-export class GitPrTool extends BaseTool {
+export class GitPrTool extends BaseTool<Args> {
   readonly name = 'generate_pr_description';
   readonly description =
     'Génère un titre et une description de PR à partir des commits et du diff par rapport à la branche de base';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.generate_pr_description;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, base_branch = 'main' } = args as GitPrArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, base_branch } = args;
     const cwd = workdir ?? process.cwd();
 
     try {

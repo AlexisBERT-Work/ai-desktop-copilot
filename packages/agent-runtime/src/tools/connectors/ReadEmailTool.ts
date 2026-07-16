@@ -1,20 +1,30 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
-interface ReadEmailArgs {
-  host?: string;
-  port?: number;
-  secure?: boolean;
-  user?: string;
-  password?: string;
-  mailbox?: string;
-  limit?: number;
-  unseen_only?: boolean;
-  since?: string;
-  search?: string;
-  fetch_uid?: number;
-}
+const argsSchema = z.object({
+  host: z.string().optional().describe('IMAP server host (falls back to IMAP_HOST env)'),
+  port: z.number().default(993).describe('IMAP port (993 TLS, 143 STARTTLS)'),
+  secure: z.boolean().optional().describe('Use TLS. Defaults to true unless port is 143.'),
+  user: z.string().optional().describe('Account username (falls back to IMAP_USER env)'),
+  password: z
+    .string()
+    .optional()
+    .describe('Account password/app-password (falls back to IMAP_PASSWORD env)'),
+  mailbox: z.string().default('INBOX').describe('Mailbox/folder to open'),
+  limit: z.number().max(100).default(20).describe('Max messages to list'),
+  unseen_only: z.boolean().default(false).describe('List only unread messages'),
+  since: z.string().optional().describe('Only messages on/after this date (YYYY-MM-DD)'),
+  search: z.string().optional().describe('Match text in subject or sender'),
+  fetch_uid: z
+    .number()
+    .optional()
+    .describe('Instead of listing, download and extract the text of this message UID'),
+});
+type Args = z.infer<typeof argsSchema>;
+/** Forme d'entree (avant defauts zod) - celle des helpers purs et des tests. */
+type ArgsInput = z.input<typeof argsSchema>;
 
 export interface ImapConfig {
   host: string;
@@ -29,7 +39,7 @@ type EnvLike = Record<string, string | undefined>;
 
 /** Resolve IMAP connection settings from args, falling back to env. Pure. */
 export function resolveImapConfig(
-  args: ReadEmailArgs,
+  args: ArgsInput,
   env: EnvLike,
 ): { ok: true; config: ImapConfig } | { ok: false; error: string } {
   const host = args.host ?? env['IMAP_HOST'];
@@ -45,7 +55,7 @@ export function resolveImapConfig(
 }
 
 /** Build imapflow search criteria from filters, or null for "recent by sequence". Pure. */
-export function buildSearchCriteria(args: ReadEmailArgs): Record<string, unknown> | null {
+export function buildSearchCriteria(args: ArgsInput): Record<string, unknown> | null {
   const criteria: Record<string, unknown> = {};
   if (args.unseen_only) criteria['seen'] = false;
   if (args.since) {
@@ -67,7 +77,7 @@ interface Addr {
 function formatAddrs(list: Addr[] | undefined): string {
   if (!list || list.length === 0) return '';
   return list
-    .map((a) => (a.name ? `${a.name} <${a.address ?? ''}>` : a.address ?? ''))
+    .map(a => (a.name ? `${a.name} <${a.address ?? ''}>` : (a.address ?? '')))
     .filter(Boolean)
     .join(', ');
 }
@@ -79,17 +89,18 @@ function formatAddrs(list: Addr[] | undefined): string {
  * - single message: pass fetch_uid to download and parse one message's text.
  * Outward-facing network connector with credentials — high risk, confirmation.
  */
-export class ReadEmailTool extends BaseTool {
+export class ReadEmailTool extends BaseTool<Args> {
   readonly name = 'read_email';
   readonly description =
     "Lit une boîte mail en IMAP (lecture seule). Sans fetch_uid : liste les messages récents d'une boîte (expéditeur, sujet, date, lu/non-lu), filtres unseen_only/since/search. Avec fetch_uid : télécharge et extrait le texte d'un message. Connexion via host/user/password ou variables IMAP_HOST/IMAP_USER/IMAP_PASSWORD. Connecteur réseau sortant avec identifiants.";
   readonly category = 'web' as const;
   readonly riskLevel = 'high' as const;
   readonly requiresConfirmation = true;
-  readonly schema = TOOL_SCHEMAS.read_email;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const args = rawArgs as ReadEmailArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const args = rawArgs;
 
     const resolved = resolveImapConfig(args, process.env);
     if (!resolved.ok) return this.fail(resolved.error);
@@ -134,7 +145,7 @@ export class ReadEmailTool extends BaseTool {
   private async list(
     client: import('imapflow').ImapFlow,
     cfg: ImapConfig,
-    args: ReadEmailArgs,
+    args: Args,
     limit: number,
   ): Promise<ToolResult> {
     const criteria = buildSearchCriteria(args);
@@ -186,8 +197,13 @@ export class ReadEmailTool extends BaseTool {
     cfg: ImapConfig,
     uid: number,
   ): Promise<ToolResult> {
-    const msg = await client.fetchOne(String(uid), { uid: true, source: true, envelope: true }, { uid: true });
-    if (!msg || !msg.source) return this.fail(`Message introuvable : uid ${uid} dans ${cfg.mailbox}.`);
+    const msg = await client.fetchOne(
+      String(uid),
+      { uid: true, source: true, envelope: true },
+      { uid: true },
+    );
+    if (!msg || !msg.source)
+      return this.fail(`Message introuvable : uid ${uid} dans ${cfg.mailbox}.`);
 
     const { simpleParser } = await import('mailparser');
     const parsed = await simpleParser(msg.source);

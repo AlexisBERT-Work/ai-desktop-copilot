@@ -1,16 +1,18 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { ghFetch, resolveToken, validateRepo } from '../../lib/githubApi';
 
-interface GitHubListIssuesArgs {
-  repo: string;
-  token?: string;
-  state?: 'open' | 'closed' | 'all';
-  labels?: string;
-  search?: string;
-  limit?: number;
-}
+const argsSchema = z.object({
+  repo: z.string().min(1).describe('GitHub repo in "owner/name" format'),
+  token: z.string().optional().describe('GitHub PAT (falls back to GITHUB_TOKEN env var)'),
+  state: z.enum(['open', 'closed', 'all']).default('open').describe('Issue state filter'),
+  labels: z.string().optional().describe('Comma-separated labels to filter by'),
+  search: z.string().optional().describe('Text search query (searches title and body)'),
+  limit: z.number().default(20).describe('Max number of issues to return'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface RawIssue {
   number: number;
@@ -57,21 +59,24 @@ function formatIssue(issue: RawIssue) {
   };
 }
 
-export class GitHubIssuesTool extends BaseTool {
+export class GitHubIssuesTool extends BaseTool<Args> {
   readonly name = 'github_list_issues';
-  readonly description = 'Liste ou recherche les issues GitHub d\'un dépôt. Supporte les filtres par état, labels et texte.';
+  readonly description =
+    "Liste ou recherche les issues GitHub d'un dépôt. Supporte les filtres par état, labels et texte.";
   readonly category = 'github' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.github_list_issues;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { repo, state = 'open', labels, search, limit = 20 } = rawArgs as GitHubListIssuesArgs;
-    const token = resolveToken((rawArgs as GitHubListIssuesArgs).token);
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { repo, state, labels, search, limit } = rawArgs;
+    const token = resolveToken(rawArgs.token);
 
     if (!repo) return this.fail('repo est requis');
     if (!validateRepo(repo)) return this.fail('Format repo invalide. Utilise "owner/nom-du-repo".');
-    if (!token) return this.fail('Token GitHub manquant. Passe token en argument ou définis GITHUB_TOKEN.');
+    if (!token)
+      return this.fail('Token GitHub manquant. Passe token en argument ou définis GITHUB_TOKEN.');
 
     let issues: RawIssue[];
 
@@ -83,11 +88,16 @@ export class GitHubIssuesTool extends BaseTool {
         state !== 'all' ? `is:${state}` : '',
         labels ? `label:"${labels}"` : '',
         search,
-      ].filter(Boolean).join('+');
+      ]
+        .filter(Boolean)
+        .join('+');
 
       let data: RawSearchResult;
       try {
-        data = await ghFetch(`/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(limit, 100)}`, token) as RawSearchResult;
+        data = (await ghFetch(
+          `/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(limit, 100)}`,
+          token,
+        )) as RawSearchResult;
       } catch (err) {
         return this.fail(`Impossible de contacter GitHub API: ${String(err)}`);
       }
@@ -100,7 +110,9 @@ export class GitHubIssuesTool extends BaseTool {
 
       let data: RawIssue[] | RawListResult;
       try {
-        data = await ghFetch(`/repos/${repo}/issues?${params.toString()}`, token) as RawIssue[] | RawListResult;
+        data = (await ghFetch(`/repos/${repo}/issues?${params.toString()}`, token)) as
+          | RawIssue[]
+          | RawListResult;
       } catch (err) {
         return this.fail(`Impossible de contacter GitHub API: ${String(err)}`);
       }

@@ -1,30 +1,34 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { BrowserManager } from '../../lib/browserManager';
 
-interface BrowserTypeArgs {
-  selector: string;
-  text: string;
-  clear_first?: boolean;
-  timeout_ms?: number;
-}
+const argsSchema = z.object({
+  selector: z.string().min(1).describe('CSS selector of the input/textarea to fill'),
+  text: z.string().describe('Text to type into the element'),
+  clear_first: z.boolean().default(true).describe('Clear existing content before typing'),
+  timeout_ms: z.number().default(10_000).describe('Max time to wait for element'),
+});
+type Args = z.infer<typeof argsSchema>;
 
-export class BrowserTypeTool extends BaseTool {
+export class BrowserTypeTool extends BaseTool<Args> {
   readonly name = 'browser_type';
-  readonly description = 'Saisit du texte dans un champ de formulaire (input, textarea) identifié par un sélecteur CSS.';
+  readonly description =
+    'Saisit du texte dans un champ de formulaire (input, textarea) identifié par un sélecteur CSS.';
   readonly category = 'browser' as const;
   readonly riskLevel = 'high' as const;
   readonly requiresConfirmation = true;
-  readonly schema = TOOL_SCHEMAS.browser_type;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(rawArgs: unknown): Promise<ToolResult> {
-    const { selector, text, clear_first, timeout_ms } = rawArgs as BrowserTypeArgs;
+  async execute(rawArgs: Args): Promise<ToolResult> {
+    const { selector, text, clear_first, timeout_ms } = rawArgs;
 
     if (!selector?.trim()) return this.fail('selector est requis');
     if (text === undefined || text === null) return this.fail('text est requis');
     if (!BrowserManager.get().isOpen()) {
-      return this.fail('Aucune page ouverte — utilise browser_navigate d\'abord');
+      return this.fail("Aucune page ouverte — utilise browser_navigate d'abord");
     }
 
     try {
@@ -38,7 +42,9 @@ export class BrowserTypeTool extends BaseTool {
         url: BrowserManager.get().getCurrentUrl(),
       });
     } catch (err) {
-      return this.fail(`Saisie échouée sur "${selector}": ${err instanceof Error ? err.message : String(err)}`);
+      return this.fail(
+        `Saisie échouée sur "${selector}": ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

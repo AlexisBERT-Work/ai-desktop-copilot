@@ -7,10 +7,20 @@ describe('resolveImapConfig', () => {
       { host: 'imap.example.com', user: 'u', password: 'p', port: 1993, secure: false },
       {},
     );
-    expect(r).toEqual({ ok: true, config: { host: 'imap.example.com', port: 1993, secure: false, user: 'u', pass: 'p', mailbox: 'INBOX' } });
+    expect(r).toEqual({
+      ok: true,
+      config: {
+        host: 'imap.example.com',
+        port: 1993,
+        secure: false,
+        user: 'u',
+        pass: 'p',
+        mailbox: 'INBOX',
+      },
+    });
   });
 
-  it('retombe sur les variables d\'environnement', () => {
+  it("retombe sur les variables d'environnement", () => {
     const r = resolveImapConfig({}, { IMAP_HOST: 'h', IMAP_USER: 'u', IMAP_PASSWORD: 'p' });
     expect(r.ok).toBe(true);
     if (r.ok) {
@@ -58,7 +68,7 @@ describe('ReadEmailTool', () => {
   });
 
   it('échoue proprement sans configuration', async () => {
-    const r = await tool.execute({});
+    const r = await tool.run({});
     expect(r.success).toBe(false);
     expect(r.error).toContain('host');
   });

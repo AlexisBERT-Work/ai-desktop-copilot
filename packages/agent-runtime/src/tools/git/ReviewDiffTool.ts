@@ -1,16 +1,26 @@
+import { z } from 'zod';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-interface ReviewDiffArgs {
-  workdir?: string;
-  base_branch?: string;
-  staged_only?: boolean;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  base_branch: z
+    .string()
+    .optional()
+    .describe(
+      'Review committed changes vs this branch (e.g. "main"). If omitted, reviews uncommitted working-tree changes',
+    ),
+  staged_only: z
+    .boolean()
+    .default(false)
+    .describe('When reviewing the working tree, look only at staged changes'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 type Severity = 'critical' | 'warning' | 'info';
 
@@ -36,13 +46,13 @@ const RULES: PatternRule[] = [
     rule: 'secret',
     severity: 'critical',
     re: /(?:api[_-]?key|secret|password|passwd|access[_-]?token|auth[_-]?token|client[_-]?secret)\s*[:=]\s*['"][^'"\s]{8,}['"]/i,
-    message: 'Secret potentiellement codé en dur. Déplacer vers une variable d\'environnement.',
+    message: "Secret potentiellement codé en dur. Déplacer vers une variable d'environnement.",
   },
   {
     rule: 'aws-key',
     severity: 'critical',
     re: /\bAKIA[0-9A-Z]{16}\b/,
-    message: 'Clé d\'accès AWS détectée. À révoquer et sortir du code immédiatement.',
+    message: "Clé d'accès AWS détectée. À révoquer et sortir du code immédiatement.",
   },
   {
     rule: 'private-key',
@@ -60,7 +70,7 @@ const RULES: PatternRule[] = [
     rule: 'eval',
     severity: 'warning',
     re: /\beval\s*\(|new Function\s*\(/,
-    message: 'Usage de eval/new Function — risque d\'injection, à éviter.',
+    message: "Usage de eval/new Function — risque d'injection, à éviter.",
   },
   {
     rule: 'debugger',
@@ -96,7 +106,12 @@ const RULES: PatternRule[] = [
 
 // ─── Diff scanner (pure, exported for tests) ───────────────────
 
-export function scanDiff(diff: string): { findings: DiffFinding[]; filesChanged: string[]; added: number; removed: number } {
+export function scanDiff(diff: string): {
+  findings: DiffFinding[];
+  filesChanged: string[];
+  added: number;
+  removed: number;
+} {
   const findings: DiffFinding[] = [];
   const filesChanged: string[] = [];
   let added = 0;
@@ -116,7 +131,13 @@ export function scanDiff(diff: string): { findings: DiffFinding[]; filesChanged:
       continue;
     }
     if (raw.startsWith('--- ')) continue;
-    if (raw.startsWith('diff --git') || raw.startsWith('index ') || raw.startsWith('rename ') || raw.startsWith('similarity ')) continue;
+    if (
+      raw.startsWith('diff --git') ||
+      raw.startsWith('index ') ||
+      raw.startsWith('rename ') ||
+      raw.startsWith('similarity ')
+    )
+      continue;
 
     const hunk = raw.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
     if (hunk) {
@@ -154,17 +175,18 @@ export function scanDiff(diff: string): { findings: DiffFinding[]; filesChanged:
 
 // ─── Tool ──────────────────────────────────────────────────────
 
-export class ReviewDiffTool extends BaseTool {
+export class ReviewDiffTool extends BaseTool<Args> {
   readonly name = 'review_diff';
   readonly description =
-    "Joue le rôle de reviewer sur un git diff : repère secrets codés en dur, code de debug oublié, marqueurs de conflit, eval, tests focalisés, `any`, TODO. Compare au working tree (par défaut), au staged, ou à une branche de base.";
+    'Joue le rôle de reviewer sur un git diff : repère secrets codés en dur, code de debug oublié, marqueurs de conflit, eval, tests focalisés, `any`, TODO. Compare au working tree (par défaut), au staged, ou à une branche de base.';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.review_diff;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, base_branch, staged_only = false } = args as ReviewDiffArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, base_branch, staged_only } = args;
     const cwd = workdir ?? process.cwd();
 
     const diffArgs =
@@ -189,7 +211,10 @@ export class ReviewDiffTool extends BaseTool {
       const { findings, filesChanged, added, removed } = scanDiff(diff);
 
       const order: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
-      findings.sort((a, b) => order[a.severity] - order[b.severity] || a.file.localeCompare(b.file) || a.line - b.line);
+      findings.sort(
+        (a, b) =>
+          order[a.severity] - order[b.severity] || a.file.localeCompare(b.file) || a.line - b.line,
+      );
 
       const counts = { critical: 0, warning: 0, info: 0 };
       for (const f of findings) counts[f.severity]++;
@@ -215,7 +240,8 @@ export class ReviewDiffTool extends BaseTool {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('not a git repository')) return this.fail('Ce répertoire n\'est pas un dépôt git.');
+      if (msg.includes('not a git repository'))
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       if (/unknown revision|bad revision|ambiguous argument/i.test(msg)) {
         return this.fail(`Branche de base introuvable: "${base_branch}". Vérifie le nom.`);
       }

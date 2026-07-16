@@ -1,20 +1,25 @@
+import { z } from 'zod';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { readFile } from 'fs/promises';
 import { join, isAbsolute } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-interface ResolveConflictsArgs {
-  workdir?: string;
-  path?: string;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  path: z
+    .string()
+    .optional()
+    .describe('Analyze only this conflicted file (optional, defaults to all)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export interface ConflictHunk {
-  startLine: number;   // 1-based line of the <<<<<<< marker
+  startLine: number; // 1-based line of the <<<<<<< marker
   oursLabel: string;
   theirsLabel: string;
   ours: string;
@@ -30,7 +35,10 @@ export function parseConflicts(content: string): ConflictHunk[] {
   let i = 0;
   while (i < lines.length) {
     const line = lines[i] ?? '';
-    if (!line.startsWith('<<<<<<<')) { i++; continue; }
+    if (!line.startsWith('<<<<<<<')) {
+      i++;
+      continue;
+    }
 
     const startLine = i + 1;
     const oursLabel = line.slice(7).trim();
@@ -45,9 +53,21 @@ export function parseConflicts(content: string): ConflictHunk[] {
     i++;
     for (; i < lines.length; i++) {
       const l = lines[i] ?? '';
-      if (l.startsWith('|||||||')) { phase = 'base'; hasBase = true; continue; }
-      if (l.startsWith('=======')) { phase = 'theirs'; continue; }
-      if (l.startsWith('>>>>>>>')) { theirsLabel = l.slice(7).trim(); closed = true; i++; break; }
+      if (l.startsWith('|||||||')) {
+        phase = 'base';
+        hasBase = true;
+        continue;
+      }
+      if (l.startsWith('=======')) {
+        phase = 'theirs';
+        continue;
+      }
+      if (l.startsWith('>>>>>>>')) {
+        theirsLabel = l.slice(7).trim();
+        closed = true;
+        i++;
+        break;
+      }
       if (phase === 'ours') ours.push(l);
       else if (phase === 'base') base.push(l);
       else theirs.push(l);
@@ -68,17 +88,18 @@ export function parseConflicts(content: string): ConflictHunk[] {
   return hunks;
 }
 
-export class ResolveConflictsTool extends BaseTool {
+export class ResolveConflictsTool extends BaseTool<Args> {
   readonly name = 'resolve_conflicts';
   readonly description =
     "Détecte les fichiers en conflit de merge et décompose chaque conflit en blocs ours/theirs (et base si diff3). Fournit au LLM le contexte structuré pour proposer une résolution. N'écrit rien : lecture seule.";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.resolve_conflicts;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, path } = args as ResolveConflictsArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, path } = args;
     const cwd = workdir ?? process.cwd();
 
     let files: string[];
@@ -88,16 +109,24 @@ export class ResolveConflictsTool extends BaseTool {
       } else {
         // List unmerged paths.
         const { stdout } = await exec('git', ['diff', '--name-only', '--diff-filter=U'], { cwd });
-        files = stdout.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+        files = stdout
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l.length > 0);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('not a git repository')) return this.fail('Ce répertoire n\'est pas un dépôt git.');
+      if (msg.includes('not a git repository'))
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       return this.fail(`Erreur git: ${msg}`);
     }
 
     if (files.length === 0) {
-      return this.ok({ conflictedFiles: 0, files: [], summary: 'Aucun conflit de merge en cours.' });
+      return this.ok({
+        conflictedFiles: 0,
+        files: [],
+        summary: 'Aucun conflit de merge en cours.',
+      });
     }
 
     const results = [];
@@ -108,7 +137,10 @@ export class ResolveConflictsTool extends BaseTool {
       try {
         content = await readFile(abs, 'utf-8');
       } catch (err) {
-        results.push({ file: rel, error: `Lecture impossible: ${err instanceof Error ? err.message : String(err)}` });
+        results.push({
+          file: rel,
+          error: `Lecture impossible: ${err instanceof Error ? err.message : String(err)}`,
+        });
         continue;
       }
       const hunks = parseConflicts(content);
@@ -116,7 +148,7 @@ export class ResolveConflictsTool extends BaseTool {
       results.push({
         file: rel,
         conflictCount: hunks.length,
-        diff3: hunks.some((h) => h.base !== null),
+        diff3: hunks.some(h => h.base !== null),
         hunks,
       });
     }
@@ -125,8 +157,7 @@ export class ResolveConflictsTool extends BaseTool {
       conflictedFiles: files.length,
       totalConflicts: totalHunks,
       files: results,
-      note:
-        'Lecture seule. Pour chaque hunk, le LLM doit proposer le contenu fusionné (souvent garder les deux intentions), puis écrire via write_file et retirer les marqueurs.',
+      note: 'Lecture seule. Pour chaque hunk, le LLM doit proposer le contenu fusionné (souvent garder les deux intentions), puis écrire via write_file et retirer les marqueurs.',
     });
   }
 }

@@ -1,15 +1,20 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { runGit } from '../../lib/git';
 
-interface SummarizeGitLogArgs {
-  workdir?: string;
-  since?: string;
-  path?: string;
-  author?: string;
-  max?: number;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  since: z.string().optional().describe('Time window, e.g. "1 week ago", "2024-01-01" (optional)'),
+  path: z
+    .string()
+    .optional()
+    .describe('Limit to commits touching this file or directory (optional)'),
+  author: z.string().optional().describe('Filter by author name/email substring (optional)'),
+  max: z.number().default(100).describe('Max commits to analyze'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export interface Commit {
   hash: string;
@@ -49,17 +54,18 @@ function tally(items: Array<string | null>): Record<string, number> {
   return Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]));
 }
 
-export class SummarizeGitLogTool extends BaseTool {
+export class SummarizeGitLogTool extends BaseTool<Args> {
   readonly name = 'summarize_git_log';
   readonly description =
     "Résume l'historique git sur une fenêtre de temps, un chemin ou un auteur : répartition par type de commit (Conventional Commits), par auteur, fichiers les plus modifiés. Répond à « qu'a changé ce fichier cette semaine ? ».";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.summarize_git_log;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, since, path, author, max = 100 } = args as SummarizeGitLogArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, since, path, author, max } = args;
     const cwd = workdir ?? process.cwd();
 
     // hash \x1f author \x1f ISO date \x1f subject
@@ -122,15 +128,13 @@ export class SummarizeGitLogTool extends BaseTool {
         byAuthor,
         byScope,
         topFiles,
-        commits: commits
-          .slice(0, 50)
-          .map(c => ({
-            hash: c.hash,
-            type: c.type,
-            subject: c.subject,
-            author: c.author,
-            date: c.date,
-          })),
+        commits: commits.slice(0, 50).map(c => ({
+          hash: c.hash,
+          type: c.type,
+          subject: c.subject,
+          author: c.author,
+          date: c.date,
+        })),
         note: 'Données agrégées — le LLM doit en tirer un résumé narratif (thèmes principaux, points notables) à partir des subjects.',
       });
     } catch (err) {

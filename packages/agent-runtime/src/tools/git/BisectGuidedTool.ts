@@ -1,18 +1,28 @@
+import { z } from 'zod';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
-interface BisectGuidedArgs {
-  workdir?: string;
-  good: string;
-  bad?: string;
-  path?: string;
-  test_command?: string;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  good: z.string().min(1).describe('Last known-good commit/ref (where the bug is absent)'),
+  bad: z.string().default('HEAD').describe('Known-bad commit/ref (where the bug is present)'),
+  path: z
+    .string()
+    .optional()
+    .describe('Limit the suspect range to commits touching this file/dir (optional)'),
+  test_command: z
+    .string()
+    .optional()
+    .describe(
+      'Command that exits 0 when good, non-zero when bad - enables a `git bisect run` one-liner (optional)',
+    ),
+});
+type Args = z.infer<typeof argsSchema>;
 
 export interface Candidate {
   hash: string;
@@ -33,17 +43,18 @@ export function pickMidpoint(candidates: Candidate[]): Candidate | null {
   return candidates[idx] ?? candidates[candidates.length - 1] ?? null;
 }
 
-export class BisectGuidedTool extends BaseTool {
+export class BisectGuidedTool extends BaseTool<Args> {
   readonly name = 'bisect_guided';
   readonly description =
     "Prépare un git bisect pour trouver le commit qui a cassé quelque chose : compte les commits suspects entre good et bad, désigne le prochain à tester (point milieu), estime le nombre d'étapes, et fournit les commandes manuelles + la ligne `git bisect run` si un test est donné. Lecture seule.";
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.bisect_guided;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, good, bad = 'HEAD', path, test_command } = args as BisectGuidedArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, good, bad, path, test_command } = args;
     const cwd = workdir ?? process.cwd();
 
     if (typeof good !== 'string' || good.trim().length === 0) {
@@ -52,7 +63,13 @@ export class BisectGuidedTool extends BaseTool {
 
     // Suspect commits = those in (good, bad]. rev-list good..bad excludes `good`
     // itself, which is correct: good is known-good so it can't be the culprit.
-    const revArgs = ['rev-list', '--first-parent', `${good}..${bad}`, '--pretty=format:%H\x1f%s', '--no-commit-header'];
+    const revArgs = [
+      'rev-list',
+      '--first-parent',
+      `${good}..${bad}`,
+      '--pretty=format:%H\x1f%s',
+      '--no-commit-header',
+    ];
     if (typeof path === 'string' && path.length > 0) revArgs.push('--', path);
 
     try {
@@ -60,9 +77,9 @@ export class BisectGuidedTool extends BaseTool {
 
       const candidates: Candidate[] = stdout
         .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0)
-        .map((l) => {
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .map(l => {
           const [hash = '', subject = ''] = l.split('\x1f');
           return { hash: hash.slice(0, 12), subject };
         });
@@ -106,9 +123,12 @@ export class BisectGuidedTool extends BaseTool {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('not a git repository')) return this.fail('Ce répertoire n\'est pas un dépôt git.');
+      if (msg.includes('not a git repository'))
+        return this.fail("Ce répertoire n'est pas un dépôt git.");
       if (/unknown revision|bad revision|ambiguous argument/i.test(msg)) {
-        return this.fail(`Référence introuvable (good="${good}", bad="${bad}"). Vérifie les noms de commits/branches.`);
+        return this.fail(
+          `Référence introuvable (good="${good}", bad="${bad}"). Vérifie les noms de commits/branches.`,
+        );
       }
       return this.fail(`Erreur git: ${msg}`);
     }

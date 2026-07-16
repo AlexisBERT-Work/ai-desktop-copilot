@@ -252,36 +252,6 @@ export const TOOL_SCHEMAS = {
     },
   },
 
-  generate_commit_message: {
-    type: 'object' as const,
-    properties: {
-      workdir: {
-        type: 'string' as const,
-        description: 'Git repo root (defaults to current directory)',
-      },
-      staged_only: {
-        type: 'boolean' as const,
-        default: true,
-        description: 'Use only staged diff (true) or full working tree diff (false)',
-      },
-    },
-  },
-
-  generate_pr_description: {
-    type: 'object' as const,
-    properties: {
-      workdir: {
-        type: 'string' as const,
-        description: 'Git repo root (defaults to current directory)',
-      },
-      base_branch: {
-        type: 'string' as const,
-        default: 'main',
-        description: 'Base branch to compare against',
-      },
-    },
-  },
-
   generate_unit_tests: {
     type: 'object' as const,
     required: ['path'],
@@ -319,26 +289,6 @@ export const TOOL_SCHEMAS = {
     },
   },
 
-  review_diff: {
-    type: 'object' as const,
-    properties: {
-      workdir: {
-        type: 'string' as const,
-        description: 'Git repo root (defaults to current directory)',
-      },
-      base_branch: {
-        type: 'string' as const,
-        description:
-          'Review committed changes vs this branch (e.g. "main"). If omitted, reviews uncommitted working-tree changes',
-      },
-      staged_only: {
-        type: 'boolean' as const,
-        default: false,
-        description: 'When reviewing the working tree, look only at staged changes',
-      },
-    },
-  },
-
   analyze_dependencies: {
     type: 'object' as const,
     properties: {
@@ -350,59 +300,6 @@ export const TOOL_SCHEMAS = {
       manifest: {
         type: 'string' as const,
         description: 'Specific manifest file to analyze (optional, auto-detected otherwise)',
-      },
-    },
-  },
-
-  watch_ci: {
-    type: 'object' as const,
-    required: ['repo'],
-    properties: {
-      repo: {
-        type: 'string' as const,
-        description: 'GitHub repo in "owner/name" format (e.g. "alexis/catdesk")',
-      },
-      branch: {
-        type: 'string' as const,
-        description: 'Branch to watch (defaults to current git branch)',
-      },
-      token: {
-        type: 'string' as const,
-        description: 'GitHub personal access token (falls back to GITHUB_TOKEN env var)',
-      },
-      limit: {
-        type: 'number' as const,
-        default: 5,
-        description: 'Number of recent workflow runs to fetch',
-      },
-    },
-  },
-
-  bisect_guided: {
-    type: 'object' as const,
-    required: ['good'],
-    properties: {
-      workdir: {
-        type: 'string' as const,
-        description: 'Git repo root (defaults to current directory)',
-      },
-      good: {
-        type: 'string' as const,
-        description: 'Last known-good commit/ref (where the bug is absent)',
-      },
-      bad: {
-        type: 'string' as const,
-        default: 'HEAD',
-        description: 'Known-bad commit/ref (where the bug is present)',
-      },
-      path: {
-        type: 'string' as const,
-        description: 'Limit the suspect range to commits touching this file/dir (optional)',
-      },
-      test_command: {
-        type: 'string' as const,
-        description:
-          'Command that exits 0 when good, non-zero when bad — enables a `git bisect run` one-liner (optional)',
       },
     },
   },
@@ -458,43 +355,6 @@ export const TOOL_SCHEMAS = {
       blockers: {
         type: 'string' as const,
         description: 'Free-text blockers to include (optional)',
-      },
-    },
-  },
-
-  summarize_git_log: {
-    type: 'object' as const,
-    properties: {
-      workdir: {
-        type: 'string' as const,
-        description: 'Git repo root (defaults to current directory)',
-      },
-      since: {
-        type: 'string' as const,
-        description: 'Time window, e.g. "1 week ago", "2024-01-01" (optional)',
-      },
-      path: {
-        type: 'string' as const,
-        description: 'Limit to commits touching this file or directory (optional)',
-      },
-      author: {
-        type: 'string' as const,
-        description: 'Filter by author name/email substring (optional)',
-      },
-      max: { type: 'number' as const, default: 100, description: 'Max commits to analyze' },
-    },
-  },
-
-  resolve_conflicts: {
-    type: 'object' as const,
-    properties: {
-      workdir: {
-        type: 'string' as const,
-        description: 'Git repo root (defaults to current directory)',
-      },
-      path: {
-        type: 'string' as const,
-        description: 'Analyze only this conflicted file (optional, defaults to all)',
       },
     },
   },
@@ -579,66 +439,6 @@ export const TOOL_SCHEMAS = {
     },
   },
 
-  call_api: {
-    type: 'object' as const,
-    required: ['url'],
-    properties: {
-      url: {
-        type: 'string' as const,
-        description:
-          'Full URL. https:// anywhere, or http:// only for localhost/127.0.0.1 (local MCP/API servers)',
-      },
-      method: {
-        type: 'string' as const,
-        enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const,
-        default: 'GET',
-        description: 'HTTP method',
-      },
-      headers: {
-        type: 'object' as const,
-        description: 'Extra request headers as a string→string map (optional)',
-      },
-      body: {
-        type: 'string' as const,
-        description:
-          'Request body for POST/PUT/PATCH. JSON string unless a Content-Type header says otherwise (optional)',
-      },
-      token: {
-        type: 'string' as const,
-        description: 'Bearer token added as Authorization header (optional)',
-      },
-      timeout_ms: {
-        type: 'number' as const,
-        default: 15000,
-        maximum: 60000,
-        description: 'Request timeout',
-      },
-    },
-  },
-
-  send_webhook_message: {
-    type: 'object' as const,
-    required: ['message'],
-    properties: {
-      message: { type: 'string' as const, description: 'Message text to post to the channel' },
-      platform: {
-        type: 'string' as const,
-        enum: ['discord', 'slack'] as const,
-        default: 'discord',
-        description: 'Which incoming-webhook format to use',
-      },
-      webhook_url: {
-        type: 'string' as const,
-        description:
-          'Incoming webhook URL (falls back to DISCORD_WEBHOOK_URL / SLACK_WEBHOOK_URL by platform)',
-      },
-      username: {
-        type: 'string' as const,
-        description: 'Override the displayed sender name (Discord only)',
-      },
-    },
-  },
-
   notion_search: {
     type: 'object' as const,
     properties: {
@@ -678,54 +478,6 @@ export const TOOL_SCHEMAS = {
         type: 'number' as const,
         default: 20000,
         description: 'Max characters of extracted text to return',
-      },
-    },
-  },
-
-  read_email: {
-    type: 'object' as const,
-    properties: {
-      host: {
-        type: 'string' as const,
-        description: 'IMAP server host (falls back to IMAP_HOST env)',
-      },
-      port: {
-        type: 'number' as const,
-        default: 993,
-        description: 'IMAP port (993 TLS, 143 STARTTLS)',
-      },
-      secure: {
-        type: 'boolean' as const,
-        description: 'Use TLS. Defaults to true unless port is 143.',
-      },
-      user: {
-        type: 'string' as const,
-        description: 'Account username (falls back to IMAP_USER env)',
-      },
-      password: {
-        type: 'string' as const,
-        description: 'Account password/app-password (falls back to IMAP_PASSWORD env)',
-      },
-      mailbox: { type: 'string' as const, default: 'INBOX', description: 'Mailbox/folder to open' },
-      limit: {
-        type: 'number' as const,
-        default: 20,
-        maximum: 100,
-        description: 'Max messages to list',
-      },
-      unseen_only: {
-        type: 'boolean' as const,
-        default: false,
-        description: 'List only unread messages',
-      },
-      since: {
-        type: 'string' as const,
-        description: 'Only messages on/after this date (YYYY-MM-DD)',
-      },
-      search: { type: 'string' as const, description: 'Match text in subject or sender' },
-      fetch_uid: {
-        type: 'number' as const,
-        description: 'Instead of listing, download and extract the text of this message UID',
       },
     },
   },
@@ -821,34 +573,6 @@ export const TOOL_SCHEMAS = {
     },
   },
 
-  github_list_issues: {
-    type: 'object' as const,
-    required: ['repo'],
-    properties: {
-      repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format' },
-      token: {
-        type: 'string' as const,
-        description: 'GitHub PAT (falls back to GITHUB_TOKEN env var)',
-      },
-      state: {
-        type: 'string' as const,
-        enum: ['open', 'closed', 'all'] as const,
-        default: 'open',
-        description: 'Issue state filter',
-      },
-      labels: { type: 'string' as const, description: 'Comma-separated labels to filter by' },
-      search: {
-        type: 'string' as const,
-        description: 'Text search query (searches title and body)',
-      },
-      limit: {
-        type: 'number' as const,
-        default: 20,
-        description: 'Max number of issues to return',
-      },
-    },
-  },
-
   run_subagent: {
     type: 'object' as const,
     required: ['task'],
@@ -915,54 +639,6 @@ export const TOOL_SCHEMAS = {
     },
   },
 
-  github_get_pr: {
-    type: 'object' as const,
-    required: ['repo', 'pr_number'],
-    properties: {
-      repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format' },
-      pr_number: { type: 'number' as const, description: 'Pull request number' },
-      token: {
-        type: 'string' as const,
-        description: 'GitHub PAT (falls back to GITHUB_TOKEN env var)',
-      },
-      include_diff: {
-        type: 'boolean' as const,
-        default: false,
-        description: 'Include the full unified diff (can be large)',
-      },
-      include_comments: {
-        type: 'boolean' as const,
-        default: true,
-        description: 'Include review comments and PR comments',
-      },
-    },
-  },
-
-  schedule_task: {
-    type: 'object' as const,
-    required: ['task', 'schedule'],
-    properties: {
-      task: {
-        type: 'string' as const,
-        description: 'Agent task description to run on a recurring schedule (natural language)',
-      },
-      schedule: {
-        type: 'string' as const,
-        description:
-          'When to run: "every 5m", "every 30m", "every 1h", "every 6h", "every 1d", "hourly", "daily", "weekly"',
-      },
-      name: {
-        type: 'string' as const,
-        description: 'Human-readable label for this job (optional, defaults to truncated task)',
-      },
-      enabled: {
-        type: 'boolean' as const,
-        default: true,
-        description: 'Whether the job starts active (default: true)',
-      },
-    },
-  },
-
   list_scheduled_tasks: {
     type: 'object' as const,
     properties: {},
@@ -975,28 +651,6 @@ export const TOOL_SCHEMAS = {
       id: {
         type: 'string' as const,
         description: 'Job ID to cancel — get IDs from list_scheduled_tasks',
-      },
-    },
-  },
-
-  browser_navigate: {
-    type: 'object' as const,
-    required: ['url'],
-    properties: {
-      url: {
-        type: 'string' as const,
-        description: 'URL to navigate to (must start with http:// or https://)',
-      },
-      wait_until: {
-        type: 'string' as const,
-        enum: ['load', 'domcontentloaded', 'networkidle'] as const,
-        default: 'domcontentloaded',
-        description: 'When to consider navigation complete',
-      },
-      timeout_ms: {
-        type: 'number' as const,
-        default: 30000,
-        description: 'Navigation timeout in milliseconds',
       },
     },
   },
@@ -1028,44 +682,6 @@ export const TOOL_SCHEMAS = {
         type: 'number' as const,
         default: 20000,
         description: 'Max characters to return',
-      },
-    },
-  },
-
-  browser_click: {
-    type: 'object' as const,
-    required: ['selector'],
-    properties: {
-      selector: {
-        type: 'string' as const,
-        description: 'CSS selector or text="…" locator of the element to click',
-      },
-      timeout_ms: {
-        type: 'number' as const,
-        default: 10000,
-        description: 'Max time to wait for element to be clickable',
-      },
-    },
-  },
-
-  browser_type: {
-    type: 'object' as const,
-    required: ['selector', 'text'],
-    properties: {
-      selector: {
-        type: 'string' as const,
-        description: 'CSS selector of the input/textarea to fill',
-      },
-      text: { type: 'string' as const, description: 'Text to type into the element' },
-      clear_first: {
-        type: 'boolean' as const,
-        default: true,
-        description: 'Clear existing content before typing',
-      },
-      timeout_ms: {
-        type: 'number' as const,
-        default: 10000,
-        description: 'Max time to wait for element',
       },
     },
   },

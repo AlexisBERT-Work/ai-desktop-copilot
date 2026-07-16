@@ -1,12 +1,17 @@
+import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 import { runGit } from '../../lib/git';
 
-interface GitCommitArgs {
-  workdir?: string;
-  staged_only?: boolean;
-}
+const argsSchema = z.object({
+  workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
+  staged_only: z
+    .boolean()
+    .default(true)
+    .describe('Use only staged diff (true) or full working tree diff (false)'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 // Conventional Commits type inference from diff content
 export function inferCommitType(diff: string, stats: string): string {
@@ -46,17 +51,18 @@ export function inferScope(files: string[]): string | null {
   return null;
 }
 
-export class GitCommitTool extends BaseTool {
+export class GitCommitTool extends BaseTool<Args> {
   readonly name = 'generate_commit_message';
   readonly description =
     'Lit le git diff stagé et génère un message de commit Conventional Commits';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.generate_commit_message;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { workdir, staged_only = true } = args as GitCommitArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { workdir, staged_only } = args;
     const cwd = workdir ?? process.cwd();
 
     try {

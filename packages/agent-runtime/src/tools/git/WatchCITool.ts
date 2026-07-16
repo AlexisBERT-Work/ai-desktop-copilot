@@ -1,19 +1,24 @@
+import { z } from 'zod';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
-import { TOOL_SCHEMAS } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
+import { jsonSchemaFrom } from '../base/zodSchema';
 
 const exec = promisify(execFile);
 
 const GH_API = 'https://api.github.com';
 
-interface WatchCIArgs {
-  repo: string;
-  branch?: string;
-  token?: string;
-  limit?: number;
-}
+const argsSchema = z.object({
+  repo: z.string().min(1).describe('GitHub repo in "owner/name" format (e.g. "alexis/catdesk")'),
+  branch: z.string().optional().describe('Branch to watch (defaults to current git branch)'),
+  token: z
+    .string()
+    .optional()
+    .describe('GitHub personal access token (falls back to GITHUB_TOKEN env var)'),
+  limit: z.number().default(5).describe('Number of recent workflow runs to fetch'),
+});
+type Args = z.infer<typeof argsSchema>;
 
 interface WorkflowRun {
   id: number;
@@ -47,12 +52,16 @@ async function ghFetch(path: string, token: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const url = new URL(path.startsWith('http') ? path : `${GH_API}${path}`);
     const req = https.get(
-      { hostname: url.hostname, path: url.pathname + url.search, headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'catdesk-agent/1.0',
-        'X-GitHub-Api-Version': '2022-11-28',
-      }},
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'catdesk-agent/1.0',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      },
       res => {
         const chunks: Buffer[] = [];
         res.on('data', (c: Buffer) => chunks.push(c));
@@ -63,10 +72,13 @@ async function ghFetch(path: string, token: string): Promise<unknown> {
             reject(new Error('Invalid JSON from GitHub API'));
           }
         });
-      }
+      },
     );
     req.on('error', reject);
-    req.setTimeout(10_000, () => { req.destroy(); reject(new Error('GitHub API timeout')); });
+    req.setTimeout(10_000, () => {
+      req.destroy();
+      reject(new Error('GitHub API timeout'));
+    });
   });
 }
 
@@ -80,7 +92,7 @@ async function getCurrentBranch(cwd: string): Promise<string | null> {
 }
 
 async function getFailedJobs(repo: string, runId: number, token: string): Promise<FailedJob[]> {
-  const data = await ghFetch(`/repos/${repo}/actions/runs/${runId}/jobs`, token) as {
+  const data = (await ghFetch(`/repos/${repo}/actions/runs/${runId}/jobs`, token)) as {
     jobs?: Array<{
       name: string;
       conclusion: string | null;
@@ -99,16 +111,18 @@ async function getFailedJobs(repo: string, runId: number, token: string): Promis
     }));
 }
 
-export class WatchCITool extends BaseTool {
+export class WatchCITool extends BaseTool<Args> {
   readonly name = 'watch_ci';
-  readonly description = 'Récupère les derniers runs GitHub Actions et remonte les erreurs de build sans quitter le terminal';
+  readonly description =
+    'Récupère les derniers runs GitHub Actions et remonte les erreurs de build sans quitter le terminal';
   readonly category = 'analysis' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
-  readonly schema = TOOL_SCHEMAS.watch_ci;
+  override readonly argsSchema = argsSchema;
+  readonly schema = jsonSchemaFrom(argsSchema);
 
-  async execute(args: unknown): Promise<ToolResult> {
-    const { repo, branch, token: argToken, limit = 5 } = args as WatchCIArgs;
+  async execute(args: Args): Promise<ToolResult> {
+    const { repo, branch, token: argToken, limit } = args;
 
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
       return this.fail('Format repo invalide. Utilise "owner/nom-du-repo" (ex: "alexis/catdesk").');
@@ -117,7 +131,7 @@ export class WatchCITool extends BaseTool {
     const token = argToken ?? process.env['GITHUB_TOKEN'] ?? '';
     if (!token) {
       return this.fail(
-        'Token GitHub manquant. Passe `token` en argument ou définis la variable d\'environnement GITHUB_TOKEN.'
+        "Token GitHub manquant. Passe `token` en argument ou définis la variable d'environnement GITHUB_TOKEN.",
       );
     }
 
@@ -140,10 +154,10 @@ export class WatchCITool extends BaseTool {
     };
 
     try {
-      runsData = await ghFetch(
+      runsData = (await ghFetch(
         `/repos/${repo}/actions/runs?branch=${encodeURIComponent(resolvedBranch)}&per_page=${limit}`,
-        token
-      ) as typeof runsData;
+        token,
+      )) as typeof runsData;
     } catch (err) {
       return this.fail(`Impossible de contacter GitHub API: ${String(err)}`);
     }
@@ -156,9 +170,8 @@ export class WatchCITool extends BaseTool {
 
     const runs: WorkflowRun[] = await Promise.all(
       raw.map(async r => {
-        const jobsFailed = r.conclusion === 'failure'
-          ? await getFailedJobs(repo, r.id, token).catch(() => [])
-          : [];
+        const jobsFailed =
+          r.conclusion === 'failure' ? await getFailedJobs(repo, r.id, token).catch(() => []) : [];
 
         return {
           id: r.id,
@@ -173,7 +186,7 @@ export class WatchCITool extends BaseTool {
           url: r.html_url,
           jobsFailed,
         };
-      })
+      }),
     );
 
     const failing = runs.filter(r => r.conclusion === 'failure');
