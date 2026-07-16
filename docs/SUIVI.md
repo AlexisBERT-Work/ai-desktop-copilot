@@ -1,9 +1,44 @@
 # SUIVI — Évolution de CatDesk
 
 > Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
-> Dernière mise à jour : 2026-07-15.
+> Dernière mise à jour : 2026-07-17.
 
 ## État actuel
+
+**Suite du refactoring (2026-07-17)** — les quatre chantiers restants du plan
+sont terminés. État final : **575 tests agent-runtime + 8 desktop + 5 Python +
+22 Rust, lint 0 warning** :
+
+- **AgentOrchestrator** : `process()` décomposé en phases privées à
+  comportement identique (`tryServeFromCache`, `streamAssistantTurn` avec la
+  rétention de tokens, `runToolCall` porte de permission + scan sécurité,
+  `finalizeAnswer` effets de bord) — et **premiers tests de l'orchestrateur**
+  (14, faux OllamaClient scripté) : streaming, cache sémantique, boucle
+  d'outils (rejeu/refus/exception/récupération `<tool_call>`), interruption,
+  MAX_ITERATIONS.
+- **Validation zod 67/67 outils** : lots 2-4 migrés — plus AUCUN
+  `rawArgs as Args` ; `shared-types/tools.ts` (709 lignes de schémas runtime)
+  **supprimé**, le schéma zod de chaque outil est la source unique. Script de
+  migration réutilisable : scratchpad `migrate_lot4.py` (génération zod depuis
+  les schémas JSON, descriptions/défauts/enums conservés).
+- **God components découpés** : SettingsWindow 570→75 l. (onglets ModelTab/
+  SecurityTab/HotkeysTab/AboutTab + KvCacheCard) ; PressFeedsManager 555→140 l.
+  (PressFeedEditor, PressFeedList, SourcePicker, pressFeedsUi). L'onglet
+  À propos n'annonce plus LanceDB (jamais livré).
+- **pressDigest éclaté par étape** : digestLlm (plomberie commune),
+  journalAnalysis, detailVerification (anti-invention), globalSynthesis —
+  pressDigest garde l'orchestration et réexporte tout (aucun importeur touché,
+  38 tests inchangés).
+
+Reste à faire : tests composants React (testing-library),
+`cargo clippy -D warnings` en CI après purge des 11 warnings préexistants,
+vérification manuelle end-to-end (`pnpm dev`) : chat 2 conversations,
+permission accordée qui ferme le prompt, ligne FILE_WRITE dans l'audit,
+refus français sur C:\Windows, dashboard, dailys.
+
+---
+
+### État antérieur (2026-07-15)
 
 **Refactoring de fond (2026-07-15)** — audit complet noté 12/20, puis 6 phases
 exécutées (comportement produit inchangé, **557 tests TS verts / 71 fichiers +
@@ -70,12 +105,6 @@ exécutées (comportement produit inchangé, **557 tests TS verts / 71 fichiers 
   `requirements-dev.txt`, le job CI exécute enfin compileall + pytest.
   NB : le `.venv` était endommagé (pip/pywin32/chardet amputés) — réparé via
   `pip --python` ; refaire `scripts/setup.ps1` si d'autres modules manquent.
-
-Reste à faire (plan `.claude/plans/quiet-kindling-sundae.md`) : migration zod
-lots 2-4 (55 outils restants, pattern posé), extraction de méthodes testables
-dans `AgentOrchestrator.process()`, découpage visuel des god components
-(SettingsWindow 527 l., PressFeedsManager), tests composants
-(testing-library), `cargo clippy -D warnings` en CI, découpage pressDigest.
 
 ---
 
