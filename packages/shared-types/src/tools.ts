@@ -1,45 +1,28 @@
 // ─── Tool Schemas (JSON Schema definitions for each tool) ──────
 
+// NB : les outils migrés sur zod (lot 1 : filesystem, system, infra) portent
+// désormais leur schéma dans leur fichier *Tool.ts (source unique) — leurs
+// entrées ont été retirées d'ici.
 export const TOOL_SCHEMAS = {
-  read_file: {
-    type: 'object' as const,
-    required: ['path'],
-    properties: {
-      path: { type: 'string' as const, description: 'Absolute path to the file' },
-      encoding: { type: 'string' as const, enum: ['utf-8', 'base64'], default: 'utf-8' },
-      maxBytes: { type: 'number' as const, description: 'Max bytes to read', maximum: 1_000_000 },
-    },
-  },
-
-  list_directory: {
-    type: 'object' as const,
-    required: ['path'],
-    properties: {
-      path: { type: 'string' as const, description: 'Directory path to list' },
-      recursive: { type: 'boolean' as const, default: false },
-      includeHidden: { type: 'boolean' as const, default: false },
-      filter: { type: 'string' as const, description: 'Glob pattern filter' },
-    },
-  },
-
-  write_file: {
-    type: 'object' as const,
-    required: ['path', 'content'],
-    properties: {
-      path: { type: 'string' as const, description: 'Absolute path to write' },
-      content: { type: 'string' as const, description: 'Content to write' },
-      append: { type: 'boolean' as const, default: false },
-      encoding: { type: 'string' as const, enum: ['utf-8', 'base64'], default: 'utf-8' },
-    },
-  },
-
   parse_document: {
     type: 'object' as const,
     required: ['path'],
     properties: {
-      path: { type: 'string' as const, description: 'Absolute path to a local .pdf, .docx or .csv file. The format is detected from the extension.' },
-      max_pages: { type: 'number' as const, default: 50, description: 'PDF only: maximum number of pages to extract' },
-      max_rows: { type: 'number' as const, default: 1000, description: 'CSV only: maximum number of rows to parse' },
+      path: {
+        type: 'string' as const,
+        description:
+          'Absolute path to a local .pdf, .docx or .csv file. The format is detected from the extension.',
+      },
+      max_pages: {
+        type: 'number' as const,
+        default: 50,
+        description: 'PDF only: maximum number of pages to extract',
+      },
+      max_rows: {
+        type: 'number' as const,
+        default: 1000,
+        description: 'CSV only: maximum number of rows to parse',
+      },
     },
   },
 
@@ -47,11 +30,28 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['path'],
     properties: {
-      path: { type: 'string' as const, description: 'Absolute path to a local .ics (iCalendar) file' },
-      from: { type: 'string' as const, description: 'Window start as YYYY-MM-DD (defaults to today)' },
-      to: { type: 'string' as const, description: 'Window end as YYYY-MM-DD (defaults to from + days)' },
-      days: { type: 'number' as const, default: 30, description: 'Window length in days when "to" is omitted' },
-      limit: { type: 'number' as const, default: 50, description: 'Maximum number of events to return' },
+      path: {
+        type: 'string' as const,
+        description: 'Absolute path to a local .ics (iCalendar) file',
+      },
+      from: {
+        type: 'string' as const,
+        description: 'Window start as YYYY-MM-DD (defaults to today)',
+      },
+      to: {
+        type: 'string' as const,
+        description: 'Window end as YYYY-MM-DD (defaults to from + days)',
+      },
+      days: {
+        type: 'number' as const,
+        default: 30,
+        description: 'Window length in days when "to" is omitted',
+      },
+      limit: {
+        type: 'number' as const,
+        default: 50,
+        description: 'Maximum number of events to return',
+      },
     },
   },
 
@@ -59,10 +59,23 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['content', 'path'],
     properties: {
-      content: { type: 'string' as const, description: 'Markdown or plain text to render into the document' },
-      path: { type: 'string' as const, description: 'Absolute output path. The extension picks the format unless "format" is set.' },
-      format: { type: 'string' as const, enum: ['pdf', 'docx', 'html', 'md'] as const, description: 'Output format. Optional — inferred from the path extension otherwise.' },
-      title: { type: 'string' as const, description: 'Optional document title rendered as a top heading' },
+      content: {
+        type: 'string' as const,
+        description: 'Markdown or plain text to render into the document',
+      },
+      path: {
+        type: 'string' as const,
+        description: 'Absolute output path. The extension picks the format unless "format" is set.',
+      },
+      format: {
+        type: 'string' as const,
+        enum: ['pdf', 'docx', 'html', 'md'] as const,
+        description: 'Output format. Optional — inferred from the path extension otherwise.',
+      },
+      title: {
+        type: 'string' as const,
+        description: 'Optional document title rendered as a top heading',
+      },
     },
   },
 
@@ -70,13 +83,41 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['path'],
     properties: {
-      path: { type: 'string' as const, description: 'Absolute path to a local .csv, .xlsx or .xls file' },
-      operation: { type: 'string' as const, enum: ['profile', 'aggregate'] as const, default: 'profile', description: "'profile' = structure + summary stats + preview; 'aggregate' = group_by + an aggregation" },
-      group_by: { type: 'array' as const, items: { type: 'string' as const }, description: 'aggregate only: one or more column names to group by' },
-      value_column: { type: 'string' as const, description: "aggregate only: numeric column to aggregate (omit when agg='count')" },
-      agg: { type: 'string' as const, enum: ['sum', 'mean', 'median', 'min', 'max', 'count', 'std', 'nunique'] as const, default: 'sum', description: 'aggregate only: aggregation function' },
-      sheet: { type: 'string' as const, description: 'Excel only: sheet name (defaults to the first sheet)' },
-      max_rows: { type: 'number' as const, default: 100000, description: 'Max rows to load into memory' },
+      path: {
+        type: 'string' as const,
+        description: 'Absolute path to a local .csv, .xlsx or .xls file',
+      },
+      operation: {
+        type: 'string' as const,
+        enum: ['profile', 'aggregate'] as const,
+        default: 'profile',
+        description:
+          "'profile' = structure + summary stats + preview; 'aggregate' = group_by + an aggregation",
+      },
+      group_by: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'aggregate only: one or more column names to group by',
+      },
+      value_column: {
+        type: 'string' as const,
+        description: "aggregate only: numeric column to aggregate (omit when agg='count')",
+      },
+      agg: {
+        type: 'string' as const,
+        enum: ['sum', 'mean', 'median', 'min', 'max', 'count', 'std', 'nunique'] as const,
+        default: 'sum',
+        description: 'aggregate only: aggregation function',
+      },
+      sheet: {
+        type: 'string' as const,
+        description: 'Excel only: sheet name (defaults to the first sheet)',
+      },
+      max_rows: {
+        type: 'number' as const,
+        default: 100000,
+        description: 'Max rows to load into memory',
+      },
     },
   },
 
@@ -109,7 +150,11 @@ export const TOOL_SCHEMAS = {
         },
       },
       fullScreen: { type: 'boolean' as const, default: false },
-      language: { type: 'string' as const, default: 'fra+eng', description: 'Tesseract language codes' },
+      language: {
+        type: 'string' as const,
+        default: 'fra+eng',
+        description: 'Tesseract language codes',
+      },
     },
   },
 
@@ -133,93 +178,6 @@ export const TOOL_SCHEMAS = {
     },
   },
 
-  docker_ps: {
-    type: 'object' as const,
-    properties: {
-      all: { type: 'boolean' as const, default: false, description: 'Include stopped containers (docker ps -a)' },
-      logs_for: { type: 'string' as const, description: 'Also fetch recent logs for this container name/id (optional)' },
-      tail: { type: 'number' as const, default: 50, description: 'Number of log lines when logs_for is set' },
-    },
-  },
-
-  docker_control: {
-    type: 'object' as const,
-    required: ['action'],
-    properties: {
-      action: { type: 'string' as const, enum: ['start', 'stop', 'restart', 'up', 'down'] as const, description: 'start/stop/restart a container, or compose up/down a project' },
-      target: { type: 'string' as const, description: 'Container name/id (start/stop/restart) or compose file path (up/down, defaults to ./docker-compose.yml)' },
-      workdir: { type: 'string' as const, description: 'Working directory for compose commands (defaults to current directory)' },
-    },
-  },
-
-  run_sqlite: {
-    type: 'object' as const,
-    required: ['db_path', 'query'],
-    properties: {
-      db_path: { type: 'string' as const, description: 'Path to the SQLite database file' },
-      query: { type: 'string' as const, description: 'SQL to execute' },
-      read_only: { type: 'boolean' as const, default: true, description: 'Reject anything but SELECT/PRAGMA/EXPLAIN when true' },
-    },
-  },
-
-  query_database: {
-    type: 'object' as const,
-    required: ['query'],
-    properties: {
-      query: { type: 'string' as const, description: 'SQL to execute. Read-only by default: only single-statement SELECT/WITH/EXPLAIN/SHOW are allowed.' },
-      dialect: { type: 'string' as const, enum: ['postgres', 'mysql'] as const, description: "Database engine. Optional if the connection string scheme makes it clear (postgres:// / mysql://)." },
-      connection_string: { type: 'string' as const, description: 'DSN, e.g. postgres://user:pass@host:5432/db or mysql://user:pass@host:3306/db. Falls back to PG_URL/MYSQL_URL/DATABASE_URL env vars.' },
-      read_only: { type: 'boolean' as const, default: true, description: 'Reject writes (guard + DB-level READ ONLY transaction). Set false to allow writes.' },
-      max_rows: { type: 'number' as const, default: 1000, description: 'Maximum number of rows to return' },
-      timeout_ms: { type: 'number' as const, default: 15000, maximum: 60000, description: 'Query/connection timeout in milliseconds' },
-    },
-  },
-
-  audit_env: {
-    type: 'object' as const,
-    properties: {
-      workdir: { type: 'string' as const, description: 'Project root containing the env files (defaults to current directory)' },
-      env_file: { type: 'string' as const, default: '.env', description: 'Env file to audit, relative to workdir' },
-      example_file: { type: 'string' as const, default: '.env.example', description: 'Template file to compare against, relative to workdir' },
-    },
-  },
-
-  inspect_port: {
-    type: 'object' as const,
-    properties: {
-      port: { type: 'number' as const, description: 'TCP port to inspect (optional — lists all listening ports if omitted)' },
-    },
-  },
-
-  kill_process: {
-    type: 'object' as const,
-    required: ['pid'],
-    properties: {
-      pid: { type: 'number' as const, description: 'Process ID to terminate' },
-      force: { type: 'boolean' as const, default: false, description: 'Force kill (taskkill /F) instead of a graceful stop' },
-    },
-  },
-
-  run_command: {
-    type: 'object' as const,
-    required: ['command'],
-    properties: {
-      command: { type: 'string' as const, description: 'The command to execute' },
-      shell: { type: 'string' as const, enum: ['powershell', 'cmd'], default: 'powershell' },
-      workdir: { type: 'string' as const, description: 'Working directory' },
-      timeoutMs: { type: 'number' as const, default: 30000, maximum: 120000 },
-    },
-  },
-
-  open_app: {
-    type: 'object' as const,
-    required: ['name'],
-    properties: {
-      name: { type: 'string' as const, description: 'Application name or executable path' },
-      args: { type: 'string' as const, description: 'Command line arguments' },
-    },
-  },
-
   read_clipboard: {
     type: 'object' as const,
     properties: {},
@@ -238,7 +196,11 @@ export const TOOL_SCHEMAS = {
     required: ['content'],
     properties: {
       content: { type: 'string' as const, description: 'Information to store in memory' },
-      tags: { type: 'array' as const, items: { type: 'string' as const }, description: 'Tags for retrieval' },
+      tags: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Tags for retrieval',
+      },
     },
   },
 
@@ -256,8 +218,14 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['stacktrace'],
     properties: {
-      stacktrace: { type: 'string' as const, description: 'The stacktrace or error output to analyze' },
-      context: { type: 'string' as const, description: 'Optional context about what was happening when the error occurred' },
+      stacktrace: {
+        type: 'string' as const,
+        description: 'The stacktrace or error output to analyze',
+      },
+      context: {
+        type: 'string' as const,
+        description: 'Optional context about what was happening when the error occurred',
+      },
     },
   },
 
@@ -266,25 +234,51 @@ export const TOOL_SCHEMAS = {
     required: ['path'],
     properties: {
       path: { type: 'string' as const, description: 'Absolute path to a local log file' },
-      max_lines: { type: 'number' as const, default: 5000, maximum: 100000, description: 'Analyze only the last N lines' },
-      pattern: { type: 'string' as const, description: 'Keep only lines containing this text (case-insensitive) before analyzing' },
-      top_errors: { type: 'number' as const, default: 10, description: 'Number of grouped error clusters to return' },
+      max_lines: {
+        type: 'number' as const,
+        default: 5000,
+        maximum: 100000,
+        description: 'Analyze only the last N lines',
+      },
+      pattern: {
+        type: 'string' as const,
+        description: 'Keep only lines containing this text (case-insensitive) before analyzing',
+      },
+      top_errors: {
+        type: 'number' as const,
+        default: 10,
+        description: 'Number of grouped error clusters to return',
+      },
     },
   },
 
   generate_commit_message: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      staged_only: { type: 'boolean' as const, default: true, description: 'Use only staged diff (true) or full working tree diff (false)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      staged_only: {
+        type: 'boolean' as const,
+        default: true,
+        description: 'Use only staged diff (true) or full working tree diff (false)',
+      },
     },
   },
 
   generate_pr_description: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      base_branch: { type: 'string' as const, default: 'main', description: 'Base branch to compare against' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      base_branch: {
+        type: 'string' as const,
+        default: 'main',
+        description: 'Base branch to compare against',
+      },
     },
   },
 
@@ -292,9 +286,20 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['path'],
     properties: {
-      path: { type: 'string' as const, description: 'Absolute path to the source file to generate tests for' },
-      framework: { type: 'string' as const, enum: ['auto', 'vitest', 'jest', 'pytest', 'cargo', 'go'] as const, default: 'auto', description: 'Test framework to target — "auto" detects from the project' },
-      symbol: { type: 'string' as const, description: 'Only scaffold tests for this exported function/class (optional)' },
+      path: {
+        type: 'string' as const,
+        description: 'Absolute path to the source file to generate tests for',
+      },
+      framework: {
+        type: 'string' as const,
+        enum: ['auto', 'vitest', 'jest', 'pytest', 'cargo', 'go'] as const,
+        default: 'auto',
+        description: 'Test framework to target — "auto" detects from the project',
+      },
+      symbol: {
+        type: 'string' as const,
+        description: 'Only scaffold tests for this exported function/class (optional)',
+      },
     },
   },
 
@@ -302,25 +307,50 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['path'],
     properties: {
-      path: { type: 'string' as const, description: 'Absolute path to the source file to analyze for refactoring opportunities' },
-      max_findings: { type: 'number' as const, default: 12, description: 'Max number of refactoring findings to return' },
+      path: {
+        type: 'string' as const,
+        description: 'Absolute path to the source file to analyze for refactoring opportunities',
+      },
+      max_findings: {
+        type: 'number' as const,
+        default: 12,
+        description: 'Max number of refactoring findings to return',
+      },
     },
   },
 
   review_diff: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      base_branch: { type: 'string' as const, description: 'Review committed changes vs this branch (e.g. "main"). If omitted, reviews uncommitted working-tree changes' },
-      staged_only: { type: 'boolean' as const, default: false, description: 'When reviewing the working tree, look only at staged changes' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      base_branch: {
+        type: 'string' as const,
+        description:
+          'Review committed changes vs this branch (e.g. "main"). If omitted, reviews uncommitted working-tree changes',
+      },
+      staged_only: {
+        type: 'boolean' as const,
+        default: false,
+        description: 'When reviewing the working tree, look only at staged changes',
+      },
     },
   },
 
   analyze_dependencies: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Project root containing package.json / Cargo.toml / requirements.txt (defaults to current directory)' },
-      manifest: { type: 'string' as const, description: 'Specific manifest file to analyze (optional, auto-detected otherwise)' },
+      workdir: {
+        type: 'string' as const,
+        description:
+          'Project root containing package.json / Cargo.toml / requirements.txt (defaults to current directory)',
+      },
+      manifest: {
+        type: 'string' as const,
+        description: 'Specific manifest file to analyze (optional, auto-detected otherwise)',
+      },
     },
   },
 
@@ -328,10 +358,23 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['repo'],
     properties: {
-      repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format (e.g. "alexis/catdesk")' },
-      branch: { type: 'string' as const, description: 'Branch to watch (defaults to current git branch)' },
-      token: { type: 'string' as const, description: 'GitHub personal access token (falls back to GITHUB_TOKEN env var)' },
-      limit: { type: 'number' as const, default: 5, description: 'Number of recent workflow runs to fetch' },
+      repo: {
+        type: 'string' as const,
+        description: 'GitHub repo in "owner/name" format (e.g. "alexis/catdesk")',
+      },
+      branch: {
+        type: 'string' as const,
+        description: 'Branch to watch (defaults to current git branch)',
+      },
+      token: {
+        type: 'string' as const,
+        description: 'GitHub personal access token (falls back to GITHUB_TOKEN env var)',
+      },
+      limit: {
+        type: 'number' as const,
+        default: 5,
+        description: 'Number of recent workflow runs to fetch',
+      },
     },
   },
 
@@ -339,11 +382,28 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['good'],
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      good: { type: 'string' as const, description: 'Last known-good commit/ref (where the bug is absent)' },
-      bad: { type: 'string' as const, default: 'HEAD', description: 'Known-bad commit/ref (where the bug is present)' },
-      path: { type: 'string' as const, description: 'Limit the suspect range to commits touching this file/dir (optional)' },
-      test_command: { type: 'string' as const, description: 'Command that exits 0 when good, non-zero when bad — enables a `git bisect run` one-liner (optional)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      good: {
+        type: 'string' as const,
+        description: 'Last known-good commit/ref (where the bug is absent)',
+      },
+      bad: {
+        type: 'string' as const,
+        default: 'HEAD',
+        description: 'Known-bad commit/ref (where the bug is present)',
+      },
+      path: {
+        type: 'string' as const,
+        description: 'Limit the suspect range to commits touching this file/dir (optional)',
+      },
+      test_command: {
+        type: 'string' as const,
+        description:
+          'Command that exits 0 when good, non-zero when bad — enables a `git bisect run` one-liner (optional)',
+      },
     },
   },
 
@@ -359,32 +419,68 @@ export const TOOL_SCHEMAS = {
           required: ['at', 'signature'],
           properties: {
             at: { type: 'string' as const, description: 'ISO timestamp or epoch ms of the event' },
-            kind: { type: 'string' as const, description: 'Event kind, e.g. "edit", "run", "test_fail", "error" (optional)' },
-            signature: { type: 'string' as const, description: 'What the event is about — same file path, error message, or task. Repetition of this is the spiral signal.' },
+            kind: {
+              type: 'string' as const,
+              description: 'Event kind, e.g. "edit", "run", "test_fail", "error" (optional)',
+            },
+            signature: {
+              type: 'string' as const,
+              description:
+                'What the event is about — same file path, error message, or task. Repetition of this is the spiral signal.',
+            },
           },
         },
       },
-      threshold_minutes: { type: 'number' as const, default: 45, description: 'Minutes on the same signature before flagging a spiral' },
+      threshold_minutes: {
+        type: 'number' as const,
+        default: 45,
+        description: 'Minutes on the same signature before flagging a spiral',
+      },
     },
   },
 
   generate_standup: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      since: { type: 'string' as const, default: '1 day ago', description: 'How far back "yesterday" reaches' },
-      author: { type: 'string' as const, description: 'Filter to one author (defaults to the git user)' },
-      blockers: { type: 'string' as const, description: 'Free-text blockers to include (optional)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      since: {
+        type: 'string' as const,
+        default: '1 day ago',
+        description: 'How far back "yesterday" reaches',
+      },
+      author: {
+        type: 'string' as const,
+        description: 'Filter to one author (defaults to the git user)',
+      },
+      blockers: {
+        type: 'string' as const,
+        description: 'Free-text blockers to include (optional)',
+      },
     },
   },
 
   summarize_git_log: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      since: { type: 'string' as const, description: 'Time window, e.g. "1 week ago", "2024-01-01" (optional)' },
-      path: { type: 'string' as const, description: 'Limit to commits touching this file or directory (optional)' },
-      author: { type: 'string' as const, description: 'Filter by author name/email substring (optional)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      since: {
+        type: 'string' as const,
+        description: 'Time window, e.g. "1 week ago", "2024-01-01" (optional)',
+      },
+      path: {
+        type: 'string' as const,
+        description: 'Limit to commits touching this file or directory (optional)',
+      },
+      author: {
+        type: 'string' as const,
+        description: 'Filter by author name/email substring (optional)',
+      },
       max: { type: 'number' as const, default: 100, description: 'Max commits to analyze' },
     },
   },
@@ -392,23 +488,40 @@ export const TOOL_SCHEMAS = {
   resolve_conflicts: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Git repo root (defaults to current directory)' },
-      path: { type: 'string' as const, description: 'Analyze only this conflicted file (optional, defaults to all)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Git repo root (defaults to current directory)',
+      },
+      path: {
+        type: 'string' as const,
+        description: 'Analyze only this conflicted file (optional, defaults to all)',
+      },
     },
   },
 
   load_project_context: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Project root to profile (defaults to current directory)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Project root to profile (defaults to current directory)',
+      },
     },
   },
 
   analyze_code_style: {
     type: 'object' as const,
     properties: {
-      workdir: { type: 'string' as const, description: 'Directory to sample source files from (defaults to current directory)' },
-      extensions: { type: 'array' as const, items: { type: 'string' as const }, description: 'File extensions to sample, e.g. [".ts", ".py"] (defaults to common code types)' },
+      workdir: {
+        type: 'string' as const,
+        description: 'Directory to sample source files from (defaults to current directory)',
+      },
+      extensions: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description:
+          'File extensions to sample, e.g. [".ts", ".py"] (defaults to common code types)',
+      },
       max_files: { type: 'number' as const, default: 40, description: 'Max files to sample' },
     },
   },
@@ -418,21 +531,51 @@ export const TOOL_SCHEMAS = {
     required: ['query'],
     properties: {
       query: { type: 'string' as const, description: 'What to search for in local files' },
-      paths: { type: 'array' as const, items: { type: 'string' as const }, description: 'Directories to search (defaults to current working directory)' },
-      extensions: { type: 'array' as const, items: { type: 'string' as const }, description: 'File extensions to include, e.g. [".ts", ".md"] (defaults to common text/code types)' },
+      paths: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Directories to search (defaults to current working directory)',
+      },
+      extensions: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description:
+          'File extensions to include, e.g. [".ts", ".md"] (defaults to common text/code types)',
+      },
       limit: { type: 'number' as const, default: 10, description: 'Max results to return' },
-      max_file_size: { type: 'number' as const, default: 500000, description: 'Skip files larger than this size in bytes' },
+      max_file_size: {
+        type: 'number' as const,
+        default: 500000,
+        description: 'Skip files larger than this size in bytes',
+      },
     },
   },
 
   obsidian_notes: {
     type: 'object' as const,
     properties: {
-      vault: { type: 'string' as const, description: 'Path to the Obsidian vault folder (falls back to OBSIDIAN_VAULT env var)' },
-      query: { type: 'string' as const, description: 'Text to search across note titles and content (optional)' },
-      note: { type: 'string' as const, description: 'Read a specific note in full by relative path or title (optional)' },
-      tag: { type: 'string' as const, description: 'Filter to notes carrying this tag (frontmatter or #inline), without the leading #' },
-      limit: { type: 'number' as const, default: 15, description: 'Max notes to return when searching' },
+      vault: {
+        type: 'string' as const,
+        description: 'Path to the Obsidian vault folder (falls back to OBSIDIAN_VAULT env var)',
+      },
+      query: {
+        type: 'string' as const,
+        description: 'Text to search across note titles and content (optional)',
+      },
+      note: {
+        type: 'string' as const,
+        description: 'Read a specific note in full by relative path or title (optional)',
+      },
+      tag: {
+        type: 'string' as const,
+        description:
+          'Filter to notes carrying this tag (frontmatter or #inline), without the leading #',
+      },
+      limit: {
+        type: 'number' as const,
+        default: 15,
+        description: 'Max notes to return when searching',
+      },
     },
   },
 
@@ -440,12 +583,36 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['url'],
     properties: {
-      url: { type: 'string' as const, description: 'Full URL. https:// anywhere, or http:// only for localhost/127.0.0.1 (local MCP/API servers)' },
-      method: { type: 'string' as const, enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const, default: 'GET', description: 'HTTP method' },
-      headers: { type: 'object' as const, description: 'Extra request headers as a string→string map (optional)' },
-      body: { type: 'string' as const, description: 'Request body for POST/PUT/PATCH. JSON string unless a Content-Type header says otherwise (optional)' },
-      token: { type: 'string' as const, description: 'Bearer token added as Authorization header (optional)' },
-      timeout_ms: { type: 'number' as const, default: 15000, maximum: 60000, description: 'Request timeout' },
+      url: {
+        type: 'string' as const,
+        description:
+          'Full URL. https:// anywhere, or http:// only for localhost/127.0.0.1 (local MCP/API servers)',
+      },
+      method: {
+        type: 'string' as const,
+        enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const,
+        default: 'GET',
+        description: 'HTTP method',
+      },
+      headers: {
+        type: 'object' as const,
+        description: 'Extra request headers as a string→string map (optional)',
+      },
+      body: {
+        type: 'string' as const,
+        description:
+          'Request body for POST/PUT/PATCH. JSON string unless a Content-Type header says otherwise (optional)',
+      },
+      token: {
+        type: 'string' as const,
+        description: 'Bearer token added as Authorization header (optional)',
+      },
+      timeout_ms: {
+        type: 'number' as const,
+        default: 15000,
+        maximum: 60000,
+        description: 'Request timeout',
+      },
     },
   },
 
@@ -454,19 +621,46 @@ export const TOOL_SCHEMAS = {
     required: ['message'],
     properties: {
       message: { type: 'string' as const, description: 'Message text to post to the channel' },
-      platform: { type: 'string' as const, enum: ['discord', 'slack'] as const, default: 'discord', description: 'Which incoming-webhook format to use' },
-      webhook_url: { type: 'string' as const, description: 'Incoming webhook URL (falls back to DISCORD_WEBHOOK_URL / SLACK_WEBHOOK_URL by platform)' },
-      username: { type: 'string' as const, description: 'Override the displayed sender name (Discord only)' },
+      platform: {
+        type: 'string' as const,
+        enum: ['discord', 'slack'] as const,
+        default: 'discord',
+        description: 'Which incoming-webhook format to use',
+      },
+      webhook_url: {
+        type: 'string' as const,
+        description:
+          'Incoming webhook URL (falls back to DISCORD_WEBHOOK_URL / SLACK_WEBHOOK_URL by platform)',
+      },
+      username: {
+        type: 'string' as const,
+        description: 'Override the displayed sender name (Discord only)',
+      },
     },
   },
 
   notion_search: {
     type: 'object' as const,
     properties: {
-      query: { type: 'string' as const, description: 'Text to search across Notion pages and databases (empty returns recently edited)' },
-      token: { type: 'string' as const, description: 'Notion integration token (falls back to NOTION_TOKEN env var)' },
-      page_id: { type: 'string' as const, description: 'Read a specific page\'s text content instead of searching (optional)' },
-      filter: { type: 'string' as const, enum: ['page', 'database', 'all'] as const, default: 'all', description: 'Restrict results to pages, databases, or both' },
+      query: {
+        type: 'string' as const,
+        description:
+          'Text to search across Notion pages and databases (empty returns recently edited)',
+      },
+      token: {
+        type: 'string' as const,
+        description: 'Notion integration token (falls back to NOTION_TOKEN env var)',
+      },
+      page_id: {
+        type: 'string' as const,
+        description: "Read a specific page's text content instead of searching (optional)",
+      },
+      filter: {
+        type: 'string' as const,
+        enum: ['page', 'database', 'all'] as const,
+        default: 'all',
+        description: 'Restrict results to pages, databases, or both',
+      },
       limit: { type: 'number' as const, default: 15, description: 'Max results to return' },
     },
   },
@@ -476,25 +670,63 @@ export const TOOL_SCHEMAS = {
     required: ['url'],
     properties: {
       url: { type: 'string' as const, description: 'URL to fetch and extract text from' },
-      selector: { type: 'string' as const, description: 'CSS selector to extract specific element (optional)' },
-      max_chars: { type: 'number' as const, default: 20000, description: 'Max characters of extracted text to return' },
+      selector: {
+        type: 'string' as const,
+        description: 'CSS selector to extract specific element (optional)',
+      },
+      max_chars: {
+        type: 'number' as const,
+        default: 20000,
+        description: 'Max characters of extracted text to return',
+      },
     },
   },
 
   read_email: {
     type: 'object' as const,
     properties: {
-      host: { type: 'string' as const, description: 'IMAP server host (falls back to IMAP_HOST env)' },
-      port: { type: 'number' as const, default: 993, description: 'IMAP port (993 TLS, 143 STARTTLS)' },
-      secure: { type: 'boolean' as const, description: 'Use TLS. Defaults to true unless port is 143.' },
-      user: { type: 'string' as const, description: 'Account username (falls back to IMAP_USER env)' },
-      password: { type: 'string' as const, description: 'Account password/app-password (falls back to IMAP_PASSWORD env)' },
+      host: {
+        type: 'string' as const,
+        description: 'IMAP server host (falls back to IMAP_HOST env)',
+      },
+      port: {
+        type: 'number' as const,
+        default: 993,
+        description: 'IMAP port (993 TLS, 143 STARTTLS)',
+      },
+      secure: {
+        type: 'boolean' as const,
+        description: 'Use TLS. Defaults to true unless port is 143.',
+      },
+      user: {
+        type: 'string' as const,
+        description: 'Account username (falls back to IMAP_USER env)',
+      },
+      password: {
+        type: 'string' as const,
+        description: 'Account password/app-password (falls back to IMAP_PASSWORD env)',
+      },
       mailbox: { type: 'string' as const, default: 'INBOX', description: 'Mailbox/folder to open' },
-      limit: { type: 'number' as const, default: 20, maximum: 100, description: 'Max messages to list' },
-      unseen_only: { type: 'boolean' as const, default: false, description: 'List only unread messages' },
-      since: { type: 'string' as const, description: 'Only messages on/after this date (YYYY-MM-DD)' },
+      limit: {
+        type: 'number' as const,
+        default: 20,
+        maximum: 100,
+        description: 'Max messages to list',
+      },
+      unseen_only: {
+        type: 'boolean' as const,
+        default: false,
+        description: 'List only unread messages',
+      },
+      since: {
+        type: 'string' as const,
+        description: 'Only messages on/after this date (YYYY-MM-DD)',
+      },
       search: { type: 'string' as const, description: 'Match text in subject or sender' },
-      fetch_uid: { type: 'number' as const, description: 'Instead of listing, download and extract the text of this message UID' },
+      fetch_uid: {
+        type: 'number' as const,
+        description: 'Instead of listing, download and extract the text of this message UID',
+      },
     },
   },
 
@@ -504,21 +736,37 @@ export const TOOL_SCHEMAS = {
       sources: {
         type: 'array' as const,
         items: { type: 'string' as const },
-        description: 'Source ids to query (defaults to a balanced mix). Available: hackernews, devto, theverge, arstechnica, techcrunch, hackernoon, numerama, nextinpact, lesnumeriques',
+        description:
+          'Source ids to query (defaults to a balanced mix). Available: hackernews, devto, theverge, arstechnica, techcrunch, hackernoon, numerama, nextinpact, lesnumeriques',
       },
       feeds: {
         type: 'array' as const,
         items: { type: 'string' as const },
-        description: 'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]. Added on top of (or instead of) the predefined sources',
+        description:
+          'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]. Added on top of (or instead of) the predefined sources',
       },
       topics: {
         type: 'array' as const,
         items: { type: 'string' as const },
-        description: 'Keywords to filter by (matches title or excerpt), e.g. ["AI", "rust", "react"] (optional — no filter if omitted)',
+        description:
+          'Keywords to filter by (matches title or excerpt), e.g. ["AI", "rust", "react"] (optional — no filter if omitted)',
       },
-      since_hours: { type: 'number' as const, default: 24, description: 'Only keep articles published within this many hours (0 = no limit)' },
-      limit: { type: 'number' as const, default: 15, description: 'Max number of articles to return (1-50)' },
-      lang: { type: 'string' as const, enum: ['fr', 'en', 'all'] as const, default: 'all', description: 'Restrict predefined sources to a language (custom feeds are always included)' },
+      since_hours: {
+        type: 'number' as const,
+        default: 24,
+        description: 'Only keep articles published within this many hours (0 = no limit)',
+      },
+      limit: {
+        type: 'number' as const,
+        default: 15,
+        description: 'Max number of articles to return (1-50)',
+      },
+      lang: {
+        type: 'string' as const,
+        enum: ['fr', 'en', 'all'] as const,
+        default: 'all',
+        description: 'Restrict predefined sources to a language (custom feeds are always included)',
+      },
     },
   },
 
@@ -533,19 +781,43 @@ export const TOOL_SCHEMAS = {
       feeds: {
         type: 'array' as const,
         items: { type: 'string' as const },
-        description: 'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]',
+        description:
+          'Custom RSS/Atom feed URLs to include, e.g. ["https://blog.rust-lang.org/feed.xml"]',
       },
       topics: {
         type: 'array' as const,
         items: { type: 'string' as const },
         description: 'Keywords to filter by (matches title or excerpt) (optional)',
       },
-      since_hours: { type: 'number' as const, default: 24, description: 'Only keep articles published within this many hours (0 = no limit)' },
-      limit: { type: 'number' as const, default: 8, description: 'Number of articles to post as Discord embeds (1-10)' },
-      lang: { type: 'string' as const, enum: ['fr', 'en', 'all'] as const, default: 'all', description: 'Restrict sources to a language' },
-      intro: { type: 'string' as const, description: 'Short intro line posted above the articles (optional — a default header is used otherwise)' },
-      webhook_url: { type: 'string' as const, description: 'Discord incoming webhook URL (falls back to DISCORD_WEBHOOK_URL env var)' },
-      username: { type: 'string' as const, description: 'Override the displayed sender name (optional)' },
+      since_hours: {
+        type: 'number' as const,
+        default: 24,
+        description: 'Only keep articles published within this many hours (0 = no limit)',
+      },
+      limit: {
+        type: 'number' as const,
+        default: 8,
+        description: 'Number of articles to post as Discord embeds (1-10)',
+      },
+      lang: {
+        type: 'string' as const,
+        enum: ['fr', 'en', 'all'] as const,
+        default: 'all',
+        description: 'Restrict sources to a language',
+      },
+      intro: {
+        type: 'string' as const,
+        description:
+          'Short intro line posted above the articles (optional — a default header is used otherwise)',
+      },
+      webhook_url: {
+        type: 'string' as const,
+        description: 'Discord incoming webhook URL (falls back to DISCORD_WEBHOOK_URL env var)',
+      },
+      username: {
+        type: 'string' as const,
+        description: 'Override the displayed sender name (optional)',
+      },
     },
   },
 
@@ -554,11 +826,26 @@ export const TOOL_SCHEMAS = {
     required: ['repo'],
     properties: {
       repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format' },
-      token: { type: 'string' as const, description: 'GitHub PAT (falls back to GITHUB_TOKEN env var)' },
-      state: { type: 'string' as const, enum: ['open', 'closed', 'all'] as const, default: 'open', description: 'Issue state filter' },
+      token: {
+        type: 'string' as const,
+        description: 'GitHub PAT (falls back to GITHUB_TOKEN env var)',
+      },
+      state: {
+        type: 'string' as const,
+        enum: ['open', 'closed', 'all'] as const,
+        default: 'open',
+        description: 'Issue state filter',
+      },
       labels: { type: 'string' as const, description: 'Comma-separated labels to filter by' },
-      search: { type: 'string' as const, description: 'Text search query (searches title and body)' },
-      limit: { type: 'number' as const, default: 20, description: 'Max number of issues to return' },
+      search: {
+        type: 'string' as const,
+        description: 'Text search query (searches title and body)',
+      },
+      limit: {
+        type: 'number' as const,
+        default: 20,
+        description: 'Max number of issues to return',
+      },
     },
   },
 
@@ -566,9 +853,20 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['task'],
     properties: {
-      task: { type: 'string' as const, description: 'Task description for the sub-agent to complete autonomously' },
-      context: { type: 'string' as const, description: 'Curated background the sub-agent needs (relevant facts, file paths, prior findings) — pass exactly what it needs to act, not your whole conversation. The sub-agent starts fresh and only sees this.' },
-      max_iterations: { type: 'number' as const, default: 5, description: 'Max ReAct iterations for the sub-agent (1-8)' },
+      task: {
+        type: 'string' as const,
+        description: 'Task description for the sub-agent to complete autonomously',
+      },
+      context: {
+        type: 'string' as const,
+        description:
+          'Curated background the sub-agent needs (relevant facts, file paths, prior findings) — pass exactly what it needs to act, not your whole conversation. The sub-agent starts fresh and only sees this.',
+      },
+      max_iterations: {
+        type: 'number' as const,
+        default: 5,
+        description: 'Max ReAct iterations for the sub-agent (1-8)',
+      },
     },
   },
 
@@ -576,8 +874,16 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['tasks'],
     properties: {
-      tasks: { type: 'array' as const, items: { type: 'string' as const }, description: 'Independent task descriptions to execute simultaneously (max 8)' },
-      max_iterations: { type: 'number' as const, default: 5, description: 'Max ReAct iterations per sub-agent' },
+      tasks: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+        description: 'Independent task descriptions to execute simultaneously (max 8)',
+      },
+      max_iterations: {
+        type: 'number' as const,
+        default: 5,
+        description: 'Max ReAct iterations per sub-agent',
+      },
     },
   },
 
@@ -585,10 +891,27 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['path'],
     properties: {
-      path: { type: 'string' as const, description: 'Absolute path to the audio file (mp3, wav, m4a, mp4, webm, ogg, flac, opus)' },
-      model: { type: 'string' as const, enum: ['tiny', 'base', 'small', 'medium', 'large-v3'] as const, default: 'base', description: 'Whisper model size — tiny/base: fast; small/medium: accurate; large-v3: best quality' },
-      language: { type: 'string' as const, description: 'Language code (e.g. "fr", "en") — auto-detected if omitted' },
-      task: { type: 'string' as const, enum: ['transcribe', 'translate'] as const, default: 'transcribe', description: '"transcribe" keeps original language, "translate" converts to English' },
+      path: {
+        type: 'string' as const,
+        description: 'Absolute path to the audio file (mp3, wav, m4a, mp4, webm, ogg, flac, opus)',
+      },
+      model: {
+        type: 'string' as const,
+        enum: ['tiny', 'base', 'small', 'medium', 'large-v3'] as const,
+        default: 'base',
+        description:
+          'Whisper model size — tiny/base: fast; small/medium: accurate; large-v3: best quality',
+      },
+      language: {
+        type: 'string' as const,
+        description: 'Language code (e.g. "fr", "en") — auto-detected if omitted',
+      },
+      task: {
+        type: 'string' as const,
+        enum: ['transcribe', 'translate'] as const,
+        default: 'transcribe',
+        description: '"transcribe" keeps original language, "translate" converts to English',
+      },
     },
   },
 
@@ -598,9 +921,20 @@ export const TOOL_SCHEMAS = {
     properties: {
       repo: { type: 'string' as const, description: 'GitHub repo in "owner/name" format' },
       pr_number: { type: 'number' as const, description: 'Pull request number' },
-      token: { type: 'string' as const, description: 'GitHub PAT (falls back to GITHUB_TOKEN env var)' },
-      include_diff: { type: 'boolean' as const, default: false, description: 'Include the full unified diff (can be large)' },
-      include_comments: { type: 'boolean' as const, default: true, description: 'Include review comments and PR comments' },
+      token: {
+        type: 'string' as const,
+        description: 'GitHub PAT (falls back to GITHUB_TOKEN env var)',
+      },
+      include_diff: {
+        type: 'boolean' as const,
+        default: false,
+        description: 'Include the full unified diff (can be large)',
+      },
+      include_comments: {
+        type: 'boolean' as const,
+        default: true,
+        description: 'Include review comments and PR comments',
+      },
     },
   },
 
@@ -608,10 +942,24 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['task', 'schedule'],
     properties: {
-      task: { type: 'string' as const, description: 'Agent task description to run on a recurring schedule (natural language)' },
-      schedule: { type: 'string' as const, description: 'When to run: "every 5m", "every 30m", "every 1h", "every 6h", "every 1d", "hourly", "daily", "weekly"' },
-      name: { type: 'string' as const, description: 'Human-readable label for this job (optional, defaults to truncated task)' },
-      enabled: { type: 'boolean' as const, default: true, description: 'Whether the job starts active (default: true)' },
+      task: {
+        type: 'string' as const,
+        description: 'Agent task description to run on a recurring schedule (natural language)',
+      },
+      schedule: {
+        type: 'string' as const,
+        description:
+          'When to run: "every 5m", "every 30m", "every 1h", "every 6h", "every 1d", "hourly", "daily", "weekly"',
+      },
+      name: {
+        type: 'string' as const,
+        description: 'Human-readable label for this job (optional, defaults to truncated task)',
+      },
+      enabled: {
+        type: 'boolean' as const,
+        default: true,
+        description: 'Whether the job starts active (default: true)',
+      },
     },
   },
 
@@ -624,7 +972,10 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['id'],
     properties: {
-      id: { type: 'string' as const, description: 'Job ID to cancel — get IDs from list_scheduled_tasks' },
+      id: {
+        type: 'string' as const,
+        description: 'Job ID to cancel — get IDs from list_scheduled_tasks',
+      },
     },
   },
 
@@ -632,25 +983,52 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['url'],
     properties: {
-      url: { type: 'string' as const, description: 'URL to navigate to (must start with http:// or https://)' },
-      wait_until: { type: 'string' as const, enum: ['load', 'domcontentloaded', 'networkidle'] as const, default: 'domcontentloaded', description: 'When to consider navigation complete' },
-      timeout_ms: { type: 'number' as const, default: 30000, description: 'Navigation timeout in milliseconds' },
+      url: {
+        type: 'string' as const,
+        description: 'URL to navigate to (must start with http:// or https://)',
+      },
+      wait_until: {
+        type: 'string' as const,
+        enum: ['load', 'domcontentloaded', 'networkidle'] as const,
+        default: 'domcontentloaded',
+        description: 'When to consider navigation complete',
+      },
+      timeout_ms: {
+        type: 'number' as const,
+        default: 30000,
+        description: 'Navigation timeout in milliseconds',
+      },
     },
   },
 
   browser_screenshot: {
     type: 'object' as const,
     properties: {
-      full_page: { type: 'boolean' as const, default: false, description: 'Capture entire scrollable page (default: visible viewport only)' },
-      selector: { type: 'string' as const, description: 'CSS selector of element to screenshot (optional)' },
+      full_page: {
+        type: 'boolean' as const,
+        default: false,
+        description: 'Capture entire scrollable page (default: visible viewport only)',
+      },
+      selector: {
+        type: 'string' as const,
+        description: 'CSS selector of element to screenshot (optional)',
+      },
     },
   },
 
   browser_get_text: {
     type: 'object' as const,
     properties: {
-      selector: { type: 'string' as const, description: 'CSS selector to extract text from a specific element (optional, defaults to full page)' },
-      max_chars: { type: 'number' as const, default: 20000, description: 'Max characters to return' },
+      selector: {
+        type: 'string' as const,
+        description:
+          'CSS selector to extract text from a specific element (optional, defaults to full page)',
+      },
+      max_chars: {
+        type: 'number' as const,
+        default: 20000,
+        description: 'Max characters to return',
+      },
     },
   },
 
@@ -658,8 +1036,15 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['selector'],
     properties: {
-      selector: { type: 'string' as const, description: 'CSS selector or text="…" locator of the element to click' },
-      timeout_ms: { type: 'number' as const, default: 10000, description: 'Max time to wait for element to be clickable' },
+      selector: {
+        type: 'string' as const,
+        description: 'CSS selector or text="…" locator of the element to click',
+      },
+      timeout_ms: {
+        type: 'number' as const,
+        default: 10000,
+        description: 'Max time to wait for element to be clickable',
+      },
     },
   },
 
@@ -667,10 +1052,21 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['selector', 'text'],
     properties: {
-      selector: { type: 'string' as const, description: 'CSS selector of the input/textarea to fill' },
+      selector: {
+        type: 'string' as const,
+        description: 'CSS selector of the input/textarea to fill',
+      },
       text: { type: 'string' as const, description: 'Text to type into the element' },
-      clear_first: { type: 'boolean' as const, default: true, description: 'Clear existing content before typing' },
-      timeout_ms: { type: 'number' as const, default: 10000, description: 'Max time to wait for element' },
+      clear_first: {
+        type: 'boolean' as const,
+        default: true,
+        description: 'Clear existing content before typing',
+      },
+      timeout_ms: {
+        type: 'number' as const,
+        default: 10000,
+        description: 'Max time to wait for element',
+      },
     },
   },
 
@@ -688,7 +1084,10 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['symbol'],
     properties: {
-      symbol: { type: 'string' as const, description: 'Ticker à suivre, ex. "AAPL", "MSFT", "MC.PA" (Euronext via suffixe Yahoo)' },
+      symbol: {
+        type: 'string' as const,
+        description: 'Ticker à suivre, ex. "AAPL", "MSFT", "MC.PA" (Euronext via suffixe Yahoo)',
+      },
     },
   },
 
@@ -704,9 +1103,19 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['name', 'expression'],
     properties: {
-      name: { type: 'string' as const, description: 'Nom lisible de la formule, ex. "ratio_AAPL_MSFT"' },
-      expression: { type: 'string' as const, description: 'Expression mathjs sur les cotations, ex. "AAPL.price / MSFT.price" ou "max(AAPL.changePercent, MSFT.changePercent)"' },
-      id: { type: 'string' as const, description: 'Optionnel : id d\'une formule existante à modifier' },
+      name: {
+        type: 'string' as const,
+        description: 'Nom lisible de la formule, ex. "ratio_AAPL_MSFT"',
+      },
+      expression: {
+        type: 'string' as const,
+        description:
+          'Expression mathjs sur les cotations, ex. "AAPL.price / MSFT.price" ou "max(AAPL.changePercent, MSFT.changePercent)"',
+      },
+      id: {
+        type: 'string' as const,
+        description: "Optionnel : id d'une formule existante à modifier",
+      },
     },
   },
 
@@ -714,7 +1123,10 @@ export const TOOL_SCHEMAS = {
     type: 'object' as const,
     required: ['id'],
     properties: {
-      id: { type: 'string' as const, description: 'Id de la formule à supprimer (voir get_market)' },
+      id: {
+        type: 'string' as const,
+        description: 'Id de la formule à supprimer (voir get_market)',
+      },
     },
   },
 } as const;

@@ -1,4 +1,5 @@
 export * from './ipc';
+export * from './ipc-contract';
 export * from './agent';
 export * from './conversation';
 export * from './permissions';
