@@ -30,11 +30,24 @@ sont terminés. État final : **575 tests agent-runtime + 8 desktop + 5 Python +
   pressDigest garde l'orchestration et réexporte tout (aucun importeur touché,
   38 tests inchangés).
 
-Reste à faire : tests composants React (testing-library),
-`cargo clippy -D warnings` en CI après purge des 11 warnings préexistants,
-vérification manuelle end-to-end (`pnpm dev`) : chat 2 conversations,
-permission accordée qui ferme le prompt, ligne FILE_WRITE dans l'audit,
-refus français sur C:\Windows, dashboard, dailys.
+**Clôture du plan (même session)** — les deux derniers chantiers
+automatisables sont faits :
+
+- **Rust net** : les 12 warnings clippy purgés (stubs screen annotés contrat
+  IPC, module updater release-only, champ `recursive` mort retiré de
+  DirListArgs, `Iterator::find`, etc.) ; la CI exécute désormais
+  `cargo clippy --lib --tests -- -D warnings` — tout nouveau warning casse
+  le build.
+- **Tests composants React** : testing-library + jsdom posés (pragma
+  par fichier, les tests purs restent en node) — 13 tests sur PressFeedList
+  (confirmation 2 clics), PressFeedsManager (backend fake : validations,
+  création de bout en bout) et SettingsWindow (4 onglets, garde anti-LanceDB).
+  **Desktop : 21 tests.**
+
+Reste à faire (nécessite un humain) : vérification manuelle end-to-end
+(`pnpm dev`) — chat 2 conversations, permission accordée qui ferme le prompt,
+ligne FILE_WRITE dans l'audit, refus français sur C:\Windows, dashboard,
+dailys.
 
 ---
 
