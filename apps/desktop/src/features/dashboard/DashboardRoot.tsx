@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useUiZoom } from '../../shared/hooks/useUiZoom';
 import { useDashboardData } from './useDashboardData';
 import { DashboardPage } from './DashboardPage';
 import { WidgetGuide } from './guide/WidgetGuide';
@@ -10,6 +11,8 @@ type DashboardView = 'dashboard' | 'guide' | 'admin' | 'myfeeds';
 
 /** Racine montée dans la fenêtre `dashboard` (voir main.tsx). */
 export function DashboardRoot() {
+  // Zoom de la fenêtre : Ctrl+molette, Ctrl+«+/−», Ctrl+0 (persisté).
+  useUiZoom();
   useDashboardData();
   const [view, setView] = useState<DashboardView>('dashboard');
 
@@ -18,12 +21,12 @@ export function DashboardRoot() {
   // le bouton la réaffiche alors à volonté.
   useEffect(() => {
     const win = getCurrentWindow();
-    const unlisten = win.onCloseRequested((e) => {
+    const unlisten = win.onCloseRequested(e => {
       e.preventDefault();
       void win.hide();
     });
     return () => {
-      void unlisten.then((off) => off());
+      void unlisten.then(off => off());
     };
   }, []);
 

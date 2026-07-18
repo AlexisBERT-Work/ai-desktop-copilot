@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { DashboardConfig, Widget } from '@catdesk/shared-types';
 
 const MAX_W = 4; // colonnes de la grille
-const MAX_H = 2; // hauteurs possibles d'un widget
+const MAX_H = 4; // rangées maximum d'un widget (redimensionnement à la poignée)
 
 /**
  * Disposition par défaut au premier lancement : le bouton screenshot d'antan
@@ -59,7 +59,10 @@ const DEFAULT_CONFIG: DashboardConfig = {
       id: 'quick-screenshot',
       type: 'quick_action',
       title: 'Capture & analyse',
-      config: { iconName: 'camera', query: 'Capture mon écran et décris ce que tu vois en détail.' },
+      config: {
+        iconName: 'camera',
+        query: 'Capture mon écran et décris ce que tu vois en détail.',
+      },
       layout: { x: 0, y: 3, w: 1, h: 1 },
     },
     {
@@ -123,83 +126,96 @@ interface DashboardState {
   updateWidgetConfig: (id: string, patch: Record<string, unknown>) => void;
   cycleWidgetWidth: (id: string) => void;
   cycleWidgetHeight: (id: string) => void;
+  /** Taille exacte en unités de grille (poignée de redimensionnement). Bornée. */
+  setWidgetSize: (id: string, w: number, h: number) => void;
   reorderWidget: (sourceId: string, targetId: string) => void;
   resetToDefault: () => void;
 }
 
 /** Applique `fn` au widget `id`, renvoie une nouvelle liste de widgets. */
 function mapWidget(widgets: Widget[], id: string, fn: (w: Widget) => Widget): Widget[] {
-  return widgets.map((w) => (w.id === id ? fn(w) : w));
+  return widgets.map(w => (w.id === id ? fn(w) : w));
 }
 
 export const useDashboardStore = create<DashboardState>()(
   persist(
-    (set) => ({
+    set => ({
       config: DEFAULT_CONFIG,
       editMode: false,
 
-      setEditMode: (on) => set({ editMode: on }),
+      setEditMode: on => set({ editMode: on }),
 
-      addWidget: (widget) =>
-        set((s) => ({
+      addWidget: widget =>
+        set(s => ({
           config: {
             ...s.config,
             widgets: [...s.config.widgets, { ...widget, id: crypto.randomUUID() }],
           },
         })),
 
-      removeWidget: (id) =>
-        set((s) => ({
-          config: { ...s.config, widgets: s.config.widgets.filter((w) => w.id !== id) },
+      removeWidget: id =>
+        set(s => ({
+          config: { ...s.config, widgets: s.config.widgets.filter(w => w.id !== id) },
         })),
 
       renameWidget: (id, title) =>
-        set((s) => ({
+        set(s => ({
           config: {
             ...s.config,
-            widgets: mapWidget(s.config.widgets, id, (w) => ({ ...w, title })),
+            widgets: mapWidget(s.config.widgets, id, w => ({ ...w, title })),
           },
         })),
 
       updateWidgetConfig: (id, patch) =>
-        set((s) => ({
+        set(s => ({
           config: {
             ...s.config,
-            widgets: mapWidget(s.config.widgets, id, (w) => ({
+            widgets: mapWidget(s.config.widgets, id, w => ({
               ...w,
               config: { ...w.config, ...patch },
             })),
           },
         })),
 
-      cycleWidgetWidth: (id) =>
-        set((s) => ({
+      cycleWidgetWidth: id =>
+        set(s => ({
           config: {
             ...s.config,
-            widgets: mapWidget(s.config.widgets, id, (w) => ({
+            widgets: mapWidget(s.config.widgets, id, w => ({
               ...w,
               layout: { ...w.layout, w: clampW((w.layout.w % MAX_W) + 1) },
             })),
           },
         })),
 
-      cycleWidgetHeight: (id) =>
-        set((s) => ({
+      cycleWidgetHeight: id =>
+        set(s => ({
           config: {
             ...s.config,
-            widgets: mapWidget(s.config.widgets, id, (w) => ({
+            widgets: mapWidget(s.config.widgets, id, w => ({
               ...w,
               layout: { ...w.layout, h: clampH((w.layout.h % MAX_H) + 1) },
             })),
           },
         })),
 
+      setWidgetSize: (id, w, h) =>
+        set(s => ({
+          config: {
+            ...s.config,
+            widgets: mapWidget(s.config.widgets, id, widget => ({
+              ...widget,
+              layout: { ...widget.layout, w: clampW(w), h: clampH(h) },
+            })),
+          },
+        })),
+
       reorderWidget: (sourceId, targetId) =>
-        set((s) => {
+        set(s => {
           if (sourceId === targetId) return {};
           const ws = [...s.config.widgets];
-          const from = ws.findIndex((w) => w.id === sourceId);
-          const to = ws.findIndex((w) => w.id === targetId);
+          const from = ws.findIndex(w => w.id === sourceId);
+          const to = ws.findIndex(w => w.id === targetId);
           if (from === -1 || to === -1) return {};
           const moved = ws[from];
           if (moved === undefined) return {};
@@ -214,7 +230,7 @@ export const useDashboardStore = create<DashboardState>()(
       name: 'catdesk-dashboard',
       version: 1,
       // Ne persiste que la disposition ; `editMode` reste transitoire.
-      partialize: (s) => ({ config: s.config }),
+      partialize: s => ({ config: s.config }),
       // Valide/répare le contenu au rechargement (migration douce).
       merge: (persisted, current) => ({ ...current, config: sanitizeConfig(persisted) }),
     },
