@@ -1,15 +1,18 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing::info;
 
+// IPC contract: the frontend already sends these fields; they become live once
+// the capture is wired to the Python sidecar (stub below).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct CaptureArgs {
     pub region: Option<ScreenRegion>,
     pub active_window_only: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct ScreenRegion {
     pub x: i32,
     pub y: i32,
@@ -19,7 +22,7 @@ pub struct ScreenRegion {
 
 /// Captures the screen (or a region) and returns a base64-encoded PNG.
 #[tauri::command]
-pub async fn screen_capture(args: CaptureArgs) -> Result<String, String> {
+pub async fn screen_capture(_args: CaptureArgs) -> Result<String, String> {
     info!("Screen capture requested");
 
     // For MVP: instruct Python sidecar to do the capture

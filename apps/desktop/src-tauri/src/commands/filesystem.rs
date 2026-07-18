@@ -21,11 +21,12 @@ pub struct FileWriteArgs {
     pub append: Option<bool>,
 }
 
+// NB : pas de champ `recursive` — la récursion n'a jamais été implémentée côté
+// Rust ; serde ignore les clés inconnues, un appelant qui l'envoie reste servi.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirListArgs {
     pub path: String,
-    pub recursive: Option<bool>,
     pub include_hidden: Option<bool>,
 }
 

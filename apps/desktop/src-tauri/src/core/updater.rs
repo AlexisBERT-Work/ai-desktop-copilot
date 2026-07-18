@@ -9,9 +9,13 @@
 //! Failures (offline, no update, missing config in dev) are swallowed: the app
 //! must always start regardless.
 
+// The only caller (lib.rs setup) is release-gated: in a debug build this whole
+// module is intentionally dead code.
+#![cfg_attr(debug_assertions, allow(dead_code))]
+
 use tauri::AppHandle;
 use tauri_plugin_updater::UpdaterExt;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Fire-and-forget update check on a background task.
 pub fn spawn_update_check(app: AppHandle) {

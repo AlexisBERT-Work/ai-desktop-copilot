@@ -12,10 +12,7 @@ use tauri::{AppHandle, Manager};
 /// "ocr") if it exists, trying the common Tauri layouts.
 pub fn resource_subdir(app: &AppHandle, name: &str) -> Option<PathBuf> {
     let base = app.path().resource_dir().ok()?;
-    for candidate in [base.join(name), base.join("resources").join(name)] {
-        if candidate.exists() {
-            return Some(candidate);
-        }
-    }
-    None
+    [base.join(name), base.join("resources").join(name)]
+        .into_iter()
+        .find(|candidate| candidate.exists())
 }

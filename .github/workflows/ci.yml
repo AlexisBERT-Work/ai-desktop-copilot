@@ -61,13 +61,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96"
-          components: rustfmt
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
 
       - run: cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+      - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --tests -- -D warnings
 
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 

@@ -110,15 +110,13 @@ pub(crate) async fn detect_vram_bytes() -> Option<u64> {
 
 /// Build a Command that does not pop a console window on Windows.
 fn quiet_command(program: &str) -> tokio::process::Command {
-    let cmd = tokio::process::Command::new(program);
+    #[cfg_attr(not(windows), allow(unused_mut))]
+    let mut cmd = tokio::process::Command::new(program);
     #[cfg(windows)]
     {
-        let mut cmd = cmd;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
-        return cmd;
     }
-    #[cfg(not(windows))]
     cmd
 }
 

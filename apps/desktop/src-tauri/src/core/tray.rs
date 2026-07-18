@@ -16,7 +16,7 @@ pub fn setup_tray(app: &mut App) -> anyhow::Result<()> {
     // process working directory or whether the app was bundled.
     let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))?;
 
-    let tray = TrayIconBuilder::new()
+    let _tray = TrayIconBuilder::new()
         .icon(icon)
         .tooltip("CatDesk — clic pour ouvrir (Ctrl+Shift+Space)")
         .menu(&menu)
