@@ -1,10 +1,22 @@
 import type { OllamaClient } from '../llm/OllamaClient';
 import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import { looksLikeProse } from '../tools/web/ReadWebpageTool';
 import { articleCharBudget, complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { ensureVerifiedDetails } from './detailVerification';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:press-digest');
+
+/**
+ * Résumé de repli quand le LLM n'a rien produit : l'extrait RSS, mais
+ * SEULEMENT s'il ressemble à de la prose — un menu de site ou un sommaire
+ * aspiré par le fetch ferait un « résumé » absurde. Pas de résumé vaut mieux
+ * que du déchet. Pur, exporté pour tests.
+ */
+export function excerptSummary(it: NewsItem): string {
+  const e = (it.excerpt ?? '').trim();
+  return looksLikeProse(e, 30) ? e.slice(0, 200) : '';
+}
 
 /** Analyse intra-journal : angle éditorial + résumé et détail par article. */
 export interface JournalAnalysis {
@@ -82,7 +94,7 @@ export async function analyzeJournal(
   // jets de détails). Son échec ne dispense PAS des détails : ils sont
   // garantis plus bas, article par article.
   let analysis = '';
-  let summaries = items.map(it => (it.excerpt ? it.excerpt.slice(0, 200) : ''));
+  let summaries = items.map(excerptSummary);
   let drafted = items.map(() => '');
   try {
     const raw = await complete(
@@ -100,7 +112,7 @@ export async function analyzeJournal(
       summaries = items.map((it, i) => {
         const s = parsed.summaries[i];
         if (typeof s === 'string' && s.length > 0) return s;
-        return it.excerpt ? it.excerpt.slice(0, 200) : '';
+        return excerptSummary(it);
       });
       drafted = items.map((_, i) => {
         const d = parsed.details[i];

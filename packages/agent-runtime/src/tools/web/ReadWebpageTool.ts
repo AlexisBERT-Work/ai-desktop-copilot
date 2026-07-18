@@ -29,6 +29,48 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
+/**
+ * Le texte ressemble-t-il à de la prose (phrases rédigées) plutôt qu'à un menu
+ * de navigation, une table des matières ou une liste de liens ? Heuristique :
+ * assez long, ponctuation de phrase, et une minorité de mots capitalisés (les
+ * menus/sommaires sont massivement en Title Case). Pur, exporté pour tests.
+ */
+export function looksLikeProse(text: string, minLen = 80): boolean {
+  const t = text.trim();
+  if (t.length < minLen) return false;
+  if (!/[.!?…]/.test(t)) return false;
+  const words = t.split(/\s+/).filter(w => /\p{L}/u.test(w));
+  if (words.length < 5) return false;
+  const caps = words.filter(w => /^\p{Lu}/u.test(w)).length;
+  return caps / words.length <= 0.4;
+}
+
+/**
+ * Extrait le CONTENU d'une page d'article, pas la page entière : cible
+ * `<article>`/`<main>` quand présent, retire header/nav/aside/footer, puis ne
+ * garde que les lignes qui ressemblent à de la prose. Sans cela, les 1 500
+ * premiers caractères d'un blog sont le titre du site + le menu ×2 + le
+ * sommaire — et tout le pipeline de digest hérite de ce déchet. Renvoie ''
+ * quand rien ne ressemble à un article (paywall, mur de cookies, accueil).
+ */
+export function extractReadableText(html: string): string {
+  let scope = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|noscript|svg|iframe|template)\b[\s\S]*?<\/\1>/gi, '');
+  const main =
+    /<article\b[^>]*>([\s\S]*?)<\/article>/i.exec(scope) ??
+    /<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(scope) ??
+    /<div[^>]+role=["']main["'][^>]*>([\s\S]*?)<\/div>/i.exec(scope);
+  if (main?.[1]) scope = main[1];
+  scope = scope.replace(/<(header|nav|aside|footer|form|button)\b[\s\S]*?<\/\1>/gi, '');
+
+  return htmlToText(scope)
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => looksLikeProse(l, 60))
+    .join('\n');
+}
+
 // Extract a named element from HTML (very naive CSS selector: tag, .class, #id)
 export function extractBySelector(html: string, selector: string): string | null {
   // Support simple selectors: tag, #id, .class

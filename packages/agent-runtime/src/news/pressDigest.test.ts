@@ -9,6 +9,7 @@ import {
   buildVerifyPrompt,
   digitRuns,
   draftVerifiedDetail,
+  excerptSummary,
   globalTitle,
   journalTitle,
   numbersSupported,
@@ -25,7 +26,9 @@ import type { OllamaClient } from '../llm/OllamaClient';
 function fakeLlm(responses: (string | Error)[]): OllamaClient {
   let i = 0;
   return {
-    streamChat: function* (): Generator<{ type: 'token'; content: string } | { type: 'error'; error: string }> {
+    streamChat: function* (): Generator<
+      { type: 'token'; content: string } | { type: 'error'; error: string }
+    > {
       const r = responses[Math.min(i, responses.length - 1)];
       i++;
       if (r instanceof Error) yield { type: 'error', error: r.message };
@@ -54,16 +57,20 @@ describe('buildJournalPrompt', () => {
   });
 
   it('préfère le corps téléchargé (fullText) à l’extrait RSS', () => {
-    const withBody: NewsItem = { ...item('Titre C', 'https://x/c', 'court extrait'), fullText: 'Corps complet de l’article.' };
+    const withBody: NewsItem = {
+      ...item('Titre C', 'https://x/c', 'court extrait'),
+      fullText: 'Corps complet de l’article.',
+    };
     const p = buildJournalPrompt('Le Monde', [withBody]);
     expect(p).toContain('Texte : Corps complet de l’article.');
     expect(p).not.toContain('court extrait');
   });
 
   it('tronque chaque texte au budget par article', () => {
-    const many = Array.from({ length: 20 }, (_, i) =>
-      ({ ...item(`T${i}`, `https://x/${i}`), fullText: 'x'.repeat(2000) }),
-    );
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...item(`T${i}`, `https://x/${i}`),
+      fullText: 'x'.repeat(2000),
+    }));
     const p = buildJournalPrompt('Le Monde', many);
     // 20 articles ⇒ 600 caractères chacun (plancher du budget).
     expect(p).toContain('x'.repeat(600));
@@ -143,10 +150,12 @@ describe('buildJournalBody', () => {
   });
 
   it('aplatit les détails multi-lignes et omet ceux qui répètent le résumé', () => {
-    const body = buildJournalBody('', items, ['résumé A', 'résumé B'], [
-      'Ligne 1.\nLigne 2.',
-      'résumé B',
-    ]);
+    const body = buildJournalBody(
+      '',
+      items,
+      ['résumé A', 'résumé B'],
+      ['Ligne 1.\nLigne 2.', 'résumé B'],
+    );
     expect(body).toContain('  > Ligne 1. Ligne 2.');
     // Détail identique au résumé → omis.
     expect(body).not.toContain('> résumé B');
@@ -224,6 +233,31 @@ describe('garantie de détail par article', () => {
     expect(verbatimDetail({ title: 'T', url: 'u', source: 's', excerpt: 'court' })).toBe('');
   });
 
+  it('verbatimDetail écarte un extrait de navigation et retombe sur le corps propre', () => {
+    // Échantillon réel du bug des dailys : menu + sommaire cités comme « extrait ».
+    const junk =
+      'Fable 5 vs. GPT-5.6 Sol on an NP-Hard Problem: Does /goal Help? - Charles AZAM CA Charles Azam ' +
+      'Home Projects Blog Consulting Books fr fr Home Projects Blog Consulting Books On this page The problem';
+    const withBody = { ...rivian, excerpt: junk };
+    const v = verbatimDetail(withBody);
+    expect(v).toContain('Rivian shares fell'); // le fullText propre, pas le menu
+    expect(v).not.toContain('Consulting Books');
+    // Menu partout → aucune citation : rien ne vaut mieux que du déchet.
+    expect(verbatimDetail({ title: 'T', url: 'u', source: 's', excerpt: junk })).toBe('');
+  });
+
+  it('excerptSummary sert un extrait rédigé et refuse un menu de site', () => {
+    const prose = item('T', 'u', 'Le marché a progressé de 3 % mardi, porté par la tech.');
+    expect(excerptSummary(prose)).toContain('marché');
+    const junk = item(
+      'T',
+      'u',
+      'Home Projects Blog Consulting Books fr fr Home Projects Blog On this page The problem How large is it?',
+    );
+    expect(excerptSummary(junk)).toBe('');
+    expect(excerptSummary(item('T', 'u'))).toBe('');
+  });
+
   it('accepte un détail correct du premier coup', async () => {
     const bon = 'Rivian a vendu 75 millions d’actions et son titre a perdu près de 15 %.';
     const llm = fakeLlm([bon, '{"fidele":[true]}']);
@@ -272,7 +306,9 @@ describe('synthèse transversale', () => {
   });
 
   it('parseSynthesisJson lit idées + synthèse, null si vide/illisible', () => {
-    expect(parseSynthesisJson('{"idees":["A frappe fort.","B recule."],"synthese":"Tendance globale"}')).toEqual({
+    expect(
+      parseSynthesisJson('{"idees":["A frappe fort.","B recule."],"synthese":"Tendance globale"}'),
+    ).toEqual({
       ideas: ['A frappe fort.', 'B recule.'],
       synthesis: 'Tendance globale',
     });

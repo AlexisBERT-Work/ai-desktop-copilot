@@ -3,7 +3,7 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { aggregateNews, httpGet, toExcerpt, type NewsItem } from './FetchTechNewsTool';
-import { htmlToText } from './ReadWebpageTool';
+import { extractReadableText, looksLikeProse } from './ReadWebpageTool';
 import type { OllamaClient } from '../../llm/OllamaClient';
 import { summarizeDigest } from '../../llm/NewsSummarizer';
 import { createLogger } from '../../logger';
@@ -126,7 +126,7 @@ export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
       if (item.excerpt && item.excerpt.length > 0) return;
       try {
         const html = await httpGet(item.url, 8_000);
-        const text = htmlToText(html);
+        const text = extractReadableText(html);
         if (text.length > 80) item.excerpt = toExcerpt(text, 500);
       } catch {
         /* leave without excerpt */
@@ -138,22 +138,26 @@ export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
 
 /**
  * Lecture du corps des articles : télécharge CHAQUE page liée et en garde le
- * texte principal (plafonné à `maxChars`), pour donner au LLM bien plus de
- * matière que le seul extrait RSS. Complète aussi l'extrait manquant au
- * passage (une seule requête par article). Best-effort en parallèle : un
- * échec (timeout, paywall) laisse l'item avec son extrait d'origine.
+ * texte PRINCIPAL (extraction lisible : cible `<article>`/`<main>`, filtre les
+ * menus — voir extractReadableText), plafonné à `maxChars`, pour donner au LLM
+ * bien plus de matière que le seul extrait RSS. Complète aussi au passage
+ * l'extrait manquant — ou pollué (menu de site aspiré par une version
+ * antérieure du fetch). Best-effort en parallèle : un échec (timeout, paywall)
+ * laisse l'item avec son extrait d'origine.
  */
 export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Promise<NewsItem[]> {
   await Promise.allSettled(
     items.map(async item => {
       try {
         const html = await httpGet(item.url, 8_000);
-        const text = htmlToText(html);
-        // Sous ~200 caractères, on est face à un paywall ou un mur de cookies :
-        // l'extrait RSS fait alors meilleure matière que ce résidu.
+        const text = extractReadableText(html);
+        // Sous ~200 caractères, on est face à un paywall, un mur de cookies ou
+        // une page sans prose : l'extrait RSS fait alors meilleure matière.
         if (text.length < 200) return;
         item.fullText = toExcerpt(text, maxChars);
-        if (!item.excerpt || item.excerpt.length === 0) item.excerpt = toExcerpt(text, 500);
+        if (!item.excerpt || !looksLikeProse(item.excerpt, 30)) {
+          item.excerpt = toExcerpt(text, 500);
+        }
       } catch {
         /* garde l'extrait RSS */
       }

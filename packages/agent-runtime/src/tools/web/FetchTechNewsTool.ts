@@ -365,11 +365,19 @@ export function parseFeed(xml: string, source: string): NewsItem[] {
     const title = tagContent(block, 'title');
     if (!title) continue;
 
-    // RSS: <link>url</link> ; Atom: <link href="url" .../>
+    // RSS: <link>url</link> ; Atom: <link href="url" .../> — un <entry> Atom
+    // porte souvent PLUSIEURS <link> (alternate = l'article, self = le flux,
+    // replies…) : prendre le premier href revoyait parfois vers l'accueil du
+    // site, et tout l'enrichissement aval lisait la mauvaise page.
     let url = tagContent(block, 'link');
     if (!url) {
-      const href = /<link[^>]*href=["']([^"']+)["']/i.exec(block);
-      url = href ? decodeEntities(href[1]!) : null;
+      const tags = block.match(/<link\b[^>]*>/gi) ?? [];
+      const best =
+        tags.find(t => /rel=["']alternate["']/i.test(t)) ??
+        tags.find(t => !/\brel=/i.test(t)) ??
+        tags[0];
+      const href = best ? /href=["']([^"']+)["']/i.exec(best) : null;
+      url = href?.[1] ? decodeEntities(href[1]) : null;
     }
     if (!url) continue;
 

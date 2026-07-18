@@ -16,8 +16,10 @@ import {
 
 describe('PRESS_SOURCE_CATALOG (shared-types) ↔ NEWS_SOURCES (agent)', () => {
   it('les deux listes ont exactement les mêmes ids et labels', () => {
-    const agent = Object.values(NEWS_SOURCES).map((s) => `${s.id}|${s.label}|${s.lang}`).sort();
-    const catalog = PRESS_SOURCE_CATALOG.map((s) => `${s.id}|${s.label}|${s.lang}`).sort();
+    const agent = Object.values(NEWS_SOURCES)
+      .map(s => `${s.id}|${s.label}|${s.lang}`)
+      .sort();
+    const catalog = PRESS_SOURCE_CATALOG.map(s => `${s.id}|${s.label}|${s.lang}`).sort();
     expect(catalog).toEqual(agent);
   });
 });
@@ -25,7 +27,9 @@ describe('PRESS_SOURCE_CATALOG (shared-types) ↔ NEWS_SOURCES (agent)', () => {
 describe('feedLabelFromUrl', () => {
   it('extrait le hostname sans www', () => {
     expect(feedLabelFromUrl('https://www.blog.rust-lang.org/feed.xml')).toBe('blog.rust-lang.org');
-    expect(feedLabelFromUrl('https://simonwillison.net/atom/everything/')).toBe('simonwillison.net');
+    expect(feedLabelFromUrl('https://simonwillison.net/atom/everything/')).toBe(
+      'simonwillison.net',
+    );
   });
 
   it('retombe sur la chaîne brute si URL invalide', () => {
@@ -53,7 +57,11 @@ describe('parseFeed', () => {
     </channel></rss>`;
     const items = parseFeed(xml, 'Test');
     expect(items).toHaveLength(2);
-    expect(items[0]).toMatchObject({ title: 'Rust 2.0 sort', url: 'https://example.com/rust', source: 'Test' });
+    expect(items[0]).toMatchObject({
+      title: 'Rust 2.0 sort',
+      url: 'https://example.com/rust',
+      source: 'Test',
+    });
     expect(items[0]!.publishedAt).toBeDefined();
     expect(items[0]!.excerpt).toBe('La nouvelle version arrive.'); // description nettoyée du HTML
     expect(items[1]!.title).toBe('IA & vous'); // CDATA + entité décodés
@@ -73,6 +81,27 @@ describe('parseFeed', () => {
     const xml = `<rss><item><link>https://x.com/a</link></item><item><title>Sans lien</title></item></rss>`;
     expect(parseFeed(xml, 'X')).toHaveLength(0);
   });
+
+  it('choisit rel="alternate" dans un entry Atom multi-liens (self en premier)', () => {
+    // Cause du bug des dailys : prendre le PREMIER href renvoyait le flux (ou
+    // l'accueil du site) — tout l'enrichissement aval lisait la mauvaise page.
+    const xml = `<feed><entry>
+      <title>Mon article</title>
+      <link rel="self" href="https://blog.example/feed.xml"/>
+      <link rel="alternate" href="https://blog.example/posts/mon-article"/>
+    </entry></feed>`;
+    const items = parseFeed(xml, 'Blog');
+    expect(items[0]!.url).toBe('https://blog.example/posts/mon-article');
+  });
+
+  it('sans rel="alternate", préfère un <link> sans rel au <link rel="self">', () => {
+    const xml = `<feed><entry>
+      <title>Autre article</title>
+      <link rel="self" href="https://blog.example/feed.xml"/>
+      <link href="https://blog.example/posts/autre"/>
+    </entry></feed>`;
+    expect(parseFeed(xml, 'Blog')[0]!.url).toBe('https://blog.example/posts/autre');
+  });
 });
 
 describe('dedupeItems', () => {
@@ -85,7 +114,7 @@ describe('dedupeItems', () => {
     ];
     const out = dedupeItems(items);
     expect(out).toHaveLength(2);
-    expect(out.map((i) => i.source)).toEqual(['A', 'C']);
+    expect(out.map(i => i.source)).toEqual(['A', 'C']);
   });
 });
 
@@ -100,15 +129,20 @@ describe('filterByTopics', () => {
   });
 
   it('filtre par mot-clé insensible à la casse', () => {
-    expect(filterByTopics(items, ['react']).map((i) => i.title)).toEqual(['New React 19 features']);
+    expect(filterByTopics(items, ['react']).map(i => i.title)).toEqual(['New React 19 features']);
   });
 
-  it('matche aussi sur l\'extrait, pas seulement le titre', () => {
+  it("matche aussi sur l'extrait, pas seulement le titre", () => {
     const withExcerpt: NewsItem[] = [
-      { title: 'Un titre neutre', url: 'https://x/1', source: 'X', excerpt: 'Cet article parle de Kubernetes en profondeur.' },
+      {
+        title: 'Un titre neutre',
+        url: 'https://x/1',
+        source: 'X',
+        excerpt: 'Cet article parle de Kubernetes en profondeur.',
+      },
       { title: 'Autre titre', url: 'https://x/2', source: 'X', excerpt: 'Rien à voir.' },
     ];
-    expect(filterByTopics(withExcerpt, ['kubernetes']).map((i) => i.url)).toEqual(['https://x/1']);
+    expect(filterByTopics(withExcerpt, ['kubernetes']).map(i => i.url)).toEqual(['https://x/1']);
   });
 });
 
@@ -138,15 +172,21 @@ describe('filterByRegex', () => {
   });
 
   it('inclure ne garde que ce qui matche (titre + extrait)', () => {
-    expect(filterByRegex(items, '(IA|LLM)', null).map((i) => i.url)).toEqual(['https://x/1', 'https://x/3']);
+    expect(filterByRegex(items, '(IA|LLM)', null).map(i => i.url)).toEqual([
+      'https://x/1',
+      'https://x/3',
+    ]);
   });
 
   it('exclure retire ce qui matche', () => {
-    expect(filterByRegex(items, null, 'sponsoris').map((i) => i.url)).toEqual(['https://x/1', 'https://x/3']);
+    expect(filterByRegex(items, null, 'sponsoris').map(i => i.url)).toEqual([
+      'https://x/1',
+      'https://x/3',
+    ]);
   });
 
   it('combine inclure et exclure', () => {
-    const out = filterByRegex(items, '.', 'sponsoris').map((i) => i.url);
+    const out = filterByRegex(items, '.', 'sponsoris').map(i => i.url);
     expect(out).toEqual(['https://x/1', 'https://x/3']);
   });
 
@@ -165,7 +205,7 @@ describe('filterByAge', () => {
 
   it('garde les articles dans la fenêtre et ceux sans date', () => {
     const out = filterByAge(items, 24, now);
-    expect(out.map((i) => i.title)).toEqual(['récent', 'sans date']);
+    expect(out.map(i => i.title)).toEqual(['récent', 'sans date']);
   });
 
   it('ne filtre rien si since_hours <= 0', () => {
@@ -176,10 +216,22 @@ describe('filterByAge', () => {
 describe('rankItems', () => {
   it('classe par points décroissants puis par récence', () => {
     const items: NewsItem[] = [
-      { title: 'b', url: 'https://x/b', source: 'X', points: 10, publishedAt: '2025-06-10T01:00:00Z' },
+      {
+        title: 'b',
+        url: 'https://x/b',
+        source: 'X',
+        points: 10,
+        publishedAt: '2025-06-10T01:00:00Z',
+      },
       { title: 'a', url: 'https://x/a', source: 'X', points: 100 },
-      { title: 'c', url: 'https://x/c', source: 'X', points: 10, publishedAt: '2025-06-10T05:00:00Z' },
+      {
+        title: 'c',
+        url: 'https://x/c',
+        source: 'X',
+        points: 10,
+        publishedAt: '2025-06-10T05:00:00Z',
+      },
     ];
-    expect(rankItems(items).map((i) => i.title)).toEqual(['a', 'c', 'b']);
+    expect(rankItems(items).map(i => i.title)).toEqual(['a', 'c', 'b']);
   });
 });

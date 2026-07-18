@@ -1,5 +1,6 @@
 import type { OllamaClient } from '../llm/OllamaClient';
 import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import { looksLikeProse } from '../tools/web/ReadWebpageTool';
 import { articleCharBudget, complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { createLogger } from '../logger';
 
@@ -174,12 +175,16 @@ export function buildDetailPrompt(item: NewsItem): string {
 /**
  * Repli garanti fidèle : extrait verbatim de l'article (langue d'origine),
  * clairement présenté comme citation. L'extrait RSS (chapeau éditorial) est
- * préféré au texte de page, qui charrie parfois des résidus de navigation.
- * Renvoie '' si la matière est trop maigre pour valoir un bouton. Pur.
+ * préféré au texte de page. Un candidat qui ne ressemble pas à de la prose
+ * (menu de site, sommaire) est écarté : citer du déchet est pire que ne rien
+ * afficher. Renvoie '' si aucune matière ne vaut un bouton. Pur.
  */
 export function verbatimDetail(item: NewsItem): string {
-  const text = (item.excerpt ?? item.fullText ?? '').replace(/\s+/g, ' ').trim();
-  if (text.length < 80) return '';
+  const text =
+    [item.excerpt ?? '', item.fullText ?? '']
+      .map(t => t.replace(/\s+/g, ' ').trim())
+      .find(t => looksLikeProse(t)) ?? '';
+  if (text.length === 0) return '';
   const cut = text.length <= 350 ? text : `${text.slice(0, 350).replace(/\s+\S*$/, '')}…`;
   return `Extrait de l'article : « ${cut} »`;
 }

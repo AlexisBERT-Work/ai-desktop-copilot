@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { ReadWebpageTool, htmlToText, extractBySelector } from './ReadWebpageTool';
+import {
+  ReadWebpageTool,
+  htmlToText,
+  extractBySelector,
+  extractReadableText,
+  looksLikeProse,
+} from './ReadWebpageTool';
+
+// Échantillon réel du bug des dailys (2026-07-18) : titre du site + menu ×2 +
+// sommaire d'un blog, aspirés comme « extrait » puis cités tels quels.
+const NAV_JUNK =
+  'Fable 5 vs. GPT-5.6 Sol on an NP-Hard Problem: Does /goal Help? - Charles AZAM CA Charles Azam ' +
+  'Home Projects Blog Consulting Books fr fr Home Projects Blog Consulting Books On this page ' +
+  'The problem How large is the search space? What I tested Results Deep dive into the goal command';
 
 describe('htmlToText', () => {
   it('retire script et style', () => {
@@ -42,6 +55,69 @@ describe('extractBySelector', () => {
 
   it('renvoie null si aucune correspondance', () => {
     expect(extractBySelector(html, '#absent')).toBeNull();
+  });
+});
+
+describe('looksLikeProse', () => {
+  it('accepte des phrases rédigées (fr et en)', () => {
+    expect(
+      looksLikeProse(
+        'Le gouvernement a annoncé mardi une réforme des retraites. Les syndicats appellent à la grève générale.',
+      ),
+    ).toBe(true);
+    expect(
+      looksLikeProse(
+        'Rivian shares fell nearly 15% after the electric vehicle maker announced it would sell 75 million shares.',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejette le menu de site + sommaire (échantillon réel du bug)', () => {
+    expect(looksLikeProse(NAV_JUNK)).toBe(false);
+  });
+
+  it('rejette trop court ou sans ponctuation de phrase', () => {
+    expect(looksLikeProse('court.')).toBe(false);
+    expect(
+      looksLikeProse(
+        'des mots sans aucune ponctuation de phrase du tout mais assez longs pour dépasser la barre de longueur minimale pourtant',
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('extractReadableText', () => {
+  const PAGE = `<html><body>
+    <header><a>Home</a> <a>Projects</a> <a>Blog</a> <a>Consulting</a> <a>Books</a></header>
+    <nav><li>Home</li><li>Projects</li><li>Blog</li></nav>
+    <article>
+      <h1>Does /goal help?</h1>
+      <p>La commande /goal transforme la manière dont le modèle explore l'espace de recherche. Nous avons mesuré ses effets sur un problème NP-difficile.</p>
+      <p>Les résultats montrent une amélioration nette de la convergence sur les grandes instances, avec un coût mémoire constant.</p>
+    </article>
+    <footer>© 2026 — mentions légales</footer>
+  </body></html>`;
+
+  it("garde la prose de l'article, pas le menu ni le footer", () => {
+    const out = extractReadableText(PAGE);
+    expect(out).toContain("l'espace de recherche");
+    expect(out).toContain('convergence');
+    expect(out).not.toContain('Consulting');
+    expect(out).not.toContain('mentions légales');
+  });
+
+  it('sans <article>, filtre quand même header/nav et les lignes non-prose', () => {
+    const page = `<body><header><a>Home</a><a>Blog</a></header>
+      <div><p>Une phrase complète qui explique le fond du sujet, avec des détails et un contexte suffisant.</p></div></body>`;
+    const out = extractReadableText(page);
+    expect(out).toContain('phrase complète');
+    expect(out).not.toContain('Home');
+  });
+
+  it("renvoie '' quand la page n'a aucune prose (accueil, mur de cookies)", () => {
+    const home =
+      '<html><body><nav><a>Home</a><a>Blog</a></nav><ul><li>Post 1</li><li>Post 2</li></ul></body></html>';
+    expect(extractReadableText(home)).toBe('');
   });
 });
 
