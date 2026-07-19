@@ -233,6 +233,30 @@ describe('garantie de détail par article', () => {
     expect(verbatimDetail({ title: 'T', url: 'u', source: 's', excerpt: 'court' })).toBe('');
   });
 
+  it('verbatimDetail écarte un extrait pris en cours de phrase au profit du corps', () => {
+    // Échantillon réel : extrait RSS tronqué qui démarre au milieu d'une phrase.
+    const midStart = {
+      ...rivian,
+      excerpt:
+        'optimization problem, with and without their native goal mode. Fable was an absolute beast on this benchmark, truly.',
+    };
+    const v = verbatimDetail(midStart);
+    expect(v).toContain('Rivian shares fell'); // le fullText, qui commence à un vrai début
+  });
+
+  it('verbatimDetail coupe à la fin de phrase, jamais en plein milieu', () => {
+    const phrase =
+      'Rivian shares fell nearly 15% after the electric vehicle maker announced it would sell 75 million shares to raise capital. ';
+    const long: NewsItem = {
+      title: rivian.title,
+      url: rivian.url,
+      source: rivian.source,
+      fullText: phrase.repeat(6),
+    };
+    const v = verbatimDetail(long);
+    expect(v.endsWith('capital. »')).toBe(true);
+  });
+
   it('verbatimDetail écarte un extrait de navigation et retombe sur le corps propre', () => {
     // Échantillon réel du bug des dailys : menu + sommaire cités comme « extrait ».
     const junk =
@@ -256,6 +280,13 @@ describe('garantie de détail par article', () => {
     );
     expect(excerptSummary(junk)).toBe('');
     expect(excerptSummary(item('T', 'u'))).toBe('');
+    // Fragment pris en cours de phrase : pas de résumé plutôt qu'un résumé illisible.
+    const midStart = item(
+      'T',
+      'u',
+      'problem, with and without their native goal mode. Fable was a beast on this benchmark.',
+    );
+    expect(excerptSummary(midStart)).toBe('');
   });
 
   it('accepte un détail correct du premier coup', async () => {

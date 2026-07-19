@@ -10,6 +10,7 @@ import {
   filterByAge,
   rankItems,
   toExcerpt,
+  cutAtSentence,
   feedLabelFromUrl,
   type NewsItem,
 } from './FetchTechNewsTool';
@@ -46,6 +47,28 @@ describe('toExcerpt', () => {
     const out = toExcerpt('a'.repeat(600), 100);
     expect(out.length).toBe(101); // 100 + ellipse
     expect(out.endsWith('…')).toBe(true);
+  });
+});
+
+describe('cutAtSentence', () => {
+  it('rend le texte intact sous la limite', () => {
+    expect(cutAtSentence('Une phrase courte.', 100)).toBe('Une phrase courte.');
+  });
+
+  it('coupe à la dernière fin de phrase avant la limite', () => {
+    const texte =
+      'La première phrase fait une taille raisonnable pour être conservée entière. ' +
+      'La deuxième phrase sera sacrifiée car elle dépasse largement la limite fixée ici.';
+    const out = cutAtSentence(texte, 100);
+    expect(out).toBe('La première phrase fait une taille raisonnable pour être conservée entière.');
+  });
+
+  it("coupe au mot + ellipse quand aucune phrase complète n'est assez longue", () => {
+    const out = cutAtSentence('Court. ' + 'mot '.repeat(60), 100);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(101);
+    // Pas de coupe en plein mot.
+    expect(out).not.toMatch(/mo…$/);
   });
 });
 

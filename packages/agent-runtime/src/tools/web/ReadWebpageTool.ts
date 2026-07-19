@@ -10,23 +10,49 @@ const argsSchema = z.object({
 });
 type Args = z.infer<typeof argsSchema>;
 
-// Minimal HTML-to-text extractor — removes tags, scripts, styles, decodes entities
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<(br|p|div|li|h[1-6]|tr|td|th)[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+function decodeHtmlEntities(text: string): string {
+  return text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+// Minimal HTML-to-text extractor — removes tags, scripts, styles, decodes entities.
+// Une ligne du résultat = un BLOC de la page (paragraphe, titre, cellule…), jamais
+// une ligne du fichier source : les retours à la ligne du HTML source sont du
+// pliage d'éditeur, pas de la structure. Les traiter comme des fins de ligne
+// coupait les phrases en deux, et le filtre de prose aval (looksLikeProse) jetait
+// le morceau sans ponctuation — d'où des extraits démarrant en cours de phrase.
+export function htmlToText(html: string): string {
+  // Sanctuarise les <pre> : LEURS retours à la ligne sont du contenu (code).
+  const pres: string[] = [];
+  const guarded = html.replace(/<pre\b[\s\S]*?<\/pre>/gi, m => {
+    pres.push(m);
+    return `\u0000${pres.length - 1}\u0000`;
+  });
+  const text = decodeHtmlEntities(
+    guarded
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/[\r\n]+/g, ' ')
+      .replace(
+        /<\/?(?:br|p|div|li|ul|ol|h[1-6]|tr|td|th|table|section|article|blockquote|figure|figcaption|dt|dd)\b[^>]*>/gi,
+        '\n',
+      )
+      .replace(/<[^>]+>/g, ''),
+  )
     .replace(/[ \t]+/g, ' ')
+    .replace(/ ?\n ?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
+  // eslint-disable-next-line no-control-regex -- sentinelle NUL volontaire (voir plus haut)
+  return text.replace(/\u0000(\d+)\u0000/g, (_, i: string) =>
+    decodeHtmlEntities(pres[Number(i)]?.replace(/<[^>]+>/g, '') ?? '').trim(),
+  );
 }
 
 /**
@@ -43,6 +69,15 @@ export function looksLikeProse(text: string, minLen = 80): boolean {
   if (words.length < 5) return false;
   const caps = words.filter(w => /^\p{Lu}/u.test(w)).length;
   return caps / words.length <= 0.4;
+}
+
+/**
+ * Un texte qui démarre par une minuscule a été pris EN COURS de phrase (flux
+ * RSS tronqué, fragment recollé) : à écarter quand on cite ou résume — un
+ * extrait qui commence au milieu d'une phrase est illisible. Pur, exporté.
+ */
+export function startsMidSentence(text: string): boolean {
+  return /^\p{Ll}/u.test(text.trim());
 }
 
 /**

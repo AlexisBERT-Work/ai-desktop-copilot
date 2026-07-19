@@ -2,8 +2,14 @@ import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-import { aggregateNews, httpGet, toExcerpt, type NewsItem } from './FetchTechNewsTool';
-import { extractReadableText, looksLikeProse } from './ReadWebpageTool';
+import {
+  aggregateNews,
+  cutAtSentence,
+  httpGet,
+  toExcerpt,
+  type NewsItem,
+} from './FetchTechNewsTool';
+import { extractReadableText, looksLikeProse, startsMidSentence } from './ReadWebpageTool';
 import type { OllamaClient } from '../../llm/OllamaClient';
 import { summarizeDigest } from '../../llm/NewsSummarizer';
 import { createLogger } from '../../logger';
@@ -154,8 +160,10 @@ export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Pr
         // Sous ~200 caractères, on est face à un paywall, un mur de cookies ou
         // une page sans prose : l'extrait RSS fait alors meilleure matière.
         if (text.length < 200) return;
-        item.fullText = toExcerpt(text, maxChars);
-        if (!item.excerpt || !looksLikeProse(item.excerpt, 30)) {
+        // Coupe à la phrase en PRÉSERVANT les sauts de paragraphe : écraser les
+        // \n collait des paragraphes sans rapport en une seule « phrase ».
+        item.fullText = cutAtSentence(text, maxChars);
+        if (!item.excerpt || !looksLikeProse(item.excerpt, 30) || startsMidSentence(item.excerpt)) {
           item.excerpt = toExcerpt(text, 500);
         }
       } catch {

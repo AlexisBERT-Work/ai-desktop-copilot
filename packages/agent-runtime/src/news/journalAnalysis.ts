@@ -1,6 +1,6 @@
 import type { OllamaClient } from '../llm/OllamaClient';
-import type { NewsItem } from '../tools/web/FetchTechNewsTool';
-import { looksLikeProse } from '../tools/web/ReadWebpageTool';
+import { cutAtSentence, type NewsItem } from '../tools/web/FetchTechNewsTool';
+import { looksLikeProse, startsMidSentence } from '../tools/web/ReadWebpageTool';
 import { articleCharBudget, complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { ensureVerifiedDetails } from './detailVerification';
 import { createLogger } from '../logger';
@@ -15,7 +15,8 @@ const log = createLogger('news:press-digest');
  */
 export function excerptSummary(it: NewsItem): string {
   const e = (it.excerpt ?? '').trim();
-  return looksLikeProse(e, 30) ? e.slice(0, 200) : '';
+  if (!looksLikeProse(e, 30) || startsMidSentence(e)) return '';
+  return cutAtSentence(e, 200);
 }
 
 /** Analyse intra-journal : angle éditorial + résumé et détail par article. */
@@ -42,7 +43,7 @@ export function buildJournalPrompt(journal: string, items: NewsItem[]): string {
     // Corps de l'article téléchargé (enrichArticleTexts) de préférence, sinon
     // extrait RSS : c'est la seule matière autorisée pour les détails.
     const text = it.fullText && it.fullText.length > 0 ? it.fullText : it.excerpt;
-    if (text && text.length > 0) parts.push(`Texte : ${text.slice(0, budget)}`);
+    if (text && text.length > 0) parts.push(`Texte : ${cutAtSentence(text, budget)}`);
     return parts.join('\n');
   });
   return `Journal : ${journal}\nVoici les ${items.length} articles du jour :\n\n${lines.join('\n\n')}`;

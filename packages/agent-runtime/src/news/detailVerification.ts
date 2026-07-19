@@ -1,6 +1,6 @@
 import type { OllamaClient } from '../llm/OllamaClient';
-import type { NewsItem } from '../tools/web/FetchTechNewsTool';
-import { looksLikeProse } from '../tools/web/ReadWebpageTool';
+import { cutAtSentence, type NewsItem } from '../tools/web/FetchTechNewsTool';
+import { looksLikeProse, startsMidSentence } from '../tools/web/ReadWebpageTool';
 import { articleCharBudget, complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { createLogger } from '../logger';
 
@@ -169,7 +169,7 @@ Règles STRICTES :
 /** Invite mono-article pour la régénération d'un détail. Pur, exporté pour tests. */
 export function buildDetailPrompt(item: NewsItem): string {
   const text = item.fullText ?? item.excerpt ?? '';
-  return `Titre : ${item.title}\n\nTexte de l'article :\n${text.slice(0, 1500)}`;
+  return `Titre : ${item.title}\n\nTexte de l'article :\n${cutAtSentence(text, 1500)}`;
 }
 
 /**
@@ -180,13 +180,14 @@ export function buildDetailPrompt(item: NewsItem): string {
  * afficher. Renvoie '' si aucune matière ne vaut un bouton. Pur.
  */
 export function verbatimDetail(item: NewsItem): string {
-  const text =
-    [item.excerpt ?? '', item.fullText ?? '']
-      .map(t => t.replace(/\s+/g, ' ').trim())
-      .find(t => looksLikeProse(t)) ?? '';
+  const candidates = [item.excerpt ?? '', item.fullText ?? '']
+    .map(t => t.replace(/\s+/g, ' ').trim())
+    .filter(t => looksLikeProse(t));
+  // Un extrait qui démarre en cours de phrase (flux RSS tronqué) cède sa place
+  // au corps de page, qui commence à un vrai paragraphe.
+  const text = candidates.find(t => !startsMidSentence(t)) ?? candidates[0] ?? '';
   if (text.length === 0) return '';
-  const cut = text.length <= 350 ? text : `${text.slice(0, 350).replace(/\s+\S*$/, '')}…`;
-  return `Extrait de l'article : « ${cut} »`;
+  return `Extrait de l'article : « ${cutAtSentence(text, 350)} »`;
 }
 
 const DETAIL_ATTEMPTS = 3;

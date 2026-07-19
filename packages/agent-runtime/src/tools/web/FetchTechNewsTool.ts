@@ -344,13 +344,31 @@ function tagContent(block: string, tag: string): string | null {
   return m ? decodeEntities(m[1]!) : null;
 }
 
+/**
+ * Coupe un texte trop long à la dernière fin de phrase avant `max` ; à défaut
+ * (aucune phrase complète assez longue), au dernier mot entier + « … ». Une
+ * coupe brute en pleine phrase (« This is pure raw The… ») rend illisible tout
+ * ce qui cite ou résume ce texte ensuite. Pur, exporté pour tests.
+ */
+export function cutAtSentence(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const slice = text.slice(0, max);
+  let end = -1;
+  const re = /[.!?…](?=\s)/g;
+  for (let m = re.exec(slice); m !== null; m = re.exec(slice)) end = m.index + 1;
+  // Une « phrase » qui n'occupe pas au moins 40 % du budget est trop maigre :
+  // mieux vaut couper au mot que de réduire l'extrait à presque rien.
+  if (end >= max * 0.4) return slice.slice(0, end).trimEnd();
+  return `${slice.replace(/\s+\S*$/, '').trimEnd()}…`;
+}
+
 // Strip residual HTML from a feed description into a short plain-text teaser.
 export function toExcerpt(raw: string, max = 500): string {
   const text = raw
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
+  return cutAtSentence(text, max);
 }
 
 /** Parse an RSS 2.0 or Atom feed into news items. Resilient to formatting. */

@@ -5,6 +5,7 @@ import {
   extractBySelector,
   extractReadableText,
   looksLikeProse,
+  startsMidSentence,
 } from './ReadWebpageTool';
 
 // Échantillon réel du bug des dailys (2026-07-18) : titre du site + menu ×2 +
@@ -24,7 +25,26 @@ describe('htmlToText', () => {
   });
 
   it('convertit les balises de bloc en sauts de ligne', () => {
-    expect(htmlToText('<h1>Titre</h1><p>Para</p>')).toBe('Titre\nPara');
+    expect(htmlToText('<h1>Titre</h1><p>Para</p>')).toBe('Titre\n\nPara');
+  });
+
+  it('ignore les retours à la ligne du fichier source : une phrase repliée reste entière', () => {
+    // Cause réelle du bug des dailys : la phrase coupée par le pliage du HTML
+    // perdait son début (filtré comme non-prose) et le reste démarrait en
+    // plein milieu (« ago writing C++ to solve it »).
+    const html =
+      '<p>I spent two evenings a couple of years\nago writing C++ to solve it, so I have a useful human baseline.</p>';
+    expect(htmlToText(html)).toBe(
+      'I spent two evenings a couple of years ago writing C++ to solve it, so I have a useful human baseline.',
+    );
+  });
+
+  it('préserve les retours à la ligne DANS les <pre> (code)', () => {
+    const html = '<p>Avant.</p><pre>ligne 1\n  ligne 2</pre><p>Après.</p>';
+    const out = htmlToText(html);
+    expect(out).toContain('ligne 1\n  ligne 2');
+    expect(out).toContain('Avant.');
+    expect(out).toContain('Après.');
   });
 
   it('décode les entités HTML', () => {
@@ -83,6 +103,16 @@ describe('looksLikeProse', () => {
         'des mots sans aucune ponctuation de phrase du tout mais assez longs pour dépasser la barre de longueur minimale pourtant',
       ),
     ).toBe(false);
+  });
+});
+
+describe('startsMidSentence', () => {
+  it('détecte un fragment pris en cours de phrase', () => {
+    expect(
+      startsMidSentence('optimization problem, with and without their native goal mode.'),
+    ).toBe(true);
+    expect(startsMidSentence('Rivian shares fell nearly 15% after the announcement.')).toBe(false);
+    expect(startsMidSentence('« Une citation ouvrante. »')).toBe(false);
   });
 });
 
