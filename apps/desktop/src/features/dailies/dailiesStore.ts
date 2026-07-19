@@ -36,23 +36,23 @@ interface DailiesState {
 
 export const useDailiesStore = create<DailiesState>()(
   persist(
-    (set) => ({
+    set => ({
       items: [],
       status: 'loading',
       followed: [],
       hasMore: false,
       loadingMore: false,
 
-      setItems: (items) => set({ items }),
-      setStatus: (status) => set({ status }),
-      setHasMore: (hasMore) => set({ hasMore }),
-      setLoadingMore: (loadingMore) => set({ loadingMore }),
+      setItems: items => set({ items }),
+      setStatus: status => set({ status }),
+      setHasMore: hasMore => set({ hasMore }),
+      setLoadingMore: loadingMore => set({ loadingMore }),
       loadMore: () => {},
-      setLoadMore: (fn) => set({ loadMore: fn }),
-      toggleCategory: (category) =>
-        set((s) => ({
+      setLoadMore: fn => set({ loadMore: fn }),
+      toggleCategory: category =>
+        set(s => ({
           followed: s.followed.includes(category)
-            ? s.followed.filter((c) => c !== category)
+            ? s.followed.filter(c => c !== category)
             : [...s.followed, category],
         })),
       clearFollowed: () => set({ followed: [] }),
@@ -60,7 +60,7 @@ export const useDailiesStore = create<DailiesState>()(
     {
       name: 'catdesk-dailies',
       // On ne persiste que les préférences ; les items viennent du backend.
-      partialize: (s) => ({ followed: s.followed }),
+      partialize: s => ({ followed: s.followed }),
       // Répare un état persisté éventuellement obsolète (catégorie supprimée…).
       merge: (persisted, current) => {
         const f = (persisted as { followed?: unknown } | null)?.followed;
@@ -79,7 +79,7 @@ export const useDailiesStore = create<DailiesState>()(
 export function computeActiveDailies(items: Daily[]): Daily[] {
   const now = Date.now();
   return items
-    .filter((d) => d.expiresAt === null || Date.parse(d.expiresAt) > now)
+    .filter(d => d.expiresAt === null || Date.parse(d.expiresAt) > now)
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 }
 
@@ -87,7 +87,7 @@ export function computeActiveDailies(items: Daily[]): Daily[] {
 export function filterByFollowed(items: Daily[], followed: DailyCategory[]): Daily[] {
   if (followed.length === 0) return items;
   const set = new Set(followed);
-  return items.filter((d) => set.has(d.category));
+  return items.filter(d => set.has(d.category));
 }
 
 /**
@@ -97,7 +97,7 @@ export function filterByFollowed(items: Daily[], followed: DailyCategory[]): Dai
 export function searchDailies(items: Daily[], query: string): Daily[] {
   const q = query.trim().toLowerCase();
   if (q === '') return items;
-  return items.filter((d) => `${d.title}\n${d.body}`.toLowerCase().includes(q));
+  return items.filter(d => `${d.title}\n${d.body}`.toLowerCase().includes(q));
 }
 
 /**
@@ -106,10 +106,32 @@ export function searchDailies(items: Daily[], query: string): Daily[] {
  */
 export function filterByKind(items: Daily[], kind: DailyKindFilter): Daily[] {
   if (kind === 'all') return items;
-  return items.filter((d) => {
+  return items.filter(d => {
     const k = dailyKindFromTitle(d.title);
     return kind === 'journal' ? k === 'journal' || k === 'synthesis' : k === 'topic';
   });
+}
+
+/** Filtre d'origine d'un widget dailys : tout, partagées, ou persos (ce poste). */
+export type DailyOriginFilter = 'all' | 'shared' | 'local';
+
+export const DAILY_ORIGIN_LABEL: Record<DailyOriginFilter, string> = {
+  all: 'Toutes',
+  shared: 'Partagées',
+  local: 'Persos',
+};
+
+export function isDailyOriginFilter(x: unknown): x is DailyOriginFilter {
+  return x === 'all' || x === 'shared' || x === 'local';
+}
+
+/**
+ * Restreint à une origine ; une daily sans tag est partagée (données serveur).
+ * 'all' ⇒ tout. Pur.
+ */
+export function filterByOrigin(items: Daily[], origin: DailyOriginFilter): Daily[] {
+  if (origin === 'all') return items;
+  return items.filter(d => (d.origin ?? 'shared') === origin);
 }
 
 /** Fenêtre temporelle d'un widget dailys. */
@@ -126,12 +148,16 @@ export function isDailyPeriod(x: unknown): x is DailyPeriodFilter {
 }
 
 /** Restreint à la fenêtre temporelle (jour local ; 'week' = 7 derniers jours). Pur. */
-export function filterByPeriod(items: Daily[], period: DailyPeriodFilter, now = new Date()): Daily[] {
+export function filterByPeriod(
+  items: Daily[],
+  period: DailyPeriodFilter,
+  now = new Date(),
+): Daily[] {
   if (period === 'all') return items;
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   if (period === 'week') start.setDate(start.getDate() - 6);
-  return items.filter((d) => {
+  return items.filter(d => {
     const t = Date.parse(d.publishedAt);
     return !Number.isNaN(t) && t >= start.getTime();
   });
@@ -155,7 +181,7 @@ export function dailySourceLabel(title: string): string {
 
 /** Sources distinctes des dailys données, triées alphabétiquement. Pur. */
 export function listDailySources(items: Daily[]): string[] {
-  return [...new Set(items.map((d) => dailySourceLabel(d.title)))].sort((a, b) =>
+  return [...new Set(items.map(d => dailySourceLabel(d.title)))].sort((a, b) =>
     a.localeCompare(b, 'fr'),
   );
 }
@@ -163,5 +189,5 @@ export function listDailySources(items: Daily[]): string[] {
 /** Restreint à une source (journal ou sujet) ; '' ⇒ toutes. Pur. */
 export function filterBySource(items: Daily[], source: string): Daily[] {
   if (source === '') return items;
-  return items.filter((d) => dailySourceLabel(d.title) === source);
+  return items.filter(d => dailySourceLabel(d.title) === source);
 }

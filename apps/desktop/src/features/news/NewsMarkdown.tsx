@@ -15,7 +15,7 @@ function CollapsibleDetail({ children }: { children?: ReactNode }) {
   return (
     <div className="my-0.5">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         className="flex items-center gap-0.5 text-[11px] font-medium text-brand-300 hover:text-brand-200"
       >
@@ -53,7 +53,7 @@ export function NewsMarkdown({ content }: { content: string }) {
                 href={href}
                 title="Ouvrir l'article officiel dans le navigateur"
                 className="cursor-pointer text-brand-300 underline underline-offset-2 hover:text-brand-200"
-                onClick={(e) => {
+                onClick={e => {
                   e.preventDefault();
                   openExternal(href);
                 }}
@@ -64,6 +64,19 @@ export function NewsMarkdown({ content }: { content: string }) {
           },
           blockquote({ children }) {
             return <CollapsibleDetail>{children}</CollapsibleDetail>;
+          },
+          // Chaque puce est UN article (convention des corps de dailys) : on la
+          // rend comme un bloc bordé distinct — sans séparation, les articles
+          // se fondaient en un seul pavé illisible.
+          ul({ children }) {
+            return <ul className="my-1 list-none space-y-1.5 pl-0">{children}</ul>;
+          },
+          li({ children }) {
+            return (
+              <li className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                {children}
+              </li>
+            );
           },
         }}
       >

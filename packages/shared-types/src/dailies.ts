@@ -22,6 +22,13 @@ export function isDailyCategory(x: unknown): x is DailyCategory {
   return typeof x === 'string' && (DAILY_CATEGORIES as readonly string[]).includes(x);
 }
 
+/**
+ * Origine d'une daily : 'shared' = publiée pour tous les utilisateurs (poste
+ * admin → Supabase) ; 'local' = personnelle, générée sur CE poste par « Mes
+ * journaux ». Taguée côté client au moment de fusionner les deux flux.
+ */
+export type DailyOrigin = 'shared' | 'local';
+
 /** Une daily, telle que consommée côté client (camelCase). */
 export interface Daily {
   id: string;
@@ -30,6 +37,8 @@ export interface Daily {
   category: DailyCategory;
   publishedAt: string; // ISO 8601
   expiresAt: string | null; // ISO 8601 ou null
+  /** Origine (partagée/personnelle). Absente = partagée (données serveur). */
+  origin?: DailyOrigin;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Cat, Search, X } from 'lucide-react';
+import { Cat, Laptop, Search, Users, X } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
@@ -11,15 +11,19 @@ import {
 import { NewsMarkdown } from '../../news/NewsMarkdown';
 import {
   computeActiveDailies,
+  DAILY_ORIGIN_LABEL,
   DAILY_PERIOD_LABEL,
   filterByFollowed,
   filterByKind,
+  filterByOrigin,
   filterByPeriod,
   filterBySource,
+  isDailyOriginFilter,
   isDailyPeriod,
   listDailySources,
   searchDailies,
   useDailiesStore,
+  type DailyOriginFilter,
   type DailyPeriodFilter,
 } from '../../dailies/dailiesStore';
 import { useLocalPressStore } from '../../dailies/localPress';
@@ -53,6 +57,42 @@ function readSource(config: Record<string, unknown>): string {
   return typeof s === 'string' ? s : '';
 }
 
+/** Lit le filtre d'origine du widget ('all' par défaut). */
+function readOrigin(config: Record<string, unknown>): DailyOriginFilter {
+  const o = config['origin'];
+  return isDailyOriginFilter(o) ? o : 'all';
+}
+
+/**
+ * Badge d'origine d'une daily : « Perso » (générée sur ce poste) vs
+ * « Partagée » (publiée pour tous). La différence doit sauter aux yeux —
+ * les deux flux sont fusionnés dans la même liste.
+ */
+function OriginBadge({ origin }: { origin: 'shared' | 'local' }) {
+  if (origin === 'local') {
+    return (
+      <span
+        title="Daily personnelle — générée sur ce poste par « Mes journaux »"
+        className="flex shrink-0 items-center gap-0.5 rounded bg-emerald-500/15 px-1.5 py-0.5
+                   text-[10px] font-medium text-emerald-200"
+      >
+        <Laptop className="h-2.5 w-2.5" aria-hidden />
+        Perso
+      </span>
+    );
+  }
+  return (
+    <span
+      title="Daily partagée — publiée pour tous les utilisateurs"
+      className="flex shrink-0 items-center gap-0.5 rounded bg-sky-500/15 px-1.5 py-0.5
+                 text-[10px] font-medium text-sky-200"
+    >
+      <Users className="h-2.5 w-2.5" aria-hidden />
+      Partagée
+    </span>
+  );
+}
+
 const CHIP_BASE = 'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors';
 
 const KIND_OPTIONS: readonly { value: DailyKindFilter; label: string }[] = [
@@ -73,7 +113,11 @@ const segmentClass = (on: boolean): string =>
 const STEP_LIMITS = [20, Infinity] as const;
 
 function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 function dayLabel(iso: string, now: Date): string {
@@ -126,6 +170,9 @@ interface DailiesViewProps {
   /** Source (journal ou sujet) ; menu affiché si onSourceChange est fourni. '' = toutes. */
   source?: string;
   onSourceChange?: (source: string) => void;
+  /** Origine (partagées/persos) ; sélecteur affiché si les deux cohabitent. */
+  origin?: DailyOriginFilter;
+  onOriginChange?: (origin: DailyOriginFilter) => void;
   max?: number;
   /** Le serveur détient-il des dailys plus anciennes non encore chargées ? */
   serverHasMore?: boolean;
@@ -146,6 +193,8 @@ export function DailiesView({
   onPeriodChange,
   source = '',
   onSourceChange,
+  origin = 'all',
+  onOriginChange,
   max = 5,
   serverHasMore = false,
   loadingMore = false,
@@ -155,15 +204,21 @@ export function DailiesView({
   const [step, setStep] = useState(0);
   const searching = query.trim().length > 0;
 
-  // Filtres genre → source → période → catégories → recherche, puis dévoilement
-  // progressif (5 → 20 → tout).
+  // Filtres genre → origine → source → période → catégories → recherche, puis
+  // dévoilement progressif (5 → 20 → tout).
   const byKind = filterByKind(items, kindFilter);
-  const sources = useMemo(() => listDailySources(byKind), [byKind]);
+  // Le sélecteur d'origine n'apparaît que si les deux mondes cohabitent
+  // (un poste sans Supabase n'a que des persos : le montrer serait du bruit).
+  const hasMixedOrigins =
+    byKind.some(d => (d.origin ?? 'shared') === 'local') &&
+    byKind.some(d => (d.origin ?? 'shared') === 'shared');
+  const byOrigin = filterByOrigin(byKind, hasMixedOrigins ? origin : 'all');
+  const sources = useMemo(() => listDailySources(byOrigin), [byOrigin]);
   // Une source qui n'existe plus dans la vue courante (changement de genre,
   // données rafraîchies) est ignorée plutôt que de vider silencieusement la liste.
   const effectiveSource = source !== '' && sources.includes(source) ? source : '';
   const list = searchDailies(
-    filterByFollowed(filterByPeriod(filterBySource(byKind, effectiveSource), period), followed),
+    filterByFollowed(filterByPeriod(filterBySource(byOrigin, effectiveSource), period), followed),
     query,
   );
   const limit = step === 0 ? max : (STEP_LIMITS[step - 1] ?? Infinity);
@@ -181,7 +236,7 @@ export function DailiesView({
         <div className="flex flex-wrap items-center gap-1.5">
           {onKindChange !== undefined && (
             <div role="tablist" aria-label="Genre de dailys" className={SEGMENT_GROUP}>
-              {KIND_OPTIONS.map((o) => (
+              {KIND_OPTIONS.map(o => (
                 <button
                   key={o.value}
                   role="tab"
@@ -196,7 +251,7 @@ export function DailiesView({
           )}
           {onPeriodChange !== undefined && (
             <div role="tablist" aria-label="Période" className={SEGMENT_GROUP}>
-              {PERIOD_OPTIONS.map((p) => (
+              {PERIOD_OPTIONS.map(p => (
                 <button
                   key={p}
                   role="tab"
@@ -209,12 +264,27 @@ export function DailiesView({
               ))}
             </div>
           )}
+          {onOriginChange !== undefined && hasMixedOrigins && (
+            <div role="tablist" aria-label="Origine des dailys" className={SEGMENT_GROUP}>
+              {(['all', 'shared', 'local'] as const).map(o => (
+                <button
+                  key={o}
+                  role="tab"
+                  aria-selected={origin === o}
+                  onClick={() => onOriginChange(o)}
+                  className={segmentClass(origin === o)}
+                >
+                  {DAILY_ORIGIN_LABEL[o]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Filtres par centre d'intérêt */}
       <div className="flex flex-wrap gap-1">
-        {DAILY_CATEGORIES.map((c) => {
+        {DAILY_CATEGORIES.map(c => {
           const on = followed.includes(c);
           return (
             <button
@@ -239,7 +309,7 @@ export function DailiesView({
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={e => setQuery(e.target.value)}
             placeholder="Rechercher dans les dailys…"
             className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-7 pr-7 text-xs
                        text-white/85 outline-none placeholder-white/30 focus:border-brand-400/50"
@@ -257,14 +327,14 @@ export function DailiesView({
         {onSourceChange !== undefined && sources.length > 1 && (
           <select
             value={effectiveSource}
-            onChange={(e) => onSourceChange(e.target.value)}
+            onChange={e => onSourceChange(e.target.value)}
             aria-label="Filtrer par source"
             className="max-w-[45%] shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5
                        text-xs text-white/85 outline-none focus:border-brand-400/50
                        [&>option]:bg-gray-900 [&>option]:text-white/85"
           >
             <option value="">Toutes les sources</option>
-            {sources.map((s) => (
+            {sources.map(s => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -289,30 +359,42 @@ export function DailiesView({
         // key = filtres actifs : changer de vue rejoue un léger glissement,
         // ce qui rend le changement de contenu perceptible sans être intrusif.
         <div
-          key={`${kindFilter}|${period}|${effectiveSource}|${followed.join(',')}`}
+          key={`${kindFilter}|${period}|${effectiveSource}|${origin}|${followed.join(',')}`}
           className="flex-1 animate-slide-up space-y-3 overflow-y-auto"
         >
-          {groups.map((g) => (
+          {groups.map(g => (
             <div key={g.key}>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
                 {g.label}
               </p>
               <ul className="space-y-2">
-                {g.items.map((d) => (
-                  <li key={d.id} className="border-t border-white/5 pt-2 first:border-0 first:pt-0">
-                    <div className="flex items-center gap-2">
-                      <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
-                        {DAILY_CATEGORY_LABEL[d.category]}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
-                        {d.title}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 text-xs text-white/60">
-                      <NewsMarkdown content={d.body} />
-                    </div>
-                  </li>
-                ))}
+                {g.items.map(d => {
+                  const dOrigin = d.origin ?? 'shared';
+                  return (
+                    <li
+                      key={d.id}
+                      className={`border-t border-white/5 pt-2 first:border-0 first:pt-0 ${
+                        // Liseré d'origine : vert = perso (ce poste), bleu = partagée.
+                        dOrigin === 'local'
+                          ? 'border-l-2 border-l-emerald-400/40 pl-2'
+                          : 'border-l-2 border-l-sky-400/30 pl-2'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
+                          {DAILY_CATEGORY_LABEL[d.category]}
+                        </span>
+                        <OriginBadge origin={dOrigin} />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
+                          {d.title}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-white/60">
+                        <NewsMarkdown content={d.body} />
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -321,7 +403,7 @@ export function DailiesView({
             <div className="flex items-center gap-3 pt-1 text-xs">
               {canRevealMore && (
                 <button
-                  onClick={() => setStep((s) => s + 1)}
+                  onClick={() => setStep(s => s + 1)}
                   className="font-medium text-brand-300 hover:text-brand-200"
                 >
                   {step === 0 ? 'Voir plus' : 'Voir tout'} ({list.length})
@@ -355,19 +437,24 @@ export function DailiesView({
  * la sélection de catégories est une préférence locale persistée.
  */
 export function DailiesWidget({ widget }: WidgetProps) {
-  const items = useDailiesStore((s) => s.items);
-  const status = useDailiesStore((s) => s.status);
-  const globalFollowed = useDailiesStore((s) => s.followed);
-  const hasMore = useDailiesStore((s) => s.hasMore);
-  const loadingMore = useDailiesStore((s) => s.loadingMore);
-  const loadMore = useDailiesStore((s) => s.loadMore);
-  const localDailies = useLocalPressStore((s) => s.dailies);
-  const updateWidgetConfig = useDashboardStore((s) => s.updateWidgetConfig);
-  const renameWidget = useDashboardStore((s) => s.renameWidget);
+  const items = useDailiesStore(s => s.items);
+  const status = useDailiesStore(s => s.status);
+  const globalFollowed = useDailiesStore(s => s.followed);
+  const hasMore = useDailiesStore(s => s.hasMore);
+  const loadingMore = useDailiesStore(s => s.loadingMore);
+  const loadMore = useDailiesStore(s => s.loadMore);
+  const localDailies = useLocalPressStore(s => s.dailies);
+  const updateWidgetConfig = useDashboardStore(s => s.updateWidgetConfig);
+  const renameWidget = useDashboardStore(s => s.renameWidget);
   // Dailys partagées (Supabase) + dailys locales (journaux perso de ce poste),
-  // fusionnées et triées ensemble.
+  // fusionnées et triées ensemble — chacune taguée de son origine pour que la
+  // différence reste visible (badge, liseré, filtre).
   const active = useMemo(
-    () => computeActiveDailies([...items, ...localDailies]),
+    () =>
+      computeActiveDailies([
+        ...items.map(d => ({ ...d, origin: 'shared' as const })),
+        ...localDailies.map(d => ({ ...d, origin: 'local' as const })),
+      ]),
     [items, localDailies],
   );
   const kindFilter = readKind(widget.config);
@@ -390,7 +477,7 @@ export function DailiesWidget({ widget }: WidgetProps) {
   // config) ; un widget jamais filtré hérite de l'ancienne préférence globale.
   const followed = readFollowed(widget.config) ?? globalFollowed;
   const toggle = (c: DailyCategory) => {
-    const next = followed.includes(c) ? followed.filter((x) => x !== c) : [...followed, c];
+    const next = followed.includes(c) ? followed.filter(x => x !== c) : [...followed, c];
     updateWidgetConfig(widget.id, { followed: next });
   };
 
@@ -416,9 +503,11 @@ export function DailiesWidget({ widget }: WidgetProps) {
       kindFilter={kindFilter}
       onKindChange={setKind}
       period={period}
-      onPeriodChange={(p) => updateWidgetConfig(widget.id, { period: p })}
+      onPeriodChange={p => updateWidgetConfig(widget.id, { period: p })}
       source={source}
-      onSourceChange={(s) => updateWidgetConfig(widget.id, { source: s })}
+      onSourceChange={s => updateWidgetConfig(widget.id, { source: s })}
+      origin={readOrigin(widget.config)}
+      onOriginChange={o => updateWidgetConfig(widget.id, { origin: o })}
       serverHasMore={hasMore}
       loadingMore={loadingMore}
       onLoadMore={loadMore}
