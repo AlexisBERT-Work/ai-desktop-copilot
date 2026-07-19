@@ -8,8 +8,13 @@ import {
 } from '@catdesk/shared-types';
 import { NewsMarkdown } from '../news/NewsMarkdown';
 import { useAdminSession, signInAdmin, signOutAdmin } from './adminAuth';
-import { createDaily, deleteDaily, listAllDailies, updateDaily, type DailyInput } from './dailiesAdmin';
-import { PressFeedsPanel } from './PressFeedsPanel';
+import {
+  createDaily,
+  deleteDaily,
+  listAllDailies,
+  updateDaily,
+  type DailyInput,
+} from './dailiesAdmin';
 
 const FIELD =
   'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 ' +
@@ -19,7 +24,8 @@ const LABEL = 'block text-xs font-medium text-white/50 mb-1';
 const BTN_PRIMARY =
   'flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white ' +
   'transition-colors hover:bg-brand-500 disabled:opacity-50';
-const BTN_GHOST = 'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-colors hover:text-white/85';
+const BTN_GHOST =
+  'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-colors hover:text-white/85';
 
 function isoToLocalInput(iso: string | null): string {
   if (iso === null) return '';
@@ -32,7 +38,12 @@ function isoToLocalInput(iso: string | null): string {
 function formatPublished(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 interface Draft {
@@ -45,10 +56,12 @@ interface Draft {
 const EMPTY: Draft = { title: '', body: '', category: 'markets', expiresAt: '' };
 
 /**
- * Console d'administration des dailys — réservée à l'admin (claim
- * `app_metadata.role = 'admin'`). Permet de rédiger, éditer, faire expirer et
- * supprimer les dailys. Les écritures sont en plus bornées par la RLS serveur :
- * un non-admin ne peut rien publier, même en contournant l'UI.
+ * Console d'administration — réservée à l'admin (claim
+ * `app_metadata.role = 'admin'`). Recentrée sur son seul métier UNIQUE :
+ * rédiger, éditer, faire expirer et supprimer les dailys manuelles. La gestion
+ * des journaux (persos ET partagés) vit dans l'écran « Journaux » — une seule
+ * interface pour un même travail. Les écritures sont en plus bornées par la
+ * RLS serveur : un non-admin ne peut rien publier, même en contournant l'UI.
  */
 export function DailiesAdminConsole({ onClose }: { onClose: () => void }) {
   const { loading, isAdmin, email } = useAdminSession();
@@ -56,12 +69,18 @@ export function DailiesAdminConsole({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
       <header className="flex items-center gap-2.5 border-b border-white/10 px-5 py-3">
-        <button onClick={onClose} className="flex items-center gap-1 text-sm text-white/60 hover:text-white/90">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1 text-sm text-white/60 hover:text-white/90"
+        >
           <ArrowLeft className="h-4 w-4" />
           Retour
         </button>
         <ShieldCheck className="ml-1 h-4 w-4 text-brand-400" />
-        <span className="text-sm font-semibold text-white/90">Console — Dailys</span>
+        <span className="text-sm font-semibold text-white/90">Console — Dailys manuelles</span>
+        <span className="text-xs text-white/35">
+          rédigées à la main, publiées pour tous · les journaux se gèrent dans « Journaux »
+        </span>
         {isAdmin && (
           <div className="ml-auto flex items-center gap-3">
             <span className="text-xs text-white/40">{email}</span>
@@ -80,7 +99,7 @@ export function DailiesAdminConsole({ onClose }: { onClose: () => void }) {
         {loading ? (
           <p className="text-sm text-white/40">Chargement…</p>
         ) : isAdmin ? (
-          <AdminTabs />
+          <Console />
         ) : (
           <AdminLogin />
         )}
@@ -89,31 +108,8 @@ export function DailiesAdminConsole({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Onglets de la console admin : dailys manuelles vs journaux personnalisés. */
-function AdminTabs() {
-  const [tab, setTab] = useState<'dailies' | 'feeds'>('dailies');
-  const tabClass = (active: boolean) =>
-    `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-      active ? 'bg-brand-600 text-white' : 'text-white/55 hover:bg-white/10 hover:text-white/85'
-    }`;
-
-  return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-5 flex items-center gap-2">
-        <button className={tabClass(tab === 'dailies')} onClick={() => setTab('dailies')}>
-          Dailys
-        </button>
-        <button className={tabClass(tab === 'feeds')} onClick={() => setTab('feeds')}>
-          Journaux personnalisés
-        </button>
-      </div>
-      {tab === 'dailies' ? <Console /> : <PressFeedsPanel />}
-    </div>
-  );
-}
-
-/** Formulaire de connexion admin. */
-function AdminLogin() {
+/** Formulaire de connexion admin. Réutilisé par la portée « Partagés » de « Journaux ». */
+export function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -145,7 +141,7 @@ function AdminLogin() {
             type="email"
             autoComplete="username"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={e => setEmail(e.target.value)}
             placeholder="admin@exemple.com"
           />
         </label>
@@ -156,8 +152,8 @@ function AdminLogin() {
             type="password"
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => {
               if (e.key === 'Enter') void submit();
             }}
           />
@@ -197,7 +193,12 @@ function Console() {
 
   const startEdit = (d: Daily) => {
     setEditingId(d.id);
-    setDraft({ title: d.title, body: d.body, category: d.category, expiresAt: isoToLocalInput(d.expiresAt) });
+    setDraft({
+      title: d.title,
+      body: d.body,
+      category: d.category,
+      expiresAt: isoToLocalInput(d.expiresAt),
+    });
   };
 
   const save = async () => {
@@ -213,7 +214,8 @@ function Console() {
     };
     setBusy(true);
     setErr(null);
-    const { error } = editingId === null ? await createDaily(input) : await updateDaily(editingId, input);
+    const { error } =
+      editingId === null ? await createDaily(input) : await updateDaily(editingId, input);
     setBusy(false);
     if (error !== null) {
       setErr(error);
@@ -252,7 +254,7 @@ function Console() {
             <input
               className={FIELD}
               value={draft.title}
-              onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+              onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
               placeholder="Ouverture des marchés"
             />
           </label>
@@ -261,9 +263,9 @@ function Console() {
             <select
               className={FIELD}
               value={draft.category}
-              onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value as DailyCategory }))}
+              onChange={e => setDraft(d => ({ ...d, category: e.target.value as DailyCategory }))}
             >
-              {DAILY_CATEGORIES.map((c) => (
+              {DAILY_CATEGORIES.map(c => (
                 <option key={c} value={c} className={OPTION}>
                   {DAILY_CATEGORY_LABEL[c]}
                 </option>
@@ -276,7 +278,7 @@ function Console() {
               className={`${FIELD} resize-y`}
               rows={5}
               value={draft.body}
-              onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+              onChange={e => setDraft(d => ({ ...d, body: e.target.value }))}
               placeholder="Les futures US **en hausse**…"
             />
           </label>
@@ -286,7 +288,7 @@ function Console() {
               className={FIELD}
               type="datetime-local"
               value={draft.expiresAt}
-              onChange={(e) => setDraft((d) => ({ ...d, expiresAt: e.target.value }))}
+              onChange={e => setDraft(d => ({ ...d, expiresAt: e.target.value }))}
             />
           </label>
 
@@ -315,7 +317,7 @@ function Console() {
           <p className="text-sm text-white/35">Aucune daily pour l'instant.</p>
         ) : (
           <ul className="space-y-2">
-            {items.map((d) => {
+            {items.map(d => {
               const expired = d.expiresAt !== null && Date.parse(d.expiresAt) <= now;
               return (
                 <li key={d.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -323,7 +325,9 @@ function Console() {
                     <span className="shrink-0 rounded bg-brand-600/20 px-1.5 py-0.5 text-[10px] font-medium text-brand-200">
                       {DAILY_CATEGORY_LABEL[d.category]}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">{d.title}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
+                      {d.title}
+                    </span>
                     {expired && (
                       <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/40">
                         expirée
@@ -346,7 +350,7 @@ function Console() {
                     </button>
                     <button
                       onClick={() => (confirmId === d.id ? void remove(d.id) : setConfirmId(d.id))}
-                      onBlur={() => setConfirmId((id) => (id === d.id ? null : id))}
+                      onBlur={() => setConfirmId(id => (id === d.id ? null : id))}
                       disabled={busy}
                       className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
                         confirmId === d.id
