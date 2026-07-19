@@ -71,7 +71,10 @@ const ENTRIES: readonly GuideEntry[] = [
     params: [
       { key: 'Symbole', desc: 'Le ticker à suivre, ex. AAPL, MSFT, TSLA.' },
       { key: 'Champ', desc: 'price, change, changePercent ou volume.' },
-      { key: 'Formule (prioritaire)', desc: 'Si renseignée, remplace le symbole/champ — ex. AAPL.price / MSFT.price.' },
+      {
+        key: 'Formule (prioritaire)',
+        desc: 'Si renseignée, remplace le symbole/champ — ex. AAPL.price / MSFT.price.',
+      },
       { key: 'Libellé', desc: 'Texte affiché au-dessus de la valeur (optionnel).' },
     ],
     previewClass: 'h-28',
@@ -90,7 +93,7 @@ const ENTRIES: readonly GuideEntry[] = [
     name: 'Statistique',
     summary: 'Une variation, colorée selon le sens.',
     detail:
-      "Identique au KPI mais pensé pour les pourcentages : la valeur passe en vert si positive, en rouge si négative. Parfait pour la variation du jour.",
+      'Identique au KPI mais pensé pour les pourcentages : la valeur passe en vert si positive, en rouge si négative. Parfait pour la variation du jour.',
     params: [
       { key: 'Symbole', desc: 'Le ticker à suivre.' },
       { key: 'Champ', desc: 'Typiquement changePercent (variation du jour en %).' },
@@ -112,10 +115,13 @@ const ENTRIES: readonly GuideEntry[] = [
     name: 'Bourse',
     summary: 'Watchlist live + mini-courbes + formules.',
     detail:
-      "Le widget central : plusieurs symboles avec prix, variation et sparkline, suivis de colonnes de formules recalculées à chaque rafraîchissement. Les symboles et formules sont synchronisés automatiquement avec le moteur de données.",
+      'Le widget central : plusieurs symboles avec prix, variation et sparkline, suivis de colonnes de formules recalculées à chaque rafraîchissement. Les symboles et formules sont synchronisés automatiquement avec le moteur de données.',
     params: [
       { key: 'Symboles', desc: 'Liste séparée par des virgules, ex. AAPL, MSFT, TSLA.' },
-      { key: 'Formules', desc: 'Paires nom + expression (mathjs), ex. « AAPL/MSFT » = AAPL.price / MSFT.price.' },
+      {
+        key: 'Formules',
+        desc: 'Paires nom + expression (mathjs), ex. « AAPL/MSFT » = AAPL.price / MSFT.price.',
+      },
     ],
     preview: (
       <StocksView
@@ -136,7 +142,11 @@ const ENTRIES: readonly GuideEntry[] = [
     params: [{ key: 'Symbole', desc: 'Le ticker à tracer, ex. AAPL.' }],
     previewClass: 'h-40',
     preview: (
-      <ChartView symbol="AAPL" quote={SAMPLE_QUOTES.AAPL ?? null} history={SAMPLE_HISTORY.AAPL ?? []} />
+      <ChartView
+        symbol="AAPL"
+        quote={SAMPLE_QUOTES.AAPL ?? null}
+        history={SAMPLE_HISTORY.AAPL ?? []}
+      />
     ),
   },
   {
@@ -145,7 +155,9 @@ const ENTRIES: readonly GuideEntry[] = [
     summary: 'Tableau multi-symboles.',
     detail:
       'Compare plusieurs valeurs côte à côte : prix, variation et volume sur une même ligne. Pratique pour une vue de marché dense.',
-    params: [{ key: 'Symboles', desc: 'Liste séparée par des virgules, ex. AAPL, MSFT, TSLA, NVDA.' }],
+    params: [
+      { key: 'Symboles', desc: 'Liste séparée par des virgules, ex. AAPL, MSFT, TSLA, NVDA.' },
+    ],
     preview: <TableView symbols={['AAPL', 'MSFT', 'TSLA', 'NVDA']} quotes={SAMPLE_QUOTES} />,
   },
   {
@@ -154,21 +166,49 @@ const ENTRIES: readonly GuideEntry[] = [
     summary: 'Annonces poussées par l’administrateur.',
     detail:
       "Liste les annonces actives (maintenance, nouveautés, alertes). Le contenu est piloté par l'administrateur via le backend ; côté client, ce widget est en lecture seule.",
-    params: [{ key: 'Aucun réglage', desc: 'Le contenu provient du backend Supabase, pas de la configuration locale.' }],
+    params: [
+      {
+        key: 'Aucun réglage',
+        desc: 'Le contenu provient du backend Supabase, pas de la configuration locale.',
+      },
+    ],
     preview: <NewsView items={SAMPLE_NEWS} />,
   },
   {
     Icon: Newspaper,
     name: 'Dailys',
-    summary: 'Revue de presse quotidienne générée par IA, en lecture seule.',
+    summary: 'Revues de presse quotidiennes générées par IA — partagées et personnelles.',
     detail:
-      "Chaque jour, le système agrège les articles de nombreux journaux (finance, généraliste FR, international, tech), en fait des résumés par IA, et publie des « dailys » : soit une revue PAR JOURNAL, soit les news importantes triées PAR SUJET (International, Économie & marchés, Politique, Société, Tech & sciences, Culture & sport), plus une synthèse du jour. L'admin peut aussi créer des JOURNAUX PERSONNALISÉS (console admin) : ses propres sources/URLs de flux + filtres mots-clés et regex (inclure/exclure), publiés automatiquement et visibles de tous. Génération réservée à l'admin ; les clients ne font que consulter.",
+      "Chaque jour, le système agrège les articles de nombreux journaux, en fait des résumés par IA, et publie des « dailys » : revue PAR JOURNAL, news importantes triées PAR SUJET, plus une synthèse du jour. Deux origines cohabitent, chacune marquée d'un badge et d'un liseré : « Partagée » (bleu) — publiée pour tous les utilisateurs par le poste de référence — et « Perso » (vert) — générée sur VOTRE poste par vos propres journaux (écran « Journaux »). Chaque article est un bloc distinct avec son lien vers l'article officiel et, quand la matière le permet, un « En savoir plus » : un développement vérifié anti-invention (chiffres et faits contrôlés contre l'article source).",
     params: [
-      { key: 'Affichage', desc: 'Trois widgets au choix : « Tout », « Par sujet », « Par journal » (réglable via la roue).' },
-      { key: 'Catégories', desc: 'Puces pour ne suivre que certains centres d’intérêt. Préférence locale mémorisée.' },
-      { key: 'Recherche', desc: 'Champ de recherche approfondie : fouille les titres ET les articles de toutes les dailys.' },
-      { key: 'Historique', desc: 'Dailys groupées par jour (Aujourd’hui, Hier…) ; « Voir plus » puis « Voir tout » pour rattraper les jours manqués — rien n’est supprimé.' },
-      { key: 'Pagination', desc: 'Chargement par pages depuis le serveur : « Charger plus d’articles » remonte les dailys plus anciennes à la demande, prêt à encaisser des centaines d’articles sans tout charger d’un coup.' },
+      {
+        key: 'Affichage',
+        desc: '« Tout », « Par sujet » ou « Par journal » (réglable via la roue ou les onglets).',
+      },
+      {
+        key: 'Origine',
+        desc: '« Toutes · Partagées · Persos » — le sélecteur apparaît quand les deux origines cohabitent.',
+      },
+      {
+        key: 'Période / Source',
+        desc: 'Fenêtre temporelle (Aujourd’hui, 7 jours, Tout) et filtre par journal ou sujet.',
+      },
+      {
+        key: 'Catégories',
+        desc: 'Puces pour ne suivre que certains centres d’intérêt. Préférence mémorisée par widget.',
+      },
+      {
+        key: 'Recherche',
+        desc: 'Champ de recherche approfondie : fouille les titres ET les articles de toutes les dailys.',
+      },
+      {
+        key: 'Historique',
+        desc: 'Dailys groupées par jour (Aujourd’hui, Hier…) ; « Voir plus » puis « Voir tout » pour rattraper les jours manqués — rien n’est supprimé.',
+      },
+      {
+        key: 'Pagination',
+        desc: 'Chargement par pages depuis le serveur : « Charger plus d’articles » remonte les dailys plus anciennes à la demande.',
+      },
     ],
     preview: <DailiesView items={SAMPLE_DAILIES} followed={[]} onToggle={() => {}} />,
   },
@@ -179,7 +219,10 @@ const ENTRIES: readonly GuideEntry[] = [
     detail:
       "Transforme une tâche récurrente en un clic : le bouton ouvre le chat et envoie une requête prédéfinie à l'assistant (ex. capturer puis décrire l'écran).",
     params: [
-      { key: 'Icône', desc: 'Choisie dans une liste (zap, camera, clipboard, terminal, file, search).' },
+      {
+        key: 'Icône',
+        desc: 'Choisie dans une liste (zap, camera, clipboard, terminal, file, search).',
+      },
       { key: "Requête envoyée à l'agent", desc: 'Le texte exact transmis à l’assistant au clic.' },
     ],
     preview: (
@@ -230,7 +273,9 @@ export function WidgetGuide({ onClose }: Props) {
       <article className="mx-auto max-w-3xl px-8 py-8">
         <div className="mb-2 flex items-center gap-2 text-brand-600">
           <LayoutDashboard className="h-5 w-5" />
-          <span className="text-xs font-semibold uppercase tracking-wider">CatDesk · Marchés &amp; News</span>
+          <span className="text-xs font-semibold uppercase tracking-wider">
+            CatDesk · Marchés &amp; News
+          </span>
         </div>
         <h1 className="text-2xl font-bold text-slate-900">Guide des widgets du tableau de bord</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
@@ -247,20 +292,35 @@ export function WidgetGuide({ onClose }: Props) {
           </h2>
           <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
             <li>
-              • Les cotations sont récupérées automatiquement et rafraîchies en continu (≈ toutes les
-              minutes) — aucune action manuelle.
+              • Les cotations sont récupérées automatiquement et rafraîchies en continu (≈ toutes
+              les minutes) — aucune action manuelle.
             </li>
             <li>
               • Pour modifier le tableau de bord, cliquez sur <strong>Éditer</strong>{' '}
-              <Pencil className="inline h-3 w-3" /> : vous pouvez ajouter, déplacer, redimensionner,
-              renommer ou configurer chaque widget.
+              <Pencil className="inline h-3 w-3" /> (le bandeau affiche « Mode édition ») : le
+              tableau devient un <strong>canvas libre façon PowerPoint</strong>. Attrapez une carte
+              n’importe où pour la poser exactement où vous voulez ; tirez ses poignées (bords et
+              coin) pour la dimensionner au pixel ; si le contenu dépasse, il défile à l’intérieur
+              de la carte. Échap annule le déplacement en cours.
             </li>
             <li>
-              • Chaque widget a une roue de réglages où l’on saisit ses symboles, champs et formules.
+              • Chaque widget a une roue de réglages : ses paramètres (symboles, champs, formules…)
+              et une section <strong>Style</strong> — couleur d’accent (6 teintes pour distinguer
+              vos familles de widgets) et taille du texte (A⁻ à A⁺⁺), appliquées immédiatement.
             </li>
             <li>
-              • Les formules utilisent la syntaxe <em>mathjs</em> et accèdent aux champs d’un symbole
-              via un point (ex. <code className="rounded bg-slate-200 px-1">AAPL.price</code>).
+              • Le bouton <strong>Affichages</strong> enregistre la disposition actuelle sous un nom
+              et permet d’en restaurer une autre à tout moment — gardez plusieurs mises en page (ex.
+              « Bourse », « Presse ») et alternez d’un clic.
+            </li>
+            <li>
+              • Zoom global de la fenêtre : <strong>Ctrl + molette</strong>, Ctrl + « + / − », Ctrl
+              + 0 pour revenir à 100 %.
+            </li>
+            <li>
+              • Les formules utilisent la syntaxe <em>mathjs</em> et accèdent aux champs d’un
+              symbole via un point (ex.{' '}
+              <code className="rounded bg-slate-200 px-1">AAPL.price</code>).
             </li>
             <li>
               • Formules <strong>glissantes</strong> : l’historique de prix est accessible via{' '}
@@ -273,10 +333,42 @@ export function WidgetGuide({ onClose }: Props) {
           </ul>
         </section>
 
+        {/* Journaux & annonces */}
+        <section className="print-break mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Newspaper className="h-4 w-4 text-brand-600" />
+            Journaux &amp; annonces : qui produit quoi ?
+          </h2>
+          <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
+            <li>
+              • L’écran <strong>« Journaux »</strong> (bouton en haut de la fenêtre) est l’unique
+              endroit où configurer des revues de presse : sources, URLs de flux, filtres mots-clés
+              et regex (inclure/exclure), nombre d’articles.
+            </li>
+            <li>
+              • Portée <strong>« Ce poste »</strong> : vos journaux personnels, générés chaque jour
+              par votre agent local (7 h, avec rattrapage à l’allumage) ou immédiatement via «
+              Générer maintenant » — qui régénère aussi les dailys du jour déjà publiées. La
+              progression s’affiche en bandeau (journal 2/3, collecte puis rédaction), sur l’accueil
+              comme dans l’écran Journaux.
+            </li>
+            <li>
+              • Portée <strong>« Partagés (tous) »</strong> : les journaux publiés pour l’ensemble
+              des utilisateurs par le poste de référence — visible uniquement si le backend partagé
+              est configuré, et réservée à l’administrateur.
+            </li>
+            <li>
+              • La console <strong>Admin</strong> sert uniquement à rédiger des{' '}
+              <strong>dailys manuelles</strong> (annonces écrites à la main, avec expiration),
+              publiées pour tous.
+            </li>
+          </ul>
+        </section>
+
         {/* Widgets */}
         <h2 className="mt-8 text-lg font-bold text-slate-900">Les widgets, un par un</h2>
         <div className="mt-3 space-y-5">
-          {ENTRIES.map((e) => (
+          {ENTRIES.map(e => (
             <section
               key={e.name}
               className="print-break grid grid-cols-1 gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
@@ -295,7 +387,7 @@ export function WidgetGuide({ onClose }: Props) {
                   Paramètres
                 </h4>
                 <dl className="mt-1 space-y-1 text-sm">
-                  {e.params.map((p) => (
+                  {e.params.map(p => (
                     <div key={p.key} className="flex gap-2">
                       <dt className="shrink-0 font-medium text-slate-700">{p.key} :</dt>
                       <dd className="text-slate-600">{p.desc}</dd>
@@ -333,7 +425,7 @@ export function WidgetGuide({ onClose }: Props) {
               </tr>
             </thead>
             <tbody>
-              {FORMULA_EXAMPLES.map((f) => (
+              {FORMULA_EXAMPLES.map(f => (
                 <tr key={f.expr} className="border-t border-slate-200">
                   <td className="py-1.5 pr-3">
                     <code className="rounded bg-slate-200 px-1 text-slate-800">{f.expr}</code>

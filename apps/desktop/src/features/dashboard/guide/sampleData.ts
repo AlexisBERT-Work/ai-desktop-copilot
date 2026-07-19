@@ -95,6 +95,8 @@ export const SAMPLE_DAILIES: Daily[] = [
     category: 'tech',
     publishedAt: '2026-06-29T06:50:00.000Z',
     expiresAt: null,
+    // Illustre le badge « Perso » (daily générée sur ce poste) dans le guide.
+    origin: 'local',
   },
   {
     id: 'd3',
