@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import {
-  BookOpen,
-  Check,
-  Newspaper,
-  Pencil,
-  Plus,
-  RotateCcw,
-  ShieldCheck,
-  X,
-} from 'lucide-react';
+import { Bookmark, BookOpen, Check, Newspaper, Pencil, Plus, ShieldCheck, X } from 'lucide-react';
 import { BrandMark } from '../../shared/components/BrandMark';
 import { useDashboardStore } from './dashboardStore';
 import { isNewsConfigured as isSupabaseConfigured } from '../news/supabaseClient';
+import { PressRunStatusBanner } from '../dailies/PressRunStatusBanner';
 import { DashboardWidgetCard } from './DashboardWidgetCard';
+import { LayoutPresetsMenu } from './LayoutPresetsMenu';
+import { useWidgetDrag } from './useWidgetDrag';
 import { AddWidgetMenu } from './widgets/AddWidgetMenu';
 import { computeActiveNews, useNewsStore } from '../news/newsStore';
 import { NewsMarkdown } from '../news/NewsMarkdown';
 import { NEWS_BANNER_STYLE, NEWS_ICON, NEWS_ICON_COLOR } from '../news/newsStyles';
 
-const COLS = 4;
+/** Marge (px) laissée sous/à droite du contenu pour pouvoir y déposer un widget. */
+const CANVAS_MARGIN = 240;
 
 const hideWindow = () => {
   void getCurrentWindow().hide();
@@ -27,8 +22,9 @@ const hideWindow = () => {
 
 /**
  * Page pleine de l'application « Marchés & News » — fenêtre Tauri dédiée,
- * séparée de la bulle IA. Affiche les annonces + la grille de widgets (marchés,
- * stats, formules…).
+ * séparée de la bulle IA. Affiche les annonces + le canvas libre de widgets
+ * (marchés, stats, formules…) : chaque widget est posé et dimensionné en px,
+ * façon PowerPoint.
  */
 interface DashboardPageProps {
   onOpenGuide: () => void;
@@ -38,10 +34,23 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: DashboardPageProps) {
-  const { config, editMode, setEditMode, reorderWidget, resetToDefault } = useDashboardStore();
+  const { config, editMode, setEditMode } = useDashboardStore();
   const [addOpen, setAddOpen] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [presetsOpen, setPresetsOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const { draggingId, startDrag } = useWidgetDrag(scrollRef, canvasRef);
+
+  // Le canvas s'étend jusqu'au widget le plus bas/le plus à droite (+ marge).
+  const canvasSize = useMemo(() => {
+    let right = 0;
+    let bottom = 0;
+    for (const w of config.widgets) {
+      right = Math.max(right, w.layout.x + w.layout.w);
+      bottom = Math.max(bottom, w.layout.y + w.layout.h);
+    }
+    return { width: right + CANVAS_MARGIN, height: bottom + CANVAS_MARGIN };
+  }, [config.widgets]);
 
   // Échap : ferme l'éditeur s'il est ouvert, sinon masque la fenêtre.
   useEffect(() => {
@@ -57,14 +66,26 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
   const exitEdit = () => {
     setEditMode(false);
     setAddOpen(false);
-    setConfirmReset(false);
+    setPresetsOpen(false);
   };
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
-      {/* Header */}
-      <header className="flex items-center gap-2.5 border-b border-white/10 px-5 py-3">
+      {/* Header — teinté en mode édition pour rendre l'état impossible à confondre. */}
+      <header
+        className={`flex items-center gap-2.5 border-b px-5 py-3 transition-colors ${
+          editMode ? 'border-brand-400/30 bg-brand-600/10' : 'border-white/10'
+        }`}
+      >
         <BrandMark subtitle="Marchés & News" />
+        {editMode && (
+          <span
+            className="rounded-full border border-brand-400/40 bg-brand-600/25 px-2 py-0.5
+                       text-[10px] font-semibold uppercase tracking-wider text-brand-200"
+          >
+            Mode édition
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-1.5">
           <button
@@ -81,10 +102,10 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
             onClick={onOpenMyFeeds}
             className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
                        text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
-            title="Mes journaux — tes propres revues de presse, générées sur ce poste"
+            title="Journaux — tes revues de presse de ce poste, et les partagées (admin)"
           >
             <Newspaper className="h-3.5 w-3.5" />
-            Mes journaux
+            Journaux
           </button>
 
           {isSupabaseConfigured && (
@@ -92,7 +113,7 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
               onClick={onOpenAdmin}
               className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
                          text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
-              title="Console admin — rédiger les dailys (réservé à l'admin)"
+              title="Console admin — rédiger les dailys manuelles (réservé à l'admin)"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
               Admin
@@ -102,7 +123,10 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
           {editMode && (
             <>
               <button
-                onClick={() => setAddOpen((v) => !v)}
+                onClick={() => {
+                  setAddOpen(v => !v);
+                  setPresetsOpen(false);
+                }}
                 className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
                            text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
                 aria-expanded={addOpen}
@@ -112,23 +136,19 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
               </button>
               <button
                 onClick={() => {
-                  if (confirmReset) {
-                    resetToDefault();
-                    setConfirmReset(false);
-                  } else {
-                    setConfirmReset(true);
-                  }
+                  setPresetsOpen(v => !v);
+                  setAddOpen(false);
                 }}
-                onBlur={() => setConfirmReset(false)}
                 className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition-colors ${
-                  confirmReset
-                    ? 'bg-red-500/20 text-red-200 hover:bg-red-500/30'
+                  presetsOpen
+                    ? 'bg-white/10 text-white/90'
                     : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white/90'
                 }`}
-                title="Rétablir la disposition par défaut"
+                aria-expanded={presetsOpen}
+                title="Enregistrer et restaurer des affichages (plusieurs mises en page)"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
-                {confirmReset ? 'Confirmer ?' : 'Réinitialiser'}
+                <Bookmark className="h-3.5 w-3.5" />
+                Affichages
               </button>
             </>
           )}
@@ -163,8 +183,17 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
         </div>
       )}
 
-      {/* Corps scrollable : News + grille */}
-      <div className="flex-1 overflow-y-auto">
+      {editMode && presetsOpen && (
+        <div className="border-b border-white/10 px-5 py-2">
+          <LayoutPresetsMenu onClose={() => setPresetsOpen(false)} />
+        </div>
+      )}
+
+      {/* Génération des dailys en cours/échouée — visible depuis l'accueil. */}
+      <PressRunStatusBanner showDone={false} />
+
+      {/* Corps scrollable (2 axes) : News + canvas libre */}
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         <NewsSection />
 
         <div className="p-5">
@@ -183,10 +212,19 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
             </div>
           ) : (
             <div
-              className="grid gap-3"
+              ref={canvasRef}
+              className="relative"
               style={{
-                gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
-                gridAutoRows: 'minmax(88px, auto)',
+                width: canvasSize.width,
+                height: canvasSize.height,
+                // Pointillés discrets en mode édition : repère visuel du canvas.
+                ...(editMode
+                  ? {
+                      backgroundImage:
+                        'radial-gradient(circle, rgb(255 255 255 / 0.08) 1px, transparent 1px)',
+                      backgroundSize: '24px 24px',
+                    }
+                  : {}),
               }}
             >
               {config.widgets.map((w, i) => (
@@ -196,12 +234,7 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
                   enterDelayMs={Math.min(i, 12) * 45}
                   editMode={editMode}
                   dragging={draggingId === w.id}
-                  onDragStart={setDraggingId}
-                  onDragEnd={() => setDraggingId(null)}
-                  onDropOn={(targetId) => {
-                    if (draggingId) reorderWidget(draggingId, targetId);
-                    setDraggingId(null);
-                  }}
+                  onDragPointerDown={startDrag}
                 />
               ))}
             </div>
@@ -214,38 +247,41 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
 
 /** Bandeau d'annonces (news admin) en tête de page. */
 function NewsSection() {
-  const items = useNewsStore((s) => s.items);
-  const dismissedIds = useNewsStore((s) => s.dismissedIds);
-  const dismiss = useNewsStore((s) => s.dismiss);
-  const status = useNewsStore((s) => s.status);
+  const items = useNewsStore(s => s.items);
+  const dismissedIds = useNewsStore(s => s.dismissedIds);
+  const dismiss = useNewsStore(s => s.dismiss);
+  const status = useNewsStore(s => s.status);
   const active = useMemo(() => computeActiveNews(items, dismissedIds), [items, dismissedIds]);
 
   if (status === 'unconfigured' || active.length === 0) return null;
 
   return (
     <div className="space-y-2 border-b border-white/10 px-5 py-3">
-      {active.slice(0, 4).map((n) => {
+      {active.slice(0, 4).map(n => {
         const Icon = NEWS_ICON[n.severity];
         return (
-        <div
-          key={n.id}
-          className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${NEWS_BANNER_STYLE[n.severity]}`}
-        >
-          <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${NEWS_ICON_COLOR[n.severity]}`} aria-hidden />
-          <div className="min-w-0 flex-1 text-sm">
-            <p className="font-medium text-white/90">{n.title}</p>
-            <div className="text-white/70">
-              <NewsMarkdown content={n.body} />
-            </div>
-          </div>
-          <button
-            onClick={() => dismiss(n.id)}
-            className="rounded-md p-1 text-white/40 transition hover:bg-white/10 hover:text-white/80"
-            aria-label="Ignorer cette annonce"
+          <div
+            key={n.id}
+            className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${NEWS_BANNER_STYLE[n.severity]}`}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+            <Icon
+              className={`mt-0.5 h-5 w-5 shrink-0 ${NEWS_ICON_COLOR[n.severity]}`}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-medium text-white/90">{n.title}</p>
+              <div className="text-white/70">
+                <NewsMarkdown content={n.body} />
+              </div>
+            </div>
+            <button
+              onClick={() => dismiss(n.id)}
+              className="rounded-md p-1 text-white/40 transition hover:bg-white/10 hover:text-white/80"
+              aria-label="Ignorer cette annonce"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         );
       })}
     </div>

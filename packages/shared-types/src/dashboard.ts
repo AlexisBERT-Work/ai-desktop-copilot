@@ -13,12 +13,28 @@ export type WidgetType =
   | 'news'
   | 'dailies';
 
-/** Position/taille dans la grille, en unités de colonnes/lignes. */
+/**
+ * Position/taille sur le canvas libre du dashboard, en px (v2). Les anciennes
+ * dispositions v1 (unités de grille ≤ 8) sont migrées au chargement par le
+ * store du dashboard.
+ */
 export interface WidgetLayout {
   x: number;
   y: number;
   w: number;
   h: number;
+}
+
+/** Accents de couleur disponibles pour personnaliser un widget. */
+export const WIDGET_ACCENTS = ['default', 'sky', 'emerald', 'amber', 'rose', 'violet'] as const;
+export type WidgetAccent = (typeof WIDGET_ACCENTS)[number];
+
+/** Personnalisation visuelle d'un widget (couleur d'accent, taille du texte). */
+export interface WidgetStyle {
+  /** Couleur d'accent (bordure + titre). 'default' = neutre. */
+  accent?: WidgetAccent;
+  /** Facteur de taille du texte du contenu (zoom local, borné ~0.7–1.6). */
+  textScale?: number;
 }
 
 /** Un widget paramétrable de l'interface dashboard. */
@@ -31,6 +47,8 @@ export interface Widget {
   /** Options propres au type de widget (schéma défini plus tard). */
   config: Record<string, unknown>;
   layout: WidgetLayout;
+  /** Personnalisation visuelle (optionnelle, persistée avec la disposition). */
+  style?: WidgetStyle;
 }
 
 /** Disposition complète de l'accueil, persistée entre sessions. */

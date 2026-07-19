@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
-import { ArrowLeftRight, ArrowUpDown, GripVertical, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { GripVertical, SlidersHorizontal, Trash2 } from 'lucide-react';
 import type { Widget } from '@catdesk/shared-types';
-import { MAX_H, MAX_W } from './dashboardStore';
+import { useZoomStore } from '../../shared/hooks/useUiZoom';
 import { useDashboardStore } from './dashboardStore';
 import { widgetComponent } from './widgets/registry';
+import { ACCENT_STYLES, readWidgetStyle } from './widgets/widgetStyle';
 import { WidgetErrorBoundary } from './widgets/WidgetErrorBoundary';
 import { WidgetConfigEditor } from './widgets/WidgetConfigEditor';
 
@@ -12,17 +13,14 @@ interface Props {
   /** Décalage de l'animation d'entrée (cascade au chargement du dashboard). */
   enterDelayMs?: number;
   editMode: boolean;
+  /** Ce widget est en cours de drag (léger relief, il suit le curseur). */
   dragging: boolean;
-  onDragStart: (id: string) => void;
-  onDropOn: (targetId: string) => void;
-  onDragEnd: () => void;
+  /** Appui pointeur sur la carte (hors contrôles) — démarre un éventuel drag. */
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>, id: string) => void;
 }
 
 const ICON_BTN =
   'rounded p-1 text-white/30 transition-colors hover:bg-white/10 hover:text-white/70';
-
-/** Espacement de la grille du dashboard (gap-3 dans DashboardPage). */
-const GRID_GAP = 12;
 
 type ResizeAxis = 'x' | 'y' | 'both';
 
@@ -31,21 +29,18 @@ export function DashboardWidgetCard({
   enterDelayMs = 0,
   editMode,
   dragging,
-  onDragStart,
-  onDropOn,
-  onDragEnd,
+  onDragPointerDown,
 }: Props) {
-  const { removeWidget, renameWidget, cycleWidgetWidth, cycleWidgetHeight, setWidgetSize } =
-    useDashboardStore();
+  const { removeWidget, renameWidget, setWidgetSize } = useDashboardStore();
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(widget.title);
   const [editingConfig, setEditingConfig] = useState(false);
-  const [over, setOver] = useState(false);
-  /** Taille (unités de grille) pendant un redimensionnement à la poignée. */
-  const [resizing, setResizing] = useState<{ w: number; h: number } | null>(null);
-  const cardRef = useRef<HTMLDivElement | null>(null);
+  /** Un redimensionnement à la poignée est en cours (badge de taille affiché). */
+  const [resizing, setResizing] = useState(false);
 
   const Widget = widgetComponent(widget.type);
+  const { accent, textScale } = readWidgetStyle(widget);
+  const accentStyle = ACCENT_STYLES[accent];
 
   const commitRename = () => {
     renameWidget(widget.id, draft.trim() || widget.title);
@@ -53,38 +48,31 @@ export function DashboardWidgetCard({
   };
 
   /**
-   * Redimensionnement façon PowerPoint : on tire une poignée, la taille snappe
-   * sur la grille en direct. La taille d'une unité est mesurée au départ sur
-   * la carte elle-même (robuste au zoom UI et à la largeur de fenêtre).
+   * Redimensionnement façon PowerPoint : on tire une poignée, la taille suit en
+   * px exacts (snap léger et bornes appliqués par le store). Les deltas pointeur
+   * sont en px viewport → divisés par le zoom UI pour retomber en px layout.
    */
   const beginResize = (e: React.PointerEvent, axis: ResizeAxis) => {
     e.preventDefault();
     e.stopPropagation();
-    const el = cardRef.current;
-    if (el === null) return;
-    const rect = el.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
-    const startW = Math.min(Math.max(widget.layout.w, 1), MAX_W);
-    const startH = Math.max(widget.layout.h, 1);
-    const unitW = (rect.width - GRID_GAP * (startW - 1)) / startW;
-    const unitH = (rect.height - GRID_GAP * (startH - 1)) / startH;
+    const startW = widget.layout.w;
+    const startH = widget.layout.h;
 
     const apply = (ev: PointerEvent) => {
-      const dw = axis === 'y' ? 0 : Math.round((ev.clientX - startX) / (unitW + GRID_GAP));
-      const dh = axis === 'x' ? 0 : Math.round((ev.clientY - startY) / (unitH + GRID_GAP));
-      const w = Math.min(Math.max(startW + dw, 1), MAX_W);
-      const h = Math.min(Math.max(startH + dh, 1), MAX_H);
-      setResizing({ w, h });
-      setWidgetSize(widget.id, w, h);
+      const zoom = useZoomStore.getState().zoom;
+      const dw = axis === 'y' ? 0 : (ev.clientX - startX) / zoom;
+      const dh = axis === 'x' ? 0 : (ev.clientY - startY) / zoom;
+      setWidgetSize(widget.id, startW + dw, startH + dh);
     };
     const stop = () => {
       window.removeEventListener('pointermove', apply);
       window.removeEventListener('pointerup', stop);
       window.removeEventListener('pointercancel', stop);
-      setResizing(null);
+      setResizing(false);
     };
-    setResizing({ w: startW, h: startH });
+    setResizing(true);
     window.addEventListener('pointermove', apply);
     window.addEventListener('pointerup', stop);
     window.addEventListener('pointercancel', stop);
@@ -92,29 +80,28 @@ export function DashboardWidgetCard({
 
   return (
     <div
-      ref={cardRef}
-      className={`group relative flex animate-widget-enter flex-col rounded-xl border bg-white/5 p-3
-        transition-colors ${over ? 'border-brand-400/60' : 'border-white/10'}
-        ${dragging ? 'opacity-40' : ''} ${resizing !== null ? 'border-brand-400/60' : ''}`}
+      data-widget-id={widget.id}
+      className={`group absolute flex animate-widget-enter flex-col rounded-xl border bg-gray-900 p-3
+        transition-colors ${
+          dragging
+            ? 'border-brand-400/70 shadow-2xl shadow-black/60'
+            : resizing
+              ? 'border-brand-400/60'
+              : accentStyle.border
+        } ${editMode && !dragging && !resizing ? 'border-dashed' : ''}
+        ${editMode && !renaming && !editingConfig ? 'cursor-grab touch-none' : ''}`}
       style={{
-        gridColumn: `span ${Math.min(widget.layout.w, MAX_W)}`,
-        gridRow: `span ${Math.max(widget.layout.h, 1)}`,
+        left: widget.layout.x,
+        top: widget.layout.y,
+        width: widget.layout.w,
+        height: widget.layout.h,
         animationDelay: `${enterDelayMs}ms`,
       }}
-      draggable={editMode && !renaming && !editingConfig && resizing === null}
-      onDragStart={() => onDragStart(widget.id)}
-      onDragEnd={() => {
-        setOver(false);
-        onDragEnd();
-      }}
-      onDragOver={e => {
-        if (editMode) e.preventDefault();
-      }}
-      onDragEnter={() => editMode && setOver(true)}
-      onDragLeave={() => setOver(false)}
-      onDrop={() => {
-        setOver(false);
-        onDropOn(widget.id);
+      onPointerDown={e => {
+        if (!editMode || renaming || editingConfig || resizing) return;
+        // Les contrôles (renommer, config, retirer…) restent cliquables.
+        if ((e.target as HTMLElement).closest('button, input')) return;
+        onDragPointerDown(e, widget.id);
       }}
     >
       {/* Header */}
@@ -142,7 +129,7 @@ export function DashboardWidgetCard({
           />
         ) : (
           <button
-            className={`min-w-0 flex-1 truncate text-left text-xs font-medium text-white/60
+            className={`min-w-0 flex-1 truncate text-left text-xs font-medium ${accentStyle.title}
               ${editMode ? 'cursor-text hover:text-white/90' : 'cursor-default'}`}
             onClick={() => editMode && setRenaming(true)}
             disabled={!editMode}
@@ -154,22 +141,6 @@ export function DashboardWidgetCard({
 
         {editMode && !renaming && (
           <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              className={ICON_BTN}
-              onClick={() => cycleWidgetWidth(widget.id)}
-              aria-label="Changer la largeur"
-              title={`Largeur : ${widget.layout.w}/${MAX_W}`}
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5" />
-            </button>
-            <button
-              className={ICON_BTN}
-              onClick={() => cycleWidgetHeight(widget.id)}
-              aria-label="Changer la hauteur"
-              title={`Hauteur : ${widget.layout.h}/${MAX_H}`}
-            >
-              <ArrowUpDown className="h-3.5 w-3.5" />
-            </button>
             <button
               className={`${ICON_BTN} ${editingConfig ? 'bg-white/10 text-white/80' : ''}`}
               onClick={() => setEditingConfig(v => !v)}
@@ -191,12 +162,21 @@ export function DashboardWidgetCard({
         )}
       </div>
 
-      {/* Body */}
+      {/* Body — le contenu défile À L'INTÉRIEUR de la carte si elle est trop petite. */}
       {editingConfig ? (
-        <WidgetConfigEditor widget={widget} onClose={() => setEditingConfig(false)} />
+        <div className="min-h-0 flex-1 overflow-auto">
+          <WidgetConfigEditor widget={widget} onClose={() => setEditingConfig(false)} />
+        </div>
       ) : (
         <WidgetErrorBoundary>
-          <div className={editMode ? 'pointer-events-none select-none opacity-90' : ''}>
+          <div
+            className={`min-h-0 flex-1 overflow-auto ${
+              editMode ? 'pointer-events-none select-none opacity-90' : ''
+            }`}
+            // Taille du texte du widget : zoom local (met tout à l'échelle,
+            // y compris les tailles rem de Tailwind).
+            style={textScale !== 1 ? { zoom: textScale } : undefined}
+          >
             <Widget widget={widget} />
           </div>
         </WidgetErrorBoundary>
@@ -217,7 +197,6 @@ export function DashboardWidgetCard({
                        transition-colors hover:bg-brand-400/40"
             aria-hidden
           />
-          {/* L'accès clavier reste assuré par les boutons largeur/hauteur du header. */}
           <div
             onPointerDown={e => beginResize(e, 'both')}
             className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize touch-none
@@ -229,11 +208,11 @@ export function DashboardWidgetCard({
         </>
       )}
 
-      {/* Badge de taille pendant le redimensionnement (« 2 × 1 »). */}
-      {resizing !== null && (
+      {/* Badge de taille pendant le redimensionnement (« 480 × 240 px »). */}
+      {resizing && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-gray-950/50">
           <span className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-semibold text-brand-300 shadow-lg">
-            {resizing.w} × {resizing.h}
+            {widget.layout.w} × {widget.layout.h} px
           </span>
         </div>
       )}
