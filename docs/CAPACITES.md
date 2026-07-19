@@ -1,12 +1,27 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-07-03**. Inventaire basé sur les **67 outils réellement
-> enregistrés** dans [index.ts](../packages/agent-runtime/src/index.ts) et leurs
+> À jour au **2026-07-20**. Inventaire basé sur les **68 outils du catalogue**
+> enregistrés via
+> [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
 > [permissions.ts](../packages/shared-types/src/permissions.ts). Inclut désormais
 > le **tableau de bord configurable**, la **news pilotée par l'admin** (Supabase)
 > et le **module Bourse** (cf. [docs/projects/](projects/)).
+>
+> **Profil d'outils** : depuis 2026-07-20 le chat tourne par défaut en profil
+> **`research`** — recentré sur les articles/dailys et la recherche générale.
+> 25 outils dev/infra ne sont **pas exposés** au chat dans ce profil (liste
+> `RESEARCH_EXCLUDED` dans registerTools.ts) : analyse de code
+> (`analyze_stacktrace`, `analyze_logs`, `generate_unit_tests`,
+> `suggest_refactor`, `analyze_dependencies`), git/CI
+> (`generate_commit_message`, `generate_pr_description`, `review_diff`,
+> `summarize_git_log`, `resolve_conflicts`, `bisect_guided`, `watch_ci`),
+> productivité dev (`detect_spiral`, `generate_standup`, `analyze_code_style`,
+> `load_project_context`), infra (`docker_ps`, `docker_control`, `run_sqlite`,
+> `query_database`, `audit_env`, `inspect_port`, `kill_process`) et GitHub
+> (`github_list_issues`, `github_get_pr`).
+> `CATDESK_TOOL_PROFILE=full` réexpose tout le catalogue.
 >
 > Pour ce que CatDesk **ne sait pas (encore) faire**, voir [LIMITES.md](LIMITES.md).
 > Pour les détails techniques : [README](../README.md) ·
@@ -25,117 +40,118 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 67 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 68 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
 
 ## Légende des niveaux de risque
 
-| Risque | Comportement | |
-|---|---|---|
-| 🟢 **Low** | Exécution automatique, journalisée | lecture, analyse |
-| 🟡 **Medium** | Confirmation une fois par session | écriture, sous-agents |
-| 🟠 **High** | Confirmation à chaque appel | commandes, navigateur actif, réseau sortant |
-| 🔴 **Critical** | Désactivé par défaut | suppression, élévation de privilèges |
+| Risque          | Comportement                       |                                             |
+| --------------- | ---------------------------------- | ------------------------------------------- |
+| 🟢 **Low**      | Exécution automatique, journalisée | lecture, analyse                            |
+| 🟡 **Medium**   | Confirmation une fois par session  | écriture, sous-agents                       |
+| 🟠 **High**     | Confirmation à chaque appel        | commandes, navigateur actif, réseau sortant |
+| 🔴 **Critical** | Désactivé par défaut               | suppression, élévation de privilèges        |
 
 ---
 
 ## 1. Voir & lire ce qui est devant toi
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Lire un fichier | `read_file` | 🟢 |
-| Lister un dossier | `list_directory` | 🟢 |
-| **Écrire / créer un fichier** (dossiers parents auto, répertoires système bloqués) | `write_file` | 🟡 |
-| Lire le presse-papier | `read_clipboard` | 🟢 |
-| **Écrire dans le presse-papier** (UTF-8, accents préservés) | `write_clipboard` | 🟡 |
-| Capturer l'écran (total/partiel) | `capture_screen` | 🟢 |
-| Lire le **texte de l'écran (OCR)** Tesseract fra+eng | `ocr_region` | 🟢 |
-| **Décrire visuellement** l'écran (modèle multimodal `llava:7b`) | `describe_screen` | 🟢 |
-| **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD) | `transcribe_audio` | 🟢 |
+| Capacité                                                                           | Outil(s)           | Risque |
+| ---------------------------------------------------------------------------------- | ------------------ | :----: |
+| Lire un fichier                                                                    | `read_file`        |   🟢   |
+| Lister un dossier                                                                  | `list_directory`   |   🟢   |
+| **Écrire / créer un fichier** (dossiers parents auto, répertoires système bloqués) | `write_file`       |   🟡   |
+| Lire le presse-papier                                                              | `read_clipboard`   |   🟢   |
+| **Écrire dans le presse-papier** (UTF-8, accents préservés)                        | `write_clipboard`  |   🟡   |
+| Capturer l'écran (total/partiel)                                                   | `capture_screen`   |   🟢   |
+| Lire le **texte de l'écran (OCR)** Tesseract fra+eng                               | `ocr_region`       |   🟢   |
+| **Décrire visuellement** l'écran (modèle multimodal `llava:7b`)                    | `describe_screen`  |   🟢   |
+| **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD)           | `transcribe_audio` |   🟢   |
 
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
 
 ## 2. Web & navigateur
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Récupérer une page web (HTTP simple, détecte les SPA) | `read_webpage` | 🟢 |
-| Naviguer une page JS/SPA (Playwright, Chrome/Edge système) | `browser_navigate` | 🟠 |
-| Extraire le texte visible d'une page | `browser_get_text` | 🟢 |
-| Capture d'écran de la page | `browser_screenshot` | 🟢 |
-| Cliquer sur un élément | `browser_click` | 🟠 |
-| Saisir du texte dans un champ | `browser_type` | 🟠 |
-| Fermer le navigateur | `browser_close` | 🟢 |
-| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…) | `fetch_tech_news` | 🟢 |
+| Capacité                                                                                                         | Outil(s)             | Risque |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------- | :----: |
+| Récupérer une page web (HTTP simple, détecte les SPA)                                                            | `read_webpage`       |   🟢   |
+| Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   |   🟠   |
+| Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢   |
+| Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢   |
+| Cliquer sur un élément                                                                                           | `browser_click`      |   🟠   |
+| Saisir du texte dans un champ                                                                                    | `browser_type`       |   🟠   |
+| Fermer le navigateur                                                                                             | `browser_close`      |   🟢   |
+| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…)                                                         | `fetch_tech_news`    |   🟢   |
+| **Chercher/lire les dailys** (revues de presse locales + partagées) pour répondre aux questions sur les articles | `search_dailies`     |   🟢   |
 
 `read_webpage` détecte une SPA (HTML lourd, texte quasi nul) et oriente
 automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 
 ## 3. Connecteurs externes
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Chercher/lire des notes dans un vault **Obsidian** local | `obsidian_notes` | 🟢 |
-| Chercher/lire des pages **Notion** (API) | `notion_search` | 🟢 |
-| Appeler une **API REST** (GET auto ; écriture confirmée) | `call_api` | 🟠 |
-| Poster sur un **webhook Discord/Slack** | `send_webhook_message` | 🟠 |
-| Publier l'actu tech sur un webhook Discord (embeds) | `post_tech_news_discord` | 🟡 |
+| Capacité                                                 | Outil(s)                 | Risque |
+| -------------------------------------------------------- | ------------------------ | :----: |
+| Chercher/lire des notes dans un vault **Obsidian** local | `obsidian_notes`         |   🟢   |
+| Chercher/lire des pages **Notion** (API)                 | `notion_search`          |   🟢   |
+| Appeler une **API REST** (GET auto ; écriture confirmée) | `call_api`               |   🟠   |
+| Poster sur un **webhook Discord/Slack**                  | `send_webhook_message`   |   🟠   |
+| Publier l'actu tech sur un webhook Discord (embeds)      | `post_tech_news_discord` |   🟡   |
 
 ## 4. Développement & analyse de code
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Analyser une **stacktrace** (Node/TS/Python/Rust/Java + cause racine) | `analyze_stacktrace` | 🟢 |
-| Analyser un **fichier de log** local (erreurs, patterns, lecture seule) | `analyze_logs` | 🟢 |
-| Générer des **tests unitaires** (détecte le framework) | `generate_unit_tests` | 🟢 |
-| Repérer des **refactos** (fonctions longues, duplication, complexité) | `suggest_refactor` | 🟢 |
-| Analyser les **dépendances** (package.json / Cargo.toml / requirements.txt) | `analyze_dependencies` | 🟢 |
-| **Relire un diff** (secrets, code de debug, patterns risqués) | `review_diff` | 🟢 |
-| Inférer les **conventions de style** du projet | `analyze_code_style` | 🟢 |
-| **Profiler un projet** à l'ouverture (stack, scripts, structure, README) | `load_project_context` | 🟢 |
-| Auditer un `.env` vs `.env.example` (clés manquantes, secrets) | `audit_env` | 🟢 |
-| Recherche locale par mots-clés/sémantique | `semantic_search` | 🟢 |
+| Capacité                                                                    | Outil(s)               | Risque |
+| --------------------------------------------------------------------------- | ---------------------- | :----: |
+| Analyser une **stacktrace** (Node/TS/Python/Rust/Java + cause racine)       | `analyze_stacktrace`   |   🟢   |
+| Analyser un **fichier de log** local (erreurs, patterns, lecture seule)     | `analyze_logs`         |   🟢   |
+| Générer des **tests unitaires** (détecte le framework)                      | `generate_unit_tests`  |   🟢   |
+| Repérer des **refactos** (fonctions longues, duplication, complexité)       | `suggest_refactor`     |   🟢   |
+| Analyser les **dépendances** (package.json / Cargo.toml / requirements.txt) | `analyze_dependencies` |   🟢   |
+| **Relire un diff** (secrets, code de debug, patterns risqués)               | `review_diff`          |   🟢   |
+| Inférer les **conventions de style** du projet                              | `analyze_code_style`   |   🟢   |
+| **Profiler un projet** à l'ouverture (stack, scripts, structure, README)    | `load_project_context` |   🟢   |
+| Auditer un `.env` vs `.env.example` (clés manquantes, secrets)              | `audit_env`            |   🟢   |
+| Recherche locale par mots-clés/sémantique                                   | `semantic_search`      |   🟢   |
 
 ## 5. Git & GitHub
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Générer un **message de commit** (Conventional Commits) | `generate_commit_message` | 🟢 |
-| Générer une **description de PR** (commits vs base) | `generate_pr_description` | 🟢 |
-| Résumer l'**historique git** (par type/auteur/zone) | `summarize_git_log` | 🟢 |
-| Aider à résoudre les **conflits de merge** (ours/theirs) | `resolve_conflicts` | 🟢 |
-| Piloter un **git bisect** (compter, choisir le prochain commit) | `bisect_guided` | 🟢 |
-| Surveiller la **CI GitHub Actions** (jobs/étapes en échec) | `watch_ci` | 🟢 |
-| Lister/chercher des **issues GitHub** | `github_list_issues` | 🟢 |
-| Détails complets d'une **PR** (fichiers, reviews, diff) | `github_get_pr` | 🟢 |
+| Capacité                                                        | Outil(s)                  | Risque |
+| --------------------------------------------------------------- | ------------------------- | :----: |
+| Générer un **message de commit** (Conventional Commits)         | `generate_commit_message` |   🟢   |
+| Générer une **description de PR** (commits vs base)             | `generate_pr_description` |   🟢   |
+| Résumer l'**historique git** (par type/auteur/zone)             | `summarize_git_log`       |   🟢   |
+| Aider à résoudre les **conflits de merge** (ours/theirs)        | `resolve_conflicts`       |   🟢   |
+| Piloter un **git bisect** (compter, choisir le prochain commit) | `bisect_guided`           |   🟢   |
+| Surveiller la **CI GitHub Actions** (jobs/étapes en échec)      | `watch_ci`                |   🟢   |
+| Lister/chercher des **issues GitHub**                           | `github_list_issues`      |   🟢   |
+| Détails complets d'une **PR** (fichiers, reviews, diff)         | `github_get_pr`           |   🟢   |
 
 ## 6. Productivité
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Détecter quand tu **tournes en rond** sur un problème | `detect_spiral` | 🟢 |
-| Rédiger un **standup quotidien** depuis l'activité git | `generate_standup` | 🟢 |
+| Capacité                                               | Outil(s)           | Risque |
+| ------------------------------------------------------ | ------------------ | :----: |
+| Détecter quand tu **tournes en rond** sur un problème  | `detect_spiral`    |   🟢   |
+| Rédiger un **standup quotidien** depuis l'activité git | `generate_standup` |   🟢   |
 
 ## 7. Système & infra (local)
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Exécuter une **commande** PowerShell/CMD (sandbox) | `run_command` | 🟠 |
-| **Ouvrir une application** (nom, chemin ou app du PATH) | `open_app` | 🟡 |
-| Lister les **ports TCP** en écoute + processus liés | `inspect_port` | 🟢 |
-| **Tuer un processus** par PID | `kill_process` | 🟠 |
-| Lister les **conteneurs Docker** + logs | `docker_ps` | 🟢 |
-| Contrôler Docker (start/stop/restart, compose up/down) | `docker_control` | 🟠 |
-| Requêter une base **SQLite** locale (lecture seule par défaut) | `run_sqlite` | 🟡 |
+| Capacité                                                       | Outil(s)         | Risque |
+| -------------------------------------------------------------- | ---------------- | :----: |
+| Exécuter une **commande** PowerShell/CMD (sandbox)             | `run_command`    |   🟠   |
+| **Ouvrir une application** (nom, chemin ou app du PATH)        | `open_app`       |   🟡   |
+| Lister les **ports TCP** en écoute + processus liés            | `inspect_port`   |   🟢   |
+| **Tuer un processus** par PID                                  | `kill_process`   |   🟠   |
+| Lister les **conteneurs Docker** + logs                        | `docker_ps`      |   🟢   |
+| Contrôler Docker (start/stop/restart, compose up/down)         | `docker_control` |   🟠   |
+| Requêter une base **SQLite** locale (lecture seule par défaut) | `run_sqlite`     |   🟡   |
 
 ## 8. Mémoire & RAG
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Rechercher en **mémoire** (sémantique ou repli mots-clés) | `search_memory` | 🟢 |
-| **Stocker un fait en mémoire** persistante (tags, inter-sessions) | `store_memory` | 🟡 |
+| Capacité                                                          | Outil(s)        | Risque |
+| ----------------------------------------------------------------- | --------------- | :----: |
+| Rechercher en **mémoire** (sémantique ou repli mots-clés)         | `search_memory` |   🟢   |
+| **Stocker un fait en mémoire** persistante (tags, inter-sessions) | `store_memory`  |   🟡   |
 
 - VectorStore réel : embeddings Ollama (`nomic-embed-text`) + similarité cosinus
   en mémoire, persistance disque (`vectors.json`).
@@ -144,13 +160,13 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 
 ## 9. Orchestration & autonomie
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Lancer un **sous-agent** isolé (contexte propre, anti-récursion) | `run_subagent` | 🟡 |
-| Lancer jusqu'à 8 **sous-agents en parallèle** | `run_parallel_agents` | 🟡 |
-| **Planifier une tâche récurrente** (cron, tick 60s, persistance SQLite) | `schedule_task` | 🟠 |
-| Lister les tâches planifiées | `list_scheduled_tasks` | 🟢 |
-| Annuler une tâche planifiée | `cancel_scheduled_task` | 🟡 |
+| Capacité                                                                | Outil(s)                | Risque |
+| ----------------------------------------------------------------------- | ----------------------- | :----: |
+| Lancer un **sous-agent** isolé (contexte propre, anti-récursion)        | `run_subagent`          |   🟡   |
+| Lancer jusqu'à 8 **sous-agents en parallèle**                           | `run_parallel_agents`   |   🟡   |
+| **Planifier une tâche récurrente** (cron, tick 60s, persistance SQLite) | `schedule_task`         |   🟠   |
+| Lister les tâches planifiées                                            | `list_scheduled_tasks`  |   🟢   |
+| Annuler une tâche planifiée                                             | `cancel_scheduled_task` |   🟡   |
 
 Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
 
@@ -165,13 +181,13 @@ Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
 Interface d'accueil = **grille de widgets configurables** (KPI, stats, actions,
 bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 
-| Capacité | Outil(s) | Risque |
-|---|---|:--:|
-| Lire l'instantané bourse (cotations + formules) | `get_market` | 🟢 |
-| Ajouter un symbole à la watchlist live | `add_to_watchlist` | 🟡 |
-| Retirer un symbole de la watchlist | `remove_from_watchlist` | 🟡 |
-| Créer/modifier une formule (mathjs, recalcul live) | `set_formula` | 🟡 |
-| Supprimer une formule | `remove_formula` | 🟡 |
+| Capacité                                           | Outil(s)                | Risque |
+| -------------------------------------------------- | ----------------------- | :----: |
+| Lire l'instantané bourse (cotations + formules)    | `get_market`            |   🟢   |
+| Ajouter un symbole à la watchlist live             | `add_to_watchlist`      |   🟡   |
+| Retirer un symbole de la watchlist                 | `remove_from_watchlist` |   🟡   |
+| Créer/modifier une formule (mathjs, recalcul live) | `set_formula`           |   🟡   |
+| Supprimer une formule                              | `remove_formula`        |   🟡   |
 
 - **Bourse live** : cotations Yahoo rafraîchies ~30 s, **formules** (ratios…)
   recalculées à chaque tick, **sparklines** par symbole. **Formules glissantes** :
@@ -188,8 +204,8 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 - **3 modèles** pour la parité de fonctionnalités :
   `qwen2.5:7b` (chat principal), `llava:7b` (vision écran),
   `nomic-embed-text` (mémoire sémantique).
-- **Sélecteur de mode dans le chat** : *Auto* (route léger/code selon la tâche),
-  *Léger* (économie), *Code* (force `qwen2.5-coder:14b`).
+- **Sélecteur de mode dans le chat** : _Auto_ (route léger/code selon la tâche),
+  _Léger_ (économie), _Code_ (force `qwen2.5-coder:14b`).
 - **Routage de modèles** en downgrade-only via `CATDESK_MODEL_SMALL`.
 - Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
   réglable par requête. ⚠️ **Pas de KV-cache 4-bit global** : `q4_0` corrompt la

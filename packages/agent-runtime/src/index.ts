@@ -45,6 +45,7 @@ import {
 } from './news/PressDigestScheduler';
 import { LocalPressFeedStore } from './news/LocalPressFeedStore';
 import { LocalDailyStore } from './news/LocalDailyStore';
+import { SharedDailyReader } from './news/SharedDailyReader';
 import { LocalPressScheduler } from './news/LocalPressScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
@@ -163,18 +164,33 @@ async function main() {
     });
   }
 
+  // ─── Journaux personnalisés LOCAUX + dailys ────────────────
+  // Créés AVANT le registre d'outils : search_dailies lit les dailys locales
+  // (« Mes journaux ») et les dailys partagées (lecture Supabase anonyme).
+  const localFeeds = new LocalPressFeedStore(CONFIG.dataDir);
+  const localDailies = new LocalDailyStore(CONFIG.dataDir);
+  const sharedDailies = new SharedDailyReader();
+
   // ─── Tool Registry ─────────────────────────────────────────
   const defaultModel = CONFIG.model;
   const tools = new ToolRegistry();
-  registerCoreTools(tools, {
-    llm,
-    vectorStore,
-    market,
-    defaultModel,
-    // Vision : minicpm-v — PAS llava ni l'arch 'mllama' (voir SUIVI.md, choix
-    // validé sur RX 6700). Override via CATDESK_VISION_MODEL.
-    visionModel: CONFIG.visionModel,
-  });
+  registerCoreTools(
+    tools,
+    {
+      llm,
+      vectorStore,
+      market,
+      localDailies,
+      sharedDailies,
+      defaultModel,
+      // Vision : minicpm-v — PAS llava ni l'arch 'mllama' (voir SUIVI.md, choix
+      // validé sur RX 6700). Override via CATDESK_VISION_MODEL.
+      visionModel: CONFIG.visionModel,
+    },
+    // Profil 'research' (défaut) : bot recentré articles + recherche, sans
+    // outils dev/infra. CATDESK_TOOL_PROFILE=full pour tout réexposer.
+    CONFIG.toolProfile,
+  );
 
   const marketPoller = new MarketPoller(market, CONFIG.marketIntervalMs);
   marketPoller.start();
@@ -272,8 +288,7 @@ async function main() {
   // Chaque poste peut définir ses propres journaux (panneau « Mes journaux »),
   // générés quotidiennement par SON agent et stockés localement — ils viennent
   // s'ajouter aux dailys partagées dans le widget. Aucun rôle admin requis.
-  const localFeeds = new LocalPressFeedStore(CONFIG.dataDir);
-  const localDailies = new LocalDailyStore(CONFIG.dataDir);
+  // (Stores localFeeds/localDailies créés plus haut, avant le registre d'outils.)
   const localPress = new LocalPressScheduler(
     llm,
     defaultModel,
@@ -285,7 +300,7 @@ async function main() {
   );
   localPress.start();
 
-  log.info('Tools registered', { tools: tools.listNames() });
+  log.info('Tools registered', { profile: CONFIG.toolProfile, tools: tools.listNames() });
 
   // ─── IPC Bridge ────────────────────────────────────────────
   const bridge = new StdinBridge(

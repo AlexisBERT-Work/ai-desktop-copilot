@@ -54,6 +54,14 @@ export const CONFIG = {
   numCtx: envNumber('CATDESK_NUM_CTX', 8192),
   maxTokens: envNumber('CATDESK_MAX_TOKENS', 1024),
   toolLimit: envNumber('CATDESK_TOOL_LIMIT', 14),
+  /**
+   * Profil d'outils du chat : 'research' (défaut) recentre le bot sur les
+   * articles/dailys et la recherche générale (pas d'outils dev/infra).
+   * CATDESK_TOOL_PROFILE=full pour réexposer tout le catalogue.
+   */
+  toolProfile: (process.env['CATDESK_TOOL_PROFILE'] === 'full' ? 'full' : 'research') as
+    | 'research'
+    | 'full',
 
   // ─── Données ─────────────────────────────────────────────────
   dataDir: process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data'),

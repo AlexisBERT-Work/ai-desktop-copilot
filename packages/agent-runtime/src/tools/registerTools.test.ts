@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
 import { ToolRegistry } from '../ToolRegistry';
-import { registerCoreTools, registerAutomationTools } from './registerTools';
+import {
+  registerCoreTools,
+  registerAutomationTools,
+  RESEARCH_EXCLUDED,
+  type ToolProfile,
+} from './registerTools';
 import { OllamaClient } from '../llm/OllamaClient';
 import { VectorStore } from '../memory/VectorStore';
 import { MarketService } from '../market/MarketService';
@@ -14,16 +19,22 @@ import type { CronScheduler } from '../CronScheduler';
  * qu'elles se désynchronisent — outil sans permission, permission orpheline,
  * ou riskLevel/requiresConfirmation divergents.
  */
-function buildFullRegistry(): ToolRegistry {
+function buildRegistry(profile: ToolProfile): ToolRegistry {
   const tools = new ToolRegistry();
   const llm = new OllamaClient({ baseUrl: 'http://127.0.0.1:1' });
-  registerCoreTools(tools, {
-    llm,
-    vectorStore: new VectorStore(llm),
-    market: new MarketService([]),
-    defaultModel: 'test-model',
-    visionModel: 'test-vision',
-  });
+  registerCoreTools(
+    tools,
+    {
+      llm,
+      vectorStore: new VectorStore(llm),
+      market: new MarketService([]),
+      localDailies: { list: () => [] },
+      sharedDailies: { fetch: async () => ({ items: [] }) },
+      defaultModel: 'test-model',
+      visionModel: 'test-vision',
+    },
+    profile,
+  );
   // Les constructeurs des outils d'automatisation ne font que stocker la
   // référence : des doubles vides suffisent pour inspecter les métadonnées.
   registerAutomationTools(tools, {} as SubAgentRunner, {} as CronScheduler);
@@ -31,12 +42,12 @@ function buildFullRegistry(): ToolRegistry {
 }
 
 describe('cohérence outils ↔ permissions', () => {
-  const registry = buildFullRegistry();
+  const registry = buildRegistry('full');
   const registered = registry.getEnabled();
   const permissionNames = Object.keys(DEFAULT_PERMISSION_CONFIG.tools);
 
-  it('enregistre bien les 67 outils', () => {
-    expect(registered.length).toBe(67);
+  it('enregistre bien les 68 outils', () => {
+    expect(registered.length).toBe(68);
   });
 
   it('chaque outil enregistré a une entrée de permission', () => {
@@ -74,5 +85,32 @@ describe('cohérence outils ↔ permissions', () => {
       .filter(t => !t.schema || Object.keys(t.schema).length === 0)
       .map(t => t.name);
     expect(empty).toEqual([]);
+  });
+});
+
+describe("profil 'research' (bot articles + recherche)", () => {
+  const registry = buildRegistry('research');
+  const names = new Set(registry.getEnabled().map(t => t.name));
+
+  it('masque les outils dev/infra', () => {
+    const leaked = [...RESEARCH_EXCLUDED].filter(n => names.has(n));
+    expect(leaked).toEqual([]);
+  });
+
+  it('garde les outils recherche/presse essentiels', () => {
+    for (const n of [
+      'search_dailies',
+      'read_webpage',
+      'fetch_tech_news',
+      'search_memory',
+      'schedule_task',
+      'run_subagent',
+    ]) {
+      expect(names.has(n), n).toBe(true);
+    }
+  });
+
+  it('compte : catalogue complet moins les exclusions', () => {
+    expect(names.size).toBe(68 - RESEARCH_EXCLUDED.size);
   });
 });

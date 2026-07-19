@@ -1,9 +1,40 @@
 # SUIVI — Évolution de CatDesk
 
 > Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
-> Dernière mise à jour : 2026-07-18.
+> Dernière mise à jour : 2026-07-20.
 
 ## État actuel
+
+**Bot recentré : questions sur les articles + recherche générale (2026-07-20)** —
+**607 tests agent-runtime + 31 desktop, type-check OK** (demande utilisateur :
+« principalement répondre aux questions sur les articles, thème recherche,
+pas de codage, pas de trucs inutiles ») :
+
+- **Nouvel outil `search_dailies`** (68ᵉ du catalogue) : l'agent peut enfin lire
+  les dailys pour répondre aux questions sur les articles — fusion locales
+  (« Mes journaux », `LocalDailyStore`) + partagées (nouveau
+  `SharedDailyReader` : session Supabase anonyme comme l'UI, cache 60 s,
+  dégradation propre en local-seul si non configuré/inaccessible). Filtres
+  mots-clés (accents/pluriel tolérés, titre pondéré ×3), catégorie, fenêtre en
+  jours ; dédoublonnage par titre (garde la plus récente), expirées exclues,
+  corps tronqués à 4 000 car. ; zéro correspondance → liste des titres
+  disponibles pour que le LLM reformule au lieu d'halluciner.
+- **Profil d'outils `research` par défaut** (`CATDESK_TOOL_PROFILE`, repli
+  `full`) : 25 outils dev/infra (analyse de code, git/CI, docker/SQL, GitHub,
+  debug système — liste `RESEARCH_EXCLUDED` dans registerTools.ts) ne sont plus
+  enregistrés pour le chat → 43 outils exposés, prompt plus court, meilleure
+  précision de choix d'outil sur qwen3:14b. Le test de cohérence
+  outils ↔ permissions tourne toujours en profil `full`.
+- **Prompt système recentré** : mission = articles des dailys + recherche
+  d'information ; « PAS un assistant de programmation » sauf demande explicite ;
+  guidage `search_dailies` EN PREMIER pour toute question article/actualité,
+  citation journal + date, aveu « rien trouvé » + proposition de recherche web.
+- **`ESSENTIAL_CORE` de selectTools réorienté** : `search_dailies`,
+  `read_webpage`, `fetch_tech_news` toujours exposés ; `read_file`/
+  `list_directory`/`run_command` ne remontent plus que si la requête les évoque.
+- Reste : valider en réel dans `pnpm dev` (poser des questions sur les dailys
+  du widget) ; si la lecture anonyme Supabase est refusée par la RLS, vérifier
+  que les sign-ins anonymes sont activés côté projet Supabase.
 
 **Dashboard en canvas libre + extraits d'articles lisibles (2026-07-18/19)** —
 **593 tests agent-runtime + 31 desktop, lint 0 warning** :

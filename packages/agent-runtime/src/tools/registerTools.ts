@@ -79,96 +79,158 @@ import { BrowserGetTextTool } from './browser/BrowserGetTextTool';
 import { BrowserClickTool } from './browser/BrowserClickTool';
 import { BrowserTypeTool } from './browser/BrowserTypeTool';
 import { BrowserCloseTool } from './browser/BrowserCloseTool';
+import {
+  SearchDailiesTool,
+  type LocalDailySource,
+  type SharedDailySource,
+} from './news/SearchDailiesTool';
+
+/**
+ * Profil d'exposition des outils au chat :
+ * - 'research' (défaut) : bot recentré articles/dailys + recherche générale —
+ *   les outils de développement et d'infra ne sont pas enregistrés.
+ * - 'full' : tout le catalogue (CATDESK_TOOL_PROFILE=full pour revenir en arrière).
+ * Les permissions (DEFAULT_PERMISSION_CONFIG) couvrent toujours le catalogue
+ * complet : le test de cohérence tourne en profil 'full'.
+ */
+export type ToolProfile = 'research' | 'full';
+
+/** Outils dev/infra masqués en profil 'research' (« pas de codage »). */
+export const RESEARCH_EXCLUDED: ReadonlySet<string> = new Set([
+  // Analyse de code
+  'analyze_stacktrace',
+  'analyze_logs',
+  'generate_unit_tests',
+  'suggest_refactor',
+  'analyze_dependencies',
+  // Git / CI
+  'generate_commit_message',
+  'generate_pr_description',
+  'review_diff',
+  'summarize_git_log',
+  'resolve_conflicts',
+  'bisect_guided',
+  'watch_ci',
+  // Productivité dev
+  'detect_spiral',
+  'generate_standup',
+  'analyze_code_style',
+  'load_project_context',
+  // Infra
+  'docker_ps',
+  'docker_control',
+  'run_sqlite',
+  'query_database',
+  'audit_env',
+  'inspect_port',
+  'kill_process',
+  // GitHub
+  'github_list_issues',
+  'github_get_pr',
+]);
 
 export interface CoreToolDeps {
   llm: OllamaClient;
   vectorStore: VectorStore;
   market: MarketService;
+  /** Dailys locales (« Mes journaux ») lues par search_dailies. */
+  localDailies: LocalDailySource;
+  /** Dailys partagées (Supabase, lecture anonyme) lues par search_dailies. */
+  sharedDailies: SharedDailySource;
   /** Modèle principal (post_tech_news_discord rédige les embeds avec). */
   defaultModel: string;
   /** Modèle vision pour describe_screen (minicpm-v — PAS llava, cf. SUIVI). */
   visionModel: string;
 }
 
-/** Tous les outils sans dépendance sur l'orchestrateur. */
-export function registerCoreTools(tools: ToolRegistry, deps: CoreToolDeps): void {
-  const { llm, vectorStore, market, defaultModel, visionModel } = deps;
+/** Tous les outils sans dépendance sur l'orchestrateur, filtrés par profil. */
+export function registerCoreTools(
+  tools: ToolRegistry,
+  deps: CoreToolDeps,
+  profile: ToolProfile = 'full',
+): void {
+  const { llm, vectorStore, market, localDailies, sharedDailies, defaultModel, visionModel } = deps;
+  const register = (tool: Parameters<ToolRegistry['register']>[0]): void => {
+    if (profile === 'research' && RESEARCH_EXCLUDED.has(tool.name)) return;
+    tools.register(tool);
+  };
 
   // Filesystem / système / infra
-  tools.register(new ReadFileTool());
-  tools.register(new ListDirTool());
-  tools.register(new WriteFileTool());
-  tools.register(new RunCommandTool());
-  tools.register(new OpenAppTool());
-  tools.register(new AuditEnvTool());
-  tools.register(new InspectPortTool());
-  tools.register(new KillProcessTool());
-  tools.register(new DockerPsTool());
-  tools.register(new DockerControlTool());
-  tools.register(new RunSqliteTool());
-  tools.register(new QueryDatabaseTool());
+  register(new ReadFileTool());
+  register(new ListDirTool());
+  register(new WriteFileTool());
+  register(new RunCommandTool());
+  register(new OpenAppTool());
+  register(new AuditEnvTool());
+  register(new InspectPortTool());
+  register(new KillProcessTool());
+  register(new DockerPsTool());
+  register(new DockerControlTool());
+  register(new RunSqliteTool());
+  register(new QueryDatabaseTool());
 
   // Presse-papiers / mémoire
-  tools.register(new ReadClipboardTool());
-  tools.register(new WriteClipboardTool());
-  tools.register(new SearchMemoryTool(vectorStore));
-  tools.register(new StoreMemoryTool(vectorStore));
+  register(new ReadClipboardTool());
+  register(new WriteClipboardTool());
+  register(new SearchMemoryTool(vectorStore));
+  register(new StoreMemoryTool(vectorStore));
 
   // Analyse / git / productivité
-  tools.register(new AnalyzeStacktraceTool());
-  tools.register(new AnalyzeLogsTool());
-  tools.register(new GenerateUnitTestsTool());
-  tools.register(new SuggestRefactorTool());
-  tools.register(new AnalyzeDependenciesTool());
-  tools.register(new GitCommitTool());
-  tools.register(new GitPrTool());
-  tools.register(new ReviewDiffTool());
-  tools.register(new SummarizeGitLogTool());
-  tools.register(new ResolveConflictsTool());
-  tools.register(new BisectGuidedTool());
-  tools.register(new DetectSpiralTool());
-  tools.register(new GenerateStandupTool());
-  tools.register(new AnalyzeCodeStyleTool());
-  tools.register(new LoadProjectContextTool());
-  tools.register(new WatchCITool());
-  tools.register(new SemanticSearchTool());
+  register(new AnalyzeStacktraceTool());
+  register(new AnalyzeLogsTool());
+  register(new GenerateUnitTestsTool());
+  register(new SuggestRefactorTool());
+  register(new AnalyzeDependenciesTool());
+  register(new GitCommitTool());
+  register(new GitPrTool());
+  register(new ReviewDiffTool());
+  register(new SummarizeGitLogTool());
+  register(new ResolveConflictsTool());
+  register(new BisectGuidedTool());
+  register(new DetectSpiralTool());
+  register(new GenerateStandupTool());
+  register(new AnalyzeCodeStyleTool());
+  register(new LoadProjectContextTool());
+  register(new WatchCITool());
+  register(new SemanticSearchTool());
 
-  // Web / connecteurs
-  tools.register(new ReadWebpageTool());
-  tools.register(new FetchTechNewsTool());
-  tools.register(new PostTechNewsDiscordTool(llm, defaultModel));
-  tools.register(new ObsidianNotesTool());
-  tools.register(new NotionSearchTool());
-  tools.register(new SendWebhookMessageTool());
-  tools.register(new CallApiTool());
-  tools.register(new ReadEmailTool());
-  tools.register(new GitHubIssuesTool());
-  tools.register(new GitHubPRTool());
+  // Web / presse / connecteurs
+  register(new ReadWebpageTool());
+  register(new FetchTechNewsTool());
+  register(new SearchDailiesTool(localDailies, sharedDailies));
+  register(new PostTechNewsDiscordTool(llm, defaultModel));
+  register(new ObsidianNotesTool());
+  register(new NotionSearchTool());
+  register(new SendWebhookMessageTool());
+  register(new CallApiTool());
+  register(new ReadEmailTool());
+  register(new GitHubIssuesTool());
+  register(new GitHubPRTool());
 
   // Écran / audio / fichiers
-  tools.register(new CaptureScreenTool());
-  tools.register(new OcrRegionTool());
-  tools.register(new DescribeScreenTool(llm, visionModel));
-  tools.register(new TranscribeAudioTool());
-  tools.register(new ParseDocumentTool());
-  tools.register(new AnalyzeDataTool());
-  tools.register(new ExportDocumentTool());
-  tools.register(new ReadCalendarTool());
+  register(new CaptureScreenTool());
+  register(new OcrRegionTool());
+  register(new DescribeScreenTool(llm, visionModel));
+  register(new TranscribeAudioTool());
+  register(new ParseDocumentTool());
+  register(new AnalyzeDataTool());
+  register(new ExportDocumentTool());
+  register(new ReadCalendarTool());
 
   // Bourse
-  tools.register(new GetMarketTool(market));
-  tools.register(new AddToWatchlistTool(market));
-  tools.register(new RemoveFromWatchlistTool(market));
-  tools.register(new SetFormulaTool(market));
-  tools.register(new RemoveFormulaTool(market));
+  register(new GetMarketTool(market));
+  register(new AddToWatchlistTool(market));
+  register(new RemoveFromWatchlistTool(market));
+  register(new SetFormulaTool(market));
+  register(new RemoveFormulaTool(market));
 
   // Navigateur headless (playwright-core, lazy-launch)
-  tools.register(new BrowserNavigateTool());
-  tools.register(new BrowserScreenshotTool());
-  tools.register(new BrowserGetTextTool());
-  tools.register(new BrowserClickTool());
-  tools.register(new BrowserTypeTool());
-  tools.register(new BrowserCloseTool());
+  register(new BrowserNavigateTool());
+  register(new BrowserScreenshotTool());
+  register(new BrowserGetTextTool());
+  register(new BrowserClickTool());
+  register(new BrowserTypeTool());
+  register(new BrowserCloseTool());
 }
 
 /** Outils qui référencent l'orchestrateur (sous-agents) ou le cron. */

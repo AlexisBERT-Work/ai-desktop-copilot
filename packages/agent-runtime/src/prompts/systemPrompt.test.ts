@@ -10,6 +10,14 @@ describe('buildSystemPrompt', () => {
     expect(p).toContain('Réponds TOUJOURS en français');
   });
 
+  it('recentre la mission sur les articles et la recherche, pas le code', () => {
+    const p = buildSystemPrompt({});
+    expect(p).toContain('revues de presse quotidiennes (dailys)');
+    expect(p).toContain('PAS un assistant de programmation');
+    expect(p).toContain('search_dailies EN PREMIER');
+    expect(p).toContain('cite le journal et la date');
+  });
+
   it('numérote le plan et intègre le contexte fourni', () => {
     const p = buildSystemPrompt(
       {

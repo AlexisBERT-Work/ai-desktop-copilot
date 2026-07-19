@@ -270,6 +270,14 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: false,
     },
+    search_dailies: {
+      name: 'search_dailies',
+      description:
+        'Search and read the generated press-review dailies (local + shared) to answer questions about articles',
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
     post_tech_news_discord: {
       name: 'post_tech_news_discord',
       description:

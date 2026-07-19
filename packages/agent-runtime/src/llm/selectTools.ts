@@ -16,13 +16,17 @@ export interface SelectableTool {
   category: string;
 }
 
-/** Always kept so basic capabilities never disappear behind the relevance filter. */
+/**
+ * Always kept so core capabilities never disappear behind the relevance filter.
+ * Orienté recherche/articles (mission première du bot) : les outils fichiers/
+ * shell restent disponibles mais ne remontent que si la requête les évoque.
+ */
 const ESSENTIAL_CORE = [
-  'read_file',
-  'list_directory',
-  'run_command',
-  'read_clipboard',
+  'search_dailies',
+  'read_webpage',
+  'fetch_tech_news',
   'search_memory',
+  'read_clipboard',
   'list_scheduled_tasks',
   'schedule_task',
 ];
@@ -39,15 +43,11 @@ function normalize(s: string): string {
 function tokens(s: string): string[] {
   return normalize(s)
     .split(' ')
-    .filter((w) => w.length >= 3)
-    .map((w) => w.replace(/(s|es|ees|er|ent)$/u, ''));
+    .filter(w => w.length >= 3)
+    .map(w => w.replace(/(s|es|ees|er|ent)$/u, ''));
 }
 
-export function selectTools<T extends SelectableTool>(
-  tools: T[],
-  query: string,
-  limit = 14,
-): T[] {
+export function selectTools<T extends SelectableTool>(tools: T[], query: string, limit = 14): T[] {
   if (limit <= 0 || tools.length <= limit) return tools;
 
   const qWords = new Set(tokens(query));
@@ -63,7 +63,10 @@ export function selectTools<T extends SelectableTool>(
     let s = 0;
     for (const w of qWords) {
       for (const h of hayTokens) {
-        if (h === w || h.startsWith(w) || w.startsWith(h)) { s++; break; }
+        if (h === w || h.startsWith(w) || w.startsWith(h)) {
+          s++;
+          break;
+        }
       }
     }
     return s;
@@ -76,9 +79,9 @@ export function selectTools<T extends SelectableTool>(
   }
   // 2. Query-relevant tools, highest score first.
   const ranked = tools
-    .filter((t) => !picked.has(t.name))
-    .map((t) => ({ t, s: score(t) }))
-    .filter((x) => x.s > 0)
+    .filter(t => !picked.has(t.name))
+    .map(t => ({ t, s: score(t) }))
+    .filter(x => x.s > 0)
     .sort((a, b) => b.s - a.s);
 
   for (const { t } of ranked) {
