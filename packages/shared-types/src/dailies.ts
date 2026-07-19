@@ -4,14 +4,7 @@
 // client filtre selon ses centres d'intérêt. Voir docs/projects/dashboard-dailies.md.
 
 /** Catégories de daily (liste fixe). Sert au filtrage côté client. */
-export const DAILY_CATEGORIES = [
-  'markets',
-  'tech',
-  'crypto',
-  'macro',
-  'product',
-  'misc',
-] as const;
+export const DAILY_CATEGORIES = ['markets', 'tech', 'crypto', 'macro', 'product', 'misc'] as const;
 
 export type DailyCategory = (typeof DAILY_CATEGORIES)[number];
 
@@ -37,6 +30,29 @@ export interface Daily {
   category: DailyCategory;
   publishedAt: string; // ISO 8601
   expiresAt: string | null; // ISO 8601 ou null
+}
+
+/**
+ * Progression de la génération des dailys locales (notification
+ * `press.local.progress` → event `press:progress`, affichée dans « Mes
+ * journaux »). Un run dure plusieurs minutes : sans cela, « Générer
+ * maintenant » mouline en silence.
+ */
+export interface PressRunStatus {
+  state: 'running' | 'done' | 'error';
+  /** Journal en cours (1-based) sur le total, pendant un run. */
+  current?: number;
+  total?: number;
+  /** Nom du journal en cours de traitement. */
+  journal?: string;
+  /** Étape pour ce journal : collecte des articles, puis rédaction/vérification LLM. */
+  phase?: 'collecte' | 'redaction';
+  /** Dailys produites ou remplacées (état 'done'). */
+  produced?: number;
+  /** Message d'erreur (état 'error'). */
+  error?: string;
+  /** Horodatage ISO de l'événement. */
+  at: string;
 }
 
 /**

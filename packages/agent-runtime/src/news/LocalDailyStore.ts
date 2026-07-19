@@ -30,7 +30,7 @@ export class LocalDailyStore {
   }
 
   has(title: string): boolean {
-    return this.items.some((d) => d.title === title);
+    return this.items.some(d => d.title === title);
   }
 
   /** Ajoute les brouillons dont le titre n'existe pas encore. Renvoie les nouveaux. */
@@ -55,11 +55,47 @@ export class LocalDailyStore {
     return added;
   }
 
+  /**
+   * Ajoute OU REMPLACE par titre (run manuel « Générer maintenant ») : une
+   * daily du jour déjà présente est régénérée — même id (clés UI stables),
+   * corps et date rafraîchis. Sans cela, regénérer un jour déjà publié ne
+   * produisait rien : les titres datés existaient déjà, tout était ignoré.
+   * Renvoie les dailys ajoutées ou remplacées.
+   */
+  upsert(drafts: JournalDraft[], now = new Date()): Daily[] {
+    const changed: Daily[] = [];
+    for (const draft of drafts) {
+      const existing = this.items.find(d => d.title === draft.title);
+      if (existing !== undefined) {
+        existing.body = draft.body;
+        existing.category = draft.category;
+        existing.publishedAt = now.toISOString();
+        changed.push(existing);
+      } else {
+        const fresh: Daily = {
+          id: `local-${randomUUID()}`,
+          title: draft.title,
+          body: draft.body,
+          category: draft.category,
+          publishedAt: now.toISOString(),
+          expiresAt: null,
+        };
+        this.items.push(fresh);
+        changed.push(fresh);
+      }
+    }
+    if (changed.length > 0) {
+      this.prune(now);
+      this.persist();
+    }
+    return changed;
+  }
+
   /** Purge par âge (30 j) puis par cap (300), les plus récentes d'abord. */
   private prune(now: Date): void {
     const cutoff = now.getTime() - MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
     this.items = this.items
-      .filter((d) => {
+      .filter(d => {
         const t = Date.parse(d.publishedAt);
         return Number.isNaN(t) || t >= cutoff;
       })

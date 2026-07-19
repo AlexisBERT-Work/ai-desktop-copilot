@@ -19,6 +19,7 @@ export const TAURI_EVENTS = {
   marketUpdate: 'market:update',
   pressFeeds: 'press:feeds',
   dailiesLocal: 'dailies:local',
+  pressProgress: 'press:progress',
 } as const;
 
 export type TauriEventName = (typeof TAURI_EVENTS)[keyof typeof TAURI_EVENTS];
@@ -47,6 +48,7 @@ export const RPC_NOTIFICATIONS = {
   marketUpdate: 'market.update',
   pressFeeds: 'press.feeds',
   dailiesLocal: 'dailies.local',
+  pressLocalProgress: 'press.local.progress',
 } as const;
 
 export type RpcNotificationName = (typeof RPC_NOTIFICATIONS)[keyof typeof RPC_NOTIFICATIONS];

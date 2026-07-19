@@ -266,6 +266,11 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                 // Dailys générées localement par les journaux personnalisés.
                 app.emit(protocol::EVENT_DAILIES_LOCAL, params)?;
             }
+            protocol::NOTIF_PRESS_LOCAL_PROGRESS => {
+                // Progression de la génération des dailys locales (bandeau de
+                // statut du panneau « Mes journaux », fenêtre dashboard).
+                app.emit(protocol::EVENT_PRESS_PROGRESS, params)?;
+            }
             _ => {
                 warn!("Unknown agent notification: {method}");
             }

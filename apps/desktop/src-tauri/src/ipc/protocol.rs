@@ -16,6 +16,7 @@ pub const EVENT_PROACTIVE_SUGGESTION: &str = "proactive:suggestion";
 pub const EVENT_MARKET_UPDATE: &str = "market:update";
 pub const EVENT_PRESS_FEEDS: &str = "press:feeds";
 pub const EVENT_DAILIES_LOCAL: &str = "dailies:local";
+pub const EVENT_PRESS_PROGRESS: &str = "press:progress";
 
 // ─── Méthodes JSON-RPC hôte → agent ────────────────────────────
 pub const RPC_AGENT_PROCESS: &str = "agent.process";
@@ -36,6 +37,7 @@ pub const NOTIF_PROACTIVE_SUGGESTION: &str = "proactive.suggestion";
 pub const NOTIF_MARKET_UPDATE: &str = "market.update";
 pub const NOTIF_PRESS_FEEDS: &str = "press.feeds";
 pub const NOTIF_DAILIES_LOCAL: &str = "dailies.local";
+pub const NOTIF_PRESS_LOCAL_PROGRESS: &str = "press.local.progress";
 
 /// Enveloppe JSON-RPC 2.0 d'une requête vers l'agent (id aléatoire).
 pub fn rpc_request(method: &str, params: serde_json::Value) -> serde_json::Value {
@@ -75,6 +77,7 @@ mod tests {
         EVENT_MARKET_UPDATE,
         EVENT_PRESS_FEEDS,
         EVENT_DAILIES_LOCAL,
+        EVENT_PRESS_PROGRESS,
         RPC_AGENT_PROCESS,
         RPC_AGENT_CANCEL,
         RPC_PERMISSION_RESPONSE,
@@ -91,6 +94,7 @@ mod tests {
         NOTIF_MARKET_UPDATE,
         NOTIF_PRESS_FEEDS,
         NOTIF_DAILIES_LOCAL,
+        NOTIF_PRESS_LOCAL_PROGRESS,
     ];
 
     /// Chaque constante Rust doit apparaître comme littéral `'…'` dans le TS.

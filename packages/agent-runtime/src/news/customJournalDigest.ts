@@ -11,6 +11,8 @@ export interface CustomJournalDeps {
   llm: OllamaClient;
   model: string;
   now?: Date;
+  /** Progression pour l'UI : appelé au début de chaque phase d'un journal. */
+  onPhase?: (journal: string, phase: 'collecte' | 'redaction') => void;
 }
 
 /** Taille du vivier agrégé avant filtre regex (marge pour l'exclusion), plafonné. */
@@ -29,6 +31,7 @@ export async function buildCustomJournalDaily(
   deps: CustomJournalDeps,
 ): Promise<JournalDraft | null> {
   const now = deps.now ?? new Date();
+  deps.onPhase?.(feed.name, 'collecte');
 
   let items: NewsItem[] = [];
   let failed: string[] = [];
@@ -61,7 +64,13 @@ export async function buildCustomJournalDaily(
   }
 
   await enrichArticleTexts(items);
-  const { analysis, summaries, details } = await analyzeJournal(deps.llm, deps.model, feed.name, items);
+  deps.onPhase?.(feed.name, 'redaction');
+  const { analysis, summaries, details } = await analyzeJournal(
+    deps.llm,
+    deps.model,
+    feed.name,
+    items,
+  );
 
   return {
     journal: feed.name,

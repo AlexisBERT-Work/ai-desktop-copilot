@@ -36,7 +36,13 @@ describe('sanitizeFeed', () => {
   });
 
   it('répare les champs invalides avec des valeurs sûres', () => {
-    const f = sanitizeFeed({ id: 'a', name: 'X', category: 'nope', sinceHours: -3, articleLimit: 'x' });
+    const f = sanitizeFeed({
+      id: 'a',
+      name: 'X',
+      category: 'nope',
+      sinceHours: -3,
+      articleLimit: 'x',
+    });
     expect(f).toMatchObject({ category: 'misc', sinceHours: 24, articleLimit: 12, enabled: true });
   });
 });
@@ -94,6 +100,25 @@ describe('LocalDailyStore', () => {
     expect(reread.has('Veille IA — revue du 6 juillet')).toBe(true);
   });
 
+  it('upsert remplace une daily existante (même id) et ajoute les nouvelles', () => {
+    const store = new LocalDailyStore(dir);
+    const [first] = store.addNew([draft('Veille IA — revue du 6 juillet')]);
+    expect(first?.body).toBe('corps');
+
+    // Régénération manuelle : même titre ⇒ remplacé (id stable, corps neuf).
+    const changed = store.upsert([
+      { ...draft('Veille IA — revue du 6 juillet'), body: 'corps régénéré' },
+      draft('Autre journal — revue du 6 juillet'),
+    ]);
+    expect(changed).toHaveLength(2);
+    expect(changed[0]?.id).toBe(first?.id);
+    expect(store.list()).toHaveLength(2);
+
+    const reread = new LocalDailyStore(dir);
+    const regen = reread.list().find(d => d.title.startsWith('Veille IA'));
+    expect(regen?.body).toBe('corps régénéré');
+  });
+
   it('purge les dailys plus vieilles que 30 jours', () => {
     const store = new LocalDailyStore(dir);
     const old = new Date();
@@ -101,7 +126,7 @@ describe('LocalDailyStore', () => {
     store.addNew([draft('Vieille revue')], old);
     // L'ajout suivant déclenche la purge de l'ancienne.
     store.addNew([draft('Revue récente')]);
-    const titles = store.list().map((d) => d.title);
+    const titles = store.list().map(d => d.title);
     expect(titles).toEqual(['Revue récente']);
   });
 });

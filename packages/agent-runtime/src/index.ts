@@ -281,6 +281,7 @@ async function main() {
     localDailies,
     CONFIG.pressHour,
     dailies => stdoutNotifier(RPC_NOTIFICATIONS.dailiesLocal, { dailies }),
+    status => stdoutNotifier(RPC_NOTIFICATIONS.pressLocalProgress, { status }),
   );
   localPress.start();
 
@@ -307,7 +308,9 @@ async function main() {
       saveFeed: input => localFeeds.save(input),
       deleteFeed: id => localFeeds.delete(id),
       listDailies: () => localDailies.list(),
-      runNow: () => localPress.runOnce(),
+      // Manuel = force : régénère (remplace) les dailys du jour déjà publiées.
+      runNow: () => localPress.runOnce(true),
+      getStatus: () => localPress.status,
     },
   );
   bridge.start();

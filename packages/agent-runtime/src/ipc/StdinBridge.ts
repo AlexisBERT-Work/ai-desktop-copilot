@@ -5,6 +5,7 @@ import type {
   Daily,
   PressFeed,
   PressFeedInput,
+  PressRunStatus,
 } from '@catdesk/shared-types';
 import { RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
@@ -39,6 +40,8 @@ export interface LocalPressControl {
   listDailies: () => Daily[];
   /** Génération immédiate (bouton « Générer maintenant »). Fire-and-forget. */
   runNow: () => void | Promise<unknown>;
+  /** Dernier statut de génération (repoussé au sync — null si jamais couru). */
+  getStatus: () => PressRunStatus | null;
 }
 
 /**
@@ -167,6 +170,11 @@ export class StdinBridge {
         this.sendNotification(RPC_NOTIFICATIONS.dailiesLocal, {
           dailies: this.localPress.listDailies(),
         });
+        // Un run peut être en cours au montage de l'UI : repousser son statut.
+        const status = this.localPress.getStatus();
+        if (status !== null) {
+          this.sendNotification(RPC_NOTIFICATIONS.pressLocalProgress, { status });
+        }
       }
       this.sendResponse(request.id, { ok: this.localPress !== undefined });
       return;
