@@ -1,9 +1,82 @@
 # SUIVI — Évolution de CatDesk
 
 > Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
-> Dernière mise à jour : 2026-07-17.
+> Dernière mise à jour : 2026-07-18.
 
 ## État actuel
+
+**Dashboard en canvas libre + extraits d'articles lisibles (2026-07-18/19)** —
+**593 tests agent-runtime + 31 desktop, lint 0 warning** :
+
+- **Placement libre façon PowerPoint** (retour utilisateur : « les placer
+  littéralement où je veux, de la taille exacte que je veux ») : la grille
+  4 colonnes à réordonnancement est remplacée par un canvas en px —
+  `layout {x,y,w,h}` en pixels (v2), drag aux pointer events qui pose la carte
+  exactement où on la lâche (snap 8 px, zoom UI corrigé, auto-scroll 2 axes,
+  Échap = repose à l'origine, widget saisi passé au premier plan), poignées de
+  resize en px exacts (badge « 480 × 240 px »), contenu qui défile À L'INTÉRIEUR
+  de la carte trop petite. Migration douce des dispositions v1 (unités ≤ 8 →
+  gabarit 288×120 px) dans `sanitizeConfig` ; boutons cycle largeur/hauteur
+  retirés. Reste : test manuel du ressenti dans `pnpm dev`.
+- **Guide mis à jour** (WidgetGuide, exportable PDF) : canvas libre + Style +
+  Affichages + zoom dans « Principe général », nouvelle section « Journaux &
+  annonces » (portées, génération, admin = dailys manuelles), fiche Dailys
+  réécrite (origines Perso/Partagée, filtres, En savoir plus vérifié) ; un
+  échantillon du guide illustre le badge « Perso ».
+- **Une seule interface de gestion des journaux** : l'écran « Journaux »
+  (ex-« Mes journaux ») porte les deux portées — « Ce poste » (backend local)
+  et « Partagés (tous) » (backend Supabase, onglet visible si configuré,
+  verrouillé par la connexion admin + RLS). L'onglet « Journaux personnalisés »
+  de la console admin est supprimé ; la console est recentrée sur les dailys
+  manuelles (AdminLogin exporté et réutilisé).
+- **Origine des dailys visible** : `Daily.origin` ('shared' | 'local', tagué à
+  la fusion dans DailiesWidget) — badge « Perso » (vert, Laptop) vs
+  « Partagée » (bleu, Users) + liseré gauche de la même couleur sur chaque
+  daily, et sélecteur « Toutes · Partagées · Persos » (persisté par widget,
+  affiché seulement quand les deux origines cohabitent).
+- **Personnalisation des widgets** : `Widget.style` (accent parmi 6 couleurs +
+  taille du texte via zoom local 0.85–1.3, bornes 0.7–1.6) — section « Style »
+  commune en tête de l'éditeur de config, application immédiate
+  (`setWidgetStyle`). Mode édition rendu évident : header teinté brand + badge
+  « Mode édition » + cartes en pointillés. Dailys : chaque article devient un
+  bloc bordé distinct (overrides ul/li de NewsMarkdown — vaut aussi pour les
+  dailys déjà stockées).
+- **Statut de génération visible** : bandeau `PressRunStatusBanner` sur
+  l'ACCUEIL du dashboard (états en cours/échec) et dans « Mes journaux »
+  (+ état terminé : n dailys à HH:MM) — en cours = journal 2/3, phase
+  collecte/rédaction ; échec = message + retentative. Chaîne : `onPhase` (customJournalDigest) →
+  `PressRunStatus` (scheduler, notification `press.local.progress`) → event
+  Tauri `press:progress` (protocol.rs/bridge.rs, miroir vérifié par cargo test)
+  → store localPress. Le statut courant est repoussé au `press.local.sync`
+  (panneau ouvert en plein run).
+- **« Générer maintenant » régénère vraiment** : les titres de dailys étant
+  datés et le store idempotent par titre, re-cliquer le bouton un jour déjà
+  publié refaisait tout le travail puis jetait le résultat (aucun titre neuf).
+  Le run manuel passe en `force` → `LocalDailyStore.upsert` remplace les dailys
+  du jour (id stable, corps et date rafraîchis) ; le run planifié de 7 h garde
+  l'idempotence (pas de doublon au redémarrage).
+- **Affichages enregistrés (presets de disposition)** : « Réinitialiser »
+  devient le panneau « Affichages » — enregistrer la disposition actuelle sous
+  un nom (instantané `structuredClone`, indépendant des éditions suivantes),
+  restaurer/supprimer d'un clic, disposition par défaut en confirmation 2 clics.
+  Persistés (`presets` dans catdesk-dashboard), validés/migrés au rechargement
+  (`sanitizePresets`).
+- **Fenêtre Marchés & News irrécupérable après fermeture — corrigé** : la garde
+  « fermer = masquer » vivait dans un useEffect de DashboardRoot ; son cleanup
+  (crash du rendu, HMR) la débranchait, la croix native détruisait alors la
+  fenêtre et `getByLabel` renvoyait null → bouton mort jusqu'au redémarrage.
+  La garde est posée au chargement du module (main.tsx, hors React) et le
+  bouton RECRÉE la fenêtre si elle a malgré tout disparu (openDashboardWindow ;
+  permission `core:webview:allow-create-webview-window` ajoutée).
+- **Extraits d'articles : fin des phrases hachées** (retour utilisateur : dailys
+  citant « ago writing C++ to solve it », coupes « on this benc »). Cause :
+  `htmlToText` traitait les retours à la ligne du FICHIER HTML comme des fins de
+  ligne → le filtre de prose jetait les débuts de phrase et recollait le reste.
+  Corrigé : les retours source deviennent des espaces, seules les balises de
+  bloc (ouvrantes ET fermantes) structurent ; `<pre>` sanctuarisés. En aval :
+  `cutAtSentence` (coupe à la fin de phrase, pas au mot) sur excerpt/fullText/
+  invites LLM/verbatim, `startsMidSentence` écarte les extraits RSS tronqués qui
+  démarrent en cours de phrase (repli fullText, ou pas de résumé du tout).
 
 **Suite du refactoring (2026-07-17)** — les quatre chantiers restants du plan
 sont terminés. État final : **575 tests agent-runtime + 8 desktop + 5 Python +
