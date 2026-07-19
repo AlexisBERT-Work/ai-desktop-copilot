@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useState } from 'react';
 import { useUiZoom } from '../../shared/hooks/useUiZoom';
 import { useDashboardData } from './useDashboardData';
 import { DashboardPage } from './DashboardPage';
@@ -16,19 +15,8 @@ export function DashboardRoot() {
   useDashboardData();
   const [view, setView] = useState<DashboardView>('dashboard');
 
-  // Fermer via la croix native DÉTRUIRAIT la fenêtre → impossible à rouvrir
-  // ensuite (getByLabel renvoie null). On intercepte pour seulement la masquer ;
-  // le bouton la réaffiche alors à volonté.
-  useEffect(() => {
-    const win = getCurrentWindow();
-    const unlisten = win.onCloseRequested(e => {
-      e.preventDefault();
-      void win.hide();
-    });
-    return () => {
-      void unlisten.then(off => off());
-    };
-  }, []);
+  // NB : l'interception « fermer = masquer » de la fenêtre est posée dans
+  // main.tsx, hors React — un crash du rendu ne doit pas la débrancher.
 
   if (view === 'guide') return <WidgetGuide onClose={() => setView('dashboard')} />;
   if (view === 'admin') return <DailiesAdminConsole onClose={() => setView('dashboard')} />;
