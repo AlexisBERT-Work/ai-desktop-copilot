@@ -35,11 +35,20 @@ SolidCompression=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
-; Windows caps a single Setup.exe near 4 GB. The bundled models push us well past
-; that, so split the payload across ~2 GB slices: the build produces a small
-; setup.exe plus CatDesk-*-#.bin files that must be kept together to install.
+; Inno Setup refuse categoriquement un Setup.exe unique au-dela d'environ
+; 4,2 Go ("as this approaches the maximum supported by Windows") - une regle
+; d'Inno/Windows, PAS une histoire de systeme de fichiers de destination (le
+; FAT32 ajoute sa PROPRE limite dure de 4 Go/fichier, mais meme sur
+; cloud/NTFS/exFAT, sans cette limite, le plafond d'Inno s'applique quand
+; meme). Avec le payload CatDesk (~22 Go de modeles), le fractionnement en
+; tranches de 2 Go reste donc obligatoire quelle que soit la destination.
+; build-inno.ps1 -SingleFile (define SingleFile ci-dessous) ne fonctionne que
+; pour un payload qui reste sous ~4,2 Go (ex. build sans modeles).
+#ifdef SingleFile
+#else
 DiskSpanning=yes
 DiskSliceSize=2000000000
+#endif
 
 [Languages]
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
