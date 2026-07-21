@@ -52,6 +52,20 @@ function Need($name) {
   if (-not $c) { throw "Prerequisite missing: '$name' not found in PATH." }
   return $c.Source
 }
+# Remove-Item échoue (« chemin d'accès introuvable ») sur des chemins > 260
+# caractères — arrive avec un resources/agent d'un build précédent à cette
+# limite (ex. avant l'exclusion eslint/typescript ci-dessous). Robocopy gère
+# nativement les chemins longs : miroiter un dossier source vide vide la
+# cible en profondeur, après quoi le dossier (désormais vide) se supprime
+# normalement.
+function Remove-DirRobust($path) {
+  if (-not (Test-Path $path)) { return }
+  $empty = Join-Path $env:TEMP "nd-empty-$([guid]::NewGuid())"
+  New-Item -ItemType Directory -Force -Path $empty | Out-Null
+  robocopy $empty $path /MIR /NFL /NDL /NJH /NP | Out-Null
+  Remove-Item -Recurse -Force $empty -ErrorAction SilentlyContinue
+  Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue
+}
 
 # ── 0. Prerequisites ─────────────────────────────────────────────
 Step "Checking prerequisites"
@@ -78,7 +92,7 @@ if ($Update) {
 
 # ── 1. Clean & recreate staging dirs ─────────────────────────────
 Step "Preparing resources staging"
-if (Test-Path $resDir) { Remove-Item -Recurse -Force $resDir }
+Remove-DirRobust $resDir
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "agent") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ollama") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ocr") | Out-Null
@@ -109,7 +123,17 @@ pnpm --filter "@catdesk/agent-runtime" deploy --prod --legacy $deployDir
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "pnpm deploy failed (exit $LASTEXITCODE)" }
 Pop-Location
 
-Copy-Item -Recurse -Force (Join-Path $deployDir "node_modules") (Join-Path $agentOut "node_modules")
+# Robocopy plutôt que Copy-Item : le node_modules déployé (pnpm --legacy ne
+# filtre pas les devDependencies des packages workspace liés) contient des
+# chemins qui dépassent la limite Windows de 260 caractères ; Copy-Item
+# échoue dessus, robocopy les gère nativement. On exclut en plus eslint et
+# typescript (devDependencies de @catdesk/shared-types) : morts au runtime
+# (esbuild a déjà tout inliné dans dist/index.js) et ce sont eux qui
+# produisent les chemins les plus profonds (règles ESLint imbriquées) —
+# les exclure élimine le problème à la racine plutôt que de le déplacer vers
+# l'outil suivant (ISCC a le même souci de longueur de chemin que Copy-Item).
+robocopy (Join-Path $deployDir "node_modules") (Join-Path $agentOut "node_modules") /E /XD eslint typescript /NFL /NDL /NJH /NP | Out-Null
+if ($LASTEXITCODE -ge 8) { throw "robocopy node_modules failed (exit $LASTEXITCODE)" }
 Copy-Item -Recurse -Force (Join-Path $agentSrc "dist") (Join-Path $agentOut "dist")
 Copy-Item -Force (Join-Path $agentSrc "package.json") (Join-Path $agentOut "package.json")
 Copy-Item -Force $nodeExe (Join-Path $agentOut "node.exe")

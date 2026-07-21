@@ -51,7 +51,13 @@ Name: "desktopicon"; Description: "Creer un raccourci sur le Bureau"; GroupDescr
 Source: "{#ExeDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResDir}\agent\*";  DestDir: "{app}\agent";  Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#ResDir}\ollama\*"; DestDir: "{app}\ollama"; Flags: ignoreversion recursesubdirs createallsubdirs
+; OCR est optionnel (build-release.ps1 -SkipOcr laisse resources\ocr\ vide) —
+; un Source wildcard qui ne matche aucun fichier fait échouer la compilation
+; ISCC, donc cette ligne n'est incluse que si build-inno.ps1 a détecté au
+; moins un fichier réel dans resources\ocr\ (define HasOcr).
+#ifdef HasOcr
 Source: "{#ResDir}\ocr\*";    DestDir: "{app}\ocr";    Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

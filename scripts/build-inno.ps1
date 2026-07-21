@@ -50,14 +50,20 @@ foreach ($d in 'agent','ollama','ocr') {
   if (-not (Test-Path (Join-Path $resDir $d))) { throw "Missing staged resource '$d'. Run build-release.ps1 staging first." }
 }
 $hasModels = Test-Path (Join-Path $resDir "ollama\models\manifests")
+# Vrai seulement s'il y a AU MOINS un fichier réel (pas juste le dossier vide
+# laissé par -SkipOcr) — sinon le Source wildcard de catdesk.iss ferait
+# échouer ISCC ("No files found matching").
+$hasOcr = [bool](Get-ChildItem (Join-Path $resDir "ocr") -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1)
 Write-Host "ISCC:      $iscc"
 Write-Host "exe dir:   $ExeDir"
-Write-Host "resources: $resDir (models bundled: $hasModels)"
+Write-Host "resources: $resDir (models bundled: $hasModels, ocr bundled: $hasOcr)"
 
 # Compile
 Step "Building Inno Setup installer (large, may take a while)"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-& $iscc /Qp "/DExeDir=$ExeDir" "/DResDir=$resDir" "/DOutputDir=$outDir" $iss
+$isccArgs = @("/Qp", "/DExeDir=$ExeDir", "/DResDir=$resDir", "/DOutputDir=$outDir")
+if ($hasOcr) { $isccArgs += "/DHasOcr=1" }
+& $iscc @isccArgs $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed (exit $LASTEXITCODE)" }
 
 Step "Done"
