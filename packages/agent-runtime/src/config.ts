@@ -53,7 +53,9 @@ export const CONFIG = {
   extractModel: process.env['CATDESK_EXTRACT_MODEL'] ?? model,
   numCtx: envNumber('CATDESK_NUM_CTX', 8192),
   maxTokens: envNumber('CATDESK_MAX_TOKENS', 1024),
-  toolLimit: envNumber('CATDESK_TOOL_LIMIT', 14),
+  // 10 (et non 14) : chaque schéma d'outil coûte des tokens de prompt à CHAQUE
+  // itération — mesuré trop lent sur RX 6700 avec 14 (réponses > 1 min).
+  toolLimit: envNumber('CATDESK_TOOL_LIMIT', 10),
   /**
    * Profil d'outils du chat : 'research' (défaut) recentre le bot sur les
    * articles/dailys et la recherche générale (pas d'outils dev/infra).

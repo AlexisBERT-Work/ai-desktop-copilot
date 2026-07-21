@@ -86,7 +86,7 @@ pnpm exec supabase config push
 > rapport avec l'auth et non corrigeable via `config.toml`.
 >
 > **Voie fiable** : activer le réglage directement dans le dashboard —
-> **Authentication → Sign In / Providers → Anonymous sign-ins** → *Save*.
+> **Authentication → Sign In / Providers → Anonymous sign-ins** → _Save_.
 > C'est le seul réglage auth nécessaire pour CatDesk ; pas besoin d'insister sur
 > `config push`.
 
@@ -146,3 +146,19 @@ pnpm exec supabase migration new <nom>   # crée supabase/migrations/<timestamp>
 # … écris ton SQL …
 pnpm exec supabase db push               # applique au projet lié
 ```
+
+## Publication ouverte (migration `20260720000000`)
+
+Cette migration ajoute la fonction `publish_daily_if_missing` qui permet à
+**tout poste** (session anonyme, sans identifiants admin) de publier le lot
+standard de dailys — voir [`README.md`](README.md#publication-ouverte-du-lot-standard-tri-modèles-2026-07-20)
+pour le détail des garde-fous (titre/catégorie/plafond). À appliquer comme
+toute autre migration :
+
+```powershell
+pnpm exec supabase db push
+pnpm exec supabase migration list   # vérifie qu'elle est marquée appliquée
+```
+
+Aucune étape manuelle supplémentaire dans le dashboard — contrairement au
+rôle admin (§7), cette fonction ne dépend d'aucun compte particulier.

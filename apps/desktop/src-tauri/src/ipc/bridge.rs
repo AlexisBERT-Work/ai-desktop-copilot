@@ -121,14 +121,14 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
     // Default the agent's model to what this machine can run well — the same
     // VRAM-based rule the chat UI uses. Without this the agent falls back to a
     // hard-coded model that may not even be installed (tools, sub-agents, fact
-    // extraction). CATDESK_MODEL_SMALL is the light tier it can downgrade to.
+    // extraction). Un SEUL modèle de chat : plus de CATDESK_MODEL_SMALL — le
+    // 14b et le 7b ne cohabitent pas dans 10 Go de VRAM, chaque rétrogradation
+    // forçait un swap de modèle (10-20 s), plus lent que de répondre avec le
+    // modèle principal déjà chaud. (Opt-in possible via l'env pour tester.)
     let model = crate::commands::tuning::recommend_default_model(
         crate::commands::models::detect_vram_bytes().await,
     );
     launch.env.push(("CATDESK_MODEL".into(), model.into()));
-    launch
-        .env
-        .push(("CATDESK_MODEL_SMALL".into(), "qwen2.5:7b".into()));
 
     let mut cmd = tokio::process::Command::new(&launch.program);
     cmd.current_dir(&launch.work_dir)

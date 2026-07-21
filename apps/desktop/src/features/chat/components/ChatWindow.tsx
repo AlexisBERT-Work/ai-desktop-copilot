@@ -6,7 +6,6 @@ import { MessageList } from './MessageList';
 import { StatusIndicator } from './StatusIndicator';
 import { InputArea } from './InputArea';
 import { ModelSelector } from './ModelSelector';
-import { ModeSelector } from './ModeSelector';
 
 export function ChatWindow() {
   const { hide, setMode } = useOverlayStore();
@@ -29,7 +28,6 @@ export function ChatWindow() {
             {activeConv?.title ?? 'CatDesk'}
           </span>
           <ModelSelector />
-          <ModeSelector />
         </div>
         <div className="flex items-center gap-1">
           <button

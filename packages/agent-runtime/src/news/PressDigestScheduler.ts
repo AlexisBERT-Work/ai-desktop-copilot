@@ -3,7 +3,13 @@ import { buildPressDailies, type JournalDraft } from './pressDigest';
 import { buildTopicDigest } from './topicDigest';
 import { buildCustomJournalDailies } from './customJournalDigest';
 import { fetchEnabledPressFeeds } from './PressFeedStore';
-import { publishDailies, type SupabaseAdminConfig } from './SupabasePublisher';
+import {
+  publishDailies,
+  publishDailiesOpen,
+  hasTodaysSharedDigest,
+  type SupabaseAdminConfig,
+  type SupabaseOpenConfig,
+} from './SupabasePublisher';
 import { publishDailiesToDiscord } from './DiscordDailyPublisher';
 import { createLogger } from '../logger';
 
@@ -30,7 +36,19 @@ export interface PressDigestConfig {
   hour: number;
   /** Lance aussi une publication immédiate au démarrage (vérif/premier remplissage). */
   runOnStart: boolean;
-  supabase: SupabaseAdminConfig;
+  /**
+   * Session anonyme (clé publique) — TOUJOURS requise : c'est elle qui permet
+   * au lot standard (journaux + sujets + synthèse) de se publier depuis
+   * n'importe quel poste, sans identifiants admin (tri modèles 2026-07-20).
+   */
+  supabase: SupabaseOpenConfig;
+  /**
+   * Identifiants admin — OPTIONNELS : n'activent que les extras réservés à
+   * l'admin (journaux personnalisés `press_feeds`, dailys manuelles restant
+   * sur l'ancien chemin `publishDailies`). Absents ⇒ le lot standard se publie
+   * quand même, juste sans ces extras.
+   */
+  admin?: SupabaseAdminConfig;
   /** Webhook Discord optionnel : miroite les dailys publiées. Vide = désactivé. */
   discordWebhook?: string;
 }
@@ -50,8 +68,11 @@ export function isRunDue(hour: number, lastRunDay: string | null, now = new Date
 
 /**
  * Publie chaque jour une daily par journal (analyse intra-journal IA). Tourne
- * uniquement sur le poste de référence (config admin présente) — voir index.ts.
- * Idempotent : rejouer une même journée ne crée pas de doublons.
+ * sur TOUT poste ayant lancé CatDesk (tri modèles 2026-07-20 — publication
+ * ouverte, sans identifiants admin) ; les identifiants admin, s'ils sont
+ * configurés sur ce poste, activent en plus les journaux personnalisés et le
+ * miroir Discord — voir index.ts. Idempotent : rejouer une même journée, ou
+ * qu'un autre poste ait déjà publié avant nous, ne crée pas de doublons.
  *
  * Planification par « rattrapage » : on vérifie toutes les 15 min si la
  * publication du jour est due (heure atteinte, pas encore faite). Un PC éteint
@@ -101,11 +122,19 @@ export class PressDigestScheduler {
     if (await this.runOnce()) this.lastRunDay = dayKey(new Date());
   }
 
-  /** @returns vrai si le run est allé au bout (même partiellement publié). */
+  /** @returns vrai si le run est allé au bout (même partiellement publié, ou déjà fait par un autre poste). */
   async runOnce(): Promise<boolean> {
     if (this.running) return false;
     this.running = true;
     try {
+      // Un autre poste a peut-être déjà publié le lot standard du jour (tri
+      // modèles 2026-07-20 : n'importe quel poste peut désormais le faire).
+      // On économise la génération LLM locale si c'est déjà fait ailleurs.
+      if (await hasTodaysSharedDigest(this.cfg.supabase)) {
+        log.info('Revue de presse du jour déjà publiée (autre poste) — rien à générer');
+        return true;
+      }
+
       const { mode } = this.cfg;
       const drafts: JournalDraft[] = [];
 
@@ -135,36 +164,53 @@ export class PressDigestScheduler {
         );
       }
 
-      // Journaux personnalisés définis par l'admin (Supabase). Indépendants du
-      // mode : toujours collectés/publiés s'il en existe d'actifs. Échec réseau
-      // → liste vide, sans bloquer le digest standard.
-      const feeds = await fetchEnabledPressFeeds(this.cfg.supabase);
-      if (feeds.length > 0) {
-        drafts.push(
-          ...(await buildCustomJournalDailies(feeds, { llm: this.llm, model: this.model })),
-        );
-      }
-
-      const res = await publishDailies(this.cfg.supabase, drafts);
-      log.info('Press digest run complete', {
+      // Lot standard : publication ouverte (session anonyme + RPC), sans
+      // identifiants admin — c'est elle qui rend le run possible sur N'IMPORTE
+      // QUEL poste. Idempotente : un titre déjà publié par un autre poste
+      // devient un skip silencieux, jamais une erreur.
+      const res = await publishDailiesOpen(this.cfg.supabase, drafts);
+      log.info('Press digest run complete (open)', {
         mode,
-        customJournals: feeds.length,
         published: res.published,
         skipped: res.skipped,
         errors: res.errors.length,
       });
 
-      // Miroir Discord (optionnel) : on ne poste QUE les dailys neuves (celles
-      // réellement insérées dans Supabase), ce qui hérite de l'idempotence et
-      // évite les doublons à chaque redémarrage / run-on-start.
-      const webhook = this.cfg.discordWebhook?.trim();
-      if (webhook && res.publishedDrafts.length > 0) {
-        const dz = await publishDailiesToDiscord(webhook, res.publishedDrafts);
-        log.info('Press digest mirrored to Discord', {
-          posted: dz.posted,
-          batches: dz.batches,
-          errors: dz.errors.length,
-        });
+      // Extras réservés à l'admin — n'existent que sur le(s) poste(s) où les
+      // identifiants admin sont configurés ; absents ⇒ le lot standard
+      // ci-dessus a suffi, on s'arrête là.
+      if (this.cfg.admin) {
+        const admin = this.cfg.admin;
+        // Journaux personnalisés (press_feeds, réservés à l'admin). Échec
+        // réseau → liste vide, sans faire échouer le run.
+        const feeds = await fetchEnabledPressFeeds(admin);
+        if (feeds.length > 0) {
+          const customDrafts = await buildCustomJournalDailies(feeds, {
+            llm: this.llm,
+            model: this.model,
+          });
+          const adminRes = await publishDailies(admin, customDrafts);
+          res.publishedDrafts.push(...adminRes.publishedDrafts);
+          log.info('Journaux personnalisés admin publiés', {
+            feeds: feeds.length,
+            published: adminRes.published,
+            skipped: adminRes.skipped,
+            errors: adminRes.errors.length,
+          });
+        }
+
+        // Miroir Discord (optionnel) : on ne poste QUE les dailys neuves de CE
+        // run (standard + extras admin), jamais celles qu'un autre poste a
+        // déjà publiées avant nous — évite les doublons Discord.
+        const webhook = this.cfg.discordWebhook?.trim();
+        if (webhook && res.publishedDrafts.length > 0) {
+          const dz = await publishDailiesToDiscord(webhook, res.publishedDrafts);
+          log.info('Press digest mirrored to Discord', {
+            posted: dz.posted,
+            batches: dz.batches,
+            errors: dz.errors.length,
+          });
+        }
       }
       return true;
     } catch (err) {

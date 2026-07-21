@@ -36,7 +36,9 @@ describe('ModelRouter', () => {
   it("ne rétrograde PAS une requête d'action courte (capture écran, ouvre, envoie…)", () => {
     // Régression : « Capture mon écran et décris ce que tu vois » partait sur le
     // 3B (court + sans mot-clé complexe) qui sortait un français cassé.
-    expect(router.route({ prompt: 'Capture mon écran et décris ce que tu vois' }).model).toBe('large-model');
+    expect(router.route({ prompt: 'Capture mon écran et décris ce que tu vois' }).model).toBe(
+      'large-model',
+    );
     expect(router.route({ prompt: 'ouvre le fichier rapport.pdf' }).model).toBe('large-model');
     expect(router.route({ prompt: 'envoie un message sur Discord' }).model).toBe('large-model');
     expect(router.route({ prompt: 'que vois-tu à l’écran ?' }).model).toBe('large-model');
@@ -46,6 +48,19 @@ describe('ModelRouter', () => {
     expect(router.route({ prompt: 'bonjour' }).model).toBe('small-model');
     expect(router.route({ prompt: 'quelle heure est-il ?' }).model).toBe('small-model');
     expect(router.route({ prompt: 'merci beaucoup' }).model).toBe('small-model');
+  });
+
+  it('ne rétrograde PAS une question actu/articles (mission première du bot)', () => {
+    // Régression : « quelles sont les news qui concernent claude ? » partait sur
+    // le 7B (court, aucun indice) qui annonçait search_dailies en texte au lieu
+    // de l'appeler, puis déballait toute la daily → ~2 min de réponse.
+    expect(router.route({ prompt: 'quelles sont les news qui concernent claude ?' }).model).toBe(
+      'large-model',
+    );
+    expect(router.route({ prompt: "c'est quoi l'actu du jour ?" }).model).toBe('large-model');
+    expect(router.route({ prompt: 'un article parle de Nvidia ?' }).model).toBe('large-model');
+    expect(router.route({ prompt: 'quoi de neuf ?' }).model).toBe('large-model');
+    expect(router.route({ prompt: 'résume la daily du Monde' }).model).toBe('large-model');
   });
 
   it('respecte forceModel', () => {
@@ -65,7 +80,9 @@ describe('resolveModel (modes auto/light/code)', () => {
   const base = { requested: 'default', light: 'light-m', code: 'code-m', usesTools: false };
 
   it('mode light force le modèle léger', () => {
-    expect(resolveModel({ ...base, mode: 'light', input: 'analyse complexe' }).model).toBe('light-m');
+    expect(resolveModel({ ...base, mode: 'light', input: 'analyse complexe' }).model).toBe(
+      'light-m',
+    );
   });
 
   it('mode code force le modèle heavy', () => {
@@ -79,19 +96,30 @@ describe('resolveModel (modes auto/light/code)', () => {
   it('mode auto : complexe → modèle principal demandé (pas le code lourd)', () => {
     // En auto, la borne haute est `requested`; le modèle de code ne sert qu'en
     // mode 'code' explicite (le 14B est trop lent en auto sur cette machine).
-    expect(resolveModel({ ...base, mode: 'auto', input: 'refactor ce module' }).model).toBe('default');
+    expect(resolveModel({ ...base, mode: 'auto', input: 'refactor ce module' }).model).toBe(
+      'default',
+    );
   });
 
   it("mode auto : la présence d'outils seule n'escalade pas (trivial → léger)", () => {
-    expect(resolveModel({ ...base, mode: 'auto', input: 'salut', usesTools: true }).model).toBe('light-m');
+    expect(resolveModel({ ...base, mode: 'auto', input: 'salut', usesTools: true }).model).toBe(
+      'light-m',
+    );
   });
 
   it('repli sur requested quand un modèle manque', () => {
-    expect(resolveModel({ mode: 'light', requested: 'default', input: 'x', usesTools: false }).model).toBe('default');
-    expect(resolveModel({ mode: 'code', requested: 'default', input: 'x', usesTools: false }).model).toBe('default');
+    expect(
+      resolveModel({ mode: 'light', requested: 'default', input: 'x', usesTools: false }).model,
+    ).toBe('default');
+    expect(
+      resolveModel({ mode: 'code', requested: 'default', input: 'x', usesTools: false }).model,
+    ).toBe('default');
   });
 
   it('auto sans modèle léger distinct → requested', () => {
-    expect(resolveModel({ mode: 'auto', requested: 'default', input: 'bonjour', usesTools: false }).model).toBe('default');
+    expect(
+      resolveModel({ mode: 'auto', requested: 'default', input: 'bonjour', usesTools: false })
+        .model,
+    ).toBe('default');
   });
 });

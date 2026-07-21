@@ -1,6 +1,7 @@
 # Distribuer CatDesk — installeur hors-ligne + mises à jour auto
 
 Ce guide explique :
+
 1. comment produire un **installeur Windows `.exe` 100 % autonome** (aucun Node,
    Python, Ollama ni internet requis chez le proche) ;
 2. comment **pousser tes mises à jour** pour qu'elles arrivent automatiquement
@@ -9,27 +10,28 @@ Ce guide explique :
 
 > ⚠️ **Taille de l'installeur initial.** Il embarque le(s) modèle(s) LLM
 > (plusieurs Go) → **5 à 12 Go**. Impossible par mail/WeTransfer gratuit →
-> **clé USB** ou **lien Google Drive / OneDrive**. (Les *mises à jour*, elles,
+> **clé USB** ou **lien Google Drive / OneDrive**. (Les _mises à jour_, elles,
 > sont légères : voir plus bas.)
 
 ---
 
 ## 0. Architecture (à comprendre une fois)
 
-| Sous-système | Contenu bundlé | Où ça vit chez le proche |
-|---|---|---|
-| Agent IA (Node) | `node.exe` + agent compilé (`dist/index.js`) + `node_modules` | dans l'app (mis à jour) |
-| Ollama | `ollama.exe` (+ DLLs GPU/CPU) | dans l'app (mis à jour) |
-| **Modèle LLM** | blobs des modèles | **dossier persistant** `%LOCALAPPDATA%\com.catdesk.app\ollama-models` |
-| OCR / vision | sidecar Python (PyInstaller) + données Tesseract | dans l'app (mis à jour) |
+| Sous-système    | Contenu bundlé                                                | Où ça vit chez le proche                                              |
+| --------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Agent IA (Node) | `node.exe` + agent compilé (`dist/index.js`) + `node_modules` | dans l'app (mis à jour)                                               |
+| Ollama          | `ollama.exe` (+ DLLs GPU/CPU)                                 | dans l'app (mis à jour)                                               |
+| **Modèle LLM**  | blobs des modèles                                             | **dossier persistant** `%LOCALAPPDATA%\com.catdesk.app\ollama-models` |
+| OCR / vision    | sidecar Python (PyInstaller) + données Tesseract              | dans l'app (mis à jour)                                               |
 
-**Idée clé :** le modèle (lourd, immuable) est *séparé* du code. Le gros
+**Idée clé :** le modèle (lourd, immuable) est _séparé_ du code. Le gros
 installeur initial le « sème » une fois dans le dossier persistant
 ([ollama.rs](../apps/desktop/src-tauri/src/core/ollama.rs) → `seed_models`).
 Ensuite, **les mises à jour ne transportent que le code** (≈ 50–300 Mo), jamais
 le modèle. C'est ce qui rend l'auto-update viable.
 
 Au lancement, le cœur Rust :
+
 1. sème le modèle dans le dossier persistant (1ʳᵉ fois seulement) ;
 2. démarre l'Ollama embarqué en pointant `OLLAMA_MODELS` dessus (ou réutilise un
    Ollama déjà présent sur :11434) ;
@@ -56,10 +58,13 @@ ollama pull nomic-embed-text  # mémoire sémantique / recherche
 > Comme le build embarque ce que TU as pullé, ces 3 modèles garantissent la
 > parité.
 
-Pour **alléger** : supprime ce qui ne sert pas (ex. le gros modèle code) :
+Pour **alléger** : supprime ce qui ne sert pas. NB : depuis le tri 2026-07-20,
+`qwen2.5-coder:14b` n'est plus dans le lineup embarqué (bot sans codage) — si
+ton `~/.ollama` local le contient encore, il est ignoré au staging :
+
 ```powershell
 ollama list
-ollama rm qwen2.5-coder:14b   # ex. retirer 9 Go inutiles pour tes proches
+ollama rm qwen2.5-coder:14b   # option : libérer 9 Go sur TON poste de dev
 ```
 
 ---
@@ -104,6 +109,7 @@ pwsh -File scripts/build-release.ps1 -ModelsPath "D:\mes-modeles-ollama"
 ```
 
 Résultat :
+
 ```
 apps/desktop/src-tauri/target/release/bundle/nsis/CatDesk_<version>_x64-setup.exe
 ```
@@ -130,6 +136,7 @@ pwsh -File scripts/publish-update.ps1 -Version 0.1.1 -Notes "Nouveau: outil X, f
 ```
 
 Le script :
+
 1. bumpe la version dans `tauri.conf.json` ;
 2. build un **artefact de mise à jour léger** (sans le modèle) et le signe ;
 3. génère `latest.json` (le manifeste que lisent les apps) ;
@@ -163,7 +170,7 @@ jour toutes seules. Aucun re-téléchargement du modèle.
   partout). Les DLLs bundlées viennent de ton PC ; le repli CPU fonctionne.
 - **Signature SmartScreen.** Pour supprimer l'avertissement « éditeur inconnu »,
   il faut un **certificat de signature de code** (payant, ~100–300 €/an) puis
-  renseigner `bundle.windows.certificateThumbprint`. La signature *updater*
+  renseigner `bundle.windows.certificateThumbprint`. La signature _updater_
   (§2.1) est différente et gratuite — elle sécurise les mises à jour, pas l'UAC.
 - **OCR.** `-SkipOcr` désactive proprement capture/OCR écran (l'agent ne reçoit
   pas `OCR_SIDECAR_BIN`). Pour la parité, ne l'utilise pas.
@@ -172,11 +179,11 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 
 ## 7. Dépannage
 
-| Symptôme | Cause probable | Fix |
-|---|---|---|
-| `pnpm deploy` échoue | workspace non résolu | le script retente avec `--legacy` ; sinon `pnpm install` puis relancer |
-| L'IA ne répond pas chez le proche | modèle absent / mauvais nom | vérifier que `%LOCALAPPDATA%\com.catdesk.app\ollama-models` contient le modèle de `CATDESK_MODEL` |
-| Vision / "décris l'écran" muet | `llava:7b` pas pullé au build | `ollama pull llava:7b` puis rebuild installeur |
-| Les updates ne s'installent pas | version non incrémentée, ou pubkey/clé qui ne correspondent pas | bumper la version ; vérifier que la pubkey du conf vient de la même clé que celle de signature |
-| `.sig` manquant au build update | env de signature absent | définir `TAURI_SIGNING_PRIVATE_KEY` + `..._PASSWORD` avant `publish-update.ps1` |
-| Fenêtre console qui apparaît | flag `CREATE_NO_WINDOW` manquant | déjà géré dans bridge.rs / ollama.rs |
+| Symptôme                          | Cause probable                                                  | Fix                                                                                               |
+| --------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm deploy` échoue              | workspace non résolu                                            | le script retente avec `--legacy` ; sinon `pnpm install` puis relancer                            |
+| L'IA ne répond pas chez le proche | modèle absent / mauvais nom                                     | vérifier que `%LOCALAPPDATA%\com.catdesk.app\ollama-models` contient le modèle de `CATDESK_MODEL` |
+| Vision / "décris l'écran" muet    | `llava:7b` pas pullé au build                                   | `ollama pull llava:7b` puis rebuild installeur                                                    |
+| Les updates ne s'installent pas   | version non incrémentée, ou pubkey/clé qui ne correspondent pas | bumper la version ; vérifier que la pubkey du conf vient de la même clé que celle de signature    |
+| `.sig` manquant au build update   | env de signature absent                                         | définir `TAURI_SIGNING_PRIVATE_KEY` + `..._PASSWORD` avant `publish-update.ps1`                   |
+| Fenêtre console qui apparaît      | flag `CREATE_NO_WINDOW` manquant                                | déjà géré dans bridge.rs / ollama.rs                                                              |

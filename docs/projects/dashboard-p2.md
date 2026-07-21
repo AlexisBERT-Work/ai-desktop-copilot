@@ -59,10 +59,13 @@ les colonnes Postgres sont en snake_case et mappées dans `useNews.ts`.
 
 ```ts
 interface NewsItem {
-  id: string; title: string; body: string;  // body = Markdown
+  id: string;
+  title: string;
+  body: string; // body = Markdown
   severity: 'info' | 'success' | 'warning' | 'critical';
-  audienceClientId: string | null;          // null = global ; sinon cible un client
-  publishedAt: string; expiresAt: string | null;
+  audienceClientId: string | null; // null = global ; sinon cible un client
+  publishedAt: string;
+  expiresAt: string | null;
 }
 ```
 
@@ -125,11 +128,18 @@ implicite : au pire, la news est vue au prochain montage de l'app.
 
 ## 8. Limites connues / suite
 
-- **Console d'admin custom** : non livrée (on utilise Studio) — possible plus tard.
+- **Console d'admin dans l'app (2026-07-20)** : rédiger/éditer/supprimer une
+  news se fait désormais depuis l'onglet « Annonces » de la Console admin
+  ([DailiesAdminConsole.tsx](../../apps/desktop/src/features/dailies/DailiesAdminConsole.tsx))
+  — plus besoin de Supabase Studio pour l'usage courant (global ou ciblé).
+  Studio reste utile pour retrouver l'uid d'un client précis (aucun annuaire
+  des postes dans l'app) et pour la mise en route initiale (§7).
 - **Realtime + RLS** : selon la config du projet, l'événement peut être générique ;
   le re-fetch reste filtré par RLS, donc sûr.
 - **Analytics « qui a vu quoi »** et **signature de contenu** : non couverts (P4).
-- **Tests** : logique surtout présentationnelle/IO ; pas de tests ajoutés.
+- **Tests** : logique surtout présentationnelle/IO ; pas de tests ajoutés (la
+  console admin news réutilise telle quelle la logique déjà testée
+  indirectement via le pattern dailys — même RLS, même flux).
 
 ---
 

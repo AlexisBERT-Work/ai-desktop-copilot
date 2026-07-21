@@ -31,6 +31,7 @@ function makeTool(local: Daily[], shared: Daily[] = [], sharedError?: string) {
 
 interface ResultData {
   dailies: { title: string; origin: string; body: string; category: string }[];
+  contentMode: string;
   totalInWindow: number;
   availableTitles?: string[];
   sharedSourceNote?: string;
@@ -64,6 +65,34 @@ describe('SearchDailiesTool', () => {
     ]);
     const data = await run(tool, { query: 'resultats Nvidia' });
     expect(data.dailies.map(d => d.title)).toEqual(['A']);
+  });
+
+  it('avec query : ne renvoie que les blocs pertinents, pas toute la daily', async () => {
+    // Régression : 3 corps complets (12 000 car.) → prompt énorme (~2 min de
+    // réponse) et le modèle déballait la géopolitique pour une question Claude.
+    const body = [
+      '## Le monde IA — points du jour',
+      '',
+      '- Claude Code utilise désormais Bun en Rust, gain de perfs sur Linux.',
+      '',
+      "- L'impact de l'IA sur l'éducation inquiète des chercheurs.",
+      '',
+      '- Une tempête de grêle annule un concert en Italie.',
+    ].join('\n');
+    const tool = makeTool([daily({ title: 'Le monde IA — revue du 19/07', body })]);
+    const data = await run(tool, { query: 'claude' });
+    expect(data.contentMode).toBe('extraits pertinents');
+    const returned = data.dailies[0]?.body ?? '';
+    expect(returned).toContain('Claude Code');
+    expect(returned).not.toContain('tempête de grêle');
+  });
+
+  it('full_text: true renvoie le corps complet malgré la query', async () => {
+    const body = 'Claude progresse.\n\nUne tempête de grêle en Italie.';
+    const tool = makeTool([daily({ title: 'A', body })]);
+    const data = await run(tool, { query: 'claude', full_text: true });
+    expect(data.contentMode).toBe('texte complet');
+    expect(data.dailies[0]?.body).toContain('tempête de grêle');
   });
 
   it('query sans correspondance : liste les titres disponibles', async () => {

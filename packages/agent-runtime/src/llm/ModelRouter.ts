@@ -53,6 +53,15 @@ const ACTION_HINTS = [
   /\b(open|launch|run|click|read|write|send|search|download|delete|describe|show|capture)\b/i,
 ];
 
+// Questions sur l'actu / les articles / les dailys : mission première du bot.
+// Elles déclenchent search_dailies puis une synthèse filtrée — exactement ce
+// que le petit modèle rate (outil annoncé en texte, déballage de toute la
+// daily au lieu de répondre à la question). Jamais de rétrogradation ici.
+const RESEARCH_HINTS = [
+  /\b(news|actus?|actualit[ée]s?|articles?|dailys?|dailies|journa(l|ux)|presse|revues?|headlines?)\b/i,
+  /\bquoi de neuf\b/i,
+];
+
 export class ModelRouter {
   private readonly small: string;
   private readonly large: string;
@@ -76,13 +85,28 @@ export class ModelRouter {
     // chaque requête (même triviale) sur le modèle lourd. On route uniquement
     // sur la complexité réelle du prompt.
     if (prompt.length > this.lengthThreshold) {
-      return { model: this.large, tier: 'large', reason: `Requête longue (>${this.lengthThreshold} car.)` };
+      return {
+        model: this.large,
+        tier: 'large',
+        reason: `Requête longue (>${this.lengthThreshold} car.)`,
+      };
     }
     if (COMPLEX_HINTS.some(re => re.test(prompt))) {
       return { model: this.large, tier: 'large', reason: 'Indices de tâche complexe détectés' };
     }
     if (ACTION_HINTS.some(re => re.test(prompt))) {
-      return { model: this.large, tier: 'large', reason: "Requête d'action orientée-outil (pas de rétrogradation)" };
+      return {
+        model: this.large,
+        tier: 'large',
+        reason: "Requête d'action orientée-outil (pas de rétrogradation)",
+      };
+    }
+    if (RESEARCH_HINTS.some(re => re.test(prompt))) {
+      return {
+        model: this.large,
+        tier: 'large',
+        reason: 'Question actu/articles (pas de rétrogradation)',
+      };
     }
 
     return { model: this.small, tier: 'small', reason: 'Tâche simple/courte → modèle rapide' };
@@ -110,10 +134,18 @@ export interface ResolveModelInput {
  */
 export function resolveModel(i: ResolveModelInput): RouteDecision {
   if (i.mode === 'light') {
-    return { model: i.light ?? i.requested, tier: i.light ? 'small' : 'forced', reason: 'Mode léger forcé' };
+    return {
+      model: i.light ?? i.requested,
+      tier: i.light ? 'small' : 'forced',
+      reason: 'Mode léger forcé',
+    };
   }
   if (i.mode === 'code') {
-    return { model: i.code ?? i.requested, tier: i.code ? 'large' : 'forced', reason: 'Mode code (heavy) forcé' };
+    return {
+      model: i.code ?? i.requested,
+      tier: i.code ? 'large' : 'forced',
+      reason: 'Mode code (heavy) forcé',
+    };
   }
   // auto : la borne haute est le modèle principal demandé (ex. qwen2.5:7b),
   // PAS le modèle de code lourd — celui-ci ne sert qu'en mode 'code' explicite.
@@ -124,5 +156,8 @@ export function resolveModel(i: ResolveModelInput): RouteDecision {
   if (!i.light || i.light === large) {
     return { model: large, tier: 'large', reason: 'Auto : modèle principal' };
   }
-  return new ModelRouter({ small: i.light, large }).route({ prompt: i.input, usesTools: i.usesTools });
+  return new ModelRouter({ small: i.light, large }).route({
+    prompt: i.input,
+    usesTools: i.usesTools,
+  });
 }

@@ -113,7 +113,7 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
               onClick={onOpenAdmin}
               className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
                          text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
-              title="Console admin — rédiger les dailys manuelles (réservé à l'admin)"
+              title="Console admin — dailys manuelles et annonces (réservé à l'admin)"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
               Admin

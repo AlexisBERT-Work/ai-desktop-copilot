@@ -32,13 +32,16 @@ appliquer la migration sur le projet Supabase (`db push`).
 colonnes Postgres snake_case mappées dans `useDailies.ts`.
 
 ```ts
-const DAILY_CATEGORIES = ['markets','tech','crypto','macro','product','misc'] as const;
+const DAILY_CATEGORIES = ['markets', 'tech', 'crypto', 'macro', 'product', 'misc'] as const;
 type DailyCategory = (typeof DAILY_CATEGORIES)[number];
 
 interface Daily {
-  id: string; title: string; body: string;   // body = Markdown
+  id: string;
+  title: string;
+  body: string; // body = Markdown
   category: DailyCategory;
-  publishedAt: string; expiresAt: string | null;
+  publishedAt: string;
+  expiresAt: string | null;
 }
 ```
 
@@ -98,7 +101,7 @@ contournant l'UI. Deux façons de rédiger côté admin :
 La migration est appliquée par le même `pnpm exec supabase db push` que la news
 (voir [../../supabase/DEPLOY.md](../../supabase/DEPLOY.md)). Pour utiliser la
 **console admin**, le compte admin doit avoir un **mot de passe** (Auth → Add
-user *avec* mot de passe, ou sign-up) **et** le claim `role=admin` (DEPLOY §7).
+user _avec_ mot de passe, ou sign-up) **et** le claim `role=admin` (DEPLOY §7).
 Ensuite : fenêtre Marchés & News → **Admin** → connexion → rédiger.
 
 ---
@@ -117,10 +120,14 @@ Ensuite : fenêtre Marchés & News → **Admin** → connexion → rédiger.
 
 Le cœur des dailys : un pipeline qui agrège plusieurs **journaux**, fait une
 **analyse intra-journal** par le LLM local, et **publie une daily par journal**.
-Tourne **uniquement sur le poste de référence** (celui qui a les identifiants
-admin) → « tout passe par nous » ; les clients ne publient jamais.
+Depuis le tri modèles 2026-07-20, tourne sur **tout poste ayant lancé
+CatDesk** — publication ouverte (session anonyme + RPC Postgres), plus besoin
+du poste admin ni de ses identifiants pour ce lot standard. Avant chaque
+génération (coûteuse : LLM local), un poste vérifie en lecture anonyme si un
+autre poste a déjà publié le lot du jour, et s'abstient si c'est le cas.
 
 **Chaîne** (tout en TypeScript, agent-runtime — aucun changement Rust/frontend) :
+
 1. `aggregateNews({ sources:[id], topics, sinceHours, limit })` par journal —
    registre étendu (finance, généraliste FR, international, tech) dans
    [FetchTechNewsTool.ts](../../packages/agent-runtime/src/tools/web/FetchTechNewsTool.ts).
@@ -130,30 +137,42 @@ admin) → « tout passe par nous » ; les clients ne publient jamais.
    [pressDigest.ts](../../packages/agent-runtime/src/news/pressDigest.ts).
 4. `buildJournalBody` → Markdown (analyse + liste d'articles liés/résumés) ;
    catégorie déduite du journal (`categoryForSourceLabel`).
-5. `publishDailies` → connexion admin (mot de passe) + `insert` REST, **idempotent**
-   (saute une daily de même titre), renvoie les drafts **réellement insérés** →
-   [SupabasePublisher.ts](../../packages/agent-runtime/src/news/SupabasePublisher.ts).
-6. `PressDigestScheduler` → exécution **quotidienne** à `CATDESK_PRESS_HOUR`.
-7. *(optionnel)* **Miroir Discord** : les dailys **neuves** (celles insérées à
-   l'étape 5, pas les doublons ignorés) sont aussi postées en embeds sur un
-   webhook → [DiscordDailyPublisher.ts](../../packages/agent-runtime/src/news/DiscordDailyPublisher.ts).
+5. `publishDailiesOpen` → session **anonyme** + RPC Postgres
+   `publish_daily_if_missing` (`SECURITY DEFINER`, valide elle-même
+   titre/catégorie/plafond — voir
+   [migration `20260720000000`](../../supabase/migrations/20260720000000_press_digest_open_publish.sql)),
+   **idempotent** (contrainte unique sur `title`), renvoie les drafts
+   **réellement insérés** → [SupabasePublisher.ts](../../packages/agent-runtime/src/news/SupabasePublisher.ts).
+6. `PressDigestScheduler` → exécution **quotidienne** à `CATDESK_PRESS_HOUR`,
+   sur tout poste (précédée d'un `hasTodaysSharedDigest` : si un autre poste a
+   déjà publié aujourd'hui, ce poste ne regénère rien).
+7. _(optionnel, extra admin)_ **Miroir Discord** : les dailys **neuves** de ce
+   run (celles insérées à l'étape 5, pas les doublons ignorés) sont aussi
+   postées en embeds sur un webhook →
+   [DiscordDailyPublisher.ts](../../packages/agent-runtime/src/news/DiscordDailyPublisher.ts).
    Un embed par daily (couleur selon la catégorie), lots de 10 (limite Discord).
    Comme on ne miroite que le neuf, l'idempotence Supabase couvre aussi Discord :
-   pas de doublon au redémarrage / run-on-start.
+   pas de doublon au redémarrage / run-on-start. N'exige les identifiants admin
+   que parce que c'est l'admin qui possède ce webhook — pas une contrainte de
+   la publication elle-même.
 
-**Activation (poste de référence — fichier `packages/agent-runtime/.env`, gitignoré, jamais distribué)** :
+**Activation : aucune, par défaut.** Depuis le tri modèles 2026-07-20, le lot
+standard se publie sur tout poste sans configuration (URL + clé anon publiques,
+en défaut dans le code — voir `packages/agent-runtime/src/index.ts`).
+`CATDESK_PRESS_DIGEST=0` désactive explicitement sur un poste donné.
+
+**Extras admin (fichier `packages/agent-runtime/.env`, gitignoré, jamais
+distribué)** — journaux personnalisés (§8bis) + miroir Discord uniquement :
 
 Pré-requis : un **compte admin Supabase** existant, avec **mot de passe** et le
 claim `role=admin` (cf. [DEPLOY §7](../../supabase/DEPLOY.md)). Vérifiable en se
 connectant une fois dans la **console Admin** de l'app.
 
 ```
-CATDESK_PRESS_DIGEST=1
-SUPABASE_URL=https://<ref>.supabase.co
-SUPABASE_ANON_KEY=<clé anon>
 SUPABASE_ADMIN_EMAIL=<email admin>
 SUPABASE_ADMIN_PASSWORD=<mot de passe admin>
-# Optionnels :
+CATDESK_PRESS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/…  # miroir Discord (repli sur DISCORD_WEBHOOK_URL)
+# Optionnels (s'appliquent aussi sans identifiants admin — réglages du lot standard) :
 CATDESK_PRESS_MODE=both        # journal = 1 daily/journal · topic = les news importantes triées par SUJET · both
 CATDESK_PRESS_TOPIC_LIMIT=24   # articles les plus importants soumis au tri par sujet (mode topic/both)
 CATDESK_PRESS_RUN_ON_START=1   # publie aussi au démarrage (vérif immédiate, idempotent)
@@ -163,20 +182,23 @@ CATDESK_PRESS_SYNTHESIS=1   # 1 (défaut) = ajoute une « Synthèse du jour » t
 CATDESK_PRESS_HOUR=7        # heure locale de publication
 CATDESK_PRESS_SINCE_HOURS=24
 CATDESK_PRESS_LIMIT=6       # articles max par journal
-CATDESK_PRESS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/…  # miroir Discord (repli sur DISCORD_WEBHOOK_URL)
 ```
 
 > Modèle (template) versionné : [`packages/agent-runtime/.env.example`](../../packages/agent-runtime/.env.example).
-> Idempotence : rejouer une même journée (redémarrage, run-on-start) ne crée pas
-> de doublon — une daily de même titre est ignorée.
+> Idempotence : rejouer une même journée (redémarrage, run-on-start), ou qu'un
+> autre poste ait déjà publié, ne crée pas de doublon — contrainte unique sur
+> `title` en base.
 
 > Flux RSS **testés en direct** (2026-06-30). Marchent : La Tribune, Yahoo Finance,
 > Investing, MarketWatch, FT, CNBC, Le Monde (+Éco), Le Figaro, Libération,
 > France 24, BBC, The Guardian, Al Jazeera, + sources tech. **Les Échos** est
 > retiré (flux en 403). Une source en échec est ignorée sans bloquer les autres.
 
-> Sans `CATDESK_PRESS_DIGEST=1` **et** les 4 identifiants, le planificateur ne
-> démarre pas (cas des postes clients). La sécurité reste serveur (RLS admin).
+> Sécurité : la RPC valide elle-même titre (3 gabarits fixes), catégorie et
+> plafond quotidien (60 lignes) — voir `supabase/README.md`. La policy RLS
+> d'écriture directe (`dailies_admin_write`) reste réservée à l'admin ; seule
+> cette fonction (SECURITY DEFINER) peut la contourner, et seulement dans ces
+> gabarits.
 
 ## 8bis. Journaux personnalisés (admin)
 
@@ -199,7 +221,9 @@ Migration : [`supabase/migrations/20260702000000_press_feeds.sql`](../../supabas
 
 **Publier maintenant** : le bouton de la console envoie l'IPC
 `run_press_digest` → RPC `press.run_now` → `scheduler.runOnce()` (fire-and-forget ;
-les dailys arrivent via Realtime). Sans effet sur un poste sans identifiants admin.
+les dailys arrivent via Realtime). Republie toujours le lot standard (tout
+poste) ; sans identifiants admin sur CE poste, les journaux personnalisés de
+cette section n'en font simplement pas partie.
 
 ## 9. Suite possible
 

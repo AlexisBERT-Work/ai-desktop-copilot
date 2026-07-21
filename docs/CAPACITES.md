@@ -201,12 +201,14 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 
 ## 11. Modèles & inférence
 
-- **3 modèles** pour la parité de fonctionnalités :
-  `qwen2.5:7b` (chat principal), `llava:7b` (vision écran),
-  `nomic-embed-text` (mémoire sémantique).
-- **Sélecteur de mode dans le chat** : _Auto_ (route léger/code selon la tâche),
-  _Léger_ (économie), _Code_ (force `qwen2.5-coder:14b`).
-- **Routage de modèles** en downgrade-only via `CATDESK_MODEL_SMALL`.
+- **Tri 2026-07-20 — UN seul modèle de chat par machine** (choix VRAM du
+  launcher) : `qwen3:14b` si ≥ 9 GiB, sinon `qwen2.5:7b`. Plus `minicpm-v`
+  (vision, hors bundle) et `nomic-embed-text` (mémoire sémantique).
+- **Plus de sélecteur de mode ni de rétrogradation auto** : le palier léger
+  forçait un swap VRAM 14b↔7b (10-20 s) plus coûteux que la réponse elle-même,
+  et le 7b ratait les questions d'actu (outil annoncé en texte). Le mode
+  `CATDESK_MODEL_SMALL` reste un opt-in env pour expérimenter.
+- **`qwen2.5-coder:14b` retiré** du bundle et de l'UI (bot sans codage).
 - Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
   réglable par requête. ⚠️ **Pas de KV-cache 4-bit global** : `q4_0` corrompt la
   sortie de `qwen2.5:7b` sur la RX 6700 (Vulkan) — texte illisible (incident

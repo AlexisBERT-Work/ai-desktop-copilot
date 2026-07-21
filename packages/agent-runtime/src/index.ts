@@ -64,26 +64,44 @@ const DEFAULT_PRESS_SOURCES = [
   'guardian',
 ];
 
+// Projet Supabase de la revue de presse (catdesk-news). URL + clé ANON : ces
+// valeurs sont PUBLIQUES par construction (c'est l'usage prévu de la clé anon
+// Supabase, bornée par RLS côté serveur — jamais la clé service_role) et déjà
+// embarquées telles quelles dans le build desktop (VITE_SUPABASE_ANON_KEY).
+// Les avoir aussi ici en défaut permet à TOUT poste ayant lancé CatDesk de
+// publier le lot standard sans configuration (tri modèles 2026-07-20) —
+// overridable via SUPABASE_URL/SUPABASE_ANON_KEY pour pointer sur un autre
+// projet (dev/test).
+const DEFAULT_SUPABASE_URL = 'https://mpnpfbfjjkujiyeqrcwc.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbnBmYmZqamt1aml5ZXFyY3djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjMxMDksImV4cCI6MjA5ODMzOTEwOX0.mzve54klYVm97r9WFOfQht35eb2mkth5O8eNMDUfPHE';
+
 /**
- * Config de la revue de presse auto-publiée (dailys). Renvoie null — donc le
- * planificateur ne démarre PAS — sauf si explicitement activé ET muni des
- * identifiants admin Supabase. Les postes clients n'ont pas ces variables, donc
- * eux ne publient jamais : « tout passe par nous » (le poste de référence).
+ * Config de la revue de presse (dailys). Active par défaut sur TOUT poste
+ * ayant lancé CatDesk (tri modèles 2026-07-20 — CATDESK_PRESS_DIGEST=0 pour
+ * désactiver) : le lot standard (7 journaux + sujets + synthèse) se publie
+ * via une session anonyme + la RPC `publish_daily_if_missing`
+ * (SECURITY DEFINER, voir supabase/migrations/20260720000000_*.sql), sans
+ * identifiants admin. Idempotent entre postes : le premier arrivé publie, les
+ * suivants no-opent (contrainte unique sur `title`).
+ *
+ * Les identifiants admin (SUPABASE_ADMIN_EMAIL/PASSWORD), s'ils sont
+ * configurés sur CE poste, activent en plus les extras réservés à l'admin
+ * (journaux personnalisés `press_feeds`, miroir Discord) — voir
+ * PressDigestScheduler. Absents : le lot standard se publie quand même.
  */
 function readPressMode(v: string | undefined): PressMode {
   return v === 'journal' || v === 'topic' || v === 'both' ? v : 'both';
 }
 
 function readPressDigestConfig(): PressDigestConfig | null {
-  if (process.env['CATDESK_PRESS_DIGEST'] !== '1') return null;
-  const url = process.env['SUPABASE_URL'];
-  const anonKey = process.env['SUPABASE_ANON_KEY'];
+  if (process.env['CATDESK_PRESS_DIGEST'] === '0') return null;
+  const url = process.env['SUPABASE_URL'] ?? DEFAULT_SUPABASE_URL;
+  const anonKey = process.env['SUPABASE_ANON_KEY'] ?? DEFAULT_SUPABASE_ANON_KEY;
   const email = process.env['SUPABASE_ADMIN_EMAIL'];
   const password = process.env['SUPABASE_ADMIN_PASSWORD'];
-  if (!url || !anonKey || !email || !password) {
-    log.warn('CATDESK_PRESS_DIGEST=1 mais config admin Supabase incomplète — désactivé');
-    return null;
-  }
+  const admin = email && password ? { url, anonKey, email, password } : undefined;
+
   const csv = (v: string | undefined, fallback: string[]): string[] =>
     v
       ? v
@@ -101,9 +119,10 @@ function readPressDigestConfig(): PressDigestConfig | null {
     synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
     hour: CONFIG.pressHour,
     runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
-    supabase: { url, anonKey, email, password },
-    // Miroir Discord optionnel : réutilise DISCORD_WEBHOOK_URL par défaut, ou une
-    // cible dédiée aux dailys via CATDESK_PRESS_DISCORD_WEBHOOK.
+    supabase: { url, anonKey },
+    ...(admin ? { admin } : {}),
+    // Miroir Discord optionnel (extra admin) : réutilise DISCORD_WEBHOOK_URL par
+    // défaut, ou une cible dédiée aux dailys via CATDESK_PRESS_DISCORD_WEBHOOK.
     ...(() => {
       const hook = (
         process.env['CATDESK_PRESS_DISCORD_WEBHOOK'] ??
@@ -276,9 +295,11 @@ async function main() {
   await cron.initialize();
   registerAutomationTools(tools, subAgentRunner, cron);
 
-  // ─── Revue de presse → dailys (poste de référence uniquement) ──
+  // ─── Revue de presse → dailys (tout poste ayant lancé CatDesk) ──
   // Agrège plusieurs journaux, analyse intra-journal (LLM local) et publie une
-  // daily par journal dans Supabase. Inactif sans config admin (cf. ci-dessus).
+  // daily par journal dans Supabase — publication ouverte (anon), sans
+  // identifiants admin requis (cf. ci-dessus). CATDESK_PRESS_DIGEST=0 pour
+  // désactiver sur ce poste.
   const pressCfg = readPressDigestConfig();
   const pressScheduler =
     pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
@@ -310,9 +331,9 @@ async function main() {
       market.setFormulas(formulas);
       await marketPoller.refreshNow();
     },
-    // « Publier maintenant » (console admin) : lance un run immédiat de la revue
-    // de presse. Absent (undefined) sur les postes sans config admin → le bridge
-    // répond « inactif » sans rien publier.
+    // « Publier maintenant » : lance un run immédiat de la revue de presse
+    // (actif sur tout poste, sauf CATDESK_PRESS_DIGEST=0). Absent (undefined)
+    // seulement si désactivé → le bridge répond « inactif » sans rien publier.
     pressScheduler !== null
       ? async () => {
           await pressScheduler.runOnce();

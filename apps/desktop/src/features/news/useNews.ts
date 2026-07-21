@@ -1,36 +1,7 @@
 import { useEffect } from 'react';
-import type { NewsItem, NewsSeverity } from '@catdesk/shared-types';
 import { isNewsConfigured, supabase } from './supabaseClient';
 import { useNewsStore } from './newsStore';
-
-/** Forme brute d'une ligne `news` (colonnes Postgres en snake_case). */
-interface NewsRow {
-  id: string;
-  title: string;
-  body: string;
-  severity: string;
-  audience_client_id: string | null;
-  published_at: string;
-  expires_at: string | null;
-}
-
-const SEVERITIES: readonly NewsSeverity[] = ['info', 'success', 'warning', 'critical'];
-
-function toSeverity(s: string): NewsSeverity {
-  return SEVERITIES.includes(s as NewsSeverity) ? (s as NewsSeverity) : 'info';
-}
-
-function rowToItem(r: NewsRow): NewsItem {
-  return {
-    id: r.id,
-    title: r.title,
-    body: r.body,
-    severity: toSeverity(r.severity),
-    audienceClientId: r.audience_client_id,
-    publishedAt: r.published_at,
-    expiresAt: r.expires_at,
-  };
-}
+import { rowToNews, type NewsRow } from './model';
 
 /**
  * Charge la news au montage : auth anonyme (identité d'installation stable) →
@@ -38,8 +9,8 @@ function rowToItem(r: NewsRow): NewsItem {
  * pas configuré. Les requêtes sont filtrées par RLS (global + ciblé, non expiré).
  */
 export function useNews(): void {
-  const setItems = useNewsStore((s) => s.setItems);
-  const setStatus = useNewsStore((s) => s.setStatus);
+  const setItems = useNewsStore(s => s.setItems);
+  const setStatus = useNewsStore(s => s.setStatus);
 
   useEffect(() => {
     if (!isNewsConfigured || supabase === null) {
@@ -59,7 +30,7 @@ export function useNews(): void {
         setStatus('error');
         return;
       }
-      setItems(((data ?? []) as NewsRow[]).map(rowToItem));
+      setItems(((data ?? []) as NewsRow[]).map(rowToNews));
       setStatus('ready');
     };
 

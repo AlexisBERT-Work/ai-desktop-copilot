@@ -29,9 +29,6 @@ interface ChatState {
   /** True once the user manually picks a model — stops the adaptive default from overriding it. */
   userPickedModel: boolean;
   availableModels: string[];
-  modelMode: 'auto' | 'light' | 'code';
-  lightModel: string;
-  codeModel: string;
   /** On-disk size (bytes) per installed model, from Ollama. Drives the VRAM warning. */
   modelSizes: Record<string, number>;
   /** Detected GPU VRAM in bytes, or null when undetectable (then: no warning). */
@@ -42,7 +39,6 @@ interface ChatState {
   newConversation: () => void;
   selectConversation: (id: string) => void;
   setModel: (model: string) => void;
-  setModelMode: (mode: 'auto' | 'light' | 'code') => void;
   loadModels: () => Promise<void>;
   appendToken: (conversationId: string, messageId: string, token: string) => void;
   setPlan: (conversationId: string, messageId: string, steps: string[]) => void;
@@ -78,18 +74,12 @@ export const useChatStore = create<ChatState>()(
     userPickedModel: false,
     // Pre-load placeholder; loadModels() overwrites it with the real installed
     // set. Mirrors the bundled lineup so the UI isn't empty before Ollama answers.
-    availableModels: ['qwen3:14b', 'qwen2.5-coder:14b', 'qwen2.5:7b'],
-    modelMode: 'auto',
-    // Tier léger distinct du main (7B ~4.7 GB) : rend le mode « Léger » et la
-    // rétrogradation auto réellement utiles, sans le français cassé du 3B. Tient
-    // dans 10 GB de VRAM.
-    lightModel: 'qwen2.5:7b',
-    codeModel: 'qwen2.5-coder:14b',
+    availableModels: ['qwen3:14b', 'qwen2.5:7b'],
     modelSizes: {},
     vramBytes: null,
 
     sendMessage: async (content, conversationId) => {
-      const { selectedModel, modelMode, lightModel, codeModel } = get();
+      const { selectedModel } = get();
       const userMessageId = crypto.randomUUID();
       const assistantMessageId = crypto.randomUUID();
 
@@ -123,15 +113,15 @@ export const useChatStore = create<ChatState>()(
 
       try {
         // Appel Tauri via la couche API — les tokens reviennent en événements.
+        // Un seul modèle de chat (tri 2026-07-20) : plus de modes light/code —
+        // sans lightModel/codeModel, le runtime ne rétrograde jamais (le swap
+        // VRAM 14b↔7b coûtait plus cher que la réponse elle-même).
         await chatSend({
           conversationId,
           message: content,
           messageId: assistantMessageId,
           modelId: selectedModel,
           useTools: true,
-          modelMode,
-          lightModel,
-          codeModel,
         });
       } catch (err) {
         set(s => {
@@ -251,12 +241,6 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         s.selectedModel = model;
         s.userPickedModel = true;
-      });
-    },
-
-    setModelMode: mode => {
-      set(s => {
-        s.modelMode = mode;
       });
     },
 

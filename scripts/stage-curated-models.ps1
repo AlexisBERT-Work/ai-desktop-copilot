@@ -19,11 +19,12 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Relative manifest paths (under manifests/registry.ollama.ai/library) to KEEP.
+# Tri 2026-07-20 : bot recentré articles/recherche, sans codage — le coder 14b
+# (~9 Go) sort du bundle. Un seul modèle de chat par machine (choix VRAM).
 $keep = @(
-  "qwen2.5\7b",            # plancher général (français cohérent ; remplace le 3b)
-  "qwen2.5-coder\14b",     # code specialist
-  "qwen3\14b",             # powerful general (4070 Super)
-  "nomic-embed-text\latest" # embeddings
+  "qwen2.5\7b",            # modèle principal des cartes < 9 GiB (français cohérent)
+  "qwen3\14b",             # modèle principal ≥ 9 GiB (chat + digests, think:false)
+  "nomic-embed-text\latest" # embeddings (mémoire, cache sémantique)
 )
 $libRel = "manifests\registry.ollama.ai\library"
 

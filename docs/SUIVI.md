@@ -5,6 +5,92 @@
 
 ## État actuel
 
+**News : console admin dans l'app, plus Supabase Studio (2026-07-20)** —
+type-check/lint/tests (37 desktop) verts sur tout le monorepo. Suite au constat
+que `news` (Pilier B, annonces admin) n'avait jamais servi — table vide,
+rédaction possible SEULEMENT à la main dans Supabase Studio — plutôt que
+retirer la fonctionnalité, elle est désormais utilisable depuis l'app :
+
+- **Onglet « Annonces »** dans la Console admin (déjà utilisée pour les dailys
+  manuelles), à côté de l'onglet « Dailys manuelles » — même connexion admin,
+  un seul point d'entrée. CRUD complet : titre, gravité (info/succès/
+  avertissement/critique), corps Markdown, portée (tous les postes ou un uid
+  précis), expiration optionnelle.
+- **Nouveau module** [`newsAdmin.ts`](../apps/desktop/src/features/news/newsAdmin.ts)
+  (`listAllNews`/`createNews`/`updateNews`/`deleteNews`), mirroring
+  `dailiesAdmin.ts`. `model.ts` extrait de `useNews.ts` (mapping de ligne
+  partagé entre lecture client et écriture admin).
+- **Le piège vécu en testant l'API à la main est corrigé dans le code** : un
+  test concret plus tôt dans la session a montré qu'omettre
+  `audience_client_id` dans un insert le fait basculer **global** par défaut,
+  silencieusement. `newsAdmin.ts` l'envoie **toujours** explicitement (`null`
+  pour global) ; côté UI, la portée est une case à cocher **visible**, cochée
+  par défaut sur « tous les postes » — jamais un champ vide qui déciderait à
+  la place de l'admin.
+- Pas de sélecteur/annuaire d'uid : cibler un poste précis reste manuel
+  (Supabase Studio → Authentication → Users) — construire un annuaire dans
+  l'app est un chantier à part, plus gros que ce qui était demandé.
+- Reste : vérifier visuellement dans `pnpm dev` (onglet Annonces, publier puis
+  supprimer un test) — non fait depuis cette session, seule la vérification
+  statique (types/lint/tests existants) a été faite.
+
+**Dailys : publication ouverte à tout poste (2026-07-20)** —
+**630 tests agent-runtime (+ 76 fichiers), type-check/lint OK** (demande
+utilisateur : « les dailys doivent se lancer à partir du moment où n'importe
+quel PC sur terre a lancé le programme CatDesk » — suite à un diagnostic ayant
+montré, lecture directe de Supabase à l'appui, que le lot standard n'avait été
+publié qu'une seule fois, le 19 juillet, faute d'un poste admin en continu) :
+
+- **Le lot standard (7 journaux + 6 sujets + synthèse) se publie désormais
+  depuis n'importe quel poste**, sans identifiants admin — session anonyme +
+  nouvelle fonction Postgres `publish_daily_if_missing` (`SECURITY DEFINER`,
+  migration
+  [`20260720000000_press_digest_open_publish.sql`](../supabase/migrations/20260720000000_press_digest_open_publish.sql)).
+  Cette fonction, pas la policy RLS, autorise l'écriture — et **valide
+  elle-même** ce qu'elle accepte : titre restreint aux 3 gabarits attendus
+  (journal fixe, sujet fixe, synthèse), catégorie parmi les 6 valeurs
+  autorisées, corps plafonné à 20 000 caractères, **max 60 lignes/jour**.
+  Idempotente au niveau base (contrainte unique sur `title`, `on conflict do
+nothing`) : deux postes publiant la même daily en même temps → un seul
+  insert passe, l'autre no-op proprement (`SupabasePublisher.publishDailiesOpen`).
+- **Pré-check anti-gaspillage** : avant de lancer la génération LLM (coûteuse),
+  chaque poste vérifie en lecture anonyme si un autre poste a déjà publié le
+  lot du jour (`hasTodaysSharedDigest`) — s'abstient si oui. Reste une petite
+  fenêtre de course si plusieurs postes checkent simultanément (génération
+  redondante occasionnelle, sans doublon en base grâce à la contrainte
+  unique) : compromis accepté, pas over-engineeré avec un vrai verrou distribué.
+  Choix validé par l'utilisateur : anti-abus « léger » (gabarits + plafond)
+  plutôt qu'un jeton partagé ou l'absence totale de garde-fou.
+- **Identifiants admin devenus optionnels** : ils n'activent plus que les
+  extras déjà réservés à l'admin (journaux personnalisés `press_feeds`, miroir
+  Discord) — `PressDigestScheduler.runOnce()` restructuré en « lot standard
+  toujours, extras admin en plus si configurés ». `CATDESK_PRESS_DIGEST`
+  change de polarité : avant opt-in (`=1` requis + 4 identifiants), maintenant
+  opt-out (`=0` pour désactiver sur un poste donné) — `.env`/`.env.example`
+  mis à jour en conséquence.
+- **URL + clé anon Supabase en défaut dans le code** (`index.ts`) : mêmes
+  valeurs déjà embarquées dans le build desktop (`VITE_SUPABASE_ANON_KEY`,
+  publique par design — RLS est la vraie barrière, pas le secret de la clé).
+  Overridable via `SUPABASE_URL`/`SUPABASE_ANON_KEY` pour pointer sur un autre
+  projet (dev/test).
+- Diagnostic ayant motivé ce chantier : lecture directe de la table Supabase
+  (session anonyme, comme le fait le widget) a montré exactement 15 lignes,
+  toutes datées du 19 juillet — le planificateur admin-only nécessitait que le
+  poste avec les identifiants admin tourne activement au bon moment, ce qui
+  n'arrive pas si l'usage réel passe par l'app installée (qui n'a jamais eu ces
+  identifiants, par sécurité) ou par un `pnpm dev` lancé par intermittence.
+- Nouveaux tests : `SupabasePublisher.test.ts` (9 tests — anon sign-in, appel
+  RPC, published/skipped/erreurs, liste vide) et
+  `PressDigestScheduler.test.ts` (11 tests — pré-check, fusion journal+sujet,
+  extras admin conditionnels, miroir Discord, verrou `running`, reprise après
+  erreur).
+- Reste : appliquer la migration sur le projet Supabase réel
+  (`pnpm exec supabase db push`, voir `supabase/DEPLOY.md`) — pas encore fait,
+  c'est un `db push` à lancer par l'utilisateur, pas quelque chose d'exécuté
+  depuis cette session. Puis valider en conditions réelles (lancer l'app sur
+  un second poste sans identifiants admin, vérifier qu'une daily du jour
+  apparaît).
+
 **Bot recentré : questions sur les articles + recherche générale (2026-07-20)** —
 **607 tests agent-runtime + 31 desktop, type-check OK** (demande utilisateur :
 « principalement répondre aux questions sur les articles, thème recherche,
@@ -32,8 +118,28 @@ pas de codage, pas de trucs inutiles ») :
 - **`ESSENTIAL_CORE` de selectTools réorienté** : `search_dailies`,
   `read_webpage`, `fetch_tech_news` toujours exposés ; `read_file`/
   `list_directory`/`run_command` ne remontent plus que si la requête les évoque.
-- Reste : valider en réel dans `pnpm dev` (poser des questions sur les dailys
-  du widget) ; si la lecture anonyme Supabase est refusée par la RLS, vérifier
+- **Correctif latence après test réel** (réponse ~2 min sur « quelles sont les
+  news qui concernent claude ? », routée sur qwen2.5:7b qui annonçait l'outil en
+  texte puis déballait 3 dailys entières) : (1) `RESEARCH_HINTS` dans le
+  ModelRouter — les questions actu/articles/dailys ne sont plus rétrogradées
+  vers le petit modèle ; (2) `search_dailies` passe en **mode extraits** avec
+  une query (seuls les blocs Markdown qui matchent, cap 1 500 car./daily,
+  ~10× moins de tokens ; `full_text:true` pour le corps complet, repli titres
+  seuls conservé) ; (3) note « source partagée indisponible » reformulée pour ne
+  plus déclencher une relance ; (4) `CATDESK_TOOL_LIMIT` 14 → 10 schémas par
+  appel.
+- **Tri des modèles — UN seul modèle de chat par machine** : le palier léger
+  auto (`CATDESK_MODEL_SMALL=qwen2.5:7b`, injecté par le launcher Rust) est
+  supprimé — sur 10 Go de VRAM le 14b et le 7b ne cohabitent pas, chaque
+  rétrogradation forçait un swap de modèle de 10-20 s, plus lent que de répondre
+  avec le 14b déjà chaud (reste opt-in via l'env). Le sélecteur Auto/Léger/Code
+  du chat est retiré (ModeSelector supprimé, le store n'envoie plus
+  lightModel/codeModel — champs du protocole conservés). `qwen2.5-coder:14b`
+  sort du bundle installeur (−9 Go, bot sans codage). Lineup final :
+  `qwen3:14b` (≥ 9 GiB) ou `qwen2.5:7b` (< 9 GiB) + `nomic-embed-text` +
+  `minicpm-v` optionnel hors bundle.
+- Reste : valider en réel dans `pnpm dev` (reposer la question Claude et
+  chronométrer) ; si la lecture anonyme Supabase est refusée par la RLS, vérifier
   que les sign-ins anonymes sont activés côté projet Supabase.
 
 **Dashboard en canvas libre + extraits d'articles lisibles (2026-07-18/19)** —
