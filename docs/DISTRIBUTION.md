@@ -9,9 +9,15 @@ Ce guide explique :
 3. comment garantir **zéro différence de fonctionnalités** entre ton PC et le leur.
 
 > ⚠️ **Taille de l'installeur initial.** Il embarque le(s) modèle(s) LLM
-> (plusieurs Go) → **5 à 12 Go**. Impossible par mail/WeTransfer gratuit →
-> **clé USB** ou **lien Google Drive / OneDrive**. (Les _mises à jour_, elles,
-> sont légères : voir plus bas.)
+> (plusieurs Go) → **5 à 12 Go**. Impossible par mail/WeTransfer gratuit.
+> Deux façons de le distribuer :
+>
+> - **§3bis (recommandé pour des proches non-techniques)** : un petit
+>   `.exe` (~2 Mo) qui télécharge et installe tout seul, en silence — rien à
+>   jongler, aucune commande à taper côté destinataire.
+> - **clé USB / lien Drive-OneDrive** du gros installeur complet (§3), si tu
+>   préfères transmettre le fichier toi-même.
+>   (Les _mises à jour_, elles, sont légères dans les deux cas : voir plus bas.)
 
 ---
 
@@ -119,6 +125,64 @@ utilisateur** (pas d'admin), dans `%LOCALAPPDATA%`.
 
 > SmartScreen affichera « éditeur inconnu » (exe non signé par un certificat de
 > code) → « Informations complémentaires » → « Exécuter quand même ». Voir §6.
+
+---
+
+## 3bis. Distribution en un clic (bootstrap auto-téléchargeur)
+
+Pour des proches **pas du tout techniques** : pas de dossier à garder groupé,
+pas de commande, pas même besoin d'expliquer où mettre le fichier. Tu leur
+donnes **un seul petit `.exe`** (~2 Mo) — par mail, Discord, WhatsApp, Drive,
+peu importe puisqu'il est minuscule. Double-clic → il télécharge tout seul le
+vrai installeur (~22 Go, en tâche de fond avec barre de progression) → il
+l'installe en silence → CatDesk se lance.
+
+### Comment ça marche
+
+`scripts/catdesk-bootstrap.iss` compile un installeur Inno Setup **vide de
+payload** : à l'étape `ssInstall`, son `[Code]` Pascal télécharge (PowerShell
+natif `Invoke-WebRequest`, `-UseBasicParsing` + `$ProgressPreference =
+'SilentlyContinue'`, 3 tentatives avec pause) les 13 fichiers déjà validés du
+§3 (`dist-installer/CatDesk-<version>-offline-setup-N.bin` + `.exe`) depuis une
+release GitHub **publique** dédiée, dans un dossier temporaire, puis lance le
+vrai installeur en `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` et nettoie
+derrière lui. `Uninstallable=no` évite qu'il crée sa propre entrée dans
+Ajout/Suppression de programmes (seul le vrai CatDesk installé ensuite en a
+une).
+
+Le payload est hébergé sur un repo GitHub **séparé et public**,
+[`catdesk-releases`](https://github.com/AlexisBERT-Work/catdesk-releases) —
+volontairement distinct du repo source privé, pour ne jamais exposer le code
+tout en permettant un téléchargement anonyme (Releases GitHub ne demandent pas
+d'authentification pour télécharger un asset d'une release publique).
+
+### Publier une nouvelle version du payload
+
+1. Build l'installeur complet comme au §3 (`scripts/build-release.ps1` puis
+   `scripts/build-inno.ps1`) → les 13 fichiers dans `dist-installer/`.
+2. Crée (ou réutilise) une release sur `catdesk-releases` et uploade-les :
+   ```powershell
+   gh release create v0.1.1 --repo AlexisBERT-Work/catdesk-releases `
+     --title "CatDesk 0.1.1" --notes "..." dist-installer/*.bin dist-installer/*.exe
+   gh release edit v0.1.1 --repo AlexisBERT-Work/catdesk-releases --draft=false
+   ```
+   > Une release fraîchement créée reste en **draft** tant qu'elle n'est pas
+   > publiée explicitement — un asset "uploadé" sur un brouillon n'est PAS
+   > accessible publiquement tant que `--draft=false` n'a pas été appliqué.
+3. Mets à jour dans `scripts/catdesk-bootstrap.iss` : `MyAppVersion`,
+   `BaseName` (contient la version) et le tag dans `BaseUrl`.
+4. Recompile (`ISCC scripts/catdesk-bootstrap.iss`, sans override) →
+   `dist-bootstrap/CatDesk-Installer.exe`. **C'est ce fichier-là** que tu
+   donnes à tes proches.
+
+### Tester en local avant publication
+
+Surcharger `BaseUrl` pour pointer sur un serveur local (`python -m
+http.server`) évite de re-télécharger 22 Go à chaque test :
+
+```powershell
+ISCC /DBaseUrl=http://127.0.0.1:8000 scripts/catdesk-bootstrap.iss
+```
 
 ---
 
