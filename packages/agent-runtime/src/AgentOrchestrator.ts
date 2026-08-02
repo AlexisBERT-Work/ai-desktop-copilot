@@ -214,6 +214,17 @@ export class AgentOrchestrator {
           temperature: config.temperature ?? 0.7,
           numCtx: NUM_CTX,
           maxTokens: MAX_TOKENS,
+          // think:false — coupe le raisonnement des modèles qwen3 sur le chat
+          // interactif. Sans ça, qwen3:14b (choisi par le launcher sur ≥ 9 GiB
+          // de VRAM) génère un long bloc <think> caché AVANT chaque réponse :
+          // gros coût de latence au premier token pour un bot recentré sur la
+          // recherche/les articles, où le raisonnement explicite n'apporte rien.
+          // Les digests coupent déjà le raisonnement (digestLlm.ts) ; le chat
+          // avait été oublié. Ollama tolère le champ sur les modèles sans
+          // raisonnement (ex. qwen2.5:7b), donc l'envoyer inconditionnellement
+          // est sûr. Le raisonnement multi-étapes reste disponible via le
+          // Planner opt-in (config.usePlanning).
+          think: false,
           ...(signal ? { signal } : {}),
         });
 

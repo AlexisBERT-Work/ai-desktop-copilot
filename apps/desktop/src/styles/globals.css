@@ -30,17 +30,41 @@
     font-family: 'Inter var', Inter, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    user-select: none; /* Prevent text selection on UI chrome */
+    /* Sélection autorisée par défaut : l'utilisateur doit pouvoir surligner et
+       copier n'importe quel texte lisible (réponses, modals, bannières…). On
+       ne coupe la sélection que sur le vrai « chrome » cliquable (boutons),
+       plus bas — sinon un double-clic sélectionnait leur libellé. */
+    user-select: text;
   }
 
-  /* Allow text selection inside message content */
-  .selectable { user-select: text; }
+  /* Chrome cliquable : pas de sélection de texte (ressenti natif). */
+  button,
+  [role='button'],
+  [data-tauri-drag-region] {
+    user-select: none;
+  }
+
+  /* Conservé pour compat : la sélection est déjà le défaut, mais des composants
+     référencent encore cette classe. Réaffirme la sélection même si un parent
+     l'a coupée localement. */
+  .selectable {
+    user-select: text;
+  }
 
   /* Scrollbar styling */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
 }
 
 /* Force la reproduction des couleurs/fonds (aperçus sombres dans le guide). */
@@ -51,17 +75,23 @@
 
 /* Impression du guide des widgets → « Enregistrer en PDF ». */
 @media print {
-  @page { margin: 14mm; }
+  @page {
+    margin: 14mm;
+  }
 
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  body { background: #fff !important; }
+  body {
+    background: #fff !important;
+  }
 
   /* Masque les barres d'action et déplie les conteneurs scrollables. */
-  .no-print { display: none !important; }
+  .no-print {
+    display: none !important;
+  }
   .guide-scroll {
     overflow: visible !important;
     height: auto !important;
@@ -69,5 +99,7 @@
   }
 
   /* Évite de couper une section au milieu d'une page. */
-  .print-break { break-inside: avoid; }
+  .print-break {
+    break-inside: avoid;
+  }
 }
