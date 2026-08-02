@@ -9,13 +9,13 @@
 ; test-bootstrap-local.ps1) : ISCC /DBaseUrl=http://127.0.0.1:8000 ...
 
 #ifndef BaseUrl
-#define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases/releases/download/v0.1.0"
+#define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases/releases/download/v0.1.1"
 #endif
 
 #define MyAppName "CatDesk"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.1"
 #define MyAppPublisher "CatDesk"
-#define BaseName "CatDesk-0.1.0-offline-setup"
+#define BaseName "CatDesk-0.1.1-offline-setup"
 #define MainInstaller BaseName + ".exe"
 #define PartCount 12
 
