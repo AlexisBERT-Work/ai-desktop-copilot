@@ -19,7 +19,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/AlexisBERT-Work/CatDesk/releases/latest/download/latest.json"
+        "https://github.com/AlexisBERT-Work/catdesk-releases/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMxOUJGRUY0ODBDQjZBMUEKUldRYWFzdUE5UDZid1Y5RTdpbU8yNmVzdDZUTTl2RHdiNDBHNTZQL0R6U3lWeWh0ZnFBcG1JMm8K"
     }

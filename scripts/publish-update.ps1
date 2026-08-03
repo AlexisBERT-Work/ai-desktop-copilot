@@ -38,7 +38,7 @@ param(
   [string]$Notes = "",
   # Releases are published to the dedicated CatDesk repo, not the dev repo this
   # source lives in. Override only if you move the release repo.
-  [string]$Repo = "AlexisBERT-Work/CatDesk"
+  [string]$Repo = "AlexisBERT-Work/catdesk-releases"
 )
 
 $ErrorActionPreference = 'Stop'

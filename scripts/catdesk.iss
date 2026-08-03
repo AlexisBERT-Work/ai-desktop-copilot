@@ -10,7 +10,7 @@
 ;   OutputDir where the installer .exe is written
 
 #define MyAppName "CatDesk"
-#define MyAppVersion "0.1.1"
+#define MyAppVersion "0.1.2"
 #define MyAppPublisher "CatDesk"
 #define MyAppExeName "catdesk.exe"
 
