@@ -5,19 +5,18 @@
 
 ## État actuel
 
-**Modèle unique + release 0.1.3 (2026-08-05)** — passage à UN seul modèle de
+**Modèle unique et release 0.1.3 (2026-08-05)** — passage à UN seul modèle de
 chat, le plus fort tenant sur 10 Go de VRAM : **`qwen3:14b`** (le palier
 `qwen2.5:7b` est retiré du bundle). `recommend_default_model` renvoie toujours le
-14b ; frontend (`chatStore`) et `stage-curated-models.ps1` alignés (bundle = 14b
-
-- `minicpm-v` + `nomic-embed-text`). Chat interactif passé en `think:false` (fin
-  du raisonnement caché de qwen3 → latence au premier token nettement réduite) et
-  texte des modals rendu sélectionnable/copiable. Distribution : installeur
-  hors-ligne **~18 Go** (contre 22), bootstrap auto-téléchargeur réécrit en
-  **`curl.exe`** (bien plus rapide + reprise `-C -`). Endpoint auto-update repointé
-  sur le repo **public** `catdesk-releases` (l'ancien pointait sur un repo privé →
-  404 anonyme). Publié : `catdesk-releases` **v0.1.3**. Type-check + tests verts.
-  Commits : `53af71e`, `13f2802`, `b2d11ee`.
+14b ; frontend (`chatStore`) et `stage-curated-models.ps1` alignés (bundle réduit
+à 14b, `minicpm-v` et `nomic-embed-text`). Chat interactif passé en `think:false`
+(fin du raisonnement caché de qwen3, latence au premier token nettement réduite)
+et texte des modals rendu sélectionnable/copiable. Distribution : installeur
+hors-ligne **~18 Go** (contre 22), bootstrap auto-téléchargeur réécrit en
+**`curl.exe`** (bien plus rapide, avec reprise `-C -`). Endpoint auto-update
+repointé sur le repo **public** `catdesk-releases` (l'ancien pointait sur un repo
+privé, 404 anonyme). Publié : `catdesk-releases` **v0.1.3**. Type-check et tests
+verts. Commits : `53af71e`, `13f2802`, `b2d11ee`.
 
 **News : console admin dans l'app, plus Supabase Studio (2026-07-20)** —
 type-check/lint/tests (37 desktop) verts sur tout le monorepo. Suite au constat
