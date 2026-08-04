@@ -256,7 +256,8 @@ cd ai-desktop-copilot
 ### 2. Pull LLM Models
 
 ```powershell
-ollama pull qwen2.5:7b        # Main chat model
+ollama pull qwen3:14b         # Main (and only) chat model
+ollama pull minicpm-v         # Vision ("describe my screen")
 ollama pull nomic-embed-text  # Embeddings for RAG
 ```
 

@@ -16,12 +16,12 @@ les appeler aujourd'hui** :
 > **Câblés le 2026-07-03** : `write_file`, `write_clipboard`, `open_app`,
 > `store_memory` — ils ne manquent plus (voir [CAPACITES.md](CAPACITES.md)).
 
-| Action manquante | Permission déclarée | Contournement actuel |
-|---|---|---|
-| **Fermer une fenêtre** | `close_window` (🟠) | — |
-| **Envoyer des frappes clavier** | `send_keys` (🟠) | `browser_type` pour le navigateur uniquement |
-| **Supprimer un fichier** | `delete_file` (🔴) | désactivé par design |
-| **Élever les privilèges (admin)** | `run_as_admin` (🔴) | désactivé par design |
+| Action manquante                  | Permission déclarée | Contournement actuel                         |
+| --------------------------------- | ------------------- | -------------------------------------------- |
+| **Fermer une fenêtre**            | `close_window` (🟠) | —                                            |
+| **Envoyer des frappes clavier**   | `send_keys` (🟠)    | `browser_type` pour le navigateur uniquement |
+| **Supprimer un fichier**          | `delete_file` (🔴)  | désactivé par design                         |
+| **Élever les privilèges (admin)** | `run_as_admin` (🔴) | désactivé par design                         |
 
 > Les deux 🔴 (`delete_file`, `run_as_admin`) sont **volontairement désactivés**
 > (`enabled: false`) : ce n'est pas un manque, c'est un garde-fou.
@@ -43,7 +43,7 @@ les appeler aujourd'hui** :
   système autour apprend — mémoire warm, playbook et EvolutionDaemon sont
   **câblés** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §3, §8),
   mais les propositions d'évolution restent à valider par l'humain et le
-  système de *skills* n'existe pas encore.
+  système de _skills_ n'existe pas encore.
 
 ## 4. Capacités partielles / à durcir
 
@@ -51,11 +51,11 @@ les appeler aujourd'hui** :
   est un **stub** — tout passe par le sidecar Python.
 - **Mémoire sémantique** : sans `nomic-embed-text`, retombe sur un repli mots-clés
   (moins précis). La mémoire hiérarchique **warm est implémentée** (WarmMemoryStore
-  + FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
-  *episodic* structurée reste à faire.
+  - FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
+    _episodic_ structurée reste à faire.
 - **Sélecteur HTML de `read_webpage`** : naïf (le sélecteur `#id` s'arrête au
   premier `</`). Suffisant pour du texte simple, pas pour du parsing fin.
-- **Vision écran** : dépend de `llava:7b` ; sans lui, `describe_screen` tombe en
+- **Vision écran** : dépend de `minicpm-v` ; sans lui, `describe_screen` tombe en
   panne silencieuse.
 - **Pas de boucle plan→exécute** robuste pour les recherches longues
   (planification opt-in basique seulement).
@@ -84,15 +84,16 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 
 ## 7. Distribution
 
-- **Installeur lourd** (~19 Go avec modèles) → impossible par mail ; clé USB ou
-  Drive/OneDrive obligatoire. (Les mises à jour, elles, sont légères.)
+- **Installeur lourd** (~18 Go avec modèles, v0.1.3) → à distribuer via le
+  **bootstrap** (petit `.exe` qui télécharge tout seul, cf. DISTRIBUTION.md §3bis)
+  ou clé USB / Drive. (Les mises à jour, elles, sont légères.)
 - **SmartScreen « éditeur inconnu »** : pas de certificat de signature de code
-  (payant ~100–300 €/an). La signature *updater* (gratuite) sécurise les mises à
+  (payant ~100–300 €/an). La signature _updater_ (gratuite) sécurise les mises à
   jour, pas l'avertissement UAC.
-- Machines **8 Go de RAM / faible VRAM** : le plancher est désormais `qwen2.5:7b`
-  (le `qwen2.5:3b` a été abandonné — français cassé). Il déborde en RAM (lent mais
-  cohérent) ; pour de la vitesse pure, pull manuellement un modèle plus petit et
-  mets-le en `CATDESK_MODEL`.
+- Machines **faible VRAM** : depuis la v0.1.3 le bundle ne contient plus que
+  `qwen3:14b` (~9 Go). Sous ~10 Go de VRAM il déborde en RAM (lent mais cohérent).
+  Pour de la vitesse sur une machine contrainte, pull manuellement un modèle plus
+  petit (ex. `qwen2.5:7b`) et impose-le via `CATDESK_MODEL`.
 
 ## 8. Tableau de bord & Bourse
 

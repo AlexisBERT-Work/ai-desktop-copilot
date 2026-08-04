@@ -25,14 +25,16 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | Choix de stack                                 | `docs/architecture/adr-*.md`                                            |
 | `docs/archive/`                                | **Obsolète — ne jamais lire ni citer**                                  |
 
-Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles (tri 2026-07-20 — UN seul
-modèle de chat par machine, pas de palier léger ni de coder) : `qwen3:14b`
-(chat + digests si ≥ 9 GiB VRAM — `think:false` requis pour les sorties JSON) ·
-`qwen2.5:7b` (modèle principal des cartes < 9 GiB, PAS un palier de
-rétrogradation : le swap VRAM 14b↔7b coûte 10-20 s) · `minicpm-v` (vision,
-PAS llava, hors bundle) · `nomic-embed-text` (embeddings).
-`qwen2.5-coder:14b` retiré (bot sans codage). `CATDESK_MODEL_SMALL` n'est plus
-injecté par le launcher (opt-in env seulement).
+Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles (tri « un seul modèle, le
+plus fort » — v0.1.3, 2026-08) : **`qwen3:14b` est le modèle de chat UNIQUE** du
+bundle (chat + digests). `think:false` requis — pour les sorties JSON **et le
+chat interactif** (sinon le raisonnement caché de qwen3 plombe la latence au
+premier token). Le palier `qwen2.5:7b` a été **retiré du bundle** (machines
+cibles ≥ ~10 Go VRAM) : plus de duo → plus de swap 14b↔7b, et
+`recommend_default_model` renvoie toujours le 14b. `minicpm-v` (vision, PAS
+llava — chargé à la demande ; seul swap restant : chat↔vision) ·
+`nomic-embed-text` (embeddings). `qwen2.5-coder:14b` retiré (bot sans codage).
+`CATDESK_MODEL_SMALL` reste un opt-in env (non injecté par le launcher).
 Jamais de KV-cache `q4_0` global (corrompt la sortie sur ce GPU).
 
 Dailys (revue de presse) : le lot standard se publie depuis **tout poste**

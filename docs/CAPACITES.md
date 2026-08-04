@@ -67,7 +67,7 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 | **Écrire dans le presse-papier** (UTF-8, accents préservés)                        | `write_clipboard`  |   🟡   |
 | Capturer l'écran (total/partiel)                                                   | `capture_screen`   |   🟢   |
 | Lire le **texte de l'écran (OCR)** Tesseract fra+eng                               | `ocr_region`       |   🟢   |
-| **Décrire visuellement** l'écran (modèle multimodal `llava:7b`)                    | `describe_screen`  |   🟢   |
+| **Décrire visuellement** l'écran (modèle multimodal `minicpm-v`)                   | `describe_screen`  |   🟢   |
 | **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD)           | `transcribe_audio` |   🟢   |
 
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
@@ -201,17 +201,18 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 
 ## 11. Modèles & inférence
 
-- **Tri 2026-07-20 — UN seul modèle de chat par machine** (choix VRAM du
-  launcher) : `qwen3:14b` si ≥ 9 GiB, sinon `qwen2.5:7b`. Plus `minicpm-v`
-  (vision, hors bundle) et `nomic-embed-text` (mémoire sémantique).
-- **Plus de sélecteur de mode ni de rétrogradation auto** : le palier léger
-  forçait un swap VRAM 14b↔7b (10-20 s) plus coûteux que la réponse elle-même,
-  et le 7b ratait les questions d'actu (outil annoncé en texte). Le mode
-  `CATDESK_MODEL_SMALL` reste un opt-in env pour expérimenter.
+- **Modèle de chat UNIQUE (v0.1.3) : `qwen3:14b`** — le plus fort qui tient sur
+  ~10 Go de VRAM. `recommend_default_model` le renvoie toujours (plus de choix
+  selon la VRAM). Plus `minicpm-v` (vision, chargé à la demande) et
+  `nomic-embed-text` (mémoire sémantique).
+- **Plus de palier `qwen2.5:7b`** : retiré du bundle et de l'UI. Il forçait un
+  swap VRAM 14b↔7b (10-20 s) et ratait les questions d'actu ; les machines
+  cibles ont ≥ ~10 Go de VRAM. `CATDESK_MODEL_SMALL` reste un opt-in env pour
+  imposer un petit modèle sur une machine très contrainte.
 - **`qwen2.5-coder:14b` retiré** du bundle et de l'UI (bot sans codage).
 - Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
   réglable par requête. ⚠️ **Pas de KV-cache 4-bit global** : `q4_0` corrompt la
-  sortie de `qwen2.5:7b` sur la RX 6700 (Vulkan) — texte illisible (incident
+  sortie sur la RX 6700 (Vulkan) — texte illisible (incident
   2026-06-15/16).
 - Matériel cible réel : **AMD RX 6700, 10 Go VRAM** → éviter les modèles 20B+
   qui débordent en RAM (voir [LIMITES.md](LIMITES.md) §3).
@@ -229,7 +230,7 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 
 ## 13. Distribution
 
-- **Installeur Windows hors-ligne** (Inno Setup, ~19 Go avec modèles) :
+- **Installeur Windows hors-ligne** (Inno Setup, ~18 Go avec modèles, v0.1.3) :
   install/désinstall silencieux vérifiés de bout en bout.
 - Le **modèle** (lourd, immuable) est séparé du code → les **mises à jour
   auto** (GitHub Releases, signées) ne transportent que le code (~50–300 Mo).

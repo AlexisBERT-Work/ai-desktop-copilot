@@ -54,15 +54,15 @@ capacités que toi, pulle-les **avant** de builder (le build copie tout
 `~/.ollama/models`) :
 
 ```powershell
-ollama pull qwen2.5:7b        # principal (CATDESK_MODEL) — déjà présent
-ollama pull llava:7b          # vision / "décris mon écran"
+ollama pull qwen3:14b         # modèle de chat UNIQUE (CATDESK_MODEL)
+ollama pull minicpm-v         # vision / "décris mon écran"
 ollama pull nomic-embed-text  # mémoire sémantique / recherche
 ```
 
-> Sans `llava:7b` la vision écran tombe en panne silencieuse ; sans
+> Sans `minicpm-v` la vision écran tombe en panne silencieuse ; sans
 > `nomic-embed-text` la recherche sémantique retombe sur un repli mots-clés.
-> Comme le build embarque ce que TU as pullé, ces 3 modèles garantissent la
-> parité.
+> Le build via `stage-curated-models.ps1` n'embarque QUE ces 3 modèles (le
+> `qwen2.5:7b` a été retiré du bundle depuis la v0.1.3) → parité garantie.
 
 Pour **alléger** : supprime ce qui ne sert pas. NB : depuis le tri 2026-07-20,
 `qwen2.5-coder:14b` n'est plus dans le lineup embarqué (bot sans codage) — si
@@ -227,9 +227,10 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 
 ## 6. Limites & notes
 
-- **RAM.** `qwen2.5:7b` ≈ 6–8 Go libres, et c'est le plancher du lineup (le
-  `qwen2.5:3b` a été abandonné pour son français cassé). Machine très contrainte →
-  pull manuellement un modèle plus petit et mets-le en `CATDESK_MODEL`.
+- **RAM/VRAM.** `qwen3:14b` (~9 Go) est le modèle unique : compte ~10 Go de VRAM
+  pour le garder résident (sinon débordement RAM — lent mais cohérent). Machine
+  très contrainte → pull manuellement un modèle plus petit (ex. `qwen2.5:7b`) et
+  impose-le via `CATDESK_MODEL`.
 - **GPU.** Ollama utilise le GPU si présent, sinon CPU (plus lent, mais marche
   partout). Les DLLs bundlées viennent de ton PC ; le repli CPU fonctionne.
 - **Signature SmartScreen.** Pour supprimer l'avertissement « éditeur inconnu »,
@@ -247,7 +248,7 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 | --------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `pnpm deploy` échoue              | workspace non résolu                                            | le script retente avec `--legacy` ; sinon `pnpm install` puis relancer                            |
 | L'IA ne répond pas chez le proche | modèle absent / mauvais nom                                     | vérifier que `%LOCALAPPDATA%\com.catdesk.app\ollama-models` contient le modèle de `CATDESK_MODEL` |
-| Vision / "décris l'écran" muet    | `llava:7b` pas pullé au build                                   | `ollama pull llava:7b` puis rebuild installeur                                                    |
+| Vision / "décris l'écran" muet    | `minicpm-v` pas pullé au build                                  | `ollama pull minicpm-v` puis rebuild installeur                                                   |
 | Les updates ne s'installent pas   | version non incrémentée, ou pubkey/clé qui ne correspondent pas | bumper la version ; vérifier que la pubkey du conf vient de la même clé que celle de signature    |
 | `.sig` manquant au build update   | env de signature absent                                         | définir `TAURI_SIGNING_PRIVATE_KEY` + `..._PASSWORD` avant `publish-update.ps1`                   |
 | Fenêtre console qui apparaît      | flag `CREATE_NO_WINDOW` manquant                                | déjà géré dans bridge.rs / ollama.rs                                                              |
