@@ -56,7 +56,7 @@ export const useChatStore = create<ChatState>()(
       {
         id: DEFAULT_CONVERSATION_ID,
         title: 'New conversation',
-        model: 'qwen2.5:7b',
+        model: 'qwen3:14b',
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 0,
@@ -68,13 +68,14 @@ export const useChatStore = create<ChatState>()(
     streamingMessageId: null,
     status: 'idle',
     activeTool: null,
-    // Safe pre-load default; loadModels() replaces it with the VRAM-adaptive
-    // recommendation (7B on weak/unknown GPUs, 14B where it fits).
-    selectedModel: 'qwen2.5:7b',
+    // Pre-load default; loadModels() confirms it via getRecommendedModel, which
+    // now always returns the single bundled model (the 7B tier was dropped).
+    selectedModel: 'qwen3:14b',
     userPickedModel: false,
     // Pre-load placeholder; loadModels() overwrites it with the real installed
-    // set. Mirrors the bundled lineup so the UI isn't empty before Ollama answers.
-    availableModels: ['qwen3:14b', 'qwen2.5:7b'],
+    // set. Mirrors the bundled lineup (a single chat model) so the UI isn't
+    // empty before Ollama answers.
+    availableModels: ['qwen3:14b'],
     modelSizes: {},
     vramBytes: null,
 
@@ -262,10 +263,9 @@ export const useChatStore = create<ChatState>()(
       } catch {
         // VRAM undetectable → leave null, warnings stay off.
       }
-      // Adaptive default: start on the model this machine can actually run well
-      // (3B on weak/unknown GPUs, 14B where it fits). Skipped once the user has
-      // manually chosen a model. Falls back to an installed model if the
-      // recommendation isn't present.
+      // Default model comes from getRecommendedModel — now always the single
+      // bundled qwen3:14b. Skipped once the user has manually chosen a model.
+      // Falls back to an installed model if the recommendation isn't present.
       try {
         const recommended = await getRecommendedModel();
         set(s => {

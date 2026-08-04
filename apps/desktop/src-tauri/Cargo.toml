@@ -1,6 +1,6 @@
 [package]
 name = "catdesk"
-version = "0.1.2"
+version = "0.1.3"
 description = "CatDesk — Local AI Desktop Copilot"
 authors = ["alexis.bert1412"]
 edition = "2021"

@@ -38,24 +38,13 @@ pub fn recommend_kv_cache(vram_bytes: Option<u64>, model_bytes: u64) -> &'static
     }
 }
 
-/// Pick the default general chat model to start with on a GPU with `vram_bytes`,
-/// matching the bundled lineup. A 14B general model where it fits (≥ ~9 GiB —
-/// the auto KV-cache tuner then runs it in q4_0 when VRAM-tight), else the 7B,
-/// whose French stays coherent (the old 3B fallback produced broken French).
-/// Unknown/zero VRAM → 7B too: it still runs everywhere (spilling to RAM on a
-/// tiny GPU is slow but correct), and correctness beats speed for chat.
-///
-/// Companion to [`recommend_kv_cache`]: this chooses *which* model, that one
-/// chooses how to fit it. Both are driven by the same detected VRAM.
-pub fn recommend_default_model(vram_bytes: Option<u64>) -> &'static str {
-    const GIB: u64 = 1 << 30;
-    match vram_bytes {
-        // 9 GiB clears an RX 6700 (~10 GiB) and an RTX 4070 Super (~12 GiB),
-        // both of which run a 14B comfortably in q4; an 8 GiB card runs the 7B
-        // comfortably in f16.
-        Some(v) if v >= 9 * GIB => "qwen3:14b",
-        _ => "qwen2.5:7b",
-    }
+/// The single bundled chat model: `qwen3:14b`. Since the "one model, the
+/// strongest" cut (target machines have a real GPU, ~10 GiB VRAM), the 7B tier
+/// was dropped from the bundle — there is nothing left to route to, so this
+/// always returns the 14B. `_vram_bytes` is kept for call-site compatibility
+/// (the KV-cache tuner and UI still probe VRAM) but no longer drives the choice.
+pub fn recommend_default_model(_vram_bytes: Option<u64>) -> &'static str {
+    "qwen3:14b"
 }
 
 /// Detect VRAM and return the model CatDesk should default to on this machine.
@@ -183,18 +172,12 @@ mod tests {
     const GIB: u64 = 1 << 30;
 
     #[test]
-    fn weak_or_unknown_vram_picks_coherent_7b() {
-        // The 3B was dropped: its French was broken. Below the 14B threshold we
-        // fall back to the 7B (coherent everywhere, comfortable on an 8 GiB card).
-        assert_eq!(recommend_default_model(None), "qwen2.5:7b");
-        assert_eq!(recommend_default_model(Some(0)), "qwen2.5:7b");
-        assert_eq!(recommend_default_model(Some(8 * GIB)), "qwen2.5:7b");
-    }
-
-    #[test]
-    fn capable_gpu_picks_14b() {
-        // RX 6700 reports ~10 GiB; RTX 4070 Super ~12 GiB → both get the 14B.
-        assert_eq!(recommend_default_model(Some(10 * GIB)), "qwen3:14b");
+    fn always_picks_the_single_bundled_14b() {
+        // The 7B tier was removed from the bundle: only qwen3:14b ships now, so
+        // the choice no longer depends on VRAM.
+        assert_eq!(recommend_default_model(None), "qwen3:14b");
+        assert_eq!(recommend_default_model(Some(0)), "qwen3:14b");
+        assert_eq!(recommend_default_model(Some(8 * GIB)), "qwen3:14b");
         assert_eq!(recommend_default_model(Some(12 * GIB)), "qwen3:14b");
     }
 

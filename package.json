@@ -1,6 +1,6 @@
 {
   "name": "ai-desktop-copilot",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "Local-first AI desktop copilot — powered by Ollama, built with Tauri + React",

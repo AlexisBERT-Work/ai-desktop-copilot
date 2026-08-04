@@ -9,13 +9,13 @@
 ; test-bootstrap-local.ps1) : ISCC /DBaseUrl=http://127.0.0.1:8000 ...
 
 #ifndef BaseUrl
-#define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases/releases/download/v0.1.2"
+#define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases/releases/download/v0.1.3"
 #endif
 
 #define MyAppName "CatDesk"
-#define MyAppVersion "0.1.2"
+#define MyAppVersion "0.1.3"
 #define MyAppPublisher "CatDesk"
-#define BaseName "CatDesk-0.1.2-offline-setup"
+#define BaseName "CatDesk-0.1.3-offline-setup"
 #define MainInstaller BaseName + ".exe"
 #define PartCount 12
 
@@ -61,17 +61,37 @@ var
 // (bug connu), critique sur un fichier de ~2 Go.
 function TryDownloadOnce(Url, Dest: string; var ResultCode: Integer): Boolean;
 var
-  Cmd, PsPath: string;
+  Cmd, PsPath, CurlPath: string;
 begin
-  // Chemin complet obligatoire : Exec('powershell.exe', ...) sans chemin ne
-  // se résout pas de façon fiable dans le contexte d'Inno (testé — échoue
-  // silencieusement, {sys} donne le System32 réel même en process 64-bit).
-  PsPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-  Cmd := '-NoProfile -ExecutionPolicy Bypass -Command ' +
-    '"$ProgressPreference=''SilentlyContinue''; ' +
-    'try { Invoke-WebRequest -Uri ''' + Url + ''' -OutFile ''' + Dest +
-    ''' -UseBasicParsing -TimeoutSec 3600 } catch { exit 1 }"';
-  Result := Exec(PsPath, Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // curl.exe est livré nativement par Windows 10 (1803+, avril 2018) et 11, dans
+  // System32. Il est BEAUCOUP plus rapide qu'Invoke-WebRequest (code natif, sans
+  // le surcoût .NET qui plafonnait le débit à quelques Mo/s — cause des plaintes
+  // de lenteur), reprend un téléchargement partiel (-C -) et gère ses propres
+  // retries. C'est donc le chemin par défaut ; on ne retombe sur PowerShell que
+  // si curl.exe est absent (Windows très ancien).
+  CurlPath := ExpandConstant('{sys}\curl.exe');
+  if FileExists(CurlPath) then
+  begin
+    // -L : suit la redirection GitHub -> CDN. --fail : code <> 0 sur HTTP >= 400.
+    // -C - : reprend un .bin partiel au lieu de tout refaire. --retry : robustesse
+    // sur une connexion domestique instable.
+    Cmd := '-L --fail --retry 5 --retry-delay 3 --retry-connrefused -C - ' +
+      '-o "' + Dest + '" "' + Url + '"';
+    Result := Exec(CurlPath, Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end
+  else
+  begin
+    // Repli PowerShell (machines sans curl). Chemin complet obligatoire : Exec
+    // sans chemin ne se résout pas de façon fiable dans le contexte d'Inno.
+    // -UseBasicParsing : évite l'échec sur une machine où IE n'a jamais été lancé.
+    // $ProgressPreference='SilentlyContinue' : la barre native ralentit x10-100.
+    PsPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+    Cmd := '-NoProfile -ExecutionPolicy Bypass -Command ' +
+      '"$ProgressPreference=''SilentlyContinue''; ' +
+      'try { Invoke-WebRequest -Uri ''' + Url + ''' -OutFile ''' + Dest +
+      ''' -UseBasicParsing -TimeoutSec 3600 } catch { exit 1 }"';
+    Result := Exec(PsPath, Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
 end;
 
 // 3 tentatives (connexion instable chez un particulier n'est pas rare),
