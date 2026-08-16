@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-07-20**. Inventaire basé sur les **68 outils du catalogue**
+> À jour au **2026-08-16**. Inventaire basé sur les **69 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 68 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 69 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -152,11 +152,18 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | ----------------------------------------------------------------- | --------------- | :----: |
 | Rechercher en **mémoire** (sémantique ou repli mots-clés)         | `search_memory` |   🟢   |
 | **Stocker un fait en mémoire** persistante (tags, inter-sessions) | `store_memory`  |   🟡   |
+| Charger la **procédure détaillée d'un skill** (Markdown local)    | `load_skill`    |   🟢   |
 
 - VectorStore réel : embeddings Ollama (`nomic-embed-text`) + similarité cosinus
   en mémoire, persistance disque (`vectors.json`).
 - **Repli automatique mots-clés** si les embeddings sont indisponibles → la
   mémoire fonctionne dès l'installation.
+- **Skills (divulgation progressive)** : le system prompt n'annonce que
+  `nom — description` des skills de `<dataDir>/skills/` ; `load_skill` va
+  chercher le corps à la demande. Les brouillons auto-générés par
+  l'EvolutionDaemon (`skill-drafts/`) ne sont **jamais indexés** — chargeables
+  seulement si on les nomme, et signalés comme non validés. Bibliothèque vide
+  par défaut. Voir `docs/veille/2026-08-16-analyse-repos-externes.md`.
 
 ## 9. Orchestration & autonomie
 
