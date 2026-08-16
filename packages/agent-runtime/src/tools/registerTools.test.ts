@@ -12,6 +12,9 @@ import { VectorStore } from '../memory/VectorStore';
 import { MarketService } from '../market/MarketService';
 import type { SubAgentRunner } from '../SubAgentRunner';
 import type { CronScheduler } from '../CronScheduler';
+import { SkillStore } from '../skills/SkillStore';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /**
  * Garde-fou anti-dérive : les métadonnées d'un outil vivent à deux endroits
@@ -28,6 +31,9 @@ function buildRegistry(profile: ToolProfile): ToolRegistry {
       llm,
       vectorStore: new VectorStore(llm),
       market: new MarketService([]),
+      // Dossier inexistant : le store dégrade proprement en catalogue vide, ce
+      // qui suffit pour inspecter les métadonnées de load_skill.
+      skills: new SkillStore(join(tmpdir(), 'catdesk-skills-absent')),
       localDailies: { list: () => [] },
       sharedDailies: { fetch: async () => ({ items: [] }) },
       defaultModel: 'test-model',
@@ -46,8 +52,8 @@ describe('cohérence outils ↔ permissions', () => {
   const registered = registry.getEnabled();
   const permissionNames = Object.keys(DEFAULT_PERMISSION_CONFIG.tools);
 
-  it('enregistre bien les 68 outils', () => {
-    expect(registered.length).toBe(68);
+  it('enregistre bien les 69 outils', () => {
+    expect(registered.length).toBe(69);
   });
 
   it('chaque outil enregistré a une entrée de permission', () => {
@@ -105,12 +111,15 @@ describe("profil 'research' (bot articles + recherche)", () => {
       'search_memory',
       'schedule_task',
       'run_subagent',
+      // Brique du harness (divulgation progressive), pas une capacité métier :
+      // load_skill doit rester exposé même sur le profil recentré.
+      'load_skill',
     ]) {
       expect(names.has(n), n).toBe(true);
     }
   });
 
   it('compte : catalogue complet moins les exclusions', () => {
-    expect(names.size).toBe(68 - RESEARCH_EXCLUDED.size);
+    expect(names.size).toBe(69 - RESEARCH_EXCLUDED.size);
   });
 });

@@ -68,6 +68,23 @@ export const CONFIG = {
   // ─── Données ─────────────────────────────────────────────────
   dataDir: process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data'),
 
+  /**
+   * Annonce des skills dans le system prompt (`nom — description`).
+   * **Opt-in, désactivé par défaut** — contrairement aux autres drapeaux, celui-ci
+   * ne vaut pas « fonctionnalité en rodage » mais « nuisible sur le modèle du
+   * bundle », et c'est mesuré (2026-08-16, `qwen3:14b` + `think:false`, banc de
+   * 6 requêtes × 4 formulations) : dès qu'on liste les skills dans le prompt, le
+   * modèle tente un appel d'outil malformé qu'Ollama jette — réponse VIDE, aucun
+   * outil appelé, sur 2 à 5 requêtes sur 6 selon la formulation. Sans la liste,
+   * les mêmes requêtes appellent correctement `search_dailies` (5/6).
+   * L'outil `load_skill` lui-même est inoffensif (mesuré séparément : aucune
+   * dégradation) et reste donc TOUJOURS enregistré — un skill se charge en le
+   * nommant. Seule l'auto-découverte est coupée.
+   * `CATDESK_SKILL_INDEX=1` pour réactiver (ex. après changement de modèle).
+   * Voir docs/veille/2026-08-16-analyse-repos-externes.md §5.
+   */
+  skillIndex: process.env['CATDESK_SKILL_INDEX'] === '1',
+
   // ─── Mémoire / caches / daemons ──────────────────────────────
   warmMemory: envFlag('CATDESK_WARM_MEMORY'),
   compaction: envFlag('CATDESK_COMPACTION'),

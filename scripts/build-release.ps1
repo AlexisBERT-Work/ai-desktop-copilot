@@ -137,6 +137,17 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy node_modules failed (exit $LASTEXITCO
 Copy-Item -Recurse -Force (Join-Path $agentSrc "dist") (Join-Path $agentOut "dist")
 Copy-Item -Force (Join-Path $agentSrc "package.json") (Join-Path $agentOut "package.json")
 Copy-Item -Force $nodeExe (Join-Path $agentOut "node.exe")
+# Skills livrés avec l'app. Doivent atterrir en SŒUR de dist/ : le runtime les
+# cherche en `join(__dirname, '..', 'skills')`, ce qui donne dist/../skills ici
+# et src/../skills en dev — même expression, aucun cas particulier. Les skills
+# de l'utilisateur (<dataDir>/skills) priment à nom égal, donc une mise à jour
+# n'écrase jamais une personnalisation.
+$skillsSrc = Join-Path $agentSrc "skills"
+if (Test-Path $skillsSrc) {
+  Copy-Item -Recurse -Force $skillsSrc (Join-Path $agentOut "skills")
+  $skillCount = (Get-ChildItem $skillsSrc -Filter *.md).Count
+  Write-Host "Skills staged → $skillCount fichier(s)"
+}
 Write-Host "Agent staged → $agentOut"
 
 # ── 3. Ollama binary (+ models, full build only) ─────────────────

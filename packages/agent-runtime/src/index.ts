@@ -3,6 +3,7 @@
  * Communicates with Tauri Rust core via JSON-RPC 2.0 over stdin/stdout.
  */
 
+import { join } from 'path';
 import { StdinBridge } from './ipc/StdinBridge';
 import { AgentOrchestrator } from './AgentOrchestrator';
 import { ToolRegistry } from './ToolRegistry';
@@ -49,6 +50,7 @@ import { SharedDailyReader } from './news/SharedDailyReader';
 import { LocalPressScheduler } from './news/LocalPressScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
+import { SkillStore } from './skills/SkillStore';
 
 const log = createLogger('runtime:main');
 
@@ -190,6 +192,17 @@ async function main() {
   const localDailies = new LocalDailyStore(CONFIG.dataDir);
   const sharedDailies = new SharedDailyReader();
 
+  // Skills : <dataDir>/skills (utilisateur, prioritaire) + les skills livrés
+  // avec l'app + <dataDir>/skill-drafts (brouillons de l'EvolutionDaemon,
+  // jamais indexés). Tous ces dossiers peuvent manquer — le store renvoie
+  // alors une liste vide.
+  //
+  // `../skills` résout au même endroit dans les deux contextes, sans condition :
+  // en dev `src/../skills` → packages/agent-runtime/skills ; en production le
+  // bundle esbuild vit dans `dist/`, donc `dist/../skills` → resources/agent/skills
+  // (voir l'étape de staging dans scripts/build-release.ps1).
+  const skills = new SkillStore(CONFIG.dataDir, join(__dirname, '..', 'skills'));
+
   // ─── Tool Registry ─────────────────────────────────────────
   const defaultModel = CONFIG.model;
   const tools = new ToolRegistry();
@@ -199,6 +212,7 @@ async function main() {
       llm,
       vectorStore,
       market,
+      skills,
       localDailies,
       sharedDailies,
       defaultModel,
@@ -266,6 +280,10 @@ async function main() {
     compactor,
     playbook,
     cache,
+    // Index des skills dans le prompt : opt-in explicite (CATDESK_SKILL_INDEX=1).
+    // Mesuré nuisible sur qwen3:14b — voir CONFIG.skillIndex. L'outil load_skill
+    // reste enregistré dans tous les cas : seule l'auto-découverte est coupée.
+    CONFIG.skillIndex ? skills : undefined,
   );
 
   // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
@@ -326,9 +344,10 @@ async function main() {
   // ─── IPC Bridge ────────────────────────────────────────────
   const bridge = new StdinBridge(
     orchestrator,
-    async (symbols, formulas) => {
+    async (symbols, formulas, intervalSecs) => {
       market.setWatchlist(symbols);
       market.setFormulas(formulas);
+      if (intervalSecs !== undefined) marketPoller.setIntervalMs(intervalSecs * 1000);
       await marketPoller.refreshNow();
     },
     // « Publier maintenant » : lance un run immédiat de la revue de presse
