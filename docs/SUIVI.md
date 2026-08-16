@@ -6,7 +6,7 @@
 ## État actuel
 
 **Veille externe → 3 chantiers : skills, extraction d'articles, coupe-circuit
-(2026-08-16)** — **683 tests agent-runtime (+53, 81 fichiers) + 39 desktop + 7 Python,
+(2026-08-16)** — **687 tests agent-runtime (+57, 81 fichiers) + 39 desktop + 7 Python,
 type-check et lint verts**. Parti d'une analyse de 8 repos externes
 ([docs/veille/2026-08-16](veille/2026-08-16-analyse-repos-externes.md), qui garde
 les traces de raisonnement et les pistes rejetées) :
@@ -125,6 +125,15 @@ les traces de raisonnement et les pistes rejetées) :
   enregistré) ; `load_skill` appelé correctement 2/2 sur skill nommé via Ollama ;
   extraction testée sur **5 articles réellement en ligne** (The Verge, Numerama)
   → **5/5 via trafilatura**, aucun repli, zéro ligne de tableau parasite.
+- **Pipeline de digest validé de bout en bout** : `buildPressDailies` lancé pour
+  de vrai (RSS Numerama → articles réels → trafilatura → `qwen3:14b`) produit une
+  daily de 2 809 caractères en 93 s, en français correct et **sans mojibake** —
+  le correctif d'encodage tient en conditions réelles.
+- **Cascade d'extraction factorisée** dans `extractArticleText` : `read_webpage`
+  et `enrichArticleTexts` partagent le même repli, écrit une seule fois. Corrige
+  au passage une asymétrie réelle — dans `enrichArticleTexts`, une exception du
+  sidecar tombait dans le `catch` global et l'article repartait avec son seul
+  extrait RSS, **en perdant l'heuristique pourtant disponible**.
 - **Build de release complet vérifié** : `tauri build` compile le Rust et produit
   les installeurs MSI + NSIS (3 min 46) avec l'ensemble de ces changements.
 - Reste : réessayer l'index des skills si le modèle du bundle change (le banc est

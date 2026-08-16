@@ -4,6 +4,7 @@ import {
   htmlToText,
   extractBySelector,
   extractReadableText,
+  extractArticleText,
   looksLikeProse,
   startsMidSentence,
   type FetchedPage,
@@ -171,6 +172,49 @@ describe('ReadWebpageTool.execute (validation, sans réseau)', () => {
     const res = await tool.run({ url: 'ftp://example.com/file' });
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/http/i);
+  });
+});
+
+describe('extractArticleText — cascade partagée read_webpage / pipeline presse', () => {
+  const ARTICLE = `<html><body>
+<nav><a href="/">Accueil</a></nav>
+<article><p>Le groupe a publié un chiffre d'affaires de 4,2 milliards d'euros, en hausse de 12 % sur un an, dépassant le consensus des analystes.</p></article>
+<footer><p>Mentions légales.</p></footer>
+</body></html>`;
+
+  it('préfère trafilatura quand le sidecar répond', async () => {
+    const res = await extractArticleText(ARTICLE, 'https://ex.test/a', async () => ({
+      text: 'texte trafilatura',
+    }));
+    expect(res).toEqual({ text: 'texte trafilatura', method: 'trafilatura' });
+  });
+
+  it("retombe sur l'heuristique quand le sidecar renvoie null", async () => {
+    const res = await extractArticleText(ARTICLE, undefined, async () => null);
+    expect(res.method).toBe('heuristique');
+    expect(res.text).toContain('4,2 milliards');
+    expect(res.text).not.toContain('Accueil');
+  });
+
+  it("retombe sur l'heuristique quand le sidecar LÈVE (et non sur rien)", async () => {
+    // Régression : dans enrichArticleTexts, l'exception tombait dans le catch
+    // global et l'article repartait avec son seul extrait RSS — on perdait
+    // l'heuristique, pourtant toujours disponible.
+    const res = await extractArticleText(ARTICLE, undefined, async () => {
+      throw new Error('sidecar mort');
+    });
+    expect(res.method).toBe('heuristique');
+    expect(res.text).toContain('4,2 milliards');
+  });
+
+  it('rend un texte vide sans lever quand la page n’a aucune prose', async () => {
+    const res = await extractArticleText(
+      '<html><body><nav>Accueil</nav></body></html>',
+      undefined,
+      async () => null,
+    );
+    expect(res.text).toBe('');
+    expect(res.method).toBe('heuristique');
   });
 });
 

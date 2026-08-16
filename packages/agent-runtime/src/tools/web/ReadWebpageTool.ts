@@ -115,6 +115,39 @@ export function extractReadableText(html: string): string {
     .join('\n');
 }
 
+/** Extracteur d'article (sidecar). Injectable pour les tests. */
+export type ArticleExtractor = (html: string, url?: string) => Promise<{ text: string } | null>;
+
+/**
+ * Meilleur texte d'article disponible : trafilatura via le sidecar, sinon
+ * l'heuristique locale. Point d'entrée UNIQUE des deux appelants
+ * (`read_webpage` et `enrichArticleTexts` du pipeline presse) — la même
+ * cascade écrite deux fois finirait par diverger.
+ *
+ * Le `try/catch` est ici et pas chez les appelants : le sidecar est une
+ * amélioration optionnelle, jamais une dépendance dure. S'appuyer sur le fait
+ * que `extractArticleViaSidecar` avale déjà ses erreurs marcherait, mais ferait
+ * dépendre la robustesse du pipeline d'un détail interne de l'appelé.
+ *
+ * Peut renvoyer un texte vide : c'est une réponse valable (page sans prose), à
+ * l'appelant de décider quoi en faire.
+ */
+export async function extractArticleText(
+  html: string,
+  url?: string,
+  extractArticle: ArticleExtractor = extractArticleViaSidecar,
+): Promise<{ text: string; method: 'trafilatura' | 'heuristique' }> {
+  let viaSidecar: { text: string } | null = null;
+  try {
+    viaSidecar = await extractArticle(html, url);
+  } catch {
+    /* extraction indisponible → heuristique locale */
+  }
+  return viaSidecar !== null
+    ? { text: viaSidecar.text, method: 'trafilatura' }
+    : { text: extractReadableText(html), method: 'heuristique' };
+}
+
 // Extract a named element from HTML (very naive CSS selector: tag, .class, #id)
 export function extractBySelector(html: string, selector: string): string | null {
   // Support simple selectors: tag, #id, .class
@@ -271,20 +304,10 @@ export class ReadWebpageTool extends BaseTool<Args> {
       // débruitait déjà (cf. docs/veille/2026-08-16). Les deux chemins sont
       // désormais alignés. `htmlToText` reste en dernier recours pour ne jamais
       // rendre moins de texte qu'avant sur une page sans prose détectable.
-      // try/catch et pas seulement `?? ` : le sidecar est une amélioration
-      // optionnelle, jamais une dépendance dure. S'appuyer sur le fait que
-      // extractArticleViaSidecar avale déjà ses erreurs marcherait, mais ferait
-      // dépendre la robustesse de l'outil d'un détail interne de l'appelé.
-      let viaSidecar: { text: string } | null = null;
-      try {
-        viaSidecar = await this.extractArticle(body, url);
-      } catch {
-        /* extraction indisponible → heuristique locale */
-      }
-      const readable = viaSidecar?.text ?? extractReadableText(body);
-      if (readable.length > 0) {
-        text = readable;
-        method = viaSidecar !== null ? 'trafilatura' : 'heuristique';
+      const best = await extractArticleText(body, url, this.extractArticle);
+      if (best.text.length > 0) {
+        text = best.text;
+        method = best.method;
       } else {
         text = htmlToText(body);
         method = 'brut';
