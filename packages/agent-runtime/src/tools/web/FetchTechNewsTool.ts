@@ -2,6 +2,17 @@ import { z } from 'zod';
 import type { DailyCategory, ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { CircuitBreaker } from '../../lib/CircuitBreaker';
+
+/**
+ * Coupe-circuit partagé par toutes les sources de presse (clé = libellé de la
+ * source). Cooldown long : les digests tournent à l'heure ou à la journée, un
+ * cooldown court n'écarterait rien en pratique. Voir docs/veille/2026-08-16.
+ */
+export const newsSourceBreaker = new CircuitBreaker({
+  failureThreshold: 3,
+  cooldownMs: 30 * 60 * 1000,
+});
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -656,7 +667,11 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
     }),
   ];
 
-  const results = await Promise.allSettled(tasks.map(t => t.run()));
+  // Sous coupe-circuit : un flux mort (domaine disparu, 404 permanent) est
+  // écarté après 3 échecs au lieu de recoûter son timeout à chaque digest. Un
+  // rejet du circuit ressort dans `failed` comme n'importe quel échec, avec le
+  // délai avant nouvel essai — la source reste donc visible, jamais silencieuse.
+  const results = await Promise.allSettled(tasks.map(t => newsSourceBreaker.run(t.label, t.run)));
 
   const collected: NewsItem[] = [];
   const failed: string[] = [];
