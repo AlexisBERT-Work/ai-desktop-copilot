@@ -6,7 +6,7 @@
 ## État actuel
 
 **Veille externe → 3 chantiers : skills, extraction d'articles, coupe-circuit
-(2026-08-16)** — **673 tests agent-runtime (+43, 80 fichiers) + 39 desktop,
+(2026-08-16)** — **683 tests agent-runtime (+53, 81 fichiers) + 39 desktop + 7 Python,
 type-check et lint verts**. Parti d'une analyse de 8 repos externes
 ([docs/veille/2026-08-16](veille/2026-08-16-analyse-repos-externes.md), qui garde
 les traces de raisonnement et les pistes rejetées) :
@@ -14,19 +14,24 @@ les traces de raisonnement et les pistes rejetées) :
 - **La boucle des skills est fermée (69ᵉ outil `load_skill`).** Constat de départ :
   `proposeSkills` + `EvolutionDaemon` écrivaient des `SKILL.md` dans
   `skill-drafts/` que **rien ne relisait** (`grep -rni skill` hors `playbook/` :
-  zéro résultat). Nouveau [`SkillStore`](../packages/agent-runtime/src/skills/SkillStore.ts)
-  - [`LoadSkillTool`](../packages/agent-runtime/src/tools/skills/LoadSkillTool.ts) :
-    le system prompt n'annonce que `nom — description`, le corps se charge à la
-    demande (divulgation progressive). Parseur de frontmatter maison — **pas de
-    dépendance YAML**, l'installeur hors-ligne n'a rien à y gagner. Garde-fou §8
-    préservé : les brouillons ne sont **jamais indexés** (le modèle ne peut pas les
-    découvrir), restent chargeables si on les nomme, et ressortent marqués « non
-    validé ». `status: draft` prime sur l'emplacement du fichier.
-    **L'annonce des skills dans le prompt est désactivée par défaut**
-    (`CATDESK_SKILL_INDEX=1` pour l'activer) — voir la mesure ci-dessous, qui a
-    inversé la décision de conception. L'outil `load_skill` reste toujours
-    enregistré : un skill **nommé explicitement** est chargé correctement (2/2 en
-    test réel), seule l'auto-découverte est coupée.
+  zéro résultat). Nouveaux
+  [`SkillStore`](../packages/agent-runtime/src/skills/SkillStore.ts) et
+  [`LoadSkillTool`](../packages/agent-runtime/src/tools/skills/LoadSkillTool.ts) :
+  le system prompt n'annonce que `nom — description`, le corps se charge à la
+  demande (divulgation progressive). Parseur de frontmatter maison — **pas de
+  dépendance YAML**, l'installeur hors-ligne n'a rien à y gagner. Garde-fou §8
+  préservé : les brouillons ne sont **jamais indexés** (le modèle ne peut pas les
+  découvrir), restent chargeables si on les nomme, et ressortent marqués « non
+  validé ». `status: draft` prime sur l'emplacement du fichier.
+  **L'annonce des skills dans le prompt est désactivée par défaut**
+  (`CATDESK_SKILL_INDEX=1` pour l'activer) — voir la mesure ci-dessous, qui a
+  inversé la décision de conception. L'outil `load_skill` reste toujours
+  enregistré : un skill **nommé explicitement** est chargé correctement (2/2 en
+  test réel), seule l'auto-découverte est coupée.
+  **Deux skills sont livrés avec l'app** (`revue-comparee`, `verifier-source`,
+  dans `packages/agent-runtime/skills/`, stagés par `build-release.ps1`) ; un
+  skill utilisateur de même nom prime, pour qu'une mise à jour n'écrase pas une
+  personnalisation.
 - **Mesure sur modèle réel — l'index des skills casse l'appel d'outil.** Banc A/B
   contre l'Ollama local (`qwen3:14b`, `think:false`, `temperature: 0`, vrais
   `SkillStore`/`buildSystemPrompt`/schémas d'outils) : sans la liste de skills,
@@ -111,19 +116,20 @@ les traces de raisonnement et les pistes rejetées) :
   sidecar traversait `execute` et faisait échouer tout l'appel. La robustesse ne
   tenait qu'à la politesse de `extractArticleViaSidecar` (qui avale ses erreurs) —
   `execute` a maintenant son propre `try/catch` et se replie sur l'heuristique.
-- **Deux premiers skills rédigés** (`revue-comparee`, `verifier-source`) dans
-  `packages/agent-runtime/data/skills/`. ⚠️ `data/` est **gitignoré** : ils sont
-  locaux au poste de dev et **ne sont pas embarqués** par l'installeur — livrer
-  des skills par défaut reste un chantier de packaging à part.
+- **Skills livrés avec l'application** : `packages/agent-runtime/skills/` (suivi
+  par git), stagé en sœur de `dist/` par `build-release.ps1`.
+  `join(__dirname, '..', 'skills')` résout au même endroit en dev
+  (`src/../skills`) et en production (`dist/../skills`) — aucun cas particulier.
 - **Vérifications en conditions réelles** : runtime agent démarré pour de vrai
   (aucune erreur, 44 outils en profil `research` = 69 − 25 exclus, `load_skill`
   enregistré) ; `load_skill` appelé correctement 2/2 sur skill nommé via Ollama ;
   extraction testée sur **5 articles réellement en ligne** (The Verge, Numerama)
   → **5/5 via trafilatura**, aucun repli, zéro ligne de tableau parasite.
+- **Build de release complet vérifié** : `tauri build` compile le Rust et produit
+  les installeurs MSI + NSIS (3 min 46) avec l'ensemble de ces changements.
 - Reste : réessayer l'index des skills si le modèle du bundle change (le banc est
-  reproductible) ; décider si des skills par défaut doivent être packagés.
-  L'application complète (`pnpm dev`, UI Tauri) n'a pas été lancée : les mesures
-  passent par le runtime, Ollama et le sidecar Python directement.
+  reproductible). L'app n'a pas été lancée en interactif : les vérifications
+  passent par le runtime agent, Ollama, le sidecar Python et le build de release.
 
 **Modèle unique et release 0.1.3 (2026-08-05)** — passage à UN seul modèle de
 chat, le plus fort tenant sur 10 Go de VRAM : **`qwen3:14b`** (le palier

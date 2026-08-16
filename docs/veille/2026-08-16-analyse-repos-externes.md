@@ -429,7 +429,7 @@ réel le sont.
 ## 5. Suites données (2026-08-16, même journée)
 
 Les trois chantiers techniques ont été implémentés dans la foulée de cette analyse.
-**673 tests agent-runtime verts (+43), type-check et lint OK sur le monorepo.**
+**683 tests agent-runtime (+53) + 39 desktop + 7 Python, type-check et lint OK.**
 
 | Chantier            | Livré                                                                             | Fichiers clés                                                                                                                                                                      |
 | ------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -524,10 +524,11 @@ Révélé par hasard en installant trafilatura. Réparé (19/19).
 
 ## 8. Vérifications restant à faire
 
-- **Aucun skill n'est livré par défaut** : deux skills existent
-  (`revue-comparee`, `verifier-source`) mais dans `data/`, qui est **gitignoré** —
-  ils ne sont donc pas embarqués. Packager des skills par défaut est un chantier
-  à part.
+- **Deux skills sont désormais livrés avec l'app** (`revue-comparee`,
+  `verifier-source`), stagés par `build-release.ps1`. Un skill utilisateur de même
+  nom prime, pour qu'une mise à jour n'écrase pas une personnalisation.
 - Réessayer l'index si le modèle du bundle change — le banc est reproductible.
-- L'application complète (`pnpm dev`, UI Tauri) n'a pas été lancée : les mesures
-  passent par le runtime agent, Ollama et le sidecar Python directement.
+- **Build de release complet vérifié** : `tauri build` compile le Rust et produit
+  les installeurs MSI + NSIS avec l'ensemble de ces changements. L'app n'a pas été
+  lancée en interactif : les mesures passent par le runtime agent, Ollama et le
+  sidecar Python directement.
