@@ -19,9 +19,15 @@ interface DailiesState {
   hasMore: boolean;
   /** Un chargement de page supplémentaire est-il en cours ? */
   loadingMore: boolean;
+  /**
+   * Motif de l'échec quand `status === 'error'` (message serveur abrégé).
+   * `null` sinon. Sert à distinguer « backend en veille » de « pas de réseau ».
+   */
+  error: string | null;
 
   setItems: (items: Daily[]) => void;
   setStatus: (status: DailiesStatus) => void;
+  setError: (error: string | null) => void;
   setHasMore: (hasMore: boolean) => void;
   setLoadingMore: (loadingMore: boolean) => void;
   /**
@@ -30,6 +36,12 @@ interface DailiesState {
    */
   loadMore: () => void;
   setLoadMore: (fn: () => void) => void;
+  /**
+   * Relance un chargement complet après un échec (ré-authentifie si besoin).
+   * Implémenté par `useDailies` ; no-op tant qu'il n'est pas câblé.
+   */
+  retry: () => void;
+  setRetry: (fn: () => void) => void;
   toggleCategory: (category: DailyCategory) => void;
   clearFollowed: () => void;
 }
@@ -42,13 +54,17 @@ export const useDailiesStore = create<DailiesState>()(
       followed: [],
       hasMore: false,
       loadingMore: false,
+      error: null,
 
       setItems: items => set({ items }),
       setStatus: status => set({ status }),
+      setError: error => set({ error }),
       setHasMore: hasMore => set({ hasMore }),
       setLoadingMore: loadingMore => set({ loadingMore }),
       loadMore: () => {},
       setLoadMore: fn => set({ loadMore: fn }),
+      retry: () => {},
+      setRetry: fn => set({ retry: fn }),
       toggleCategory: category =>
         set(s => ({
           followed: s.followed.includes(category)

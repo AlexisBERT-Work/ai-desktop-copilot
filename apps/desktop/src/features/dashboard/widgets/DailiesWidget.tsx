@@ -443,6 +443,8 @@ export function DailiesWidget({ widget }: WidgetProps) {
   const hasMore = useDailiesStore(s => s.hasMore);
   const loadingMore = useDailiesStore(s => s.loadingMore);
   const loadMore = useDailiesStore(s => s.loadMore);
+  const error = useDailiesStore(s => s.error);
+  const retry = useDailiesStore(s => s.retry);
   const localDailies = useLocalPressStore(s => s.dailies);
   const updateWidgetConfig = useDashboardStore(s => s.updateWidgetConfig);
   const renameWidget = useDashboardStore(s => s.renameWidget);
@@ -491,7 +493,19 @@ export function DailiesWidget({ widget }: WidgetProps) {
       return <p className="text-xs text-white/30">Chargement…</p>;
     }
     if (status === 'error') {
-      return <p className="text-xs text-red-400/70">Erreur de chargement.</p>;
+      return (
+        <div className="space-y-1.5">
+          <p className="text-xs text-red-400/70">Dailys indisponibles.</p>
+          {error !== null && <p className="text-[11px] leading-tight text-white/30">{error}</p>}
+          <button
+            onClick={retry}
+            className="rounded-md border border-white/10 bg-white/5 px-2 py-1
+                       text-[11px] text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors"
+          >
+            Réessayer
+          </button>
+        </div>
+      );
     }
   }
 
