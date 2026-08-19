@@ -129,16 +129,56 @@ describe('dashboardStore.setWidgetStyle (personnalisation)', () => {
     useDashboardStore.getState().resetToDefault();
   });
 
+  /** Style complet d'un widget neuf : tout est normalisé à l'écriture. */
+  const DEFAULT_STYLE = {
+    accent: 'default',
+    textScale: 1,
+    surface: 'auto',
+    opacity: 1,
+    hideHeader: false,
+    border: 'thin',
+    radius: 'soft',
+    locked: false,
+  };
+
   it('fusionne accent et taille de texte, avec bornes', () => {
     const id = firstWidgetId();
     useDashboardStore.getState().setWidgetStyle(id, { accent: 'emerald' });
-    expect(widgetById(id).style).toEqual({ accent: 'emerald', textScale: 1 });
+    expect(widgetById(id).style).toEqual({ ...DEFAULT_STYLE, accent: 'emerald' });
     // Le patch suivant garde l'accent déjà choisi.
     useDashboardStore.getState().setWidgetStyle(id, { textScale: 1.3 });
-    expect(widgetById(id).style).toEqual({ accent: 'emerald', textScale: 1.3 });
+    expect(widgetById(id).style).toEqual({
+      ...DEFAULT_STYLE,
+      accent: 'emerald',
+      textScale: 1.3,
+    });
     // Bornes : un zoom délirant est ramené dans [0.7, 1.6].
     useDashboardStore.getState().setWidgetStyle(id, { textScale: 99 });
     expect(widgetById(id).style?.textScale).toBe(1.6);
+  });
+
+  it('conserve fond, contour, coins et verrouillage entre deux patchs', () => {
+    const id = firstWidgetId();
+    useDashboardStore.getState().setWidgetStyle(id, { surface: 'tinted', locked: true });
+    useDashboardStore.getState().setWidgetStyle(id, { border: 'thick', radius: 'round' });
+    expect(widgetById(id).style).toEqual({
+      ...DEFAULT_STYLE,
+      surface: 'tinted',
+      locked: true,
+      border: 'thick',
+      radius: 'round',
+    });
+  });
+
+  it("borne l'opacité et ignore les valeurs inconnues", () => {
+    const id = firstWidgetId();
+    useDashboardStore.getState().setWidgetStyle(id, { opacity: 5 });
+    expect(widgetById(id).style?.opacity).toBe(1);
+    useDashboardStore.getState().setWidgetStyle(id, { opacity: 0 });
+    expect(widgetById(id).style?.opacity).toBe(0.2);
+    // Valeur hors énumération (config bidouillée à la main) → retour au défaut.
+    useDashboardStore.getState().setWidgetStyle(id, { surface: 'neon' as unknown as 'auto' });
+    expect(widgetById(id).style?.surface).toBe('auto');
   });
 });
 

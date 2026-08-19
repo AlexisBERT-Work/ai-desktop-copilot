@@ -1,17 +1,22 @@
 import { useMarketStore } from '../../market/marketStore';
+import { makeNumberFormat, useNumberFormat, type NumberFormat } from '../../appearance/format';
 import { readMetricConfig, resolveMetric, type MetricResult } from './metric';
 import type { WidgetProps } from './types';
 
-function format(value: number, unit?: string): string {
-  if (unit === '%') return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-  return Number.isInteger(value) ? value.toLocaleString('fr-FR') : value.toFixed(2);
-}
+/** Format par défaut (guide, aperçus) quand aucun n'est fourni. */
+const DEFAULT_FORMAT = makeNumberFormat('fr-FR', 2, 'none');
 
 /**
  * Rendu pur d'un KPI / statistique à partir d'une métrique déjà résolue.
  * Sans dépendance au store → réutilisable (guide, tests).
  */
-export function KpiView({ metric: m }: { metric: MetricResult }) {
+export function KpiView({
+  metric: m,
+  fmt = DEFAULT_FORMAT,
+}: {
+  metric: MetricResult;
+  fmt?: NumberFormat;
+}) {
   const valueColor =
     m.unit === '%' && m.value !== null
       ? m.value >= 0
@@ -35,15 +40,14 @@ export function KpiView({ metric: m }: { metric: MetricResult }) {
           key={m.value}
           className={`animate-value-tick text-2xl font-semibold tabular-nums ${valueColor}`}
         >
-          {format(m.value, m.unit)}
+          {m.unit === '%' ? fmt.percent(m.value) : fmt.loose(m.value)}
         </span>
       )}
       {m.changePercent !== undefined && m.unit !== '%' && (
         <span
           className={`text-xs tabular-nums ${m.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}
         >
-          {m.changePercent >= 0 ? '+' : ''}
-          {m.changePercent.toFixed(2)}%
+          {fmt.percent(m.changePercent)}
         </span>
       )}
     </div>
@@ -55,8 +59,9 @@ export function KpiView({ metric: m }: { metric: MetricResult }) {
  * de formule), en grand, avec la variation du jour colorée.
  */
 export function KpiWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const computed = useMarketStore((s) => s.computed);
+  const quotes = useMarketStore(s => s.quotes);
+  const computed = useMarketStore(s => s.computed);
+  const fmt = useNumberFormat();
   const m = resolveMetric(readMetricConfig(widget.config), quotes, computed);
-  return <KpiView metric={m} />;
+  return <KpiView metric={m} fmt={fmt} />;
 }

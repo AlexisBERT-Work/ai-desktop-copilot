@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { GripVertical, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { GripVertical, Lock, SlidersHorizontal, Trash2 } from 'lucide-react';
 import type { Widget } from '@catdesk/shared-types';
 import { useZoomStore } from '../../shared/hooks/useUiZoom';
 import { useDashboardStore } from './dashboardStore';
 import { widgetComponent } from './widgets/registry';
-import { ACCENT_STYLES, readWidgetStyle } from './widgets/widgetStyle';
+import { ACCENT_STYLES, BORDER_CLASS, RADIUS_CLASS, readWidgetStyle } from './widgets/widgetStyle';
 import { WidgetErrorBoundary } from './widgets/WidgetErrorBoundary';
 import { WidgetConfigEditor } from './widgets/WidgetConfigEditor';
 
@@ -39,8 +39,19 @@ export function DashboardWidgetCard({
   const [resizing, setResizing] = useState(false);
 
   const Widget = widgetComponent(widget.type);
-  const { accent, textScale } = readWidgetStyle(widget);
+  const { accent, textScale, surface, opacity, hideHeader, border, radius, locked } =
+    readWidgetStyle(widget);
   const accentStyle = ACCENT_STYLES[accent];
+
+  // Une carte verrouillée reste configurable, mais ne bouge plus : ni drag ni
+  // poignées. Évite de déplacer par mégarde une carte bien placée.
+  const movable = editMode && !locked;
+
+  /** Remplissage : 'auto' suit le fond global choisi dans Apparence. */
+  const surfaceClass =
+    surface === 'tinted' ? accentStyle.tint : surface === 'clear' ? 'bg-transparent' : '';
+  const surfaceStyle =
+    surface === 'auto' || surface === 'solid' ? { background: 'var(--card-bg)' } : {};
 
   const commitRename = () => {
     renameWidget(widget.id, draft.trim() || widget.title);
@@ -81,86 +92,97 @@ export function DashboardWidgetCard({
   return (
     <div
       data-widget-id={widget.id}
-      className={`group absolute flex animate-widget-enter flex-col rounded-xl border bg-gray-900 p-3
-        transition-colors ${
+      className={`group absolute flex animate-widget-enter flex-col transition-colors
+        ${RADIUS_CLASS[radius]} ${BORDER_CLASS[border]} ${surfaceClass} ${
           dragging
             ? 'border-brand-400/70 shadow-2xl shadow-black/60'
             : resizing
               ? 'border-brand-400/60'
               : accentStyle.border
-        } ${editMode && !dragging && !resizing ? 'border-dashed' : ''}
-        ${editMode && !renaming && !editingConfig ? 'cursor-grab touch-none' : ''}`}
+        } ${movable && !dragging && !resizing && border !== 'none' ? 'border-dashed' : ''}
+        ${movable && !renaming && !editingConfig ? 'cursor-grab touch-none' : ''}`}
       style={{
         left: widget.layout.x,
         top: widget.layout.y,
         width: widget.layout.w,
         height: widget.layout.h,
         animationDelay: `${enterDelayMs}ms`,
+        // Densité (Apparence) — l'espace intérieur de toutes les cartes.
+        padding: 'var(--card-pad)',
+        opacity,
+        ...surfaceStyle,
       }}
       onPointerDown={e => {
-        if (!editMode || renaming || editingConfig || resizing) return;
+        if (!movable || renaming || editingConfig || resizing) return;
         // Les contrôles (renommer, config, retirer…) restent cliquables.
         if ((e.target as HTMLElement).closest('button, input')) return;
         onDragPointerDown(e, widget.id);
       }}
     >
-      {/* Header */}
-      <div className="mb-2 flex items-center gap-1">
-        {editMode && (
-          <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-white/25" aria-hidden />
-        )}
+      {/* Header — masquable pour un rendu épuré, mais TOUJOURS rendu en mode
+          édition : sinon la carte n'aurait plus ni renommage ni accès aux
+          réglages, donc plus aucun moyen de rétablir l'en-tête. */}
+      {(!hideHeader || editMode) && (
+        <div className="flex items-center gap-1" style={{ marginBottom: 'var(--card-gap)' }}>
+          {movable && (
+            <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-white/25" aria-hidden />
+          )}
+          {locked && editMode && (
+            <Lock className="h-3 w-3 shrink-0 text-white/30" aria-label="Carte verrouillée" />
+          )}
 
-        {renaming ? (
-          <input
-            autoFocus
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={e => {
-              if (e.key === 'Enter') commitRename();
-              if (e.key === 'Escape') {
-                setDraft(widget.title);
-                setRenaming(false);
-              }
-            }}
-            className="min-w-0 flex-1 rounded border border-white/15 bg-white/10 px-1.5 py-0.5
+          {renaming ? (
+            <input
+              autoFocus
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitRename();
+                if (e.key === 'Escape') {
+                  setDraft(widget.title);
+                  setRenaming(false);
+                }
+              }}
+              className="min-w-0 flex-1 rounded border border-white/15 bg-white/10 px-1.5 py-0.5
                        text-xs text-white/90 outline-none focus:border-brand-400/50"
-            aria-label="Renommer le widget"
-          />
-        ) : (
-          <button
-            className={`min-w-0 flex-1 truncate text-left text-xs font-medium ${accentStyle.title}
+              aria-label="Renommer le widget"
+            />
+          ) : (
+            <button
+              className={`min-w-0 flex-1 truncate text-left text-xs font-medium ${accentStyle.title}
               ${editMode ? 'cursor-text hover:text-white/90' : 'cursor-default'}`}
-            onClick={() => editMode && setRenaming(true)}
-            disabled={!editMode}
-            title={editMode ? 'Cliquer pour renommer' : widget.title}
-          >
-            {widget.title}
-          </button>
-        )}
+              onClick={() => editMode && setRenaming(true)}
+              disabled={!editMode}
+              title={editMode ? 'Cliquer pour renommer' : widget.title}
+            >
+              {widget.title}
+            </button>
+          )}
 
-        {editMode && !renaming && (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              className={`${ICON_BTN} ${editingConfig ? 'bg-white/10 text-white/80' : ''}`}
-              onClick={() => setEditingConfig(v => !v)}
-              aria-label="Configurer le widget"
-              aria-pressed={editingConfig}
-              title="Configurer"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-            </button>
-            <button
-              className={`${ICON_BTN} hover:bg-red-500/15 hover:text-red-300`}
-              onClick={() => removeWidget(widget.id)}
-              aria-label="Retirer le widget"
-              title="Retirer"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
+          {editMode && !renaming && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                className={`${ICON_BTN} ${editingConfig ? 'bg-white/10 text-white/80' : ''}`}
+                onClick={() => setEditingConfig(v => !v)}
+                aria-label="Configurer le widget"
+                aria-pressed={editingConfig}
+                title="Configurer"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+              </button>
+              <button
+                className={`${ICON_BTN} hover:bg-red-500/15 hover:text-red-300`}
+                onClick={() => removeWidget(widget.id)}
+                aria-label="Retirer le widget"
+                title="Retirer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Body — le contenu défile À L'INTÉRIEUR de la carte si elle est trop petite. */}
       {editingConfig ? (
@@ -183,7 +205,7 @@ export function DashboardWidgetCard({
       )}
 
       {/* Poignées de redimensionnement (mode édition) : bord droit, bord bas, coin. */}
-      {editMode && !editingConfig && (
+      {movable && !editingConfig && (
         <>
           <div
             onPointerDown={e => beginResize(e, 'x')}

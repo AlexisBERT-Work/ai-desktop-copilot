@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { X, Cpu, Shield, Keyboard, Info } from 'lucide-react';
+import { X, Cpu, Shield, Keyboard, Info, Palette } from 'lucide-react';
 import { useOverlayStore } from '../overlay/overlayStore';
+import { AppearancePanel } from '../appearance/AppearancePanel';
 import { ModelTab } from './ModelTab';
 import { SecurityTab } from './SecurityTab';
 import { HotkeysTab } from './HotkeysTab';
 import { AboutTab } from './AboutTab';
 
-type SettingsTab = 'model' | 'security' | 'hotkeys' | 'about';
+type SettingsTab = 'appearance' | 'model' | 'security' | 'hotkeys' | 'about';
 
 /** Fenêtre Paramètres : coquille (header + navigation) ; chaque onglet a son fichier. */
 export function SettingsWindow() {
@@ -14,6 +15,7 @@ export function SettingsWindow() {
   const { setMode } = useOverlayStore();
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode }> = [
+    { id: 'appearance', label: 'Apparence', icon: <Palette className="w-4 h-4" /> },
     { id: 'model', label: 'Modèle', icon: <Cpu className="w-4 h-4" /> },
     { id: 'security', label: 'Sécurité', icon: <Shield className="w-4 h-4" /> },
     { id: 'hotkeys', label: 'Raccourcis', icon: <Keyboard className="w-4 h-4" /> },
@@ -60,6 +62,7 @@ export function SettingsWindow() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
+          {activeTab === 'appearance' && <AppearancePanel />}
           {activeTab === 'model' && <ModelTab />}
           {activeTab === 'security' && <SecurityTab />}
           {activeTab === 'hotkeys' && <HotkeysTab />}

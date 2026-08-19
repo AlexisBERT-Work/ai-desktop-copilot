@@ -29,12 +29,41 @@ export interface WidgetLayout {
 export const WIDGET_ACCENTS = ['default', 'sky', 'emerald', 'amber', 'rose', 'violet'] as const;
 export type WidgetAccent = (typeof WIDGET_ACCENTS)[number];
 
-/** Personnalisation visuelle d'un widget (couleur d'accent, taille du texte). */
+/**
+ * Remplissage d'une carte. 'auto' suit le fond global choisi dans Apparence ;
+ * 'tinted' teinte la carte de son accent ; 'clear' la rend transparente (utile
+ * pour poser un titre ou un KPI directement sur le fond du tableau).
+ */
+export const WIDGET_SURFACES = ['auto', 'solid', 'tinted', 'clear'] as const;
+export type WidgetSurface = (typeof WIDGET_SURFACES)[number];
+
+/** Épaisseur du contour d'une carte. */
+export const WIDGET_BORDERS = ['none', 'thin', 'thick'] as const;
+export type WidgetBorder = (typeof WIDGET_BORDERS)[number];
+
+/** Arrondi des coins d'une carte. */
+export const WIDGET_RADII = ['sharp', 'soft', 'round'] as const;
+export type WidgetRadius = (typeof WIDGET_RADII)[number];
+
+/** Personnalisation visuelle d'un widget. Tout est optionnel : une carte créée
+ *  par une version antérieure reste valide et prend les valeurs par défaut. */
 export interface WidgetStyle {
   /** Couleur d'accent (bordure + titre). 'default' = neutre. */
   accent?: WidgetAccent;
   /** Facteur de taille du texte du contenu (zoom local, borné ~0.7–1.6). */
   textScale?: number;
+  /** Remplissage de la carte. Défaut 'auto'. */
+  surface?: WidgetSurface;
+  /** Opacité de la carte, bornée 0.2–1. Défaut 1. */
+  opacity?: number;
+  /** Masque la barre de titre pour un rendu épuré (les contrôles restent en mode édition). */
+  hideHeader?: boolean;
+  /** Épaisseur du contour. Défaut 'thin'. */
+  border?: WidgetBorder;
+  /** Arrondi des coins. Défaut 'soft'. */
+  radius?: WidgetRadius;
+  /** Carte verrouillée : ni déplacement ni redimensionnement, même en mode édition. */
+  locked?: boolean;
 }
 
 /** Un widget paramétrable de l'interface dashboard. */

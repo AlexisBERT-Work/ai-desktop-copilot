@@ -3,13 +3,24 @@ import { X } from 'lucide-react';
 import {
   DAILY_KIND_FILTER_LABEL,
   WIDGET_ACCENTS,
+  WIDGET_BORDERS,
+  WIDGET_RADII,
+  WIDGET_SURFACES,
   type DailyKindFilter,
   type Widget,
 } from '@catdesk/shared-types';
 import { useDashboardStore } from '../dashboardStore';
 import { QUICK_ACTION_ICON_NAMES } from './quickActionIcons';
 import { QUOTE_FIELDS, type QuoteField } from './metric';
-import { ACCENT_LABEL, ACCENT_STYLES, readWidgetStyle, TEXT_SCALES } from './widgetStyle';
+import {
+  ACCENT_LABEL,
+  ACCENT_STYLES,
+  BORDER_LABEL,
+  RADIUS_LABEL,
+  readWidgetStyle,
+  SURFACE_LABEL,
+  TEXT_SCALES,
+} from './widgetStyle';
 
 interface Props {
   widget: Widget;
@@ -85,9 +96,43 @@ export function WidgetConfigEditor({ widget, onClose }: Props) {
  * taille du texte. Application IMMÉDIATE (aperçu en direct sur la carte) —
  * pas de bouton Enregistrer, contrairement aux réglages du type.
  */
+/** Petit groupe de boutons exclusifs, utilisé par toutes les options de style. */
+function Choice<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div>
+      <span className={LABEL}>{label}</span>
+      <div className="mt-1 flex w-fit flex-wrap gap-0.5 rounded-lg bg-white/5 p-0.5">
+        {options.map(o => (
+          <button
+            key={String(o.value)}
+            onClick={() => onChange(o.value)}
+            aria-pressed={value === o.value}
+            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              value === o.value ? 'bg-white/15 text-white' : 'text-white/45 hover:text-white/80'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StyleSection({ widget }: { widget: Widget }) {
   const setWidgetStyle = useDashboardStore(s => s.setWidgetStyle);
-  const { accent, textScale } = readWidgetStyle(widget);
+  const { accent, textScale, surface, opacity, hideHeader, border, radius, locked } =
+    readWidgetStyle(widget);
 
   return (
     <div className="space-y-2">
@@ -108,24 +153,68 @@ function StyleSection({ widget }: { widget: Widget }) {
           ))}
         </div>
       </div>
+      <Choice
+        label="Taille du texte"
+        value={textScale}
+        onChange={v => setWidgetStyle(widget.id, { textScale: v })}
+        options={TEXT_SCALES.map(t => ({ value: t.value, label: t.label }))}
+      />
+
+      <Choice
+        label="Fond"
+        value={surface}
+        onChange={v => setWidgetStyle(widget.id, { surface: v })}
+        options={WIDGET_SURFACES.map(s => ({ value: s, label: SURFACE_LABEL[s] }))}
+      />
+
+      <div className="grid grid-cols-2 gap-2">
+        <Choice
+          label="Contour"
+          value={border}
+          onChange={v => setWidgetStyle(widget.id, { border: v })}
+          options={WIDGET_BORDERS.map(b => ({ value: b, label: BORDER_LABEL[b] }))}
+        />
+        <Choice
+          label="Coins"
+          value={radius}
+          onChange={v => setWidgetStyle(widget.id, { radius: v })}
+          options={WIDGET_RADII.map(r => ({ value: r, label: RADIUS_LABEL[r] }))}
+        />
+      </div>
+
       <div>
-        <span className={LABEL}>Taille du texte</span>
-        <div className="mt-1 flex w-fit gap-0.5 rounded-lg bg-white/5 p-0.5">
-          {TEXT_SCALES.map(t => (
-            <button
-              key={t.value}
-              onClick={() => setWidgetStyle(widget.id, { textScale: t.value })}
-              aria-pressed={textScale === t.value}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                textScale === t.value
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/45 hover:text-white/80'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <span className={LABEL}>Opacité — {Math.round(opacity * 100)} %</span>
+        <input
+          type="range"
+          min={20}
+          max={100}
+          step={5}
+          value={Math.round(opacity * 100)}
+          onChange={e => setWidgetStyle(widget.id, { opacity: Number(e.target.value) / 100 })}
+          className="mt-1 h-1 w-full cursor-pointer accent-brand-500"
+          aria-label="Opacité de la carte"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-3 pt-0.5">
+        <label className="flex items-center gap-1.5 text-[11px] text-white/60">
+          <input
+            type="checkbox"
+            checked={hideHeader}
+            onChange={e => setWidgetStyle(widget.id, { hideHeader: e.target.checked })}
+            className="accent-brand-500"
+          />
+          Masquer le titre
+        </label>
+        <label className="flex items-center gap-1.5 text-[11px] text-white/60">
+          <input
+            type="checkbox"
+            checked={locked}
+            onChange={e => setWidgetStyle(widget.id, { locked: e.target.checked })}
+            className="accent-brand-500"
+          />
+          Verrouiller la position
+        </label>
       </div>
     </div>
   );

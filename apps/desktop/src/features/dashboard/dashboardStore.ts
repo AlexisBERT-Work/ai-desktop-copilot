@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DashboardConfig, Widget, WidgetLayout, WidgetStyle } from '@catdesk/shared-types';
-import { WIDGET_ACCENTS } from '@catdesk/shared-types';
+import { normalizeWidgetStyle } from './widgets/widgetStyle';
 
 // ─── Canvas libre (façon PowerPoint) ───────────────────────────
 // `layout` est en PIXELS : position (x, y) et taille (w, h) exactes, posées où
@@ -284,18 +284,13 @@ export const useDashboardStore = create<DashboardState>()(
         set(s => ({
           config: {
             ...s.config,
-            widgets: mapWidget(s.config.widgets, id, w => {
-              const merged: WidgetStyle = { ...w.style, ...patch };
-              const accent =
-                merged.accent !== undefined && WIDGET_ACCENTS.includes(merged.accent)
-                  ? merged.accent
-                  : 'default';
-              const textScale = Math.min(
-                Math.max(typeof merged.textScale === 'number' ? merged.textScale : 1, 0.7),
-                1.6,
-              );
-              return { ...w, style: { accent, textScale } };
-            }),
+            widgets: mapWidget(s.config.widgets, id, w => ({
+              ...w,
+              // Fusion puis normalisation par la source de vérité unique
+              // (widgetStyle.ts) : bornes et valeurs inconnues traitées au même
+              // endroit que la lecture, donc jamais de divergence.
+              style: normalizeWidgetStyle({ ...w.style, ...patch }),
+            })),
           },
         })),
 

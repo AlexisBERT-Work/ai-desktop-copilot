@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { setMarketWatchlist } from '../../shared/api/market';
+import { useAppearanceStore } from '../appearance/appearanceStore';
 import { useDashboardStore } from '../dashboard/dashboardStore';
 import type { Widget, WidgetFormula } from '@catdesk/shared-types';
 
@@ -50,13 +51,14 @@ function collectFormulas(widgets: Widget[]): WidgetFormula[] {
  */
 export function useMarketWatchSync(): void {
   const widgets = useDashboardStore(s => s.config.widgets);
+  const refreshSeconds = useAppearanceStore(s => s.refreshSeconds);
 
   useEffect(() => {
     const symbols = collectSymbols(widgets);
     const formulas = collectFormulas(widgets);
-    const send = () => void setMarketWatchlist(symbols, formulas).catch(() => {});
+    const send = () => void setMarketWatchlist(symbols, formulas, refreshSeconds).catch(() => {});
     send();
     const retry = setTimeout(send, 3500);
     return () => clearTimeout(retry);
-  }, [widgets]);
+  }, [widgets, refreshSeconds]);
 }

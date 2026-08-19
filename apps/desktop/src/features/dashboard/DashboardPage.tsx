@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Bookmark, BookOpen, Check, Newspaper, Pencil, Plus, ShieldCheck, X } from 'lucide-react';
+import {
+  Bookmark,
+  BookOpen,
+  Check,
+  Newspaper,
+  Palette,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import { BrandMark } from '../../shared/components/BrandMark';
 import { useDashboardStore } from './dashboardStore';
 import { isNewsConfigured as isSupabaseConfigured } from '../news/supabaseClient';
@@ -31,9 +41,16 @@ interface DashboardPageProps {
   onOpenAdmin: () => void;
   /** « Mes journaux » — journaux personnalisés locaux, ouverts à tout utilisateur. */
   onOpenMyFeeds: () => void;
+  /** Panneau Apparence (accent, fond, densité, bulle, données). */
+  onOpenAppearance: () => void;
 }
 
-export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: DashboardPageProps) {
+export function DashboardPage({
+  onOpenGuide,
+  onOpenAdmin,
+  onOpenMyFeeds,
+  onOpenAppearance,
+}: DashboardPageProps) {
   const { config, editMode, setEditMode } = useDashboardStore();
   const [addOpen, setAddOpen] = useState(false);
   const [presetsOpen, setPresetsOpen] = useState(false);
@@ -70,7 +87,10 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
+    <div
+      className="flex h-screen w-screen flex-col overflow-hidden text-white"
+      style={{ background: 'var(--dash-bg)' }}
+    >
       {/* Header — teinté en mode édition pour rendre l'état impossible à confondre. */}
       <header
         className={`flex items-center gap-2.5 border-b px-5 py-3 transition-colors ${
@@ -96,6 +116,16 @@ export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: Dashb
           >
             <BookOpen className="h-3.5 w-3.5" />
             Guide
+          </button>
+
+          <button
+            onClick={onOpenAppearance}
+            className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs
+                       text-white/70 transition-colors hover:bg-white/10 hover:text-white/90"
+            title="Apparence — couleur, fond, densité, bulle, données"
+          >
+            <Palette className="h-3.5 w-3.5" />
+            Apparence
           </button>
 
           <button

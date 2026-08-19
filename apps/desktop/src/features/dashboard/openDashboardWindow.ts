@@ -26,8 +26,8 @@ export async function openDashboardWindow(): Promise<void> {
   // se re-branche d'elle-même : main.tsx s'exécute dans la nouvelle webview.
   new WebviewWindow('dashboard', {
     title: 'CatDesk — Marchés & News',
-    width: 1280,
-    height: 820,
+    width: 1500,
+    height: 940,
     minWidth: 900,
     minHeight: 600,
     resizable: true,

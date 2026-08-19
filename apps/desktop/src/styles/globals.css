@@ -1,5 +1,71 @@
 @import 'tailwindcss';
 
+/* Thème Tailwind v4. En v4, `tailwind.config.ts` n'est PLUS chargé tout seul :
+   sans ce bloc, toutes les classes `brand-*` et les animations custom ne
+   produisent aucun CSS. Les valeurs deviennent des variables (--color-brand-600
+   …), ce qui permet de repeindre toute l'app à l'exécution en réécrivant ces
+   variables sur :root — c'est le mécanisme du sélecteur d'accent (appearance.ts). */
+@theme {
+  --color-brand-50: #f5f0ff;
+  --color-brand-100: #ede0ff;
+  --color-brand-200: #dbc5ff;
+  --color-brand-300: #c09aff;
+  --color-brand-400: #a16ef4;
+  --color-brand-500: #8b47e8;
+  --color-brand-600: #7a2fd4;
+  --color-brand-700: #6622b0;
+  --color-brand-800: #551e90;
+  --color-brand-900: #471c76;
+
+  --font-sans: 'Inter var', Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+
+  --blur-xs: 2px;
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-fade-in: fadeIn 0.15s ease-out;
+  --animate-slide-up: slideUp 0.2s ease-out;
+  /* Entrée des widgets — `both` pour que animation-delay (cascade) garde
+     l'élément invisible avant son tour. */
+  --animate-widget-enter: slideUp 0.3s ease-out both;
+  /* Micro-pulsation d'une valeur qui vient de changer (cours, KPI). */
+  --animate-value-tick: valueTick 0.45s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes valueTick {
+  from {
+    opacity: 0.35;
+    transform: translateY(3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 4%;
@@ -16,6 +82,24 @@
     --destructive: 0 72% 51%;
     --ring: 270 80% 60%;
     --radius: 0.75rem;
+
+    /* Pilotées à l'exécution par le panneau Apparence (appearance/useAppearance.ts).
+       Les valeurs ci-dessous sont les défauts si rien n'a encore été choisi. */
+    --dash-bg: #0a0a0a;
+    --card-bg: #18181b;
+    --card-pad: 0.75rem;
+    --card-gap: 0.5rem;
+    --bubble-opacity: 0.96;
+  }
+
+  /* Apparence → « Animations : réduites ». Neutralise les entrées de widgets et
+     les micro-transitions sans toucher au JSX. */
+  [data-animations='off'] *,
+  [data-animations='off'] *::before,
+  [data-animations='off'] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 
   * {

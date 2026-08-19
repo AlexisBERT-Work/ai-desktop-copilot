@@ -87,14 +87,22 @@ pub struct FormulaDef {
 
 /// Replace the live market config (watchlist + formulas) with what the dashboard
 /// `stocks` widgets show. Forwarded to the agent's MarketService.
+///
+/// `interval_secs` porte la période de rafraîchissement choisie dans Apparence.
+/// `None` (ou hors bornes côté agent) laisse la période courante inchangée.
 #[tauri::command]
 pub async fn set_market_watchlist(
     symbols: Vec<String>,
     formulas: Vec<FormulaDef>,
+    interval_secs: Option<u32>,
 ) -> Result<(), String> {
     let payload = rpc_request(
         protocol::RPC_MARKET_SET_WATCHLIST,
-        serde_json::json!({ "symbols": symbols, "formulas": formulas }),
+        serde_json::json!({
+            "symbols": symbols,
+            "formulas": formulas,
+            "intervalSecs": interval_secs,
+        }),
     );
     send_to_agent(payload).await.map_err(|e| e.to_string())
 }
