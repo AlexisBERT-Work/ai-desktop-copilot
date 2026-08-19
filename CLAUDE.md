@@ -15,7 +15,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 
 | Question                                       | Réponse dans                                                            |
 | ---------------------------------------------- | ----------------------------------------------------------------------- |
-| Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                              |
+| Que sait faire l'agent ? (69 outils + risques) | `docs/CAPACITES.md` — **référence unique**                              |
 | Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                       |
 | État actuel + historique du travail            | `docs/SUIVI.md` (§ « État actuel » en tête)                             |
 | Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                      |
@@ -23,6 +23,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | Techniques d'architecture agent (✅/🟡/⬜)     | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer) |
 | Dashboard / bourse / news / dailys             | `docs/projects/` + `supabase/README.md`                                 |
 | Choix de stack                                 | `docs/architecture/adr-*.md`                                            |
+| Veille externe : quoi reprendre / rejeter      | `docs/veille/` (analyses datées, traces de décision + mesures)          |
 | `docs/archive/`                                | **Obsolète — ne jamais lire ni citer**                                  |
 
 Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles (tri « un seul modèle, le
@@ -50,8 +51,9 @@ personnalisés, miroir Discord).
   `.claude/settings.local.json`).
 - **Glob ne respecte pas `.gitignore`** (il ressort node_modules/.venv) → préférer
   Grep (ripgrep, qui le respecte) ou `git ls-files`.
-- Compter/inventorier les outils agent : `packages/agent-runtime/src/index.ts`
-  (registrations) — pas de scan du dossier `tools/`.
+- Compter/inventorier les outils agent : `packages/agent-runtime/src/tools/registerTools.ts`
+  (registrations) — pas de scan du dossier `tools/`. Le compte exact est verrouillé
+  par `registerTools.test.ts`.
 - Lire les gros fichiers par tranches (`offset`/`limit`), pas en entier.
 
 ## Key Commands
@@ -81,10 +83,15 @@ Node.js agent → stdout NDJSON → Rust bridge → Tauri emit() → React
 
 ## Adding a New Tool
 
-1. Create `packages/agent-runtime/src/tools/<category>/<Name>Tool.ts` extending `BaseTool`
-2. Add schema to `packages/shared-types/src/tools.ts`
-3. Add permission config in `packages/shared-types/src/permissions.ts`
-4. Register in `packages/agent-runtime/src/index.ts`
+1. Create `packages/agent-runtime/src/tools/<category>/<Name>Tool.ts` extending `BaseTool`.
+   Declare a zod `argsSchema` and derive `schema = jsonSchemaFrom(argsSchema)` — source
+   unique, pas d'interface Args ni de table de schémas à part.
+2. Add permission config in `packages/shared-types/src/permissions.ts` (mêmes
+   `riskLevel` / `requiresConfirmation` que la classe : un test le vérifie).
+3. Register in `packages/agent-runtime/src/tools/registerTools.ts` — pas `index.ts`.
+   Décider s'il appartient à `RESEARCH_EXCLUDED` (outils dev/infra masqués au chat).
+4. Update the tool count in `registerTools.test.ts` (garde-fou anti-dérive : il échoue
+   sinon, ce qui est le comportement voulu).
 
 ## TypeScript Conventions
 
