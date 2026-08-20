@@ -9,7 +9,12 @@ import {
   toExcerpt,
   type NewsItem,
 } from './FetchTechNewsTool';
-import { extractReadableText, looksLikeProse, startsMidSentence } from './ReadWebpageTool';
+import {
+  extractArticleText,
+  extractReadableText,
+  looksLikeProse,
+  startsMidSentence,
+} from './ReadWebpageTool';
 import type { OllamaClient } from '../../llm/OllamaClient';
 import { summarizeDigest } from '../../llm/NewsSummarizer';
 import { createLogger } from '../../logger';
@@ -156,7 +161,17 @@ export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Pr
     items.map(async item => {
       try {
         const html = await httpGet(item.url, 8_000);
-        const text = extractReadableText(html);
+        // trafilatura d'abord quand le sidecar l'expose : il récupère les pages
+        // où l'heuristique rend '' (gabarits exotiques, paywall partiel) — c'est
+        // exactement la classe d'articles qui finissait résumée à partir de deux
+        // lignes de flux RSS. Repli immédiat et silencieux sinon : la qualité
+        // baisse, le pipeline ne casse pas (cf. docs/veille/2026-08-16 §3.3).
+        //
+        // `extractArticleText` porte le repli : une erreur du sidecar ne doit
+        // pas faire sauter tout le bloc, sinon l'article repartirait avec son
+        // seul extrait RSS — en perdant aussi l'heuristique, pourtant toujours
+        // disponible. Cascade partagée avec read_webpage, écrite une seule fois.
+        const { text } = await extractArticleText(html, item.url);
         // Sous ~200 caractères, on est face à un paywall, un mur de cookies ou
         // une page sans prose : l'extrait RSS fait alors meilleure matière.
         if (text.length < 200) return;

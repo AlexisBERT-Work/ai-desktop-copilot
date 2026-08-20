@@ -23,6 +23,12 @@ recurring-ical-events>=3.0
 # Vision / Image processing
 opencv-python-headless>=4.10.0
 
+# Article extraction / boilerplate removal (web.extract_article)
+# Récupère les pages où l'heuristique TS abandonne (paywall, gabarits exotiques).
+# Optionnel : sans lui, extractArticleViaSidecar échoue et l'appelant retombe
+# sur extractReadableText — jamais de régression, seulement moins de qualité.
+trafilatura>=1.12.0
+
 # Audio transcription (local Whisper)
 faster-whisper>=1.0.0
 

@@ -5,6 +5,141 @@
 
 ## État actuel
 
+**Veille externe → 3 chantiers : skills, extraction d'articles, coupe-circuit
+(2026-08-16)** — **687 tests agent-runtime (+57, 81 fichiers) + 39 desktop + 7 Python,
+type-check et lint verts**. Parti d'une analyse de 8 repos externes
+([docs/veille/2026-08-16](veille/2026-08-16-analyse-repos-externes.md), qui garde
+les traces de raisonnement et les pistes rejetées) :
+
+- **La boucle des skills est fermée (69ᵉ outil `load_skill`).** Constat de départ :
+  `proposeSkills` + `EvolutionDaemon` écrivaient des `SKILL.md` dans
+  `skill-drafts/` que **rien ne relisait** (`grep -rni skill` hors `playbook/` :
+  zéro résultat). Nouveaux
+  [`SkillStore`](../packages/agent-runtime/src/skills/SkillStore.ts) et
+  [`LoadSkillTool`](../packages/agent-runtime/src/tools/skills/LoadSkillTool.ts) :
+  le system prompt n'annonce que `nom — description`, le corps se charge à la
+  demande (divulgation progressive). Parseur de frontmatter maison — **pas de
+  dépendance YAML**, l'installeur hors-ligne n'a rien à y gagner. Garde-fou §8
+  préservé : les brouillons ne sont **jamais indexés** (le modèle ne peut pas les
+  découvrir), restent chargeables si on les nomme, et ressortent marqués « non
+  validé ». `status: draft` prime sur l'emplacement du fichier.
+  **L'annonce des skills dans le prompt est désactivée par défaut**
+  (`CATDESK_SKILL_INDEX=1` pour l'activer) — voir la mesure ci-dessous, qui a
+  inversé la décision de conception. L'outil `load_skill` reste toujours
+  enregistré : un skill **nommé explicitement** est chargé correctement (2/2 en
+  test réel), seule l'auto-découverte est coupée.
+  **Deux skills sont livrés avec l'app** (`revue-comparee`, `verifier-source`,
+  dans `packages/agent-runtime/skills/`, stagés par `build-release.ps1`) ; un
+  skill utilisateur de même nom prime, pour qu'une mise à jour n'écrase pas une
+  personnalisation.
+- **Mesure sur modèle réel — l'index des skills casse l'appel d'outil.** Banc A/B
+  contre l'Ollama local (`qwen3:14b`, `think:false`, `temperature: 0`, vrais
+  `SkillStore`/`buildSystemPrompt`/schémas d'outils) : sans la liste de skills,
+  le modèle appelle correctement `search_dailies` **5/6** ; avec la liste,
+  **0/6** — `content: ""`, aucun `tool_calls`, alors que `eval_count: 34`
+  (Ollama consomme un appel malformé et le jette ; `recoverToolCalls` ne peut rien,
+  il travaille sur le texte). Isolation : la **section de prompt** est en cause,
+  pas l'outil (outil exposé sans section → aucune dégradation). Quatre
+  formulations testées, **aucune sûre** : la moins mauvaise casse encore 2/6, dont
+  une requête sans aucun rapport avec les skills. D'où la désactivation par défaut,
+  la formulation la moins mauvaise étant conservée en code pour un futur modèle.
+  Leçon retenue dans la veille : une technique validée par la pratique du domaine
+  n'est pas transférable sans mesure sur le modèle qu'on embarque.
+- **Les deux chemins de lecture web sont alignés.** `read_webpage` appelait
+  `htmlToText` (retrait des balises seulement) alors que `extractReadableText`
+  (vrai débruitage) vivait **dans le même fichier** et servait déjà au pipeline
+  presse. Mesuré sur une page d'article type : `htmlToText` rendait 711 car. dont
+  bandeau cookies, menu, « à lire aussi » et mentions légales ; l'heuristique rend
+  392 car. sans aucun bruit. Cascade désormais trafilatura → heuristique → brut,
+  la méthode retenue étant remontée dans le résultat (`extraction`).
+- **`trafilatura` via le sidecar Python** (`web.extract_article`) : récupère les
+  pages où l'heuristique rend `''` et où `enrichArticleTexts` retombait
+  **silencieusement sur deux lignes de flux RSS**. Même mesure : trafilatura rend
+  442 car. contre 392 — l'écart est **le titre H1**, que le filtre `looksLikeProse`
+  rejette faute de ponctuation. Installé et **validé de bout en bout** par le vrai
+  sidecar (JSON-RPC → trafilatura → 442 car., bandeau cookies / menu / « à lire
+  aussi » / mentions légales tous écartés, titre récupéré).
+- **Bug d'encodage trouvé et corrigé sur le protocole du sidecar** (celui-là
+  était à moi, introduit en routant du texte d'article vers Python). Node envoie
+  du JSON **UTF-8 brut** sur stdin — `JSON.stringify` n'échappe pas le non-ASCII —
+  et `main.py` lisait ce flux avec l'encodage local de Windows (**cp1252**) :
+  « août » arrivait en « aoÃ»t ». Mesuré au codepoint sur le vrai chemin Node →
+  sidecar : `U+00C3 U+00BB` au lieu de `U+00FB`, contre une référence TS pure
+  correcte. **Tous les digests de presse française seraient partis au LLM en
+  charabia.** Le défaut était **latent depuis toujours** : les méthodes
+  historiques ne transportent que des chemins de fichiers et du base64 (ASCII),
+  `web.extract_article` est la première à faire passer du texte accentué.
+  Corrigé par `reconfigure(encoding='utf-8', errors='replace')` sur les trois
+  flux, **avant** toute lecture. Causalité vérifiée dans les deux sens
+  (correctif retiré → mojibake ; correctif remis → codepoints corrects).
+  ⚠️ Le test Python d'aller-retour ajouté **ne reproduit pas** cette panne
+  (trafilatura répare parfois le mojibake par détection de charset, selon le
+  contenu) : c'est écrit noir sur blanc dans sa docstring pour que personne ne
+  retire le `reconfigure` en se fiant à son vert.
+- **Effet de bord découvert : le venv OCR était cassé depuis le 2026-08-02.**
+  En installant trafilatura, sa chaîne de dépendances a buté sur un `lxml` amputé
+  de `lxml/html/`. Diagnostic élargi : **15 imports sur 19 en échec** — numpy,
+  pypdf, python-docx, openpyxl, markdown, icalendar, cv2, faster-whisper,
+  pytesseract, pandas — tous avec la même signature (module de tête présent,
+  sous-paquets absents) alors que pip les déclarait « already satisfied ».
+  L'OCR, le parsing PDF/docx, l'analyse de données et la transcription Whisper
+  étaient donc **hors service**, sans que rien ne le signale (`main.py` importe en
+  paresseux : le sidecar démarrait normalement et ne cassait qu'à l'usage).
+  Horodatages : les paquets touchés datent du **2026-08-02 23:44-23:45**, à la
+  minute près de la création de `build-work/` (PyInstaller) — corrélation forte,
+  cause non prouvée. Réparé par
+  `pip install --force-reinstall --no-cache-dir -r requirements.txt` :
+  **19/19 imports OK**. À revérifier après chaque build d'installeur.
+- **[`CircuitBreaker`](../packages/agent-runtime/src/lib/CircuitBreaker.ts) partagé**
+  (closed/open/half-open, horloge injectable). Complète `withRetry`, qui ne traitait
+  que l'échec transitoire : une source durablement morte repayait son timeout à
+  chaque cycle. Branché sur les sources de presse (`aggregateNews`, cooldown 30 min
+  — un rejet ressort dans `failed`, jamais silencieux) et sur Yahoo (clé au symbole,
+  cooldown 5 min : couvre le cas courant d'UN symbole radié dans la watchlist sans
+  écarter toute la liste). Réutilisé pour le sidecar d'extraction, sinon chaque
+  article d'un digest repaierait l'aller-retour sur un poste sans trafilatura.
+- Note ajoutée en tête de [`ModelRouter`](../packages/agent-runtime/src/llm/ModelRouter.ts) :
+  il est **inerte depuis v0.1.3** (modèle unique → `light` absent → sortie
+  systématique sur « Auto : modèle principal »). Ses trois familles de regex ne
+  s'évaluent que si `CATDESK_MODEL_SMALL` est posé à la main. Pas un bug, mais
+  trompeur à la lecture.
+- **Écarté explicitement** (raisons détaillées dans la veille) : tout code de
+  `worldmonitor` (AGPL-3.0, incompatible avec un installeur distribué — alors que
+  c'est le jumeau technique exact du projet) ; le routage multi-fournisseurs
+  d'OmniRoute (contredit « un seul modèle ») ; sa compression de tokens (mieux
+  extraire traite la même cause en amont) ; les dailys via cron CI (pas d'Ollama
+  sur un runner — l'architecture actuelle en ressort confirmée).
+- **Cascade d'extraction couverte bout-en-bout** : `ReadWebpageTool` accepte
+  désormais des dépendances injectables (`fetchPage`, `extractArticle`) — 6 tests
+  vérifient les quatre chemins (trafilatura / heuristique / sélecteur / brut) et
+  l'absence de bruit. Le test a d'ailleurs révélé une fragilité : une exception du
+  sidecar traversait `execute` et faisait échouer tout l'appel. La robustesse ne
+  tenait qu'à la politesse de `extractArticleViaSidecar` (qui avale ses erreurs) —
+  `execute` a maintenant son propre `try/catch` et se replie sur l'heuristique.
+- **Skills livrés avec l'application** : `packages/agent-runtime/skills/` (suivi
+  par git), stagé en sœur de `dist/` par `build-release.ps1`.
+  `join(__dirname, '..', 'skills')` résout au même endroit en dev
+  (`src/../skills`) et en production (`dist/../skills`) — aucun cas particulier.
+- **Vérifications en conditions réelles** : runtime agent démarré pour de vrai
+  (aucune erreur, 44 outils en profil `research` = 69 − 25 exclus, `load_skill`
+  enregistré) ; `load_skill` appelé correctement 2/2 sur skill nommé via Ollama ;
+  extraction testée sur **5 articles réellement en ligne** (The Verge, Numerama)
+  → **5/5 via trafilatura**, aucun repli, zéro ligne de tableau parasite.
+- **Pipeline de digest validé de bout en bout** : `buildPressDailies` lancé pour
+  de vrai (RSS Numerama → articles réels → trafilatura → `qwen3:14b`) produit une
+  daily de 2 809 caractères en 93 s, en français correct et **sans mojibake** —
+  le correctif d'encodage tient en conditions réelles.
+- **Cascade d'extraction factorisée** dans `extractArticleText` : `read_webpage`
+  et `enrichArticleTexts` partagent le même repli, écrit une seule fois. Corrige
+  au passage une asymétrie réelle — dans `enrichArticleTexts`, une exception du
+  sidecar tombait dans le `catch` global et l'article repartait avec son seul
+  extrait RSS, **en perdant l'heuristique pourtant disponible**.
+- **Build de release complet vérifié** : `tauri build` compile le Rust et produit
+  les installeurs MSI + NSIS (3 min 46) avec l'ensemble de ces changements.
+- Reste : réessayer l'index des skills si le modèle du bundle change (le banc est
+  reproductible). L'app n'a pas été lancée en interactif : les vérifications
+  passent par le runtime agent, Ollama, le sidecar Python et le build de release.
+
 **Modèle unique et release 0.1.3 (2026-08-05)** — passage à UN seul modèle de
 chat, le plus fort tenant sur 10 Go de VRAM : **`qwen3:14b`** (le palier
 `qwen2.5:7b` est retiré du bundle). `recommend_default_model` renvoie toujours le

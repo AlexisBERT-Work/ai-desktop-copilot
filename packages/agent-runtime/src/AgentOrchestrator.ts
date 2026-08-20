@@ -25,6 +25,7 @@ import type { FactExtractor } from './memory/FactExtractor';
 import type { Compactor } from './memory/Compactor';
 import type { SemanticCache } from './memory/SemanticCache';
 import type { PlaybookStore } from './playbook/PlaybookStore';
+import type { SkillStore } from './skills/SkillStore';
 import { approachSignature } from './playbook/PlaybookStore';
 import { classifyTask, type TaskType } from './playbook/classifyTask';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
@@ -92,6 +93,12 @@ export class AgentOrchestrator {
      * le LLM (CATDESK-CONCEPTS-AVANCES §E). Désactivable via CATDESK_SEMANTIC_CACHE=0.
      */
     private cache?: SemanticCache,
+    /**
+     * Bibliothèque de skills optionnelle : n'injecte que `nom — description`
+     * dans le system prompt, la procédure se charge via load_skill
+     * (divulgation progressive, CATDESK-CONCEPTS-AVANCES §1 et §8-D).
+     */
+    private skills?: SkillStore,
   ) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -187,8 +194,17 @@ export class AgentOrchestrator {
         }
       }
 
+      // Index des skills : name + description seulement (le corps se charge via
+      // load_skill). Défaillance non bloquante — un dossier illisible ne doit
+      // pas empêcher de répondre.
+      const skillIndex = this.skills?.index() ?? [];
+
       const systemPrompt = buildSystemPrompt(
-        { ...ctx, ...(playbookHint ? { playbookHint } : {}) },
+        {
+          ...ctx,
+          ...(playbookHint ? { playbookHint } : {}),
+          ...(skillIndex.length > 0 ? { skills: skillIndex } : {}),
+        },
         plan,
       );
 

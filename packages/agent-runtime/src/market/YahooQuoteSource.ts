@@ -1,4 +1,5 @@
 import type { Quote } from '@catdesk/shared-types';
+import { CircuitBreaker } from '../lib/CircuitBreaker';
 
 // Endpoint chart public de Yahoo : pas de crumb/cookie requis, une requête par
 // symbole. Suffisant à la cadence ~1 min pour une watchlist de quelques dizaines
@@ -48,24 +49,43 @@ export function parseYahooChart(symbol: string, json: unknown): Quote | null {
   };
 }
 
+/**
+ * Coupe-circuit par symbole. Le poller tourne à la minute : sans lui, un symbole
+ * invalide (titre radié, faute de frappe dans la watchlist) ou une panne Yahoo
+ * repayait une requête complète à chaque cycle, pour toujours. Clé au symbole
+ * plutôt qu'au domaine : ça couvre le cas courant (UN symbole cassé) sans
+ * écarter toute la watchlist, et une panne globale ouvre chaque symbole en
+ * trois cycles de toute façon.
+ */
+export const yahooBreaker = new CircuitBreaker({ failureThreshold: 3, cooldownMs: 5 * 60 * 1000 });
+
+/** Un échec DOIT lever ici : c'est ce que le coupe-circuit comptabilise. */
+async function requestQuote(symbol: string): Promise<Quote | null> {
+  const res = await fetch(`${ENDPOINT}${encodeURIComponent(symbol)}?interval=1d&range=1d`, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json: unknown = await res.json();
+  const quote = parseYahooChart(symbol, json);
+  // Réponse 200 mais illisible (symbole inconnu de Yahoo) : c'est un échec
+  // durable, pas un trou de données — sinon le circuit ne s'ouvrirait jamais.
+  if (quote === null) throw new Error('réponse Yahoo inexploitable');
+  return quote;
+}
+
 async function fetchQuote(symbol: string): Promise<Quote | null> {
   try {
-    const res = await fetch(`${ENDPOINT}${encodeURIComponent(symbol)}?interval=1d&range=1d`, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-    if (!res.ok) return null;
-    const json: unknown = await res.json();
-    return parseYahooChart(symbol, json);
+    return await yahooBreaker.run(symbol, () => requestQuote(symbol));
   } catch {
+    // Contrat inchangé pour l'appelant : un symbole en échec est simplement
+    // absent du résultat, qu'il ait échoué ou été écarté par le circuit.
     return null;
   }
 }
 
 /** Récupère les cotations en parallèle. Les symboles en échec sont absents. */
 export async function fetchQuotes(symbols: string[]): Promise<Map<string, Quote>> {
-  const pairs = await Promise.all(
-    symbols.map(async (s) => [s, await fetchQuote(s)] as const),
-  );
+  const pairs = await Promise.all(symbols.map(async s => [s, await fetchQuote(s)] as const));
   const map = new Map<string, Quote>();
   for (const [s, q] of pairs) {
     if (q !== null) map.set(s, q);

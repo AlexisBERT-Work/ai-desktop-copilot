@@ -90,7 +90,7 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           # Erreurs de syntaxe/imports sur tous les modules, puis tests.
-          python -m compileall -q main.py vision ocr audio files
+          python -m compileall -q main.py vision ocr audio files web
           python -m pytest -q
 
   # ─── Tauri Build (Windows only, on tags) ──────────────────

@@ -10,6 +10,24 @@ import traceback
 import logging
 from typing import Any
 
+# Force UTF-8 on the JSON-RPC pipes. MUST happen before anything reads stdin.
+#
+# Sous Windows, sys.stdin/stdout prennent l'encodage local (cp1252) : le JSON
+# envoyé par Node (UTF-8 brut, JSON.stringify n'échappe pas le non-ASCII) était
+# alors relu en cp1252 et tout accent ressortait en mojibake — « août » devenait
+# « aoÃ»t ». Le défaut est resté invisible des mois : les méthodes historiques ne
+# transportent que des chemins de fichiers et du base64, donc de l'ASCII. Il est
+# apparu avec `web.extract_article`, la première à faire transiter du texte
+# d'article accentué (détecté au codepoint le 2026-08-16 : U+00C3 U+00BB au lieu
+# de U+00FB). Sans ça, tous les digests de presse française partaient au LLM en
+# charabia. `errors='replace'` : un octet isolé invalide ne doit pas tuer le
+# sidecar en plein digest.
+for _pipe in (sys.stdin, sys.stdout, sys.stderr):
+    try:
+        _pipe.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # pragma: no cover - flux déjà remplacé
+        pass
+
 # Configure logging to stderr to keep stdout clean for JSON-RPC
 logging.basicConfig(
     stream=sys.stderr,
@@ -105,6 +123,9 @@ def dispatch(method: str, params: dict) -> Any:
 
         case "files.read_calendar":
             return read_calendar_rpc(params)
+
+        case "web.extract_article":
+            return extract_article_rpc(params)
 
         case _:
             raise ValueError(f"Unknown method: {method}")
@@ -216,6 +237,11 @@ def read_calendar_rpc(params: dict) -> dict:
         days=params.get("days", 30),
         limit=params.get("limit", 50),
     )
+
+
+def extract_article_rpc(params: dict) -> dict:
+    from web.article_extractor import extract_article
+    return extract_article(params["html"], url=params.get("url"))
 
 
 def main():

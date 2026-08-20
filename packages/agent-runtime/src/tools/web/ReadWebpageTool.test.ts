@@ -4,8 +4,11 @@ import {
   htmlToText,
   extractBySelector,
   extractReadableText,
+  extractArticleText,
   looksLikeProse,
   startsMidSentence,
+  type FetchedPage,
+  type ReadWebpageDeps,
 } from './ReadWebpageTool';
 
 // Échantillon réel du bug des dailys (2026-07-18) : titre du site + menu ×2 +
@@ -169,5 +172,150 @@ describe('ReadWebpageTool.execute (validation, sans réseau)', () => {
     const res = await tool.run({ url: 'ftp://example.com/file' });
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/http/i);
+  });
+});
+
+describe('extractArticleText — cascade partagée read_webpage / pipeline presse', () => {
+  const ARTICLE = `<html><body>
+<nav><a href="/">Accueil</a></nav>
+<article><p>Le groupe a publié un chiffre d'affaires de 4,2 milliards d'euros, en hausse de 12 % sur un an, dépassant le consensus des analystes.</p></article>
+<footer><p>Mentions légales.</p></footer>
+</body></html>`;
+
+  it('préfère trafilatura quand le sidecar répond', async () => {
+    const res = await extractArticleText(ARTICLE, 'https://ex.test/a', async () => ({
+      text: 'texte trafilatura',
+    }));
+    expect(res).toEqual({ text: 'texte trafilatura', method: 'trafilatura' });
+  });
+
+  it("retombe sur l'heuristique quand le sidecar renvoie null", async () => {
+    const res = await extractArticleText(ARTICLE, undefined, async () => null);
+    expect(res.method).toBe('heuristique');
+    expect(res.text).toContain('4,2 milliards');
+    expect(res.text).not.toContain('Accueil');
+  });
+
+  it("retombe sur l'heuristique quand le sidecar LÈVE (et non sur rien)", async () => {
+    // Régression : dans enrichArticleTexts, l'exception tombait dans le catch
+    // global et l'article repartait avec son seul extrait RSS — on perdait
+    // l'heuristique, pourtant toujours disponible.
+    const res = await extractArticleText(ARTICLE, undefined, async () => {
+      throw new Error('sidecar mort');
+    });
+    expect(res.method).toBe('heuristique');
+    expect(res.text).toContain('4,2 milliards');
+  });
+
+  it('rend un texte vide sans lever quand la page n’a aucune prose', async () => {
+    const res = await extractArticleText(
+      '<html><body><nav>Accueil</nav></body></html>',
+      undefined,
+      async () => null,
+    );
+    expect(res.text).toBe('');
+    expect(res.method).toBe('heuristique');
+  });
+});
+
+describe("ReadWebpageTool.execute — cascade d'extraction (dépendances injectées)", () => {
+  // Page réaliste : menu + bandeau cookies + article + « à lire aussi » + footer.
+  const PAGE = `<html><head><title>Le titre</title></head><body>
+<header><nav><a href="/">Accueil</a><a href="/eco">Économie</a></nav></header>
+<div class="cookies">Nous utilisons des cookies pour améliorer votre expérience. Accepter. Refuser.</div>
+<article>
+<p>Le groupe a publié mercredi un chiffre d'affaires de 4,2 milliards d'euros, en hausse de 12 % sur un an, dépassant le consensus des analystes.</p>
+<p>La marge opérationnelle s'établit à 18,4 %, contre 16,1 % un an plus tôt, grâce à la maîtrise des coûts logistiques.</p>
+</article>
+<aside><h3>À lire aussi</h3><ul><li>Un autre papier</li></ul></aside>
+<footer><p>Mentions légales. Tous droits réservés.</p></footer>
+</body></html>`;
+
+  const page = (body: string, contentType = 'text/html; charset=utf-8'): FetchedPage => ({
+    body,
+    statusCode: 200,
+    contentType,
+  });
+
+  const NOISE = ['cookies', 'Mentions', 'lire aussi', 'Accueil'];
+
+  function build(deps: Partial<ReadWebpageDeps> & { body?: string; contentType?: string } = {}) {
+    return new ReadWebpageTool({
+      fetchPage: async () => page(deps.body ?? PAGE, deps.contentType),
+      extractArticle: deps.extractArticle ?? (async () => null),
+    });
+  }
+
+  it('sans sidecar, débruite via extractReadableText (chemin batch aligné)', async () => {
+    const res = await build().run({ url: 'https://ex.test/a' });
+    const d = res.data as { text: string; extraction: string };
+
+    expect(d.extraction).toBe('heuristique');
+    expect(d.text).toContain('4,2 milliards');
+    for (const n of NOISE) expect(d.text, n).not.toContain(n);
+  });
+
+  it('utilise trafilatura quand le sidecar répond', async () => {
+    const res = await build({
+      extractArticle: async () => ({ text: 'Texte débruité par trafilatura.' }),
+    }).run({ url: 'https://ex.test/a' });
+    const d = res.data as { text: string; extraction: string };
+
+    expect(d.extraction).toBe('trafilatura');
+    expect(d.text).toBe('Texte débruité par trafilatura.');
+  });
+
+  it("retombe sur le texte brut quand la page n'a aucune prose (jamais moins qu'avant)", async () => {
+    const wall = '<html><body><div>Cookies</div><nav>Accueil</nav></body></html>';
+    const res = await build({ body: wall }).run({ url: 'https://ex.test/a' });
+    const d = res.data as { text: string; extraction: string };
+
+    // extractReadableText rend '' ici : sans repli, l'outil ne renverrait RIEN,
+    // alors qu'il renvoyait ce texte avant l'alignement.
+    expect(d.extraction).toBe('brut');
+    expect(d.text.length).toBeGreaterThan(0);
+  });
+
+  it('avec un sélecteur, respecte la demande et ne consulte pas le sidecar', async () => {
+    let called = false;
+    const tool = new ReadWebpageTool({
+      fetchPage: async () => page(PAGE),
+      extractArticle: async () => {
+        called = true;
+        return { text: 'ne doit pas servir' };
+      },
+    });
+    const res = await tool.run({ url: 'https://ex.test/a', selector: 'article' });
+    const d = res.data as { text: string; extraction: string };
+
+    expect(called).toBe(false);
+    expect(d.extraction).toBe('selecteur');
+    expect(d.text).toContain('4,2 milliards');
+  });
+
+  it('laisse le contenu non-HTML intact', async () => {
+    const res = await build({ body: '{"a":1}', contentType: 'application/json' }).run({
+      url: 'https://ex.test/a.json',
+    });
+    const d = res.data as { text: string; extraction: string };
+
+    expect(d.extraction).toBe('brut');
+    expect(d.text).toBe('{"a":1}');
+  });
+
+  it('un sidecar en panne ne casse rien : repli sur l’heuristique', async () => {
+    const res = await build({
+      extractArticle: async () => {
+        throw new Error('sidecar mort');
+      },
+    }).run({ url: 'https://ex.test/a' });
+    const d = res.data as { text: string; extraction: string };
+
+    // extractArticleViaSidecar avale déjà ses erreurs ; ce test verrouille le
+    // fait que l'outil ne dépend PAS de cette politesse pour rester debout.
+    expect(res.success).toBe(true);
+    expect(d.extraction).toBe('heuristique');
+    expect(d.text).toContain('4,2 milliards');
+    for (const n of NOISE) expect(d.text, n).not.toContain(n);
   });
 });

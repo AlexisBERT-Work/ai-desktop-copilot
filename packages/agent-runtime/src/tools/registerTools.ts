@@ -11,6 +11,7 @@ import type { VectorStore } from '../memory/VectorStore';
 import type { MarketService } from '../market/MarketService';
 import type { SubAgentRunner } from '../SubAgentRunner';
 import type { CronScheduler } from '../CronScheduler';
+import type { SkillStore } from '../skills/SkillStore';
 
 import { ReadFileTool } from './filesystem/ReadFileTool';
 import { ListDirTool } from './filesystem/ListDirTool';
@@ -28,6 +29,7 @@ import { ReadClipboardTool } from './clipboard/ReadClipboardTool';
 import { WriteClipboardTool } from './clipboard/WriteClipboardTool';
 import { SearchMemoryTool } from './memory/SearchMemoryTool';
 import { StoreMemoryTool } from './memory/StoreMemoryTool';
+import { LoadSkillTool } from './skills/LoadSkillTool';
 import { AnalyzeStacktraceTool } from './analysis/AnalyzeStacktraceTool';
 import { AnalyzeLogsTool } from './analysis/AnalyzeLogsTool';
 import { GenerateUnitTestsTool } from './analysis/GenerateUnitTestsTool';
@@ -133,6 +135,8 @@ export interface CoreToolDeps {
   llm: OllamaClient;
   vectorStore: VectorStore;
   market: MarketService;
+  /** Bibliothèque de skills lue par load_skill (divulgation progressive). */
+  skills: SkillStore;
   /** Dailys locales (« Mes journaux ») lues par search_dailies. */
   localDailies: LocalDailySource;
   /** Dailys partagées (Supabase, lecture anonyme) lues par search_dailies. */
@@ -149,7 +153,16 @@ export function registerCoreTools(
   deps: CoreToolDeps,
   profile: ToolProfile = 'full',
 ): void {
-  const { llm, vectorStore, market, localDailies, sharedDailies, defaultModel, visionModel } = deps;
+  const {
+    llm,
+    vectorStore,
+    market,
+    skills,
+    localDailies,
+    sharedDailies,
+    defaultModel,
+    visionModel,
+  } = deps;
   const register = (tool: Parameters<ToolRegistry['register']>[0]): void => {
     if (profile === 'research' && RESEARCH_EXCLUDED.has(tool.name)) return;
     tools.register(tool);
@@ -174,6 +187,9 @@ export function registerCoreTools(
   register(new WriteClipboardTool());
   register(new SearchMemoryTool(vectorStore));
   register(new StoreMemoryTool(vectorStore));
+  // Skills : jamais exclu du profil 'research' — c'est une brique du harness,
+  // pas une capacité métier (cf. SkillStore, divulgation progressive).
+  register(new LoadSkillTool(skills));
 
   // Analyse / git / productivité
   register(new AnalyzeStacktraceTool());

@@ -128,6 +128,13 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: false,
     },
+    load_skill: {
+      name: 'load_skill',
+      description: 'Load the detailed procedure of an available skill (local Markdown, read-only)',
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
     analyze_stacktrace: {
       name: 'analyze_stacktrace',
       description: 'Analyze stacktrace and extract error info',

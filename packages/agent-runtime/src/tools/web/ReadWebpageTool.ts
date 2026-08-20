@@ -2,6 +2,15 @@ import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { extractArticleViaSidecar } from '../../lib/articleExtract';
+
+/**
+ * Comment le texte a été obtenu — remonté dans le résultat pour que la qualité
+ * d'extraction soit observable au lieu d'être devinée.
+ * `trafilatura` (sidecar) > `heuristique` (extractReadableText) > `brut`
+ * (htmlToText, balises retirées seulement).
+ */
+export type ExtractionMethod = 'trafilatura' | 'heuristique' | 'selecteur' | 'brut';
 
 const argsSchema = z.object({
   url: z.string().min(1).describe('URL to fetch and extract text from'),
@@ -106,6 +115,39 @@ export function extractReadableText(html: string): string {
     .join('\n');
 }
 
+/** Extracteur d'article (sidecar). Injectable pour les tests. */
+export type ArticleExtractor = (html: string, url?: string) => Promise<{ text: string } | null>;
+
+/**
+ * Meilleur texte d'article disponible : trafilatura via le sidecar, sinon
+ * l'heuristique locale. Point d'entrée UNIQUE des deux appelants
+ * (`read_webpage` et `enrichArticleTexts` du pipeline presse) — la même
+ * cascade écrite deux fois finirait par diverger.
+ *
+ * Le `try/catch` est ici et pas chez les appelants : le sidecar est une
+ * amélioration optionnelle, jamais une dépendance dure. S'appuyer sur le fait
+ * que `extractArticleViaSidecar` avale déjà ses erreurs marcherait, mais ferait
+ * dépendre la robustesse du pipeline d'un détail interne de l'appelé.
+ *
+ * Peut renvoyer un texte vide : c'est une réponse valable (page sans prose), à
+ * l'appelant de décider quoi en faire.
+ */
+export async function extractArticleText(
+  html: string,
+  url?: string,
+  extractArticle: ArticleExtractor = extractArticleViaSidecar,
+): Promise<{ text: string; method: 'trafilatura' | 'heuristique' }> {
+  let viaSidecar: { text: string } | null = null;
+  try {
+    viaSidecar = await extractArticle(html, url);
+  } catch {
+    /* extraction indisponible → heuristique locale */
+  }
+  return viaSidecar !== null
+    ? { text: viaSidecar.text, method: 'trafilatura' }
+    : { text: extractReadableText(html), method: 'heuristique' };
+}
+
 // Extract a named element from HTML (very naive CSS selector: tag, .class, #id)
 export function extractBySelector(html: string, selector: string): string | null {
   // Support simple selectors: tag, #id, .class
@@ -180,6 +222,23 @@ async function fetchUrl(
   });
 }
 
+export interface FetchedPage {
+  body: string;
+  statusCode: number;
+  contentType: string;
+}
+
+/**
+ * Dépendances injectables — uniquement pour les tests. La cascade d'extraction
+ * (§3.3 de la veille 2026-08-16) est la partie la plus facile à casser sans s'en
+ * apercevoir : elle ne se voit ni dans les types ni dans les fonctions pures.
+ * Sans ces deux crochets, la tester exigerait un vrai réseau ET un vrai sidecar.
+ */
+export interface ReadWebpageDeps {
+  fetchPage?: (url: string, timeoutMs?: number) => Promise<FetchedPage>;
+  extractArticle?: (html: string, url?: string) => Promise<{ text: string } | null>;
+}
+
 export class ReadWebpageTool extends BaseTool<Args> {
   readonly name = 'read_webpage';
   readonly description =
@@ -189,6 +248,15 @@ export class ReadWebpageTool extends BaseTool<Args> {
   readonly requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
   readonly schema = jsonSchemaFrom(argsSchema);
+
+  private readonly fetchPage: (url: string, timeoutMs?: number) => Promise<FetchedPage>;
+  private readonly extractArticle: (html: string, url?: string) => Promise<{ text: string } | null>;
+
+  constructor(deps: ReadWebpageDeps = {}) {
+    super();
+    this.fetchPage = deps.fetchPage ?? fetchUrl;
+    this.extractArticle = deps.extractArticle ?? extractArticleViaSidecar;
+  }
 
   async execute(rawArgs: Args): Promise<ToolResult> {
     const { url, selector, max_chars = 20_000 } = rawArgs;
@@ -211,7 +279,7 @@ export class ReadWebpageTool extends BaseTool<Args> {
     let contentType: string;
 
     try {
-      ({ body, statusCode, contentType } = await fetchUrl(url));
+      ({ body, statusCode, contentType } = await this.fetchPage(url));
     } catch (err) {
       return this.fail(`Impossible de récupérer la page: ${String(err)}`);
     }
@@ -222,10 +290,28 @@ export class ReadWebpageTool extends BaseTool<Args> {
 
     const isHtml = contentType.includes('html');
     let text: string;
+    let method: ExtractionMethod = 'brut';
 
-    if (isHtml) {
-      const source = selector ? (extractBySelector(body, selector) ?? body) : body;
-      text = htmlToText(source);
+    if (isHtml && selector) {
+      // Sélecteur explicite : l'appelant sait ce qu'il veut, on ne lui applique
+      // pas en plus une détection d'article qui pourrait l'écarter.
+      text = htmlToText(extractBySelector(body, selector) ?? body);
+      method = 'selecteur';
+    } else if (isHtml) {
+      // Cascade du meilleur au plus permissif. Jusqu'ici, cet outil s'arrêtait
+      // à `htmlToText` — donc menus, bandeaux cookies et « à lire aussi »
+      // partaient au LLM jusqu'à max_chars, alors que le pipeline presse, lui,
+      // débruitait déjà (cf. docs/veille/2026-08-16). Les deux chemins sont
+      // désormais alignés. `htmlToText` reste en dernier recours pour ne jamais
+      // rendre moins de texte qu'avant sur une page sans prose détectable.
+      const best = await extractArticleText(body, url, this.extractArticle);
+      if (best.text.length > 0) {
+        text = best.text;
+        method = best.method;
+      } else {
+        text = htmlToText(body);
+        method = 'brut';
+      }
     } else {
       // Plain text, JSON, etc.
       text = body.slice(0, max_chars * 4); // rough pre-trim before encoding overhead
@@ -250,6 +336,7 @@ export class ReadWebpageTool extends BaseTool<Args> {
       text: finalText,
       charCount: finalText.length,
       truncated,
+      extraction: method,
       ...(selector ? { selector } : {}),
       ...(likelySpa
         ? {

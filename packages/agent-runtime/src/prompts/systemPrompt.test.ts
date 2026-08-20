@@ -43,4 +43,33 @@ describe('buildSystemPrompt', () => {
     const section = p.split("Contenu visible à l'écran :\n")[1]?.split('\n')[0] ?? '';
     expect(section.length).toBe(1500);
   });
+
+  describe('skills (divulgation progressive)', () => {
+    it("n'ajoute aucune section quand il n'y a pas de skill", () => {
+      expect(buildSystemPrompt({})).not.toContain('Skills disponibles');
+      expect(buildSystemPrompt({ skills: [] })).not.toContain('Skills disponibles');
+    });
+
+    it('annonce nom + description sans impératif bloquant', () => {
+      const p = buildSystemPrompt({
+        skills: [{ name: 'revue-presse', description: 'Question couvrant plusieurs journaux.' }],
+      });
+      expect(p).toContain('Procédures disponibles');
+      expect(p).toContain('- revue-presse — Question couvrant plusieurs journaux.');
+      expect(p).toContain('load_skill');
+      // L'impératif « appelle X AVANT d'agir » faisait produire à qwen3:14b un
+      // appel d'outil malformé → réponse vide (mesuré 2026-08-16). Ne pas le
+      // réintroduire sans refaire le banc.
+      expect(p).not.toContain("AVANT d'agir");
+    });
+
+    it("n'injecte JAMAIS le corps du skill (c'est tout l'intérêt)", () => {
+      const p = buildSystemPrompt({
+        skills: [{ name: 'revue-presse', description: 'Résumé court.' }],
+      });
+      // Le contexte est aussi rare que la VRAM : une régression ici ferait
+      // payer chaque tour au prix du corps complet de tous les skills.
+      expect(p.length).toBeLessThan(3000);
+    });
+  });
 });

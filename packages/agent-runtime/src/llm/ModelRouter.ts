@@ -6,6 +6,15 @@
  * Heuristique simple et explicable. Utilisé en mode « downgrade-only » par
  * l'orchestrateur : `large` vaut le modèle choisi par l'utilisateur, et on ne
  * rétrograde vers `small` que pour les tâches manifestement triviales.
+ *
+ * ⚠️ **INERTE PAR DÉFAUT DEPUIS v0.1.3.** Le bundle n'embarque plus qu'un seul
+ * modèle de chat (`qwen3:14b`, cf. CLAUDE.md) : `light` est donc absent, et
+ * `resolveModel` sort systématiquement sur « Auto : modèle principal » sans
+ * jamais construire de ModelRouter. Les trois familles de regex ci-dessous ne
+ * s'évaluent QUE si l'utilisateur pose `CATDESK_MODEL_SMALL` à la main.
+ * Ce n'est pas un bug — le garde-fou reste correct et le jour où un second
+ * palier revient, tout se rebranche seul. À lire en connaissant cet état, sinon
+ * on croit à tort que le routage est actif en production.
  */
 
 export interface ModelRouterConfig {

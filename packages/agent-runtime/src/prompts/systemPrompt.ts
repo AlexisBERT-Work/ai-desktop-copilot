@@ -3,6 +3,12 @@
  * ajusté et testé indépendamment de la boucle. Pur : (contexte, plan) → texte.
  */
 
+/** Résumé d'un skill : tout ce qui entre en contexte permanent (cf. SkillStore). */
+export interface SkillIndexEntry {
+  name: string;
+  description: string;
+}
+
 export interface SystemPromptContext {
   activeWindow?: string;
   screenText?: string;
@@ -10,6 +16,12 @@ export interface SystemPromptContext {
   warmFacts?: string[];
   conversationSummary?: string;
   playbookHint?: string;
+  /**
+   * Skills validés disponibles — annoncés en `nom — description` seulement.
+   * La procédure complète se charge à la demande via `load_skill`
+   * (divulgation progressive, voir SkillStore).
+   */
+  skills?: SkillIndexEntry[];
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext, plan: string[] = []): string {
@@ -53,6 +65,22 @@ export function buildSystemPrompt(ctx: SystemPromptContext, plan: string[] = [])
 
   if (ctx.relevantMemories && ctx.relevantMemories.length > 0) {
     parts.push(`\nSouvenirs pertinents :\n${ctx.relevantMemories.join('\n')}`);
+  }
+
+  // Divulgation progressive : on annonce l'existence des skills, pas leur
+  // contenu. Une ligne par skill ici, la procédure complète seulement si le
+  // modèle appelle load_skill — sinon on repaierait tout le corps à chaque tour.
+  //
+  // ⚠️ Alimenté UNIQUEMENT si CATDESK_SKILL_INDEX=1 (voir CONFIG.skillIndex) :
+  // sur `qwen3:14b` + `think:false`, lister les skills ici casse l'appel d'outil
+  // (réponse vide) — mesuré le 2026-08-16 sur 4 formulations, la moins mauvaise
+  // cassant encore 2 requêtes sur 6. La formulation ci-dessous est la variante B
+  // du banc (information en fin de prompt, sans impératif), la seule à obtenir
+  // 3/4 d'appels corrects — conservée telle quelle pour le jour où un modèle la
+  // supportera, mais inerte par défaut.
+  if (ctx.skills && ctx.skills.length > 0) {
+    const lines = ctx.skills.map(s => `- ${s.name} — ${s.description}`).join('\n');
+    parts.push(`\nProcédures disponibles (chargeables via load_skill) :\n${lines}`);
   }
 
   parts.push(
