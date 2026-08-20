@@ -1,5 +1,5 @@
 import { writeFile, appendFile, mkdir, stat } from 'fs/promises';
-import { dirname, resolve } from 'path';
+import { dirname, resolve, win32 } from 'path';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
@@ -23,9 +23,18 @@ const BLOCKED_PREFIXES = [
   'c:\\programdata',
 ];
 
-/** Exporté pour les tests. */
+/**
+ * Le chemin vise-t-il un répertoire système Windows ? Exporté pour les tests.
+ *
+ * Résolution en sémantique **win32 explicite**, jamais celle de l'OS hôte : avec
+ * `resolve()`, un runner Linux traite `C:\Windows\System32\x.dll` comme un simple
+ * nom de fichier relatif, le préfixe ne correspond plus et le garde-fou laisse
+ * passer l'écriture. C'est ce qui faisait échouer ces tests en CI (ubuntu) alors
+ * qu'ils passaient en local (Windows) — le test avait raison, pas le code.
+ * Sur Windows le comportement est inchangé (`resolve` y EST `win32.resolve`).
+ */
 export function isBlockedPath(path: string): boolean {
-  const normalized = resolve(path).toLowerCase();
+  const normalized = win32.resolve(path).toLowerCase();
   return BLOCKED_PREFIXES.some(p => normalized === p || normalized.startsWith(p + '\\'));
 }
 
