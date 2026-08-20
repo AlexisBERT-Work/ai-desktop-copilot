@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { Cat, X, Minimize2, Plus } from 'lucide-react';
 import { useOverlayStore } from '../../overlay/overlayStore';
 import { useChatStore } from '../store/chatStore';
+import { useAppearanceStore } from '../../appearance/appearanceStore';
+import { BUBBLE_DIMENSIONS } from '../../appearance/palettes';
 import { MessageList } from './MessageList';
 import { StatusIndicator } from './StatusIndicator';
 import { InputArea } from './InputArea';
@@ -11,12 +13,20 @@ export function ChatWindow() {
   const { hide, setMode } = useOverlayStore();
   const { activeConversationId, newConversation, conversations } = useChatStore();
   const activeConv = conversations.find(c => c.id === activeConversationId);
+  const bubbleSize = useAppearanceStore(s => s.bubbleSize);
+  const dims = BUBBLE_DIMENSIONS[bubbleSize];
 
   return (
     <motion.div
       layoutId="overlay-shell"
-      className="w-[700px] h-[620px] flex flex-col rounded-2xl border border-white/10
-                 bg-gray-950/97 shadow-2xl shadow-black/70 backdrop-blur-2xl overflow-hidden"
+      className="flex flex-col rounded-2xl border border-white/10
+                 shadow-2xl shadow-black/70 backdrop-blur-2xl overflow-hidden"
+      style={{
+        // Gabarit réglé dans Apparence ; on retire la marge d'ombre de la fenêtre.
+        width: dims.chatW - 24,
+        height: dims.chatH - 28,
+        backgroundColor: 'rgb(3 7 18 / var(--bubble-opacity))',
+      }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">

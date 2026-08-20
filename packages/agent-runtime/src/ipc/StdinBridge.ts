@@ -58,6 +58,8 @@ export class StdinBridge {
     private onSetConfig?: (
       symbols: string[],
       formulas: { name: string; expression: string }[],
+      /** Période de rafraîchissement en secondes ; `undefined` = inchangée. */
+      intervalSecs?: number,
     ) => void | Promise<void>,
     /** Déclenche une publication immédiate de la revue de presse (bouton admin). */
     private onRunPressDigest?: () => void | Promise<void>,
@@ -182,7 +184,11 @@ export class StdinBridge {
 
     // Config bourse pilotée par l'UI (symboles + formules des widgets `stocks`).
     if (request.method === RPC_METHODS.marketSetWatchlist) {
-      const params = request.params as { symbols?: unknown; formulas?: unknown };
+      const params = request.params as {
+        symbols?: unknown;
+        formulas?: unknown;
+        intervalSecs?: unknown;
+      };
       const symbols = Array.isArray(params.symbols)
         ? params.symbols.filter((s): s is string => typeof s === 'string')
         : [];
@@ -195,7 +201,12 @@ export class StdinBridge {
               : [];
           })
         : [];
-      await this.onSetConfig?.(symbols, formulas);
+      // Période de rafraîchissement (Apparence). Absente ou hors bornes ⇒ on
+      // garde la période courante plutôt que d'imposer une valeur douteuse.
+      const rawInterval = params.intervalSecs;
+      const intervalSecs =
+        typeof rawInterval === 'number' && Number.isFinite(rawInterval) ? rawInterval : undefined;
+      await this.onSetConfig?.(symbols, formulas, intervalSecs);
       this.sendResponse(request.id, { ok: true });
       return;
     }

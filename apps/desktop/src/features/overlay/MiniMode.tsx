@@ -1,15 +1,22 @@
 import { useState, useRef } from 'react';
-import { Cat, ArrowUp, Expand, Camera, Clipboard, Terminal, BarChart3 } from 'lucide-react';
+import { Cat, ArrowUp, Expand, BarChart3, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
+import { useAppearanceStore } from '../appearance/appearanceStore';
+import { BUBBLE_DIMENSIONS } from '../appearance/palettes';
 import { openDashboardWindow } from '../dashboard/openDashboardWindow';
+
+/** Marge transparente autour du contenu, pour que l'ombre portée ne soit pas
+ *  rognée par le bord de la fenêtre (voir useOverlayWindow). */
+const SHADOW_MARGIN = 20;
 
 export function MiniMode() {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const { setMode } = useOverlayStore();
   const { sendMessage, activeConversationId } = useChatStore();
+  const bubbleSize = useAppearanceStore(s => s.bubbleSize);
 
   const handleSubmit = async () => {
     const text = input.trim();
@@ -21,8 +28,13 @@ export function MiniMode() {
 
   return (
     <motion.div
-      className="w-[580px] rounded-2xl border border-white/10 bg-gray-950/96
-                 shadow-2xl shadow-black/60 backdrop-blur-2xl ring-1 ring-white/5"
+      className="rounded-2xl border border-white/10 shadow-2xl shadow-black/60
+                 backdrop-blur-2xl ring-1 ring-white/5"
+      style={{
+        width: BUBBLE_DIMENSIONS[bubbleSize].miniW - SHADOW_MARGIN,
+        // gray-950 avec l'opacité réglée dans Apparence.
+        backgroundColor: 'rgb(3 7 18 / var(--bubble-opacity))',
+      }}
       layoutId="overlay-shell"
     >
       {/* Input row */}
@@ -79,43 +91,38 @@ export function MiniMode() {
   );
 }
 
+/** Pied de la bulle : uniquement le lanceur de l'application Marchés & News. */
 function QuickActions() {
-  const { setMode } = useOverlayStore();
-
-  const actions = [
-    { label: 'Screenshot & analyze', Icon: Camera, query: 'Capture my screen and tell me what you see' },
-    { label: 'Read clipboard', Icon: Clipboard, query: 'Read my clipboard and summarize it' },
-    { label: 'Run command', Icon: Terminal, query: 'Run a PowerShell command for me' },
-  ];
-
-  const { sendMessage, activeConversationId } = useChatStore();
-
   return (
-    <div className="border-t border-white/5 px-3 py-2 flex gap-1.5 flex-wrap">
+    <div className="border-t border-white/5 px-3 py-2">
+      {/* Pleine largeur, avec la flèche « ouvre une fenêtre ». */}
       <button
         onClick={() => void openDashboardWindow()}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-                   text-xs text-brand-300 hover:text-brand-200
-                   bg-brand-500/10 hover:bg-brand-500/20 transition-colors"
+        title="Ouvrir l'application Marchés & News dans une fenêtre séparée"
+        className="group flex w-full items-center gap-2.5 rounded-xl border border-brand-500/30
+                   bg-brand-500/10 px-3 py-2.5 text-left
+                   hover:border-brand-400/50 hover:bg-brand-500/20 transition-colors"
       >
-        <BarChart3 className="w-3.5 h-3.5" />
-        Marchés &amp; News
-      </button>
-      {actions.map(action => (
-        <button
-          key={action.label}
-          onClick={async () => {
-            setMode('chat');
-            await sendMessage(action.query, activeConversationId);
-          }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-                     text-xs text-white/50 hover:text-white/80
-                     bg-white/5 hover:bg-white/10 transition-colors"
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg
+                     bg-brand-500/20 text-brand-300 group-hover:text-brand-200"
         >
-          <action.Icon className="w-3.5 h-3.5" />
-          {action.label}
-        </button>
-      ))}
+          <BarChart3 className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-semibold text-brand-200 group-hover:text-brand-100">
+            Ouvrir l&apos;application Marchés &amp; News
+          </span>
+          <span className="block text-[11px] leading-tight text-white/40">
+            Tableau de bord bourse &amp; revue de presse — fenêtre séparée
+          </span>
+        </span>
+        <ArrowUpRight
+          className="h-4 w-4 shrink-0 text-brand-300/70 transition-transform
+                     group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand-200"
+          aria-hidden
+        />
+      </button>
     </div>
   );
 }

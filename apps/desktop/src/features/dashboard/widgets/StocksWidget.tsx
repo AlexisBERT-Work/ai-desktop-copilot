@@ -2,7 +2,10 @@ import { AlertTriangle, Sigma } from 'lucide-react';
 import type { ComputedValue, Quote } from '@catdesk/shared-types';
 import { useMarketStore } from '../../market/marketStore';
 import { Sparkline } from '../../market/Sparkline';
+import { makeNumberFormat, useNumberFormat, type NumberFormat } from '../../appearance/format';
 import type { WidgetProps } from './types';
+
+const DEFAULT_FORMAT = makeNumberFormat('fr-FR', 2, 'none');
 
 function readFormulaNames(config: Record<string, unknown>): string[] {
   const fs = config.formulas;
@@ -23,17 +26,25 @@ interface StocksViewProps {
   quotes: Record<string, Quote>;
   computed: ComputedValue[];
   history: Record<string, number[]>;
+  fmt?: NumberFormat;
 }
 
 /** Rendu pur du widget bourse (cotations + colonnes de formules). */
-export function StocksView({ symbols, formulaNames, quotes, computed, history }: StocksViewProps) {
+export function StocksView({
+  symbols,
+  formulaNames,
+  quotes,
+  computed,
+  history,
+  fmt = DEFAULT_FORMAT,
+}: StocksViewProps) {
   if (symbols.length === 0 && formulaNames.length === 0) {
     return <p className="text-xs text-white/30">Aucun symbole ni formule configuré.</p>;
   }
 
   return (
     <div className="space-y-1.5">
-      {symbols.map((sym) => {
+      {symbols.map(sym => {
         const key = sym.toUpperCase();
         const q = quotes[key];
         const hist = history[key] ?? [];
@@ -46,11 +57,10 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
                 <span className="flex items-center gap-2 tabular-nums">
                   {/* key = prix : micro-pulsation à chaque tick de marché. */}
                   <span key={q.price} className="animate-value-tick text-white/80">
-                    {q.price.toFixed(2)}
+                    {fmt.price(q.price)}
                   </span>
                   <span className={q.change >= 0 ? 'text-green-400' : 'text-red-400'}>
-                    {q.change >= 0 ? '+' : ''}
-                    {q.changePercent.toFixed(2)}%
+                    {fmt.percent(q.changePercent)}
                   </span>
                   {q.stale && (
                     <AlertTriangle
@@ -69,8 +79,8 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
 
       {formulaNames.length > 0 && (
         <div className="mt-1 space-y-1 border-t border-white/5 pt-1.5">
-          {formulaNames.map((name) => {
-            const c = computed.find((v) => v.name === name);
+          {formulaNames.map(name => {
+            const c = computed.find(v => v.name === name);
             return (
               <div key={name} className="flex items-center justify-between text-sm">
                 <span className="flex min-w-0 items-center gap-1 truncate text-brand-300/90">
@@ -84,9 +94,7 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
                     erreur
                   </span>
                 ) : (
-                  <span className="tabular-nums text-white/85">
-                    {Number.isInteger(c.value) ? c.value : c.value.toFixed(4)}
-                  </span>
+                  <span className="tabular-nums text-white/85">{fmt.loose(c.value)}</span>
                 )}
               </div>
             );
@@ -104,9 +112,10 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
  * calculées reviennent dans `computed` et sont matchées par nom.
  */
 export function StocksWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const computed = useMarketStore((s) => s.computed);
-  const history = useMarketStore((s) => s.history);
+  const quotes = useMarketStore(s => s.quotes);
+  const computed = useMarketStore(s => s.computed);
+  const history = useMarketStore(s => s.history);
+  const fmt = useNumberFormat();
 
   const symbols = Array.isArray(widget.config.symbols)
     ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
@@ -120,6 +129,7 @@ export function StocksWidget({ widget }: WidgetProps) {
       quotes={quotes}
       computed={computed}
       history={history}
+      fmt={fmt}
     />
   );
 }
