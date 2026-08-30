@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod error;
 pub mod hotkeys;
 pub mod ollama;
 pub mod resources;

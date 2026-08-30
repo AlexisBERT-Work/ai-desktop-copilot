@@ -3,6 +3,8 @@
 
 use serde::Serialize;
 
+use crate::core::error::CatdeskError;
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelInfo {
@@ -18,12 +20,12 @@ pub struct ModelInfo {
 pub async fn get_ollama_models_info() -> Result<Vec<ModelInfo>, String> {
     let response = reqwest::get("http://127.0.0.1:11434/api/tags")
         .await
-        .map_err(|e| format!("Ollama non disponible: {e}"))?;
+        .map_err(|e| CatdeskError::Ollama(e.to_string()))?;
 
     let json: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| format!("Parse error: {e}"))?;
+        .map_err(|e| CatdeskError::Parse(e.to_string()))?;
 
     let models = json["models"]
         .as_array()

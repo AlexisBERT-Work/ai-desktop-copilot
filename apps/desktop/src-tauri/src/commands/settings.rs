@@ -1,8 +1,10 @@
 use serde::Deserialize;
+use serde_json::json;
 use tracing::info;
 
-use crate::ipc::bridge::send_to_agent;
-use crate::ipc::protocol::{self, rpc_request};
+use crate::commands::forward_to_agent;
+use crate::core::audit;
+use crate::ipc::protocol;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,10 +18,14 @@ pub struct UpdateSettingsArgs {
 pub async fn update_settings(args: UpdateSettingsArgs) -> Result<(), String> {
     info!(safe_mode = ?args.safe_mode, "update_settings");
 
-    let payload = rpc_request(
+    forward_to_agent(
         protocol::RPC_SETTINGS_UPDATE,
-        serde_json::json!({ "safeMode": args.safe_mode }),
-    );
+        json!({ "safeMode": args.safe_mode }),
+    )
+    .await?;
 
-    send_to_agent(payload).await.map_err(|e| e.to_string())
+    // `safeMode` conditionne le blocage de tous les outils à risque ≥ medium :
+    // son basculement doit laisser une trace, comme toute décision de sécurité.
+    audit::log("SETTINGS_UPDATE", json!({ "safeMode": args.safe_mode }));
+    Ok(())
 }
