@@ -23,43 +23,6 @@ export interface Attachment {
   size: number;
 }
 
-export interface CapturePayload {
-  region?: ScreenRegion;
-  includeActiveWindowOnly?: boolean;
-}
-
-export interface ScreenRegion {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface FileReadPayload {
-  path: string;
-  encoding?: 'utf-8' | 'base64';
-  maxBytes?: number;
-}
-
-export interface RunCommandPayload {
-  command: string;
-  shell: 'powershell' | 'cmd';
-  workdir?: string;
-  timeoutMs?: number;
-}
-
-export interface CommandOutput {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-  durationMs: number;
-}
-
-export interface ClipboardWritePayload {
-  content: string;
-  format?: 'text' | 'html' | 'rtf';
-}
-
 // ─── Tauri Events (Rust → React via listen) ────────────────────
 
 export interface TokenEvent {
@@ -91,16 +54,6 @@ export interface ToolCallEvent {
   confirmationMessage?: string;
 }
 
-export interface ToolResultEvent {
-  runId: string;
-  toolCallId: string;
-  toolName: string;
-  success: boolean;
-  result?: unknown;
-  error?: string;
-  durationMs: number;
-}
-
 export interface PermissionRequestEvent {
   requestId: string;
   tool: string;
@@ -114,12 +67,6 @@ export interface PermissionResponsePayload {
   requestId: string;
   granted: boolean;
   remember?: boolean;
-}
-
-export interface SystemNotificationPayload {
-  title: string;
-  body: string;
-  level: 'info' | 'success' | 'warning' | 'error';
 }
 
 // ─── JSON-RPC (Rust ↔ Node.js) ────────────────────────────────

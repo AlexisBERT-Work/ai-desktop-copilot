@@ -5,6 +5,7 @@ import { tmpdir } from 'os';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   content: z.string().min(1).describe('Content to write to clipboard'),
@@ -37,18 +38,14 @@ export class WriteClipboardTool extends BaseTool<Args> {
     try {
       await writeFile(tmpFile, args.content, 'utf-8');
 
-      const { execFile } = await import('child_process');
-      const { promisify } = await import('util');
-      const exec = promisify(execFile);
-
-      await exec(
+      await runProcess(
         'powershell.exe',
         [
           '-NoProfile',
           '-Command',
           `Get-Content -Raw -Encoding UTF8 -LiteralPath '${tmpFile.replace(/'/g, "''")}' | Set-Clipboard`,
         ],
-        { timeout: 5000 },
+        { timeoutMs: 5_000 },
       );
 
       return this.ok({ written: true, length: args.content.length });

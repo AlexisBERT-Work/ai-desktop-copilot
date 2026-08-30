@@ -1,11 +1,8 @@
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 const argsSchema = z.object({
   workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
@@ -21,13 +18,12 @@ interface CommitInfo {
 }
 
 async function getCurrentBranch(cwd: string): Promise<string> {
-  const { stdout } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
+  const { stdout } = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
   return stdout.trim();
 }
 
 async function getCommitsSince(cwd: string, base: string): Promise<CommitInfo[]> {
-  const { stdout } = await exec(
-    'git',
+  const { stdout } = await runGit(
     ['log', `${base}..HEAD`, '--format=%H|%s|%an|%ad', '--date=short'],
     { cwd },
   );
@@ -96,7 +92,7 @@ export class GitPrTool extends BaseTool<Args> {
       }
 
       // Diff stat for changed files
-      const { stdout: statOut } = await exec('git', ['diff', `${base_branch}...HEAD`, '--stat'], {
+      const { stdout: statOut } = await runGit(['diff', `${base_branch}...HEAD`, '--stat'], {
         cwd,
         maxBuffer: 200_000,
       });

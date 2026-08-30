@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({});
 type Args = z.infer<typeof argsSchema>;
@@ -18,13 +19,11 @@ export class ReadClipboardTool extends BaseTool<Args> {
   async execute(_args: Args): Promise<ToolResult> {
     try {
       // On Windows, use PowerShell to read clipboard
-      const { execFile } = await import('child_process');
-      const { promisify } = await import('util');
-      const exec = promisify(execFile);
-
-      const { stdout } = await exec('powershell.exe', ['-NoProfile', '-Command', 'Get-Clipboard'], {
-        timeout: 5000,
-      });
+      const { stdout } = await runProcess(
+        'powershell.exe',
+        ['-NoProfile', '-Command', 'Get-Clipboard'],
+        { timeoutMs: 5_000 },
+      );
 
       const content = stdout.trim();
       return this.ok({

@@ -1,12 +1,9 @@
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { parseLog, type Commit } from '../git/SummarizeGitLogTool';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 const argsSchema = z.object({
   workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
@@ -53,7 +50,7 @@ export class GenerateStandupTool extends BaseTool<Args> {
       let who = author;
       if (who === undefined) {
         try {
-          const { stdout } = await exec('git', ['config', 'user.name'], { cwd });
+          const { stdout } = await runGit(['config', 'user.name'], { cwd });
           who = stdout.trim() || undefined;
         } catch {
           /* leave undefined → all authors */
@@ -67,7 +64,7 @@ export class GenerateStandupTool extends BaseTool<Args> {
         '--date=short',
       ];
       if (who) logArgs.push(`--author=${who}`);
-      const { stdout: logOut } = await exec('git', logArgs, { cwd, maxBuffer: 2_000_000 });
+      const { stdout: logOut } = await runGit(logArgs, { cwd, maxBuffer: 2_000_000 });
 
       const commits = logOut.trim().length > 0 ? parseLog(logOut) : [];
       const yesterday = commitsToBullets(commits);
@@ -76,9 +73,9 @@ export class GenerateStandupTool extends BaseTool<Args> {
       let branch = '';
       let inProgress: string[] = [];
       try {
-        const { stdout: b } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
+        const { stdout: b } = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
         branch = b.trim();
-        const { stdout: st } = await exec('git', ['status', '--porcelain'], { cwd });
+        const { stdout: st } = await runGit(['status', '--porcelain'], { cwd });
         inProgress = st
           .split('\n')
           .map(l => l.slice(3).trim())

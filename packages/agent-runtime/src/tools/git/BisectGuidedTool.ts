@@ -1,11 +1,8 @@
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 const argsSchema = z.object({
   workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
@@ -73,7 +70,7 @@ export class BisectGuidedTool extends BaseTool<Args> {
     if (typeof path === 'string' && path.length > 0) revArgs.push('--', path);
 
     try {
-      const { stdout } = await exec('git', revArgs, { cwd, maxBuffer: 4_000_000 });
+      const { stdout } = await runGit(revArgs, { cwd, maxBuffer: 4_000_000 });
 
       const candidates: Candidate[] = stdout
         .split('\n')

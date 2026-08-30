@@ -1,6 +1,7 @@
 import type {
   JsonRpcRequest,
   JsonRpcResponse,
+  PermissionResponsePayload,
   Daily,
   PressFeed,
   PressFeedInput,
@@ -234,11 +235,7 @@ export class StdinBridge {
         // en NOTIFICATION (pas d'`id`, donc pas de réponse à renvoyer) —
         // `send_permission_response` dans bridge.rs.
         case RPC_METHODS.permissionResponse: {
-          const p = request.params as {
-            requestId?: unknown;
-            granted?: unknown;
-            remember?: unknown;
-          };
+          const p = request.params as Partial<PermissionResponsePayload>;
           if (typeof p.requestId !== 'string' || typeof p.granted !== 'boolean') {
             log.warn('permission.response mal formée', { params: request.params });
             return;

@@ -1,12 +1,9 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { runProcess } from '../../lib/runProcess';
 import { isCommandBlocked, MAX_COMMAND_LEN } from '../../security/commandPolicy';
-
-const execFileAsync = promisify(execFile);
 
 const argsSchema = z.object({
   command: z.string().min(1).describe('The command to execute'),
@@ -44,9 +41,11 @@ export class RunCommandTool extends BaseTool<Args> {
     const started = Date.now();
 
     try {
-      const { stdout, stderr } = await execFileAsync(program, [flag, args.command], {
-        timeout: timeoutMs,
-        cwd: args.workdir,
+      const { stdout, stderr } = await runProcess(program, [flag, args.command], {
+        timeoutMs,
+        ...(args.workdir !== undefined ? { cwd: args.workdir } : {}),
+        // Liste blanche : `env` REMPLACE l'environnement hérité, la commande ne
+        // voit donc ni les secrets de connecteurs (.env) ni le reste du shell.
         env: {
           PATH: process.env['PATH'] ?? '',
           TEMP: process.env['TEMP'] ?? '',
