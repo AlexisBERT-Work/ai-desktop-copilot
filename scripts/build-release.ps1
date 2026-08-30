@@ -195,20 +195,38 @@ if ($SkipOcr) {
   Write-Host "OCR staged → $(Join-Path $resDir 'ocr')"
 }
 
-# ── 5. Build the app (no bundling) ───────────────────────────────
-# NSIS (Tauri's Windows bundler) caps near 2 GB and cannot package CatDesk's GPU
-# runtime + multi-GB models, so build the exe WITHOUT bundling and package it
-# with Inno Setup below (no size limit; disk-spanned for the >4 GB payload).
-Step "Building Windows app (tauri build --no-bundle)"
+# ── 5. Build the app ─────────────────────────────────────────────
+# Two different packagings, because the two artifacts have very different sizes:
+#
+#  - FULL install: NSIS (Tauri's Windows bundler) caps near 2 GB and cannot
+#    package CatDesk's GPU runtime + multi-GB models, so build the exe WITHOUT
+#    bundling and package it with Inno Setup below (no size limit; disk-spanned
+#    for the >4 GB payload).
+#  - UPDATE artifact: no model is staged, so the payload fits NSIS comfortably —
+#    and we NEED the bundler, because it is what produces the `.sig` file the
+#    Tauri updater verifies. `--no-bundle` here would silently yield no installer
+#    and no signature, which is what publish-update.ps1 then failed to find.
+if ($Update) {
+  Step "Building Windows update artifact (tauri build --bundles nsis)"
+  $bundleArgs = @('--bundles', 'nsis')
+} else {
+  Step "Building Windows app (tauri build --no-bundle)"
+  $bundleArgs = @('--no-bundle')
+}
 Push-Location (Join-Path $root "apps\desktop")
-pnpm exec tauri build --config $releaseConf --no-bundle
+pnpm exec tauri build --config $releaseConf @bundleArgs
 $tauriExit = $LASTEXITCODE
 Pop-Location
 if ($tauriExit -ne 0) { throw "tauri build failed (exit $tauriExit)" }
 
 # ── 6. Package the offline installer (Inno Setup) ────────────────
-Step "Packaging offline installer (Inno Setup)"
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-inno.ps1")
-if ($LASTEXITCODE -ne 0) { throw "Inno packaging failed (exit $LASTEXITCODE)" }
+# Full installs only: an update artifact is already a complete NSIS installer.
+if ($Update) {
+  Step "Skipping Inno packaging (update artifact is the NSIS installer)"
+} else {
+  Step "Packaging offline installer (Inno Setup)"
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-inno.ps1")
+  if ($LASTEXITCODE -ne 0) { throw "Inno packaging failed (exit $LASTEXITCODE)" }
+}
 
 Step "Done"

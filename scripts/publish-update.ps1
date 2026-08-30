@@ -45,7 +45,23 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $tauriDir = Join-Path $root "apps\desktop\src-tauri"
 $confPath = Join-Path $tauriDir "tauri.conf.json"
-$nsisDir = Join-Path $tauriDir "target\release\bundle\nsis"
+
+# The Rust target dir is often relocated (CARGO_TARGET_DIR, passed through by
+# turbo.json) to keep paths short on Windows — probe the same candidates as
+# build-inno.ps1 instead of hardcoding the in-tree path. Resolved AFTER the
+# build, since the directory may not exist yet.
+function Resolve-NsisDir {
+  $candidates = @(
+    $(if ($env:CARGO_TARGET_DIR) { Join-Path $env:CARGO_TARGET_DIR "release\bundle\nsis" }),
+    "$env:LOCALAPPDATA\nd-target\release\bundle\nsis",
+    (Join-Path $tauriDir "target\release\bundle\nsis")
+  ) | Where-Object { $_ }
+  $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $found) {
+    throw "NSIS output dir not found. Looked in:`n  $($candidates -join "`n  ")"
+  }
+  return $found
+}
 
 function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
 
@@ -74,7 +90,10 @@ Step "Building update artifact"
 & (Join-Path $PSScriptRoot "build-release.ps1") -Update
 
 # ── 3. Locate installer + signature ──────────────────────────────
+# build-release.ps1 -Update builds with `--bundles nsis` precisely so this step
+# has an installer AND a .sig to collect.
 Step "Collecting artifacts"
+$nsisDir = Resolve-NsisDir
 $setup = Get-ChildItem $nsisDir -Filter "*-setup.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
 if (-not $setup) { throw "No -setup.exe found in $nsisDir" }
 $sigFile = "$($setup.FullName).sig"

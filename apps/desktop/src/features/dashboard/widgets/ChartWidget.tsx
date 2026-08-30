@@ -40,8 +40,8 @@ export function ChartView({ symbol: sym, quote: q, history: hist }: ChartViewPro
 
 /** Widget graphe : courbe du prix d'un symbole sur l'historique récent. */
 export function ChartWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const history = useMarketStore((s) => s.history);
+  const quotes = useMarketStore(s => s.quotes);
+  const history = useMarketStore(s => s.history);
 
   const sym = typeof widget.config.symbol === 'string' ? widget.config.symbol.toUpperCase() : '';
   return <ChartView symbol={sym} quote={quotes[sym] ?? null} history={history[sym] ?? []} />;

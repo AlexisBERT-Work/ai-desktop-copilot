@@ -83,7 +83,11 @@ function QuickActions() {
   const { setMode } = useOverlayStore();
 
   const actions = [
-    { label: 'Screenshot & analyze', Icon: Camera, query: 'Capture my screen and tell me what you see' },
+    {
+      label: 'Screenshot & analyze',
+      Icon: Camera,
+      query: 'Capture my screen and tell me what you see',
+    },
     { label: 'Read clipboard', Icon: Clipboard, query: 'Read my clipboard and summarize it' },
     { label: 'Run command', Icon: Terminal, query: 'Run a PowerShell command for me' },
   ];

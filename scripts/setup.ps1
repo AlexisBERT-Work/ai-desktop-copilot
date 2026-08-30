@@ -102,12 +102,21 @@ try {
 # ─── Pull recommended models ─────────────────────────────────
 Write-Host ""
 Write-Host "⑤ Pull LLM models? (this may take a while)" -ForegroundColor Yellow
-$pullModels = Read-Host "   Pull qwen2.5:7b + nomic-embed-text? [y/N]"
+# Must stay in sync with scripts/stage-curated-models.ps1 (release bundle) and
+# with commands/tuning.rs `recommend_default_model`. Single chat model since the
+# v0.1.3 "one model, the strongest" cut — see CLAUDE.md.
+$models = @(
+    @{ Name = "qwen3:14b";       Why = "chat (the only chat model)" },
+    @{ Name = "minicpm-v";       Why = "vision — 'describe my screen'" },
+    @{ Name = "nomic-embed-text"; Why = "embeddings for RAG" }
+)
+Write-Host "   $($models.Name -join ', ')"
+$pullModels = Read-Host "   Pull them now? [y/N]"
 if ($pullModels -eq "y" -or $pullModels -eq "Y") {
-    Write-Host "   Pulling qwen2.5:7b..."
-    ollama pull qwen2.5:7b
-    Write-Host "   Pulling nomic-embed-text..."
-    ollama pull nomic-embed-text
+    foreach ($m in $models) {
+        Write-Host "   Pulling $($m.Name) — $($m.Why)..."
+        ollama pull $m.Name
+    }
     Write-Host "   ✅ Models ready" -ForegroundColor Green
 }
 

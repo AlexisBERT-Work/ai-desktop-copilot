@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Tailwind v4 ne découvre plus automatiquement un config JS/TS : sans cette
+   directive, tailwind.config.ts est ignoré et le thème `brand` (132 usages) et
+   les animations custom (widget-enter, value-tick…) ne produisent aucun CSS. */
+@config '../../tailwind.config.ts';
+
 @layer base {
   :root {
     --background: 0 0% 4%;

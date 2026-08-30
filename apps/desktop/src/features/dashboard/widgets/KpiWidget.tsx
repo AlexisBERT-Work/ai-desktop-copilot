@@ -55,8 +55,8 @@ export function KpiView({ metric: m }: { metric: MetricResult }) {
  * de formule), en grand, avec la variation du jour colorée.
  */
 export function KpiWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const computed = useMarketStore((s) => s.computed);
+  const quotes = useMarketStore(s => s.quotes);
+  const computed = useMarketStore(s => s.computed);
   const m = resolveMetric(readMetricConfig(widget.config), quotes, computed);
   return <KpiView metric={m} />;
 }
