@@ -1,12 +1,9 @@
 import type { DailyCategory } from '@catdesk/shared-types';
 import type { OllamaClient } from '../llm/OllamaClient';
-import {
-  aggregateNews,
-  categoryForSourceLabel,
-  NEWS_SOURCES,
-  type NewsItem,
-} from '../tools/web/FetchTechNewsTool';
-import { enrichArticleTexts } from '../tools/web/PostTechNewsDiscordTool';
+import { aggregateNews } from './aggregate';
+import { categoryForSourceLabel, NEWS_SOURCES } from './sources';
+import type { NewsItem } from './newsItem';
+import { enrichArticleTexts } from './enrich';
 import { analyzeJournal } from './journalAnalysis';
 import {
   buildGlobalBody,

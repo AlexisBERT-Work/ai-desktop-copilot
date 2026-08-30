@@ -63,9 +63,7 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
 
 /** Récupère les cotations en parallèle. Les symboles en échec sont absents. */
 export async function fetchQuotes(symbols: string[]): Promise<Map<string, Quote>> {
-  const pairs = await Promise.all(
-    symbols.map(async (s) => [s, await fetchQuote(s)] as const),
-  );
+  const pairs = await Promise.all(symbols.map(async s => [s, await fetchQuote(s)] as const));
   const map = new Map<string, Quote>();
   for (const [s, q] of pairs) {
     if (q !== null) map.set(s, q);

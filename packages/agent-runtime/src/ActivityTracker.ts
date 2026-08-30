@@ -1,4 +1,4 @@
-import type { ActivityEvent } from './tools/productivity/DetectSpiralTool';
+import type { ActivityEvent } from './spiral';
 
 /**
  * Derive a stable "what is being worked on" signature from a tool call, so that
@@ -8,7 +8,8 @@ import type { ActivityEvent } from './tools/productivity/DetectSpiralTool';
 export function deriveSignature(toolName: string, args: Record<string, unknown>): string {
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
-  const path = str(args['path']) || str(args['db_path']) || str(args['note']) || str(args['target']);
+  const path =
+    str(args['path']) || str(args['db_path']) || str(args['note']) || str(args['target']);
   if (path.length > 0) return `file:${path}`;
 
   const stack = str(args['stacktrace']);
@@ -27,7 +28,12 @@ export function deriveSignature(toolName: string, args: Record<string, unknown>)
 }
 
 // Tools whose use signals active debugging (counts toward "failure" pressure).
-const DEBUG_TOOLS = new Set(['analyze_stacktrace', 'review_diff', 'bisect_guided', 'resolve_conflicts']);
+const DEBUG_TOOLS = new Set([
+  'analyze_stacktrace',
+  'review_diff',
+  'bisect_guided',
+  'resolve_conflicts',
+]);
 
 export function deriveKind(toolName: string, success: boolean): string | undefined {
   if (!success) return 'error';
@@ -50,7 +56,11 @@ export class ActivityTracker {
 
   record(signature: string, kind?: string): void {
     if (signature.length === 0) return;
-    this.events.push({ at: String(this.now()), signature, ...(kind !== undefined ? { kind } : {}) });
+    this.events.push({
+      at: String(this.now()),
+      signature,
+      ...(kind !== undefined ? { kind } : {}),
+    });
     this.prune();
   }
 
@@ -69,7 +79,7 @@ export class ActivityTracker {
 
   private prune(): void {
     const cutoff = this.now() - this.windowMs;
-    this.events = this.events.filter((e) => Number(e.at) >= cutoff);
+    this.events = this.events.filter(e => Number(e.at) >= cutoff);
     if (this.events.length > this.cap) this.events = this.events.slice(-this.cap);
   }
 }

@@ -1,12 +1,12 @@
 import type { OllamaClient } from './OllamaClient';
-import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import type { NewsItem } from '../news/newsItem';
 import { createLogger } from '../logger';
 
 const log = createLogger('llm:news-summary');
 
 export interface DigestSummary {
-  synthesis: string;       // daily overview, 2-4 sentences
-  summaries: string[];     // one per item, same order as input
+  synthesis: string; // daily overview, 2-4 sentences
+  summaries: string[]; // one per item, same order as input
 }
 
 const SYSTEM = `Tu es un journaliste tech francophone. On te donne une liste d'articles (titre, source, extrait).
@@ -47,14 +47,19 @@ export function extractDigestJson(text: string): DigestSummary | null {
   const obj = parsed as Record<string, unknown>;
   const synthesis = typeof obj['synthese'] === 'string' ? obj['synthese'].trim() : '';
   const rawResumes = Array.isArray(obj['resumes']) ? obj['resumes'] : [];
-  const summaries = rawResumes.map((r) => (typeof r === 'string' ? r.trim() : ''));
+  const summaries = rawResumes.map(r => (typeof r === 'string' ? r.trim() : ''));
 
   if (synthesis.length === 0 && summaries.length === 0) return null;
   return { synthesis, summaries };
 }
 
 /** Accumulate a non-streamed completion from streamChat. */
-async function complete(llm: OllamaClient, model: string, system: string, user: string): Promise<string> {
+async function complete(
+  llm: OllamaClient,
+  model: string,
+  system: string,
+  user: string,
+): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
     model,
@@ -81,7 +86,7 @@ export async function summarizeDigest(
 ): Promise<DigestSummary> {
   const fallback = (): DigestSummary => ({
     synthesis: '',
-    summaries: items.map((it) => (it.excerpt ? it.excerpt.slice(0, 280) : '')),
+    summaries: items.map(it => (it.excerpt ? it.excerpt.slice(0, 280) : '')),
   });
 
   if (items.length === 0) return { synthesis: '', summaries: [] };

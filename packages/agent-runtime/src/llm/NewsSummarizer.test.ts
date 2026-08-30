@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { extractDigestJson, buildSummaryPrompt } from './NewsSummarizer';
-import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import type { NewsItem } from '../news/newsItem';
 
 describe('extractDigestJson', () => {
   it('parse un JSON propre', () => {

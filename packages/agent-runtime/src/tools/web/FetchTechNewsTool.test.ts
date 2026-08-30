@@ -1,19 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { PRESS_SOURCE_CATALOG } from '@catdesk/shared-types';
 import {
-  NEWS_SOURCES,
-  parseFeed,
   dedupeItems,
-  filterByTopics,
-  filterByRegex,
-  safeRegex,
   filterByAge,
+  filterByRegex,
+  filterByTopics,
   rankItems,
-  toExcerpt,
-  cutAtSentence,
-  feedLabelFromUrl,
-  type NewsItem,
-} from './FetchTechNewsTool';
+  safeRegex,
+} from '../../news/aggregate';
+import type { NewsItem } from '../../news/newsItem';
+import { cutAtSentence, toExcerpt } from '../../news/newsText';
+import { parseFeed } from '../../news/parseFeed';
+import { NEWS_SOURCES, feedLabelFromUrl } from '../../news/sources';
 
 describe('PRESS_SOURCE_CATALOG (shared-types) ↔ NEWS_SOURCES (agent)', () => {
   it('les deux listes ont exactement les mêmes ids et labels', () => {

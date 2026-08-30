@@ -19,7 +19,7 @@ import {
   verbatimDetail,
 } from './pressDigest';
 import { dayKey, isRunDue } from './PressDigestScheduler';
-import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import type { NewsItem } from './newsItem';
 import type { OllamaClient } from '../llm/OllamaClient';
 
 /** Faux client Ollama : rejoue une séquence de réponses (la dernière se répète). */

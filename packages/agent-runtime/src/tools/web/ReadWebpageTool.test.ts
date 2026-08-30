@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { ReadWebpageTool } from './ReadWebpageTool';
 import {
-  ReadWebpageTool,
-  htmlToText,
   extractBySelector,
   extractReadableText,
+  htmlToText,
   looksLikeProse,
   startsMidSentence,
-} from './ReadWebpageTool';
+} from '../../lib/readableText';
 
 // Échantillon réel du bug des dailys (2026-07-18) : titre du site + menu ×2 +
 // sommaire d'un blog, aspirés comme « extrait » puis cités tels quels.

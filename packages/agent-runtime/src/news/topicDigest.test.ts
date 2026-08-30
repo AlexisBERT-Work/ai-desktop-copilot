@@ -7,12 +7,17 @@ import {
   parseTopicJson,
   topicTitle,
 } from './topicDigest';
-import type { NewsItem } from '../tools/web/FetchTechNewsTool';
+import type { NewsItem } from './newsItem';
 
-const ALLOWED = NEWS_TOPICS.map((t) => t.name);
+const ALLOWED = NEWS_TOPICS.map(t => t.name);
 
 const items: NewsItem[] = [
-  { title: 'Sommet UE', url: 'https://a.test/1', source: 'Le Monde', excerpt: 'Discussions tarifaires.' },
+  {
+    title: 'Sommet UE',
+    url: 'https://a.test/1',
+    source: 'Le Monde',
+    excerpt: 'Discussions tarifaires.',
+  },
   { title: 'Nouvelle puce IA', url: 'https://b.test/2', source: 'CNBC' },
 ];
 
@@ -48,7 +53,9 @@ describe('topicDigest — fonctions pures', () => {
   });
 
   it('topicTitle est daté et préfixé', () => {
-    expect(topicTitle('International', new Date('2026-06-30T08:00:00'))).toMatch(/^Sujet — International · /);
+    expect(topicTitle('International', new Date('2026-06-30T08:00:00'))).toMatch(
+      /^Sujet — International · /,
+    );
   });
 
   it('buildTopicBody = résumé + liens avec source', () => {

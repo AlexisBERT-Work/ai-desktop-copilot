@@ -1,7 +1,7 @@
 import type { DailyCategory } from '@catdesk/shared-types';
 import { DAILY_CATEGORY_LABEL } from '@catdesk/shared-types';
 import type { JournalDraft } from './pressDigest';
-import { postToDiscord, type DiscordEmbed } from '../tools/web/PostTechNewsDiscordTool';
+import { postToDiscord, type DiscordEmbed } from '../lib/discord';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:discord-daily');
@@ -71,7 +71,7 @@ export function batchEmbeds(embeds: DiscordEmbed[]): DiscordEmbed[][] {
 export function stripDetails(body: string): string {
   return body
     .split('\n')
-    .filter((line) => !/^\s*>/.test(line))
+    .filter(line => !/^\s*>/.test(line))
     .join('\n');
 }
 

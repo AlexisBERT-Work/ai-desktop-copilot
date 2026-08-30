@@ -1,6 +1,6 @@
 import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { ActivityTracker } from './ActivityTracker';
-import { detectSpiral, type SpiralVerdict } from './tools/productivity/DetectSpiralTool';
+import { detectSpiral, type SpiralVerdict } from './spiral';
 import { createLogger } from './logger';
 
 const log = createLogger('runtime:spiral');
