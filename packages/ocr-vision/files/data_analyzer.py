@@ -5,11 +5,9 @@ Exposes a declarative analyzer — no arbitrary code execution. Two operations:
 - aggregate : group_by + an aggregation function on a column
 """
 
-import logging
 import math
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger(__name__)
 
 AGG_FUNCS = {"sum", "mean", "median", "min", "max", "count", "std", "nunique"}
 

@@ -2,6 +2,8 @@
 // IPC TYPES — React ↔ Tauri Rust ↔ Node.js Agent Runtime
 // ════════════════════════════════════════════════════════════════
 
+import type { RpcMethodName } from './ipc-contract';
+
 // ─── Tauri Commands (React → Rust via invoke) ──────────────────
 
 export interface ChatSendPayload {
@@ -124,7 +126,12 @@ export interface SystemNotificationPayload {
 
 export interface JsonRpcRequest<P = unknown> {
   jsonrpc: '2.0';
-  id: string | number;
+  /**
+   * Absent pour une NOTIFICATION (message sans réponse attendue) : le même
+   * canal stdin transporte les deux, cf. `permission.response` émise par
+   * `bridge.rs::send_permission_response`.
+   */
+  id?: string | number;
   method: AgentMethod;
   params: P;
 }
@@ -142,26 +149,14 @@ export interface JsonRpcError {
   data?: unknown;
 }
 
-export type AgentMethod =
-  | 'agent.process'
-  | 'agent.stream'
-  | 'agent.cancel'
-  | 'market.set_watchlist'
-  | 'press.run_now'
-  | 'press.feeds.save'
-  | 'press.feeds.delete'
-  | 'press.local.run_now'
-  | 'press.local.sync'
-  | 'tools.execute'
-  | 'tools.list'
-  | 'memory.store'
-  | 'memory.retrieve'
-  | 'context.update'
-  | 'models.list'
-  | 'health.check'
-  | 'settings.update';
+/**
+ * Méthodes JSON-RPC hôte → agent. Dérivé de `RPC_METHODS` (ipc-contract.ts),
+ * qui est LA source de vérité — et que le miroir Rust vérifie par un test
+ * cargo. Auparavant une union écrite à la main : elle avait divergé dans les
+ * deux sens (6 méthodes fantômes ici, `permission.response` manquante).
+ */
+export type AgentMethod = RpcMethodName;
 
 // ─── Shared types ──────────────────────────────────────────────
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
-

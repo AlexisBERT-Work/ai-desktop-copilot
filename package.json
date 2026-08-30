@@ -10,7 +10,7 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",
-    "clean": "turbo clean && rimraf node_modules",
+    "clean": "rimraf apps/desktop/dist packages/agent-runtime/dist .turbo node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "prepare": "husky"
   },

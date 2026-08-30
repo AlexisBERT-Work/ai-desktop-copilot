@@ -23,24 +23,21 @@ export abstract class BaseTool<A = unknown> implements RegisteredTool {
   abstract readonly schema: JSONSchemaObject;
 
   /**
-   * Schéma zod des arguments (opt-in, migration progressive) : quand il est
-   * défini, `run()` valide les arguments produits par le LLM avant
-   * `execute()`, et le tool définit `schema = jsonSchemaFrom(argsSchema)`
-   * (source unique — plus d'interface Args ni d'entrée TOOL_SCHEMAS à part).
+   * Schéma zod des arguments — source unique : le tool en dérive aussi son
+   * JSON Schema via `schema = jsonSchemaFrom(argsSchema)` (plus d'interface
+   * Args ni d'entrée TOOL_SCHEMAS à part). Obligatoire : la migration est
+   * terminée, les 68 outils enregistrés en déclarent un.
    */
-  readonly argsSchema?: z.ZodType<A, z.ZodTypeDef, unknown>;
+  abstract readonly argsSchema: z.ZodType<A, z.ZodTypeDef, unknown>;
 
   abstract execute(args: A): Promise<ToolResult>;
 
   /**
-   * Point d'entrée du registre. Sans `argsSchema`, comportement historique
-   * (cast en confiance) ; avec, les arguments invalides sont refusés avec un
-   * message actionnable renvoyé au LLM.
+   * Point d'entrée du registre : valide les arguments produits par le LLM
+   * avant `execute()`. Des arguments invalides sont refusés avec un message
+   * actionnable renvoyé au LLM plutôt que propagés dans le tool.
    */
   async run(rawArgs: unknown): Promise<ToolResult> {
-    if (!this.argsSchema) {
-      return this.execute(rawArgs as A);
-    }
     const parsed = this.argsSchema.safeParse(rawArgs ?? {});
     if (!parsed.success) {
       return this.fail(`Arguments invalides: ${formatZodError(parsed.error)}`);

@@ -119,6 +119,15 @@ export class AgentOrchestrator {
     this.permissions.updateConfig(config);
   }
 
+  /**
+   * Réponse de l'utilisateur à une demande de confirmation (dialogue de
+   * permission). Débloque le `requestUserConfirmation()` en attente — sans
+   * cela, tout outil à risque `high` reste bloqué jusqu'à son timeout de 60 s.
+   */
+  resolvePermission(requestId: string, granted: boolean, remember?: boolean): void {
+    this.permissions.resolvePermissionRequest(requestId, granted, remember);
+  }
+
   async *process(
     input: string,
     conversationId: string,

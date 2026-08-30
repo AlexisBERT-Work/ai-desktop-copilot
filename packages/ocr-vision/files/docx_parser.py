@@ -1,9 +1,6 @@
 """DOCX file parser using python-docx"""
 
-import logging
 from typing import Dict, Any
-
-log = logging.getLogger(__name__)
 
 
 def parse_docx_file(path: str) -> Dict[str, Any]:

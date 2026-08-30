@@ -6,12 +6,10 @@
 - docx   : a small block-level Markdown -> python-docx converter.
 """
 
-import logging
 import os
 import re
 from typing import Dict, Any, Optional
 
-log = logging.getLogger(__name__)
 
 SUPPORTED = {"pdf", "docx", "html", "md", "markdown", "txt"}
 

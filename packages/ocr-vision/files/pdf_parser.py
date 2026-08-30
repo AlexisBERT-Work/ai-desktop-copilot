@@ -1,9 +1,6 @@
 """PDF file parser using pypdf"""
 
-import logging
 from typing import Dict, Any
-
-log = logging.getLogger(__name__)
 
 
 def parse_pdf_file(path: str, max_pages: int = 50) -> Dict[str, Any]:

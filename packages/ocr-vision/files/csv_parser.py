@@ -1,11 +1,8 @@
 """CSV file parser"""
 
-import logging
 import csv
 import chardet
 from typing import Dict, Any
-
-log = logging.getLogger(__name__)
 
 
 def parse_csv_file(path: str, max_rows: int = 1000) -> Dict[str, Any]:

@@ -6,21 +6,14 @@
 @config '../../tailwind.config.ts';
 
 @layer base {
+  /* Seuls les tokens réellement consommés sont déclarés. Les composants
+     utilisent les classes Tailwind (dont le thème `brand` de
+     tailwind.config.ts), pas ces variables : y ajouter un token « au cas où »
+     recrée la douzaine de propriétés mortes qui traînaient ici. */
   :root {
-    --background: 0 0% 4%;
     --foreground: 0 0% 95%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 95%;
     --border: 0 0% 14%;
-    --input: 0 0% 10%;
-    --primary: 270 80% 60%;
-    --primary-foreground: 0 0% 100%;
-    --muted: 0 0% 10%;
     --muted-foreground: 0 0% 50%;
-    --accent: 270 80% 60%;
-    --destructive: 0 72% 51%;
-    --ring: 270 80% 60%;
-    --radius: 0.75rem;
   }
 
   * {

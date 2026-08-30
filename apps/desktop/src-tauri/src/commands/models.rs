@@ -3,30 +3,6 @@
 
 use serde::Serialize;
 
-/// List locally available Ollama models.
-#[tauri::command]
-pub async fn get_ollama_models() -> Result<Vec<String>, String> {
-    let response = reqwest::get("http://127.0.0.1:11434/api/tags")
-        .await
-        .map_err(|e| format!("Ollama non disponible: {e}"))?;
-
-    let json: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Parse error: {e}"))?;
-
-    let models = json["models"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|m| m["name"].as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    Ok(models)
-}
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelInfo {

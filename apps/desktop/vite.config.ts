@@ -3,11 +3,12 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [react()],
   resolve: {
+    // Le workspace n'est pas construit : on pointe directement les sources
+    // partagées. Doit rester aligné sur `paths` dans tsconfig.json.
     alias: {
-      '@': path.resolve(__dirname, './src'),
       '@catdesk/shared-types': path.resolve(__dirname, '../../packages/shared-types/src/index.ts'),
     },
   },
@@ -26,4 +27,4 @@ export default defineConfig(async () => ({
     minify: !process.env['TAURI_DEBUG'] ? 'esbuild' : false,
     sourcemap: !!process.env['TAURI_DEBUG'],
   },
-}));
+});

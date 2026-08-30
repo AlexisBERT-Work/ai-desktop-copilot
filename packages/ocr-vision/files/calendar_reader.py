@@ -5,12 +5,9 @@ Recurring events (RRULE) are expanded inside the window via
 occurrence, not just the series master.
 """
 
-import logging
 import os
 from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional
-
-log = logging.getLogger(__name__)
 
 
 def _parse_window_date(value: Optional[str]) -> Optional[date]:

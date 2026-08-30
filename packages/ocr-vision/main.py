@@ -4,6 +4,7 @@ CatDesk OCR/Vision Sidecar
 JSON-RPC 2.0 over stdin/stdout
 """
 
+import os
 import sys
 import json
 import traceback
@@ -22,7 +23,6 @@ log = logging.getLogger(__name__)
 _screenshot = None
 _ocr_engine = None
 _audio_transcriber = None
-_file_parsers = {}
 
 
 def get_screenshot_module():
@@ -71,7 +71,7 @@ def handle_request(request: dict) -> dict:
 def dispatch(method: str, params: dict) -> Any:
     match method:
         case "health.check":
-            return {"status": "ok", "pid": __import__("os").getpid()}
+            return {"status": "ok", "pid": os.getpid()}
 
         case "ocr.capture_and_read":
             return capture_and_ocr(params)

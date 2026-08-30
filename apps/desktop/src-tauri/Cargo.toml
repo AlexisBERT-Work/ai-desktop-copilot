@@ -19,7 +19,6 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-global-shortcut = "2"
-tauri-plugin-clipboard-manager = "2"
 tauri-plugin-updater = "2"
 
 serde = { version = "1", features = ["derive"] }
@@ -32,18 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 dunce = "1"
-regex = "1"
-base64 = "0.22"
 reqwest = { version = "0.12", features = ["json"] }
-
-# Screenshot (Windows)
-[target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.58", features = [
-  "Win32_Foundation",
-  "Win32_UI_WindowsAndMessaging",
-  "Win32_Graphics_Gdi",
-  "Win32_System_LibraryLoader",
-] }
 
 [profile.release]
 opt-level = 3
