@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createLogger } from '../logger';
 import { loadSqlJs, type Database } from '../lib/sqljs';
+import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('playbook:store');
 
@@ -34,9 +34,7 @@ export class PlaybookStore {
   private readonly dbPath: string;
 
   constructor(dataDir?: string) {
-    const dir = dataDir ?? process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    mkdirSync(dir, { recursive: true });
-    this.dbPath = join(dir, 'playbook.db');
+    this.dbPath = dataPath('playbook.db', dataDir);
   }
 
   async initialize(): Promise<void> {

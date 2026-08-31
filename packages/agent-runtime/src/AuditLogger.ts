@@ -1,17 +1,15 @@
-import { appendFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { appendFileSync } from 'fs';
 import type { ToolResult } from '@catdesk/shared-types';
+import { dataPath } from './lib/dataDir';
 
 export class AuditLogger {
   private logPath: string;
 
   constructor() {
-    const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    const auditDir = join(dataDir, 'audit');
-    mkdirSync(auditDir, { recursive: true });
-
+    // Un fichier par jour, sous data/audit/ — même convention que le journal
+    // d'audit du cœur Rust (core/audit.rs), pour un log combiné uniforme.
     const date = new Date().toISOString().slice(0, 10);
-    this.logPath = join(auditDir, `audit-${date}.log`);
+    this.logPath = dataPath(`audit-${date}.log`, undefined, 'audit');
   }
 
   startRun(runId: string, conversationId: string, input: string): void {

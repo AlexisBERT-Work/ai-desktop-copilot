@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createLogger } from '../logger';
 import { loadSqlJs, type Database } from '../lib/sqljs';
+import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('market:history');
 
@@ -24,9 +24,7 @@ export class MarketHistoryStore {
   private readonly capPerSymbol: number;
 
   constructor(capPerSymbol?: number) {
-    const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    mkdirSync(dataDir, { recursive: true });
-    this.dbPath = join(dataDir, 'market.db');
+    this.dbPath = dataPath('market.db');
     this.capPerSymbol = Math.max(
       1,
       capPerSymbol ?? Number(process.env['CATDESK_MARKET_HISTORY_CAP'] ?? 2880),

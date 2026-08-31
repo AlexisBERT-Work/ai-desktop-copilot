@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { bm25Scores } from './bm25';
 import { createLogger } from '../logger';
+import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('memory:vector');
 
@@ -45,10 +45,11 @@ export class VectorStore {
   private readonly filePath: string;
   private embeddingsDisabled = false;
 
-  constructor(private embedder?: Embedder, dataDir?: string) {
-    const dir = dataDir ?? process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    mkdirSync(dir, { recursive: true });
-    this.filePath = join(dir, 'vectors.json');
+  constructor(
+    private embedder?: Embedder,
+    dataDir?: string,
+  ) {
+    this.filePath = dataPath('vectors.json', dataDir);
   }
 
   async initialize(): Promise<void> {
@@ -63,7 +64,11 @@ export class VectorStore {
       }
     }
     this.initialized = true;
-    log.info('VectorStore initialized', { path: this.filePath, count: this.vectors.length, embedder: !!this.embedder });
+    log.info('VectorStore initialized', {
+      path: this.filePath,
+      count: this.vectors.length,
+      embedder: !!this.embedder,
+    });
   }
 
   async search(query: string, options: SearchOptions = {}): Promise<VectorSearchResult[]> {
@@ -78,19 +83,24 @@ export class VectorStore {
     if (candidates.length === 0) return [];
 
     const queryEmbedding = await this.tryEmbed(query);
-    const denseOk = !!queryEmbedding && candidates.some(v => v.embedding.length === queryEmbedding.length);
+    const denseOk =
+      !!queryEmbedding && candidates.some(v => v.embedding.length === queryEmbedding.length);
 
     // Sparse signal: real BM25 (good at exact keywords / identifiers), normalized.
-    const bm25 = bm25Scores(query, candidates.map(v => ({ id: v.id, content: v.content })));
+    const bm25 = bm25Scores(
+      query,
+      candidates.map(v => ({ id: v.id, content: v.content })),
+    );
     const maxBm = Math.max(0, ...bm25.values());
 
     // Hybrid fusion via a soft-OR: a strong single signal stays high (so existing
     // cosine thresholds keep working) while agreement between dense and sparse
     // boosts the score. dense defaults to 0 when embeddings are unavailable.
     const scored: VectorSearchResult[] = candidates.map(v => {
-      const dense = denseOk && v.embedding.length === queryEmbedding!.length
-        ? Math.max(0, cosineSimilarity(queryEmbedding!, v.embedding))
-        : 0;
+      const dense =
+        denseOk && v.embedding.length === queryEmbedding!.length
+          ? Math.max(0, cosineSimilarity(queryEmbedding!, v.embedding))
+          : 0;
       const sparse = maxBm > 0 ? (bm25.get(v.id) ?? 0) / maxBm : 0;
       const score = 1 - (1 - dense) * (1 - sparse);
       return {
@@ -171,7 +181,10 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-function matchesFilter(metadata: Record<string, unknown> | undefined, filter: Record<string, unknown>): boolean {
+function matchesFilter(
+  metadata: Record<string, unknown> | undefined,
+  filter: Record<string, unknown>,
+): boolean {
   if (!metadata) return false;
   return Object.entries(filter).every(([k, v]) => metadata[k] === v);
 }
