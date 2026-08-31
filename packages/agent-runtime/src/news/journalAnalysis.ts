@@ -5,6 +5,7 @@ import { looksLikeProse, startsMidSentence } from '../lib/readableText';
 import { articleCharBudget, complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { ensureVerifiedDetails } from './detailVerification';
 import { createLogger } from '../logger';
+import { extractJsonObject } from '../llm/completion';
 
 const log = createLogger('news:press-digest');
 
@@ -55,19 +56,8 @@ export function buildJournalPrompt(journal: string, items: NewsItem[]): string {
  * fences markdown et au texte autour). Renvoie null si rien ne parse. Pur.
  */
 export function parseAnalysisJson(text: string): JournalAnalysis | null {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
-
-  if (typeof parsed !== 'object' || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
+  const obj = extractJsonObject(text);
+  if (obj === null) return null;
   const analysis = typeof obj['analyse'] === 'string' ? obj['analyse'].trim() : '';
   const rawResumes = Array.isArray(obj['resumes']) ? obj['resumes'] : [];
   const summaries = rawResumes.map(r => (typeof r === 'string' ? r.trim() : ''));

@@ -19,9 +19,10 @@ class AudioTranscriber:
         try:
             from faster_whisper import WhisperModel
             self._WhisperModel = WhisperModel
-        except ImportError:
-            log.error("faster-whisper not installed. Run: pip install faster-whisper")
-            raise
+        except ImportError as exc:
+            raise RuntimeError(
+                "faster_whisper n'est pas installé. Lance : pip install faster-whisper"
+            ) from exc
 
         self._models: dict = {}
         log.info("AudioTranscriber initialized")

@@ -7,6 +7,7 @@ Exposes a declarative analyzer — no arbitrary code execution. Two operations:
 
 import math
 from typing import Any, Dict, List, Optional
+from deps import require
 
 
 AGG_FUNCS = {"sum", "mean", "median", "min", "max", "count", "std", "nunique"}
@@ -155,10 +156,7 @@ def analyze_dataframe(
     value_column: Optional[str] = None,
     agg: str = "sum",
 ) -> Dict[str, Any]:
-    try:
-        import pandas  # noqa: F401
-    except ImportError:
-        raise RuntimeError("pandas not installed. Run: pip install pandas openpyxl")
+    require("pandas")
 
     df, total_rows, truncated = _load_dataframe(path, sheet, max_rows)
 

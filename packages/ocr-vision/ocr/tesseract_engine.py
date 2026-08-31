@@ -20,9 +20,10 @@ class TesseractEngine:
                     r"C:\Program Files\Tesseract-OCR\tesseract.exe"
                 )
             log.info("Tesseract OCR engine initialized")
-        except ImportError:
-            log.error("pytesseract not installed")
-            raise
+        except ImportError as exc:
+            raise RuntimeError(
+                "pytesseract n'est pas installé. Lance : pip install pytesseract"
+            ) from exc
 
     def read(self, image: Image.Image, language: str = "fra+eng") -> Tuple[str, float]:
         """

@@ -49,6 +49,21 @@ def get_audio_transcriber():
     return _audio_transcriber
 
 
+# Codes JSON-RPC 2.0 standards. Doivent rester alignes sur le cote TypeScript
+# (ipc/StdinBridge.ts), qui les utilise deja correctement.
+METHOD_NOT_FOUND = -32601
+INVALID_PARAMS = -32602
+INTERNAL_ERROR = -32603
+
+
+class UnknownMethod(Exception):
+    """Methode absente du dispatch (-32601, pas une erreur interne)."""
+
+
+def _error(req_id: Any, code: int, message: str) -> dict:
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+
+
 def handle_request(request: dict) -> dict:
     method = request.get("method", "")
     params = request.get("params", {})
@@ -59,13 +74,17 @@ def handle_request(request: dict) -> dict:
     try:
         result = dispatch(method, params)
         return {"jsonrpc": "2.0", "id": req_id, "result": result}
+    except UnknownMethod as e:
+        log.warning(str(e))
+        return _error(req_id, METHOD_NOT_FOUND, str(e))
+    except KeyError as e:
+        # Un parametre requis manque : c'est la faute de l'appelant, pas une
+        # erreur interne. Le cote TypeScript utilise deja -32602 pour ce cas.
+        log.warning(f"Missing param in {method}: {e}")
+        return _error(req_id, INVALID_PARAMS, f"Parametre requis manquant: {e}")
     except Exception as e:
         log.error(f"Error in {method}: {traceback.format_exc()}")
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "error": {"code": -32603, "message": str(e)}
-        }
+        return _error(req_id, INTERNAL_ERROR, str(e))
 
 
 def dispatch(method: str, params: dict) -> Any:
@@ -107,7 +126,7 @@ def dispatch(method: str, params: dict) -> Any:
             return read_calendar_rpc(params)
 
         case _:
-            raise ValueError(f"Unknown method: {method}")
+            raise UnknownMethod(f"Unknown method: {method}")
 
 
 def capture_and_ocr(params: dict) -> dict:

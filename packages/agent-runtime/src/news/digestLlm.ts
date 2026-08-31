@@ -1,4 +1,7 @@
-import type { OllamaClient } from '../llm/OllamaClient';
+// La plomberie générique (complete, extraction JSON) vit dans llm/completion ;
+// `complete` est réexporté ici parce que tout le pipeline presse l'appelle avec
+// DIGEST_LLM_OPTS et importe déjà ce module.
+export { complete, extractJsonArray, extractJsonObject } from '../llm/completion';
 
 /**
  * Plomberie LLM partagée des digests de presse (journaux, sujets, synthèse) :
@@ -40,28 +43,3 @@ export const DIGEST_LLM_OPTS = {
   timeoutMs: DIGEST_TIMEOUT_MS,
   think: false,
 } as const;
-
-/** Accumule une complétion non-streamée. Partagé avec topicDigest. */
-export async function complete(
-  llm: OllamaClient,
-  model: string,
-  system: string,
-  user: string,
-  opts: { numCtx?: number; timeoutMs?: number; temperature?: number; think?: boolean } = {},
-): Promise<string> {
-  let text = '';
-  const stream = llm.streamChat({
-    model,
-    system,
-    messages: [{ role: 'user', content: user }],
-    temperature: opts.temperature ?? 0.3,
-    ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
-    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
-    ...(opts.think !== undefined ? { think: opts.think } : {}),
-  });
-  for await (const chunk of stream) {
-    if (chunk.type === 'token') text += chunk.content;
-    else if (chunk.type === 'error') throw new Error(chunk.error);
-  }
-  return text;
-}

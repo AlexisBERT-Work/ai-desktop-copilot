@@ -5,6 +5,7 @@ import type { NewsItem } from './newsItem';
 import { enrichExcerpts } from './enrich';
 import { complete, DIGEST_LLM_OPTS, type JournalDraft } from './pressDigest';
 import { createLogger } from '../logger';
+import { extractJsonObject } from '../llm/completion';
 
 const log = createLogger('news:topic-digest');
 
@@ -49,17 +50,9 @@ export interface TopicGroup {
 
 /** Parse la réponse JSON de regroupement par sujet. Pur, tolérant. */
 export function parseTopicJson(text: string, allowed: readonly string[]): TopicGroup[] {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return [];
-  }
-  if (typeof parsed !== 'object' || parsed === null) return [];
-  const arr = (parsed as Record<string, unknown>)['sujets'];
+  const obj = extractJsonObject(text);
+  if (obj === null) return [];
+  const arr = obj['sujets'];
   if (!Array.isArray(arr)) return [];
 
   const allow = new Set(allowed);
