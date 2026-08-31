@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Daily } from '@catdesk/shared-types';
 import { SearchDailiesTool } from './SearchDailiesTool';
+import { expectOk } from '../base/testResult';
 
 const NOW = Date.now();
 const daysAgo = (n: number): string => new Date(NOW - n * 24 * 60 * 60 * 1000).toISOString();
@@ -39,8 +40,7 @@ interface ResultData {
 
 async function run(tool: SearchDailiesTool, args: Record<string, unknown> = {}) {
   const res = await tool.run(args);
-  expect(res.success).toBe(true);
-  return res.data as ResultData;
+  return expectOk(res).data as ResultData;
 }
 
 describe('SearchDailiesTool', () => {

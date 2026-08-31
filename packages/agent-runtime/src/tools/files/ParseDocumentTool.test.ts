@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectFormat, ParseDocumentTool } from './ParseDocumentTool';
+import { expectFail } from '../base/testResult';
 
 describe('detectFormat', () => {
   it('reconnaît pdf/docx/csv quelle que soit la casse', () => {
@@ -29,7 +30,6 @@ describe('ParseDocumentTool', () => {
 
   it('rejette un format non supporté avant tout appel au sidecar', async () => {
     const r = await tool.run({ path: 'photo.png' });
-    expect(r.success).toBe(false);
-    expect(r.error).toContain('.pdf');
+    expect(expectFail(r).error).toContain('.pdf');
   });
 });

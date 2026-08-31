@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { AnalyzeStacktraceTool } from './AnalyzeStacktraceTool';
+import { expectOk } from '../base/testResult';
 
 const tool = new AnalyzeStacktraceTool();
 
 /** Helper : exécute et renvoie data typé librement. */
 async function analyze(stacktrace: string, context?: string): Promise<any> {
   const res = await tool.run({ stacktrace, ...(context ? { context } : {}) });
-  expect(res.success).toBe(true);
-  return res.data;
+  return expectOk(res).data;
 }
 
 describe('AnalyzeStacktraceTool', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ReadWebpageTool } from './ReadWebpageTool';
+import { expectFail } from '../base/testResult';
 import {
   extractBySelector,
   extractReadableText,
@@ -161,13 +162,11 @@ describe('ReadWebpageTool.execute (validation, sans réseau)', () => {
 
   it('échoue sur une url invalide', async () => {
     const res = await tool.run({ url: 'pas une url' });
-    expect(res.success).toBe(false);
-    expect(res.error).toMatch(/invalide/i);
+    expect(expectFail(res).error).toMatch(/invalide/i);
   });
 
   it('rejette les protocoles non http(s)', async () => {
     const res = await tool.run({ url: 'ftp://example.com/file' });
-    expect(res.success).toBe(false);
-    expect(res.error).toMatch(/http/i);
+    expect(expectFail(res).error).toMatch(/http/i);
   });
 });

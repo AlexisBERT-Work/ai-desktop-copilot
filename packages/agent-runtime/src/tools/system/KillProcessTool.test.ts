@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { KillProcessTool } from './KillProcessTool';
+import { expectFail } from '../base/testResult';
 
 const tool = new KillProcessTool();
 
@@ -17,8 +18,7 @@ describe('KillProcessTool', () => {
 
   it('refuse les PID système protégés', async () => {
     const res = await tool.run({ pid: 4 });
-    expect(res.success).toBe(false);
-    expect(res.error).toMatch(/protégé/);
+    expect(expectFail(res).error).toMatch(/protégé/);
   });
 
   it('refuse de se tuer lui-même', async () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { expectFail } from '../base/testResult';
 import {
   detectLevel,
   extractTimestamp,
@@ -79,7 +80,6 @@ describe('AnalyzeLogsTool', () => {
 
   it('renvoie une erreur claire si le fichier est absent', async () => {
     const r = await tool.run({ path: 'C:/nope/does-not-exist.log' });
-    expect(r.success).toBe(false);
-    expect(r.error).toContain('introuvable');
+    expect(expectFail(r).error).toContain('introuvable');
   });
 });

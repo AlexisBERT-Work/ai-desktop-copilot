@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isReadOnlyDbQuery, detectDialect, QueryDatabaseTool } from './QueryDatabaseTool';
+import { expectFail } from '../base/testResult';
 
 describe('isReadOnlyDbQuery', () => {
   it('accepte select/with/explain/show', () => {
@@ -57,8 +58,7 @@ describe('QueryDatabaseTool', () => {
 
   it('échoue sans dialect ni connection string déterminables', async () => {
     const r = await tool.run({ query: 'SELECT 1' });
-    expect(r.success).toBe(false);
-    expect(r.error).toContain('dialect');
+    expect(expectFail(r).error).toContain('dialect');
   });
 
   it('bloque une écriture en lecture seule avant toute connexion', async () => {
@@ -66,7 +66,6 @@ describe('QueryDatabaseTool', () => {
       query: 'DELETE FROM t',
       connection_string: 'postgres://u:p@127.0.0.1:1/db',
     });
-    expect(r.success).toBe(false);
-    expect(r.error).toContain('lecture seule');
+    expect(expectFail(r).error).toContain('lecture seule');
   });
 });
