@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, LogOut, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
@@ -11,25 +11,10 @@ import {
 import { NewsMarkdown } from '../news/NewsMarkdown';
 import { NEWS_ICON, NEWS_ICON_COLOR } from '../news/newsStyles';
 import { useAdminSession, signInAdmin, signOutAdmin } from './adminAuth';
-import {
-  createDaily,
-  deleteDaily,
-  listAllDailies,
-  updateDaily,
-  type DailyInput,
-} from './dailiesAdmin';
-import { createNews, deleteNews, listAllNews, updateNews, type NewsInput } from '../news/newsAdmin';
-
-const FIELD =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 ' +
-  'outline-none placeholder-white/30 focus:border-brand-400/50';
-const OPTION = 'bg-gray-900 text-white/90';
-const LABEL = 'block text-xs font-medium text-white/50 mb-1';
-const BTN_PRIMARY =
-  'flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white ' +
-  'transition-colors hover:bg-brand-500 disabled:opacity-50';
-const BTN_GHOST =
-  'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-colors hover:text-white/85';
+import { dailiesCrud, type DailyInput } from './dailiesAdmin';
+import { newsCrud, type NewsInput } from '../news/newsAdmin';
+import { useCrudConsole } from './useCrudConsole';
+import { BTN_GHOST, BTN_PRIMARY, FIELD, LABEL, OPTION } from '../../shared/ui/tokens';
 
 function isoToLocalInput(iso: string | null): string {
   if (iso === null) return '';
@@ -200,75 +185,41 @@ export function AdminLogin() {
 
 /** CRUD des dailys (admin connecté). */
 function DailiesConsole() {
-  const [items, setItems] = useState<Daily[]>([]);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-
-  const reload = useCallback(async () => {
-    const { items: rows, error } = await listAllDailies();
-    if (error !== null) setErr(error);
-    else setItems(rows);
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  const resetForm = () => {
-    setEditingId(null);
-    setDraft(EMPTY);
-  };
-
-  const startEdit = (d: Daily) => {
-    setEditingId(d.id);
-    setDraft({
+  const {
+    items,
+    draft,
+    setDraft,
+    editingId,
+    busy,
+    err,
+    confirmId,
+    setConfirmId,
+    resetForm,
+    startEdit,
+    save,
+    remove,
+  } = useCrudConsole<Daily, Draft, DailyInput>({
+    backend: dailiesCrud,
+    emptyDraft: EMPTY,
+    toDraft: d => ({
       title: d.title,
       body: d.body,
       category: d.category,
       expiresAt: isoToLocalInput(d.expiresAt),
-    });
-  };
-
-  const save = async () => {
-    if (draft.title.trim() === '' || draft.body.trim() === '') {
-      setErr('Titre et contenu sont requis.');
-      return;
-    }
-    const input: DailyInput = {
-      title: draft.title.trim(),
-      body: draft.body.trim(),
-      category: draft.category,
-      expiresAt: draft.expiresAt === '' ? null : new Date(draft.expiresAt).toISOString(),
-    };
-    setBusy(true);
-    setErr(null);
-    const { error } =
-      editingId === null ? await createDaily(input) : await updateDaily(editingId, input);
-    setBusy(false);
-    if (error !== null) {
-      setErr(error);
-      return;
-    }
-    resetForm();
-    await reload();
-  };
-
-  const remove = async (id: string) => {
-    setBusy(true);
-    setErr(null);
-    const { error } = await deleteDaily(id);
-    setBusy(false);
-    setConfirmId(null);
-    if (error !== null) {
-      setErr(error);
-      return;
-    }
-    if (editingId === id) resetForm();
-    await reload();
-  };
+    }),
+    toInput: d =>
+      d.title.trim() === '' || d.body.trim() === ''
+        ? { ok: false, error: 'Titre et contenu sont requis.' }
+        : {
+            ok: true,
+            input: {
+              title: d.title.trim(),
+              body: d.body.trim(),
+              category: d.category,
+              expiresAt: d.expiresAt === '' ? null : new Date(d.expiresAt).toISOString(),
+            },
+          },
+  });
 
   const now = Date.now();
 
@@ -444,82 +395,49 @@ const EMPTY_NEWS: NewsDraft = {
 
 /** CRUD des annonces (admin connecté). */
 function NewsConsole() {
-  const [items, setItems] = useState<NewsItem[]>([]);
-  const [draft, setDraft] = useState<NewsDraft>(EMPTY_NEWS);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-
-  const reload = useCallback(async () => {
-    const { items: rows, error } = await listAllNews();
-    if (error !== null) setErr(error);
-    else setItems(rows);
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  const resetForm = () => {
-    setEditingId(null);
-    setDraft(EMPTY_NEWS);
-  };
-
-  const startEdit = (n: NewsItem) => {
-    setEditingId(n.id);
-    setDraft({
+  const {
+    items,
+    draft,
+    setDraft,
+    editingId,
+    busy,
+    err,
+    confirmId,
+    setConfirmId,
+    resetForm,
+    startEdit,
+    save,
+    remove,
+  } = useCrudConsole<NewsItem, NewsDraft, NewsInput>({
+    backend: newsCrud,
+    emptyDraft: EMPTY_NEWS,
+    toDraft: n => ({
       title: n.title,
       body: n.body,
       severity: n.severity,
       global: n.audienceClientId === null,
       audienceClientId: n.audienceClientId ?? '',
       expiresAt: isoToLocalInput(n.expiresAt),
-    });
-  };
-
-  const save = async () => {
-    if (draft.title.trim() === '' || draft.body.trim() === '') {
-      setErr('Titre et contenu sont requis.');
-      return;
-    }
-    if (!draft.global && draft.audienceClientId.trim() === '') {
-      setErr("Renseigne l'ID du poste visé, ou coche « Tous les postes ».");
-      return;
-    }
-    const input: NewsInput = {
-      title: draft.title.trim(),
-      body: draft.body.trim(),
-      severity: draft.severity,
-      audienceClientId: draft.global ? null : draft.audienceClientId.trim(),
-      expiresAt: draft.expiresAt === '' ? null : new Date(draft.expiresAt).toISOString(),
-    };
-    setBusy(true);
-    setErr(null);
-    const { error } =
-      editingId === null ? await createNews(input) : await updateNews(editingId, input);
-    setBusy(false);
-    if (error !== null) {
-      setErr(error);
-      return;
-    }
-    resetForm();
-    await reload();
-  };
-
-  const remove = async (id: string) => {
-    setBusy(true);
-    setErr(null);
-    const { error } = await deleteNews(id);
-    setBusy(false);
-    setConfirmId(null);
-    if (error !== null) {
-      setErr(error);
-      return;
-    }
-    if (editingId === id) resetForm();
-    await reload();
-  };
+    }),
+    toInput: d => {
+      if (d.title.trim() === '' || d.body.trim() === '') {
+        return { ok: false, error: 'Titre et contenu sont requis.' };
+      }
+      if (!d.global && d.audienceClientId.trim() === '') {
+        return { ok: false, error: "Renseigne l'ID du poste visé, ou coche « Tous les postes »." };
+      }
+      return {
+        ok: true,
+        input: {
+          title: d.title.trim(),
+          body: d.body.trim(),
+          severity: d.severity,
+          audienceClientId: d.global ? null : d.audienceClientId.trim(),
+          expiresAt: d.expiresAt === '' ? null : new Date(d.expiresAt).toISOString(),
+        },
+      };
+    },
+  });
 
   const now = Date.now();
 

@@ -5,17 +5,9 @@ import { ChevronRight, type Filter } from 'lucide-react';
  * (éditeur, liste, sélecteur de sources). Purement présentationnel.
  */
 
-export const FIELD =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 ' +
-  'outline-none placeholder-white/30 transition-colors focus:border-brand-400/60 focus:bg-white/[0.07]';
-export const OPTION = 'bg-gray-900 text-white/90';
-export const LABEL = 'block text-xs font-medium text-white/50 mb-1';
-export const BTN_PRIMARY =
-  'flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white ' +
-  'transition-all hover:bg-brand-500 hover:shadow-md hover:shadow-brand-600/25 active:scale-[.97] ' +
-  'disabled:opacity-50 disabled:hover:shadow-none';
-export const BTN_GHOST =
-  'rounded-lg px-3 py-1.5 text-sm text-white/55 transition-all hover:bg-white/5 hover:text-white/85 active:scale-[.97]';
+// Les jetons visuels vivent dans shared/ui/tokens : reexportes ici pour les
+// consommateurs historiques de ce module (PressFeedEditor, SourcePicker...).
+export { BTN_GHOST, BTN_PRIMARY, FIELD, LABEL, OPTION } from '../../shared/ui/tokens';
 
 /** Pastille « optionnel » accolée aux titres de sections non requises. */
 function OptBadge() {

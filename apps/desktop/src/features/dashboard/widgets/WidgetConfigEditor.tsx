@@ -10,6 +10,13 @@ import { useDashboardStore } from '../dashboardStore';
 import { QUICK_ACTION_ICON_NAMES } from './quickActionIcons';
 import { QUOTE_FIELDS, type QuoteField } from './metric';
 import { ACCENT_LABEL, ACCENT_STYLES, readWidgetStyle, TEXT_SCALES } from './widgetStyle';
+import {
+  BTN_GHOST_SM as CANCEL,
+  BTN_PRIMARY_SM as SAVE,
+  FIELD_COMPACT as FIELD,
+  LABEL_TIGHT as LABEL,
+  OPTION,
+} from '../../../shared/ui/tokens';
 
 interface Props {
   widget: Widget;
@@ -18,17 +25,6 @@ interface Props {
 
 type Update = (id: string, patch: Record<string, unknown>) => void;
 type EditorProps = Props & { update: Update };
-
-const FIELD =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-sm ' +
-  'text-white/90 outline-none placeholder-white/25 focus:border-brand-400/50';
-// Les <option> natives s'affichent sinon sur fond blanc (illisible en thème sombre).
-const OPTION = 'bg-gray-900 text-white/90';
-const LABEL = 'block text-xs font-medium text-white/50';
-const SAVE =
-  'rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white ' +
-  'transition-colors hover:bg-brand-500';
-const CANCEL = 'rounded-lg px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80';
 
 function Actions({ onSave, onClose }: { onSave: () => void; onClose: () => void }) {
   return (

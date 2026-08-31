@@ -5,7 +5,7 @@ import {
   type PressFeed,
   type PressFeedInput,
 } from '@catdesk/shared-types';
-import { supabase } from '../news/supabaseClient';
+import { makeTableCrud } from '../news/supabaseCrud';
 
 interface PressFeedRow {
   id: string;
@@ -57,41 +57,18 @@ function inputToRow(input: PressFeedInput) {
   };
 }
 
-const NOT_CONFIGURED = 'Supabase non configuré.';
+const crud = makeTableCrud<PressFeedRow, PressFeed, PressFeedInput>({
+  table: 'press_feeds',
+  toModel: rowToPressFeed,
+  toRow: inputToRow,
+  orderBy: 'created_at',
+  updateExtra: () => ({ updated_at: new Date().toISOString() }),
+});
 
-export async function listPressFeeds(): Promise<{ items: PressFeed[]; error: string | null }> {
-  if (supabase === null) return { items: [], error: NOT_CONFIGURED };
-  const { data, error } = await supabase
-    .from('press_feeds')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) return { items: [], error: error.message };
-  return { items: ((data ?? []) as PressFeedRow[]).map(rowToPressFeed), error: null };
-}
-
-export async function createPressFeed(input: PressFeedInput): Promise<{ error: string | null }> {
-  if (supabase === null) return { error: NOT_CONFIGURED };
-  const { error } = await supabase.from('press_feeds').insert(inputToRow(input));
-  return { error: error?.message ?? null };
-}
-
-export async function updatePressFeed(
-  id: string,
-  input: PressFeedInput,
-): Promise<{ error: string | null }> {
-  if (supabase === null) return { error: NOT_CONFIGURED };
-  const { error } = await supabase
-    .from('press_feeds')
-    .update({ ...inputToRow(input), updated_at: new Date().toISOString() })
-    .eq('id', id);
-  return { error: error?.message ?? null };
-}
-
-export async function deletePressFeed(id: string): Promise<{ error: string | null }> {
-  if (supabase === null) return { error: NOT_CONFIGURED };
-  const { error } = await supabase.from('press_feeds').delete().eq('id', id);
-  return { error: error?.message ?? null };
-}
+export const listPressFeeds = crud.listAll;
+export const createPressFeed = crud.create;
+export const updatePressFeed = crud.update;
+export const deletePressFeed = crud.remove;
 
 /**
  * Déclenche une publication immédiate de la revue de presse (journaux perso
