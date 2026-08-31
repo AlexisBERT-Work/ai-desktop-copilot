@@ -24,6 +24,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | Dashboard / bourse / news / dailys             | `docs/projects/` + `supabase/README.md`                                 |
 | Choix de stack                                 | `docs/architecture/adr-*.md`                                            |
 | Choix non tranchés + dettes connues            | `docs/AMELIORATIONS.md`                                                 |
+| Reprendre la refonte d'août 2026               | `docs/REPRISE.md` — point de reprise, actions ouvertes                  |
 | `docs/archive/`                                | **Obsolète — ne jamais lire ni citer**                                  |
 
 Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles (tri « un seul modèle, le

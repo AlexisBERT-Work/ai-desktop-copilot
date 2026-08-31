@@ -3,7 +3,8 @@
 > Journal de travail, **antéchronologique** (le plus récent en haut).
 > Référence des capacités : [CAPACITES.md](CAPACITES.md) · bornes :
 > [LIMITES.md](LIMITES.md) · décisions ouvertes et backlog :
-> [AMELIORATIONS.md](AMELIORATIONS.md).
+> [AMELIORATIONS.md](AMELIORATIONS.md) · point de reprise de la refonte d'août
+> 2026 : [REPRISE.md](REPRISE.md).
 > Dernière mise à jour : 2026-08-31.
 
 ## État actuel
