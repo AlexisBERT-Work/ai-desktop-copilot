@@ -1,8 +1,14 @@
 # Dashboard P2 — news pilotée par l'admin (Supabase)
 
+> ⚠️ **Document de cadrage historique** (état de sa date de rédaction). Il garde
+> la trace des décisions prises et de leurs raisons ; il n'est **pas maintenu**.
+> Pour l'état réel du projet : [SUIVI.md](../SUIVI.md) « État actuel »,
+> [CAPACITES.md](../CAPACITES.md) et [LIMITES.md](../LIMITES.md).
+
 **Date :** 2026-06-28
-**Statut :** Implémenté côté code + SQL (type-check + lint verts). Reste à
-**provisionner le projet Supabase** (étapes §7).
+**Statut :** **Livré.** Le projet Supabase est provisionné et sa clé anon est
+embarquée dans l'agent ; les étapes manuelles du §7 sont supplantées par
+[supabase/DEPLOY.md](../../supabase/DEPLOY.md) et la console admin in-app.
 **Auteur :** @alexis.bert1412
 
 > Implémentation du **Pilier B** : une news rédigée par **toi seul** (admin) et

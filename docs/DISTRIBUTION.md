@@ -8,8 +8,10 @@ Ce guide explique :
    chez tous tes proches ;
 3. comment garantir **zéro différence de fonctionnalités** entre ton PC et le leur.
 
-> ⚠️ **Taille de l'installeur initial.** Il embarque le(s) modèle(s) LLM
-> (plusieurs Go) → **5 à 12 Go**. Impossible par mail/WeTransfer gratuit.
+> ⚠️ **Taille de l'installeur initial : ~18 Go** (v0.1.3, avec les trois modèles
+> du bundle ; c'était ~22 Go avant le tri « un seul modèle »). La valeur exacte
+> dépend des modèles présents dans `~/.ollama/models` au moment du build.
+> Impossible par mail ou WeTransfer gratuit.
 > Deux façons de le distribuer :
 >
 > - **§3bis (recommandé pour des proches non-techniques)** : un petit
@@ -62,7 +64,7 @@ ollama pull nomic-embed-text  # mémoire sémantique / recherche
 > Sans `minicpm-v` la vision écran tombe en panne silencieuse ; sans
 > `nomic-embed-text` la recherche sémantique retombe sur un repli mots-clés.
 > Le build via `stage-curated-models.ps1` n'embarque QUE ces 3 modèles (le
-> `qwen2.5:7b` a été retiré du bundle depuis la v0.1.3) → parité garantie.
+> un modèle plus petit a été retiré du bundle depuis la v0.1.3) → parité garantie.
 
 Pour **alléger** : supprime ce qui ne sert pas. NB : depuis le tri 2026-07-20,
 `qwen2.5-coder:14b` n'est plus dans le lineup embarqué (bot sans codage) — si
@@ -70,14 +72,14 @@ ton `~/.ollama` local le contient encore, il est ignoré au staging :
 
 ```powershell
 ollama list
-ollama rm qwen2.5-coder:14b   # option : libérer 9 Go sur TON poste de dev
+ollama rm qwen2.5-coder:14b   # si présent depuis une version < 0.1.3   # option : libérer 9 Go sur TON poste de dev
 ```
 
 ---
 
 ## 2. Prérequis sur TON PC (le PC de build)
 
-- Node ≥ 20, pnpm ≥ 9, Rust ≥ 1.78 (toolchain de dev habituelle)
+- Node ≥ 22, pnpm ≥ 11.3, Rust ≥ 1.96 (toolchain de dev habituelle)
 - **Ollama** installé avec les modèles pullés (étape 1)
 - Pour l'OCR : le venv Python `packages/ocr-vision/.venv` (`scripts/setup.ps1`).
   Le script installe `pyinstaller` automatiquement.
@@ -94,7 +96,7 @@ pnpm --filter @catdesk/desktop exec tauri signer generate -w "$HOME\.tauri\catde
 Cela crée `catdesk.key` (privée, **à garder secrète**) + affiche la **clé
 publique**. Colle la clé publique dans
 [tauri.release.conf.json](../apps/desktop/src-tauri/tauri.release.conf.json),
-champ `plugins.updater.pubkey`, à la place de `PASTE_YOUR_TAURI_UPDATER_PUBLIC_KEY_HERE`.
+champ `plugins.updater.pubkey`, à la place de `la valeur actuelle de plugins.updater.pubkey`.
 
 > ⚠️ Si tu perds cette clé privée, tu ne pourras plus jamais publier de mise à
 > jour acceptée par les apps déjà installées. Sauvegarde-la.
@@ -117,7 +119,7 @@ pwsh -File scripts/build-release.ps1 -ModelsPath "D:\mes-modeles-ollama"
 Résultat :
 
 ```
-apps/desktop/src-tauri/target/release/bundle/nsis/CatDesk_<version>_x64-setup.exe
+dist-installer/CatDesk-<version>-offline-setup.exe (+ .bin si disque-spanné)
 ```
 
 C'est CE fichier que tu donnes à tes proches (USB / Drive). Installation **par
@@ -134,7 +136,7 @@ Pour des proches **pas du tout techniques** : pas de dossier à garder groupé,
 pas de commande, pas même besoin d'expliquer où mettre le fichier. Tu leur
 donnes **un seul petit `.exe`** (~2 Mo) — par mail, Discord, WhatsApp, Drive,
 peu importe puisqu'il est minuscule. Double-clic → il télécharge tout seul le
-vrai installeur (~22 Go, en tâche de fond avec barre de progression) → il
+vrai installeur (~18 Go, en tâche de fond avec barre de progression) → il
 l'installe en silence → CatDesk se lance.
 
 ### Comment ça marche
@@ -162,9 +164,9 @@ d'authentification pour télécharger un asset d'une release publique).
    `scripts/build-inno.ps1`) → les 13 fichiers dans `dist-installer/`.
 2. Crée (ou réutilise) une release sur `catdesk-releases` et uploade-les :
    ```powershell
-   gh release create v0.1.1 --repo AlexisBERT-Work/catdesk-releases `
-     --title "CatDesk 0.1.1" --notes "..." dist-installer/*.bin dist-installer/*.exe
-   gh release edit v0.1.1 --repo AlexisBERT-Work/catdesk-releases --draft=false
+   gh release create v0.1.3 --repo AlexisBERT-Work/catdesk-releases `
+     --title "CatDesk 0.1.3" --notes "..." dist-installer/*.bin dist-installer/*.exe
+   gh release edit v0.1.3 --repo AlexisBERT-Work/catdesk-releases --draft=false
    ```
    > Une release fraîchement créée reste en **draft** tant qu'elle n'est pas
    > publiée explicitement — un asset "uploadé" sur un brouillon n'est PAS
@@ -178,7 +180,7 @@ d'authentification pour télécharger un asset d'une release publique).
 ### Tester en local avant publication
 
 Surcharger `BaseUrl` pour pointer sur un serveur local (`python -m
-http.server`) évite de re-télécharger 22 Go à chaque test :
+http.server`) évite de re-télécharger ~18 Go à chaque test :
 
 ```powershell
 ISCC /DBaseUrl=http://127.0.0.1:8000 scripts/catdesk-bootstrap.iss
@@ -195,8 +197,8 @@ Une fois la clé en place (§2.1) et la clé privée dans l'environnement :
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<mot de passe de la clé>"
 
-# Publier la version 0.1.1
-pwsh -File scripts/publish-update.ps1 -Version 0.1.1 -Notes "Nouveau: outil X, fix Y"
+# Publier la version 0.1.3
+pwsh -File scripts/publish-update.ps1 -Version 0.1.3 -Notes "Nouveau: outil X, fix Y"
 ```
 
 Le script :
@@ -204,7 +206,7 @@ Le script :
 1. bumpe la version dans `tauri.conf.json` ;
 2. build un **artefact de mise à jour léger** (sans le modèle) et le signe ;
 3. génère `latest.json` (le manifeste que lisent les apps) ;
-4. crée la **release GitHub** `v0.1.1` et y uploade l'installeur + `latest.json`.
+4. crée la **release GitHub** `v0.1.3` et y uploade l'installeur + `latest.json`.
 
 Les apps de tes proches vérifient
 `releases/latest/download/latest.json` **à chaque lancement** et se mettent à
@@ -229,8 +231,7 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 
 - **RAM/VRAM.** `qwen3:14b` (~9 Go) est le modèle unique : compte ~10 Go de VRAM
   pour le garder résident (sinon débordement RAM — lent mais cohérent). Machine
-  très contrainte → pull manuellement un modèle plus petit (ex. `qwen2.5:7b`) et
-  impose-le via `CATDESK_MODEL`.
+  très contrainte → pull manuellement un modèle plus petit et impose-le via `CATDESK_MODEL_SMALL`.
 - **GPU.** Ollama utilise le GPU si présent, sinon CPU (plus lent, mais marche
   partout). Les DLLs bundlées viennent de ton PC ; le repli CPU fonctionne.
 - **Signature SmartScreen.** Pour supprimer l'avertissement « éditeur inconnu »,
@@ -244,11 +245,11 @@ jour toutes seules. Aucun re-téléchargement du modèle.
 
 ## 7. Dépannage
 
-| Symptôme                          | Cause probable                                                  | Fix                                                                                               |
-| --------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `pnpm deploy` échoue              | workspace non résolu                                            | le script retente avec `--legacy` ; sinon `pnpm install` puis relancer                            |
-| L'IA ne répond pas chez le proche | modèle absent / mauvais nom                                     | vérifier que `%LOCALAPPDATA%\com.catdesk.app\ollama-models` contient le modèle de `CATDESK_MODEL` |
-| Vision / "décris l'écran" muet    | `minicpm-v` pas pullé au build                                  | `ollama pull minicpm-v` puis rebuild installeur                                                   |
-| Les updates ne s'installent pas   | version non incrémentée, ou pubkey/clé qui ne correspondent pas | bumper la version ; vérifier que la pubkey du conf vient de la même clé que celle de signature    |
-| `.sig` manquant au build update   | env de signature absent                                         | définir `TAURI_SIGNING_PRIVATE_KEY` + `..._PASSWORD` avant `publish-update.ps1`                   |
-| Fenêtre console qui apparaît      | flag `CREATE_NO_WINDOW` manquant                                | déjà géré dans bridge.rs / ollama.rs                                                              |
+| Symptôme                                             | Cause probable                                                  | Fix                                                                                               |
+| ---------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @catdesk/agent-runtime deploy` échoue | workspace non résolu                                            | le script retente avec `--legacy` ; sinon `pnpm install` puis relancer                            |
+| L'IA ne répond pas chez le proche                    | modèle absent / mauvais nom                                     | vérifier que `%LOCALAPPDATA%\com.catdesk.app\ollama-models` contient le modèle de `CATDESK_MODEL` |
+| Vision / "décris l'écran" muet                       | `minicpm-v` pas pullé au build                                  | `ollama pull minicpm-v` puis rebuild installeur                                                   |
+| Les updates ne s'installent pas                      | version non incrémentée, ou pubkey/clé qui ne correspondent pas | bumper la version ; vérifier que la pubkey du conf vient de la même clé que celle de signature    |
+| `.sig` manquant au build update                      | env de signature absent                                         | définir `TAURI_SIGNING_PRIVATE_KEY` + `..._PASSWORD` avant `publish-update.ps1`                   |
+| Fenêtre console qui apparaît                         | flag `CREATE_NO_WINDOW` manquant                                | déjà géré dans bridge.rs / ollama.rs                                                              |

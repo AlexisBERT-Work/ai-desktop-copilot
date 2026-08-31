@@ -1,7 +1,15 @@
 # Dashboard P1 — interface configurable (implémenté)
 
+> ⚠️ **Document de cadrage historique** (état de sa date de rédaction). Il garde
+> la trace des décisions prises et de leurs raisons ; il n'est **pas maintenu**.
+> Pour l'état réel du projet : [SUIVI.md](../SUIVI.md) « État actuel »,
+> [CAPACITES.md](../CAPACITES.md) et [LIMITES.md](../LIMITES.md).
+
 **Date :** 2026-06-28
-**Statut :** Implémenté (type-check + lint verts)
+**Statut :** **Livré, puis dépassé.** La grille CSS 3 colonnes décrite ici a été
+remplacée le 2026-07-18 par un **canvas libre en pixels** (`WidgetLayout {x,y,w,h}`,
+`useWidgetDrag`, affichages enregistrés). Les sections « placement libre : non
+couvert » et « PlaceholderWidget » de ce document ne valent plus.
 **Auteur :** @alexis.bert1412
 
 > Documentation de l'**ossature du Pilier A** (interface configurable) telle que
@@ -48,6 +56,7 @@ packages/shared-types/src/dashboard.ts   # Widget, WidgetType, WidgetLayout, Das
 ```
 
 Points d'entrée (câblage overlay) :
+
 - `OverlayMode` gagne `'dashboard'` ([events.ts](../../packages/shared-types/src/events.ts)).
 - [FloatingOverlay.tsx](../../apps/desktop/src/features/overlay/FloatingOverlay.tsx) rend la fenêtre.
 - Ouverture : bouton **📊 Tableau de bord** ([MiniMode.tsx](../../apps/desktop/src/features/overlay/MiniMode.tsx)) + commande **Open dashboard** ([CommandPalette.tsx](../../apps/desktop/src/features/overlay/CommandPalette.tsx)).
@@ -61,14 +70,24 @@ Dans [packages/shared-types/src/dashboard.ts](../../packages/shared-types/src/da
 
 ```ts
 type WidgetType = 'kpi' | 'stat' | 'chart' | 'table' | 'stocks' | 'quick_action' | 'news';
-interface WidgetLayout { x: number; y: number; w: number; h: number; }
+interface WidgetLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 interface Widget {
-  id: string; type: WidgetType; title: string;
-  dataSource?: string;                 // id d'un provider (ex. 'market')
-  config: Record<string, unknown>;     // schéma propre au type
+  id: string;
+  type: WidgetType;
+  title: string;
+  dataSource?: string; // id d'un provider (ex. 'market')
+  config: Record<string, unknown>; // schéma propre au type
   layout: WidgetLayout;
 }
-interface DashboardConfig { version: number; widgets: Widget[]; }
+interface DashboardConfig {
+  version: number;
+  widgets: Widget[];
+}
 ```
 
 > **Placement actuel** : l'ordre dans le tableau `widgets` + les spans `w`/`h`
@@ -81,17 +100,17 @@ interface DashboardConfig { version: number; widgets: Widget[]; }
 
 Zustand + `persist`. Bornes : `MAX_W = 3` colonnes, `MAX_H = 2` hauteurs.
 
-| Action | Effet |
-|---|---|
-| `setEditMode(on)` | Active/désactive le mode édition (transitoire) |
-| `addWidget(widget)` | Ajoute un widget (id généré via `crypto.randomUUID()`) |
-| `removeWidget(id)` | Retire un widget |
-| `renameWidget(id, title)` | Renomme |
-| `updateWidgetConfig(id, patch)` | Fusionne un patch dans `config` |
-| `cycleWidgetWidth(id)` | Largeur 1→2→3→1 (bornée) |
-| `cycleWidgetHeight(id)` | Hauteur 1→2→1 (bornée) |
-| `reorderWidget(src, target)` | Déplace `src` avant `target` (drag & drop) |
-| `resetToDefault()` | Rétablit la disposition par défaut |
+| Action                          | Effet                                                  |
+| ------------------------------- | ------------------------------------------------------ |
+| `setEditMode(on)`               | Active/désactive le mode édition (transitoire)         |
+| `addWidget(widget)`             | Ajoute un widget (id généré via `crypto.randomUUID()`) |
+| `removeWidget(id)`              | Retire un widget                                       |
+| `renameWidget(id, title)`       | Renomme                                                |
+| `updateWidgetConfig(id, patch)` | Fusionne un patch dans `config`                        |
+| `cycleWidgetWidth(id)`          | Largeur 1→2→3→1 (bornée)                               |
+| `cycleWidgetHeight(id)`         | Hauteur 1→2→1 (bornée)                                 |
+| `reorderWidget(src, target)`    | Déplace `src` avant `target` (drag & drop)             |
+| `resetToDefault()`              | Rétablit la disposition par défaut                     |
 
 ---
 
@@ -137,7 +156,7 @@ d'erreur local ; les autres continuent de fonctionner.
    de sécurité). Faute de composant dédié, mapper vers `PlaceholderWidget`.
 4. **Ajouter une entrée** dans `widgets/widgetMeta.ts` (`label`, `icon`, `build()`)
    → le widget apparaît dans le menu « Ajouter ».
-5. *(option)* **Éditeur de config** : ajouter un cas dans `WidgetConfigEditor.tsx`
+5. _(option)_ **Éditeur de config** : ajouter un cas dans `WidgetConfigEditor.tsx`
    (sinon « Ce widget n'a pas encore de réglages »).
 
 ---

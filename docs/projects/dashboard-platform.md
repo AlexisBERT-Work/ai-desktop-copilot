@@ -1,7 +1,13 @@
 # PROJET — Plateforme Dashboard CatDesk
 
+> ⚠️ **Document de cadrage historique** (état de sa date de rédaction). Il garde
+> la trace des décisions prises et de leurs raisons ; il n'est **pas maintenu**.
+> Pour l'état réel du projet : [SUIVI.md](../SUIVI.md) « État actuel »,
+> [CAPACITES.md](../CAPACITES.md) et [LIMITES.md](../LIMITES.md).
+
 **Date :** 2026-06-28
-**Statut :** Proposé (brouillon de cadrage, en évolution)
+**Statut :** **Livré** dans ses grandes lignes (piliers A et B). Les « décisions
+ouvertes » du §7 et la checklist du §10.7 ont toutes été tranchées et exécutées.
 **Auteur :** @alexis.bert1412
 
 > Doc de cadrage de la **plateforme Dashboard** de CatDesk. Deux piliers :
@@ -35,7 +41,7 @@ un screenshot ») à une **vraie interface tableau de bord** :
 
 > ⚠️ **Changement d'architecture majeur (Pilier B) — DÉCIDÉ : backend.** CatDesk
 > est aujourd'hui « 100 % local, aucune donnée cloud ». Une news publiée par
-> l'admin et diffusée à *tous* les clients introduit **le premier composant
+> l'admin et diffusée à _tous_ les clients introduit **le premier composant
 > non-local** du produit : un **service central** (API + base) que les clients
 > interrogent, et une notion de **« clients »** identifiés. C'est assumé et cadré
 > (§5). On part **directement sur un backend** (et non un flux statique) : le
@@ -47,6 +53,7 @@ un screenshot ») à une **vraie interface tableau de bord** :
 ## 1. Objectifs / Non-objectifs
 
 ### Objectifs
+
 - **A.** Interface d'accueil = grille de **widgets configurables** (le screenshot
   devient un widget « action rapide » parmi d'autres).
 - **A.** Modèle de widget générique : `{ type, source de données, options, layout }`.
@@ -56,6 +63,7 @@ un screenshot ») à une **vraie interface tableau de bord** :
 - Rester cohérent avec CatDesk : permissions, audit, flux IPC, sandbox egress.
 
 ### Non-objectifs (pour ce cadrage)
+
 - ❌ Figer le **catalogue exact de widgets** ni leur schéma de config (plus tard).
 - ❌ Un **système multi-comptes complet** (SSO, rôles fins) : le backend se limite
   à **admin** (publie) + **clients identifiés** en lecture.
@@ -115,8 +123,8 @@ export interface Widget {
   id: string;
   type: 'kpi' | 'stat' | 'chart' | 'table' | 'stocks' | 'quick_action' | 'news';
   title: string;
-  dataSource?: string;                 // id d'un provider (ex. 'market', 'system')
-  config: Record<string, unknown>;     // schéma propre à chaque type (défini plus tard)
+  dataSource?: string; // id d'un provider (ex. 'market', 'system')
+  config: Record<string, unknown>; // schéma propre à chaque type (défini plus tard)
   layout: { x: number; y: number; w: number; h: number };
 }
 
@@ -128,6 +136,7 @@ export interface DashboardConfig {
 ```
 
 Principes posés maintenant (détails reportés) :
+
 - Le **bouton screenshot actuel** = un widget `quick_action` ⇒ rétro-compatible.
 - Le **module Bourse** (§6) = un widget `stocks` alimenté par le provider `market`.
 - Les widgets `kpi` / `stat` / `chart` consomment un **provider de données** ; la
@@ -146,14 +155,15 @@ Principes posés maintenant (détails reportés) :
 plus tard, possibilité de news **par client** (créées par nous).
 
 ### Modèle de données
+
 ```ts
 export interface NewsItem {
   id: string;
   title: string;
-  body: string;                        // Markdown
+  body: string; // Markdown
   severity: 'info' | 'success' | 'warning' | 'critical';
-  publishedAt: number;                 // epoch ms
-  expiresAt?: number;                  // disparaît après cette date
+  publishedAt: number; // epoch ms
+  expiresAt?: number; // disparaît après cette date
   audience: 'global' | { clientId: string }; // ciblage natif dès le départ
 }
 
@@ -161,17 +171,18 @@ export interface NewsItem {
 export interface NewsFeed {
   version: number;
   items: NewsItem[];
-  signature?: string;                  // optionnel : anti-falsification (le backend + TLS + authz suffisent)
+  signature?: string; // optionnel : anti-falsification (le backend + TLS + authz suffisent)
 }
 
 /** Identité d'un client, émise/validée par le backend. */
 export interface ClientIdentity {
-  clientId: string;                    // ID d'installation (ou clé de licence)
-  token: string;                       // jeton de lecture, scope read-only
+  clientId: string; // ID d'installation (ou clé de licence)
+  token: string; // jeton de lecture, scope read-only
 }
 ```
 
 ### Comment « seul moi peux publier » est garanti (via backend)
+
 1. **L'app cliente ne contient AUCUNE capacité de publication.** Le CRUD news vit
    dans une **console admin séparée** (web/CLI), protégée par **login admin**, non
    livrée aux clients. ⇒ un client **ne peut pas** émettre de news, par construction.
@@ -183,30 +194,32 @@ export interface ClientIdentity {
    de confiance.
 
 ### Distribution — DÉCIDÉ : backend
-| Aspect | Choix |
-|---|---|
-| **Forme** | Service central **API + base de données + authz par rôle** |
-| **Clients** | **Identifiés** (`ClientIdentity`), lecture seule (global + news ciblées) |
-| **Admin** | **Console séparée** (login), CRUD news, choix de l'audience (global/clientId) |
-| **Temps réel** | Possible : **WebSocket/SSE** (push) ou poll léger en repli |
-| **Ciblage par client** | **Natif dès le départ** (`audience: { clientId }`) |
+
+| Aspect                 | Choix                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| **Forme**              | Service central **API + base de données + authz par rôle**                    |
+| **Clients**            | **Identifiés** (`ClientIdentity`), lecture seule (global + news ciblées)      |
+| **Admin**              | **Console séparée** (login), CRUD news, choix de l'audience (global/clientId) |
+| **Temps réel**         | Possible : **WebSocket/SSE** (push) ou poll léger en repli                    |
+| **Ciblage par client** | **Natif dès le départ** (`audience: { clientId }`)                            |
 
 > **Stack backend : DÉCIDÉ — Supabase.** Chaque besoin se mappe sur une brique
 > native, donc très peu de code serveur à écrire :
 >
-> | Besoin | Brique Supabase |
-> |---|---|
+> | Besoin                                    | Brique Supabase                                                                                  |
+> | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
 > | « Seul l'admin publie » + clients lecture | **Row-Level Security** : policy write réservée au rôle `admin`, policy read pour `authenticated` |
-> | Ciblage par client | Policy RLS : `audience = 'global' OR audience->>'clientId' = auth.uid()` |
-> | Identité client | **Supabase Auth** (compte anonyme / lien magique / clé) → `auth.uid()` = `clientId` |
-> | News temps réel | **Realtime** (abonnement à la table `news`) |
-> | API | **PostgREST auto-générée** + client `@supabase/supabase-js` |
-> | Console admin | **Supabase Studio** au début, ou petite page admin custom plus tard |
+> | Ciblage par client                        | Policy RLS : `audience = 'global' OR audience->>'clientId' = auth.uid()`                         |
+> | Identité client                           | **Supabase Auth** (compte anonyme / lien magique / clé) → `auth.uid()` = `clientId`              |
+> | News temps réel                           | **Realtime** (abonnement à la table `news`)                                                      |
+> | API                                       | **PostgREST auto-générée** + client `@supabase/supabase-js`                                      |
+> | Console admin                             | **Supabase Studio** au début, ou petite page admin custom plus tard                              |
 >
 > Les clients embarquent uniquement la **clé `anon`** (publique, scope limité par
 > RLS) — **jamais** la `service_role`. L'app cliente n'expose aucune écriture.
 
 ### Affichage côté client
+
 - À l'ouverture : le client s'authentifie (jeton), appelle l'API et reçoit
   **global + news qui le ciblent**. Abonnement temps réel optionnel pour les
   mises à jour pendant la session.
@@ -221,11 +234,11 @@ export interface ClientIdentity {
 CatDesk évolue de « **100 % local** » vers « **local-first avec flux distants
 contrôlés, en lecture seule** » :
 
-| Flux distant | Sens | Contrôle |
-|---|---|---|
-| Données widgets (ex. cours bourse) | entrant, lecture | allow-list domaine + audit |
-| News (Pilier B) | entrant, lecture seule (API backend) | allow-list + HTTPS + **jeton client read-only** (écriture = admin only) |
-| Inférence LLM | **reste 100 % local** (Ollama) | inchangé |
+| Flux distant                       | Sens                                 | Contrôle                                                                |
+| ---------------------------------- | ------------------------------------ | ----------------------------------------------------------------------- |
+| Données widgets (ex. cours bourse) | entrant, lecture                     | allow-list domaine + audit                                              |
+| News (Pilier B)                    | entrant, lecture seule (API backend) | allow-list + HTTPS + **jeton client read-only** (écriture = admin only) |
+| Inférence LLM                      | **reste 100 % local** (Ollama)       | inchangé                                                                |
 
 À refléter dans [CAPACITES.md](../CAPACITES.md) §11 (« 100 % local ») le moment venu.
 
@@ -237,81 +250,99 @@ contrôlés, en lecture seule** » :
 > widget `stocks` / provider `market`.
 
 ### 6.1 Décisions actées
-| # | Décision | Justification |
-|---|---|---|
-| D1 | **Cadence ~1 min** (polling 30–60 s), pas de tick par tick | Tick = données propriété des bourses → **frais de licence** + débit bloqué par les API gratuites. À cette échelle, la seconde = **bruit de microstructure**. |
-| D2 | **Sources via adaptateurs**, API d'abord, scraping en filet | investing.com **sans API officielle** + anti-bot + JS. Yahoo renvoie **N actions en 1 requête**, robuste et gratuit. |
-| D3 | **Intégré à CatDesk** | Réutilise sandbox + permissions + audit + IPC + l'agent comme interface de config. |
-| D4 | **Construire** le moteur de formules | « Formules libres recalculées en direct » non couvert par TradingView/Sheets. |
+
+| #   | Décision                                                    | Justification                                                                                                                                                |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | **Cadence ~1 min** (polling 30–60 s), pas de tick par tick  | Tick = données propriété des bourses → **frais de licence** + débit bloqué par les API gratuites. À cette échelle, la seconde = **bruit de microstructure**. |
+| D2  | **Sources via adaptateurs**, API d'abord, scraping en filet | investing.com **sans API officielle** + anti-bot + JS. Yahoo renvoie **N actions en 1 requête**, robuste et gratuit.                                         |
+| D3  | **Intégré à CatDesk**                                       | Réutilise sandbox + permissions + audit + IPC + l'agent comme interface de config.                                                                           |
+| D4  | **Construire** le moteur de formules                        | « Formules libres recalculées en direct » non couvert par TradingView/Sheets.                                                                                |
 
 ### 6.2 Composants
-| Composant | Emplacement proposé | Rôle |
-|---|---|---|
-| `MarketPoller` | `packages/agent-runtime/src/market/MarketPoller.ts` | Tick (via `CronScheduler`), appelle les adaptateurs |
-| `DataSourceAdapter` | `packages/agent-runtime/src/market/adapters/` | `YahooAdapter` (batch) + `WebScrapeAdapter` (URL+sélecteur, filet) |
-| `MarketStore` | `packages/agent-runtime/src/market/MarketStore.ts` | Cache courant + historique (SQLite) |
-| `FormulaEngine` | `packages/agent-runtime/src/market/FormulaEngine.ts` | Recalcul des formules à chaque tick |
+
+| Composant           | Emplacement proposé                                  | Rôle                                                               |
+| ------------------- | ---------------------------------------------------- | ------------------------------------------------------------------ |
+| `MarketPoller`      | `packages/agent-runtime/src/market/MarketPoller.ts`  | Tick (via `CronScheduler`), appelle les adaptateurs                |
+| `DataSourceAdapter` | `packages/agent-runtime/src/market/adapters/`        | `YahooAdapter` (batch) + `WebScrapeAdapter` (URL+sélecteur, filet) |
+| `MarketStore`       | `packages/agent-runtime/src/market/MarketStore.ts`   | Cache courant + historique (SQLite)                                |
+| `FormulaEngine`     | `packages/agent-runtime/src/market/FormulaEngine.ts` | Recalcul des formules à chaque tick                                |
 
 Réutilise l'existant : `CronScheduler` (tick 60 s), SQLite, logique `call_api` /
 `read_webpage`/Playwright, `analyze_data` (pandas) pour les stats lourdes. Push UI
 via event `market:update` calqué sur le pattern `agent:plan`.
 
 ### 6.3 Modèle de données
+
 ```ts
 export interface Quote {
-  symbol: string; price: number; change: number; changePercent: number;
-  volume: number | null; currency: string;
-  source: 'yahoo' | 'web' | string; timestamp: number; stale: boolean;
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number | null;
+  currency: string;
+  source: 'yahoo' | 'web' | string;
+  timestamp: number;
+  stale: boolean;
 }
 export interface WatchlistItem {
-  symbol: string; label?: string; adapter: 'yahoo' | 'web';
+  symbol: string;
+  label?: string;
+  adapter: 'yahoo' | 'web';
   webConfig?: { url: string; selector: string; field: string };
 }
 export interface FormulaCell {
-  id: string; name: string; expression: string;
+  id: string;
+  name: string;
+  expression: string;
   scope: 'row' | 'aggregate' | 'cross' | 'rolling';
-  lastValue?: number; error?: string;
+  lastValue?: number;
+  error?: string;
 }
 ```
 
 ### 6.4 Sources
+
 investing.com : pas d'API, anti-bot, valeurs en JS ⇒ scraping **fragile, lourd,
 contraire aux CGU, bannissement** au polling. Préférer une API JSON.
 
-| Source | Coût | Débit | Verdict |
-|---|---|---|---|
-| **Yahoo Finance** (JSON non officiel) | Gratuit | **Batch** : 1 requête = N symboles | ✅ Principale |
-| Finnhub (free) | Gratuit | ~60 req/min, WS | Alternative |
-| Twelve Data (free) | Gratuit | 8 req/min, 800/j | Alternative |
-| Alpha Vantage (free) | Gratuit | 25/jour | ❌ trop limité |
-| Scraping investing.com | « gratuit » | bannissement | ⚠️ filet seulement |
+| Source                                | Coût        | Débit                              | Verdict            |
+| ------------------------------------- | ----------- | ---------------------------------- | ------------------ |
+| **Yahoo Finance** (JSON non officiel) | Gratuit     | **Batch** : 1 requête = N symboles | ✅ Principale      |
+| Finnhub (free)                        | Gratuit     | ~60 req/min, WS                    | Alternative        |
+| Twelve Data (free)                    | Gratuit     | 8 req/min, 800/j                   | Alternative        |
+| Alpha Vantage (free)                  | Gratuit     | 25/jour                            | ❌ trop limité     |
+| Scraping investing.com                | « gratuit » | bannissement                       | ⚠️ filet seulement |
 
 ### 6.5 Moteur de formules
+
 Par ligne (`change/price*100`), croisées (`AAPL.price/MSFT.price`), agrégées
 (`sum(qty*price)`), glissantes (`movingAverage(AAPL.price,20)` → historique SQLite).
 Erreur isolée par cellule (`FormulaCell.error`), ne casse jamais le tableau.
 
-| Lib | Licence | Verdict |
-|---|---|---|
-| **mathjs** | Apache-2.0 | ✅ défaut (sûr en distribution proprio) |
-| HyperFormula | **GPLv3/commerciale** | ⚠️ éviter sauf licence acceptée |
-| hot-formula-parser | MIT | alternative légère |
+| Lib                | Licence               | Verdict                                 |
+| ------------------ | --------------------- | --------------------------------------- |
+| **mathjs**         | Apache-2.0            | ✅ défaut (sûr en distribution proprio) |
+| HyperFormula       | **GPLv3/commerciale** | ⚠️ éviter sauf licence acceptée         |
+| hot-formula-parser | MIT                   | alternative légère                      |
 
 ### 6.6 Outils agent (config par l'IA)
+
 Process [CLAUDE.md](../../CLAUDE.md) §« Adding a New Tool ». Le poller est un
 **service de fond**, pas un `BaseTool` ; les outils ne font que lire/muter sa config.
 
-| Outil | Risque | Confirmation |
-|---|:--:|:--:|
-| `get_quotes` / `get_watchlist` | 🟢 low | non |
-| `add_to_watchlist` / `remove_from_watchlist` | 🟡 medium | non |
-| `set_formula` / `remove_formula` | 🟡 medium | non |
+| Outil                                        |  Risque   | Confirmation |
+| -------------------------------------------- | :-------: | :----------: |
+| `get_quotes` / `get_watchlist`               |  🟢 low   |     non      |
+| `add_to_watchlist` / `remove_from_watchlist` | 🟡 medium |     non      |
+| `set_formula` / `remove_formula`             | 🟡 medium |     non      |
 
 ---
 
 ## 7. Décisions ouvertes
 
 **Plateforme**
+
 1. ✅ **Distribution news : backend Supabase** (décidé). Reste à choisir le **plan**
    (free pour démarrer) et la région d'hébergement.
 2. **Identité client** : compte **anonyme** Supabase (ID d'installation) vs
@@ -321,36 +352,34 @@ Process [CLAUDE.md](../../CLAUDE.md) §« Adding a New Tool ». Le poller est un
 5. **L'interface configurable remplace-t-elle** la bulle/action actuelle, ou
    s'ajoute-t-elle à côté ?
 
-**Module Bourse**
-6. Univers (US seul vs Euronext/crypto/forex) · 7. Lib formules (mathjs vs autre) ·
-8. Cadence (30 s/60 s) · 9. Profondeur d'historique SQLite.
+**Module Bourse** 6. Univers (US seul vs Euronext/crypto/forex) · 7. Lib formules (mathjs vs autre) · 8. Cadence (30 s/60 s) · 9. Profondeur d'historique SQLite.
 
 ---
 
 ## 8. Risques & limites
 
-| Risque | Impact | Mitigation |
-|---|---|---|
-| **News falsifiée / usurpée** | Message frauduleux chez tous les clients | **Authz serveur (rôle admin)** + HTTPS + app cliente **sans capacité d'écriture** (+ signature optionnelle) |
-| Érosion du local-first | Confiance utilisateur | Flux **en lecture seule**, allow-list, audit, inférence locale inchangée |
+| Risque                              | Impact                                      | Mitigation                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **News falsifiée / usurpée**        | Message frauduleux chez tous les clients    | **Authz serveur (rôle admin)** + HTTPS + app cliente **sans capacité d'écriture** (+ signature optionnelle)                                        |
+| Érosion du local-first              | Confiance utilisateur                       | Flux **en lecture seule**, allow-list, audit, inférence locale inchangée                                                                           |
 | **Backend = ops / sécurité / coût** | Surface d'attaque, maintenance, hébergement | **Supabase managé** (pas de serveur à tenir), **RLS** par rôle, `service_role` jamais côté client, périmètre limité à la news, plan free au départ |
-| **Données clients (identité)** | Vie privée / RGPD | ID d'installation **anonyme** par défaut, minimisation, consentement si nominatif |
-| Endpoint Yahoo non officiel casse | Plus de data | Adaptateurs interchangeables + `WebScrapeAdapter` |
-| Données différées prises pour du RT | Mauvaise décision | Horodatage + état `stale` visibles |
-| Licence GPL (HyperFormula) | Contamination proprio | Défaut `mathjs` |
-| Formule erronée | UI cassée | Erreur isolée par cellule |
+| **Données clients (identité)**      | Vie privée / RGPD                           | ID d'installation **anonyme** par défaut, minimisation, consentement si nominatif                                                                  |
+| Endpoint Yahoo non officiel casse   | Plus de data                                | Adaptateurs interchangeables + `WebScrapeAdapter`                                                                                                  |
+| Données différées prises pour du RT | Mauvaise décision                           | Horodatage + état `stale` visibles                                                                                                                 |
+| Licence GPL (HyperFormula)          | Contamination proprio                       | Défaut `mathjs`                                                                                                                                    |
+| Formule erronée                     | UI cassée                                   | Erreur isolée par cellule                                                                                                                          |
 
 ---
 
 ## 9. Lotissement (roadmap)
 
-| Phase | Contenu | Sortie |
-|---|---|---|
-| **P0 — Cadrage** | Projet **Supabase** (plan/région), modèle d'identité client, schéma table `news` + **policies RLS** | Backend prêt à coder |
-| **P1 — Ossature dashboard** ✅ | Grille de widgets + `DashboardConfig` persistée + **mode édition** (ajout / drag-reorder / resize / rename / config) + widgets `quick_action` & `stocks` | **Implémenté** — voir [dashboard-p1.md](dashboard-p1.md) |
-| **P2 — Backend news (Supabase)** ✅ | Table `news` + **RLS** + Auth anonyme + `@supabase/supabase-js` + Realtime + bandeau & widget news + CSP egress | **Code + SQL livrés** (reste : provisionner le projet Supabase) — voir [dashboard-p2.md](dashboard-p2.md) |
-| **P3 — Module Bourse** ✅ | YahooQuoteSource + MarketService + MarketPoller + FormulaEngine (mathjs) + 5 outils agent + event `market:update` + widget `stocks` live | **Implémenté** — voir [dashboard-p3.md](dashboard-p3.md) |
-| **P4 — Enrichissements** | Backlog priorisé (widgets KPI/chart, alertes, formules glissantes, portefeuille, ciblage news…) → [dashboard-backlog.md](dashboard-backlog.md) | Post-MVP |
+| Phase                               | Contenu                                                                                                                                                  | Sortie                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **P0 — Cadrage**                    | Projet **Supabase** (plan/région), modèle d'identité client, schéma table `news` + **policies RLS**                                                      | Backend prêt à coder                                                                                      |
+| **P1 — Ossature dashboard** ✅      | Grille de widgets + `DashboardConfig` persistée + **mode édition** (ajout / drag-reorder / resize / rename / config) + widgets `quick_action` & `stocks` | **Implémenté** — voir [dashboard-p1.md](dashboard-p1.md)                                                  |
+| **P2 — Backend news (Supabase)** ✅ | Table `news` + **RLS** + Auth anonyme + `@supabase/supabase-js` + Realtime + bandeau & widget news + CSP egress                                          | **Code + SQL livrés** (reste : provisionner le projet Supabase) — voir [dashboard-p2.md](dashboard-p2.md) |
+| **P3 — Module Bourse** ✅           | YahooQuoteSource + MarketService + MarketPoller + FormulaEngine (mathjs) + 5 outils agent + event `market:update` + widget `stocks` live                 | **Implémenté** — voir [dashboard-p3.md](dashboard-p3.md)                                                  |
+| **P4 — Enrichissements**            | Backlog priorisé (widgets KPI/chart, alertes, formules glissantes, portefeuille, ciblage news…) → [dashboard-backlog.md](dashboard-backlog.md)           | Post-MVP                                                                                                  |
 
 ---
 
@@ -360,6 +389,7 @@ Sortie attendue de P0 : un backend **prêt à coder**. Tout le SQL ci-dessous se
 dans le SQL Editor du projet Supabase.
 
 ### 10.1 Table `news`
+
 ```sql
 create table public.news (
   id           uuid primary key default gen_random_uuid(),
@@ -376,6 +406,7 @@ create index on public.news (published_at desc);
 ```
 
 ### 10.2 RLS — le cœur de « seul l'admin publie »
+
 ```sql
 alter table public.news enable row level security;
 
@@ -393,6 +424,7 @@ create policy news_admin_write on public.news
   using      ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
   with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 ```
+
 > Les deux policies sont permissives (combinées en OR) : un **client** ne matche que
 > `news_read` (lecture filtrée) ; **toi (admin)** matches `news_admin_write` → tu vois
 > tout et tu es le seul à pouvoir écrire. Un client ne peut rien publier, même en
@@ -406,6 +438,7 @@ where email = 'alexis.bert1412@gmail.com';
 ```
 
 ### 10.3 Identité client
+
 - `supabase.auth.signInAnonymously()` → chaque installation obtient un `auth.uid()`
   **stable** (session persistée) = le `clientId` utilisé pour le ciblage.
 - ⚠️ Pour cibler « tel client » nominativement, l'admin doit relier un **uid** à un
@@ -413,13 +446,16 @@ where email = 'alexis.bert1412@gmail.com';
   table `clients (uid → label)`. → reste la décision ouverte §7.2.
 
 ### 10.4 Realtime
+
 ```sql
 alter publication supabase_realtime add table public.news;
 ```
 
 ### 10.5 Point d'intégration dans CatDesk
+
 Les appels Supabase = **egress réseau**. Deux options vis-à-vis de la règle « Rust
 valide l'egress » :
+
 - **(reco) Renderer direct** via `@supabase/supabase-js` — nécessaire pour le
   **WebSocket Realtime**, simple. On ajoute `*.supabase.co` à l'**allow-list / CSP
   Tauri**. Sûr : clé `anon` + RLS lecture seule.
@@ -430,28 +466,36 @@ Config embarquée : `SUPABASE_URL` + `SUPABASE_ANON_KEY` (anon = publique par de
 La `service_role` n'est **jamais** dans l'app cliente (uniquement console admin).
 
 ### 10.6 Snippets
+
 ```ts
 // CLIENT (CatDesk) — clé anon
 import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-await supabase.auth.signInAnonymously();              // clientId stable
+await supabase.auth.signInAnonymously(); // clientId stable
 
-const { data: news } = await supabase                  // RLS filtre déjà global+ciblé+non expiré
-  .from('news').select('*').order('published_at', { ascending: false });
+const { data: news } = await supabase // RLS filtre déjà global+ciblé+non expiré
+  .from('news')
+  .select('*')
+  .order('published_at', { ascending: false });
 
-supabase.channel('news')                               // temps réel
+supabase
+  .channel('news') // temps réel
   .on('postgres_changes', { event: '*', schema: 'public', table: 'news' }, reloadNews)
   .subscribe();
 ```
+
 ```ts
 // ADMIN (console séparée, session admin — NON livrée aux clients)
 await supabase.from('news').insert({
-  title: 'Maintenance prévue', body: 'Indispo le 30/06 14h-15h.',
-  severity: 'warning', audience_client_id: null,       // null = global ; sinon un uid
+  title: 'Maintenance prévue',
+  body: 'Indispo le 30/06 14h-15h.',
+  severity: 'warning',
+  audience_client_id: null, // null = global ; sinon un uid
 });
 ```
 
 ### 10.7 Checklist de sortie P0
+
 - [ ] Projet Supabase créé — plan **free**, région **EU (Frankfurt)** pour le RGPD
 - [ ] `news` + RLS (`news_read`, `news_admin_write`) + index + publication realtime
 - [ ] Compte admin + `app_metadata.role = 'admin'`
@@ -461,6 +505,7 @@ await supabase.from('news').insert({
 ---
 
 ## 11. Références techniques
+
 - Architecture & IPC : [CLAUDE.md](../../CLAUDE.md)
 - Outils réutilisables : [CAPACITES.md](../CAPACITES.md)
 - Stack (Tauri/Node/SQLite) : [adr-001](../architecture/adr-001-stack-selection.md)

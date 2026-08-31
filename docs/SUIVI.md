@@ -1,9 +1,58 @@
 # SUIVI — Évolution de CatDesk
 
-> Journal de travail. Voir aussi [CAPACITES.md](CAPACITES.md).
-> Dernière mise à jour : 2026-08-05.
+> Journal de travail, **antéchronologique** (le plus récent en haut).
+> Référence des capacités : [CAPACITES.md](CAPACITES.md) · bornes :
+> [LIMITES.md](LIMITES.md) · décisions ouvertes et backlog :
+> [AMELIORATIONS.md](AMELIORATIONS.md).
+> Dernière mise à jour : 2026-08-31.
 
 ## État actuel
+
+**Refonte propreté + documentation (2026-08-31)** — passe de refactoring à
+comportement constant sur les trois couches, plus la remise à niveau complète de
+la documentation. Vérifié à chaque étape : type-check 3/3, lint 0, **640 tests
+agent** (77 fichiers), **37 desktop**, **23 Rust**, **7 Python**,
+`cargo clippy -D warnings`, `vite build`.
+
+- **Cinq défauts silencieux réparés**, dont deux invisibles jusqu'ici :
+  Tailwind v4 ne chargeait **jamais** `tailwind.config.ts` (pas de directive
+  `@config`), donc les 132 usages de `brand-*` et les 5 animations custom ne
+  produisaient aucun CSS — vérifié par build avant/après ; et
+  `publish-update.ps1` cherchait un installeur NSIS que `--no-bundle` ne
+  produisait jamais, rendant le chemin d'auto-update inopérant.
+- **Bug de permissions** : `permission.response` n'avait aucun handler dans le
+  dispatch de l'agent. `PermissionEngine.resolvePermissionRequest` existait,
+  documentée « called from IPC bridge », appelée par personne. Tout outil `high`
+  restait donc bloqué 60 s puis échouait, quoi que réponde l'utilisateur.
+  Câblé + 4 tests de non-régression sur un dispatch qui n'en avait aucun.
+- **Surface morte retirée** : 10 des 25 commandes Tauri (40 % de la surface IPC)
+  n'avaient aucun appelant — dont `open_application`, qui lançait un processus
+  arbitraire sans `sandbox::check_command()`. Le trou se referme par suppression.
+- **Le domaine « presse » sort des fichiers d'outils** : `FetchTechNewsTool`
+  faisait 737 lignes pour une classe de 45, et dix modules `news/`/`llm/`
+  importaient leur vocabulaire métier depuis des outils. Éclaté en
+  `news/{newsItem,sources,parseFeed,newsText,aggregate,enrich,discordEmbeds}` +
+  `lib/{httpGet,readableText,discord}`. Plus aucune dépendance domaine → outils.
+- **Duplications supprimées** : 15 outils sur `lib/runProcess` (ils reperdaient
+  `windowsHide` — une console clignotait à chaque appel git — et le timeout) ;
+  5 copies de l'extraction JSON des réponses LLM ; 8 stores recalculant le
+  répertoire de données ; 7 gardes de dépendances Python en 3 variantes ; 3 blocs
+  de jetons de style et 3 modules CRUD Supabase côté front.
+- **`ToolResult` passe en union discriminée** — `if (result.success)` narrow
+  enfin. Un seul site de production en dépendait à tort (AuditLogger écrivait
+  `"error": undefined` sur chaque succès).
+- **Erreurs Rust en français** via `CatdeskError` (27 `map_err` laissaient fuiter
+  du texte OS anglais), audit ajouté aux 5 commandes à effet de bord qui n'en
+  avaient pas — dont `update_settings`, qui bascule `safeMode`.
+- **Documentation** : README, CONTRIBUTING et CHANGELOG réécrits (anglais) ;
+  CAPACITES, LIMITES, SECURITE, DISTRIBUTION, CLAUDE.md corrigés (français).
+  Le compte d'outils était faux (67 → **68**), le tableau des permissions citait
+  **cinq outils inexistants**, `LIMITES` §1 reposait entièrement sur quatre
+  outils fantômes, CONTRIBUTING pointait deux chemins qui n'existent pas, et
+  l'URL de clone comme la branche par défaut étaient fausses.
+- **Nouveau** : [AMELIORATIONS.md](AMELIORATIONS.md) — décisions ouvertes (dont
+  la contradiction **KV-cache `q4_0`** entre la doc et le code, non tranchée
+  volontairement) et dettes connues.
 
 **Modèle unique et release 0.1.3 (2026-08-05)** — passage à UN seul modèle de
 chat, le plus fort tenant sur 10 Go de VRAM : **`qwen3:14b`** (le palier
@@ -274,7 +323,7 @@ dailys.
 
 ---
 
-### État antérieur (2026-07-15)
+## État antérieur (2026-07-15)
 
 **Refactoring de fond (2026-07-15)** — audit complet noté 12/20, puis 6 phases
 exécutées (comportement produit inchangé, **557 tests TS verts / 71 fichiers +
@@ -344,7 +393,7 @@ exécutées (comportement produit inchangé, **557 tests TS verts / 71 fichiers 
 
 ---
 
-### État antérieur (2026-07-07)
+## État antérieur (2026-07-07)
 
 Dailys : le pipeline télécharge désormais le CORPS de chaque article
 (`enrichArticleTexts`, ~1 500 c/article, budget adaptatif dans l'invite) et le
@@ -375,6 +424,76 @@ avec console admin, revue de presse auto (cron + LLM), miroir Discord.
 Mémoire hiérarchique (warm store + consolidation), cache sémantique, playbook
 auto-évolution et spiral monitor câblés dans `index.ts`.
 Le monorepo type-check intégralement — **458 tests verts (65 fichiers)**.
+
+---
+
+## Journal antérieur (2026-06 → 2026-07)
+
+## Hygiène du repo — Session 3 (2026-07-02)
+
+Audit complet du projet, puis corrections :
+
+- [x] Docs resynchronisées avec la réalité du code : compte d'outils (57→62),
+      état actuel ci-dessus, [LIMITES.md](LIMITES.md) §4 (mémoire warm et RAG
+      hybride BM25 sont câblés), CHANGELOG réellement rempli,
+      [CATDESK-CONCEPTS-AVANCES.md](../CATDESK-CONCEPTS-AVANCES.md) annoté avec
+      l'état d'implémentation par section.
+- [x] PR #1 (`feat/dashboard-platform`, 32 commits) mergée dans `master`.
+- [x] Outil orphelin `analyze_logs` (branche `feat/analyze-logs-tool`, complet + testé mais jamais intégré) rapatrié dans `master`.
+- [x] Branches mortes supprimées (0 commit unique) ; `dev` remise au niveau de
+      `master`.
+- Vérifié au passage : `build-dist/` n'est **pas** tracké par git (bien ignoré),
+  et les modules « avancés » (warm memory, cache sémantique, EvolutionDaemon,
+  SpiralMonitor) sont tous réellement branchés dans `index.ts` — pas de code mort.
+
+## Phase 1 — les 4 outils manquants (2026-07-03)
+
+Les 4 actions qui avaient une fiche de permission sans outil câblé
+(LIMITES.md §1) sont maintenant implémentées, testées et enregistrées :
+
+- [x] `write_file` — écrit/append UTF-8 ou base64, crée les dossiers parents,
+      **bloque les répertoires système** (Windows, Program Files, ProgramData),
+      plafond 5 Mo. 10 tests.
+- [x] `write_clipboard` — Set-Clipboard via fichier temporaire UTF-8 (accents
+      préservés, zéro problème de quoting). Tests de validation (le vrai
+      presse-papier n'est pas touché par la suite).
+- [x] `open_app` — Start-Process avec échappement PowerShell anti-injection,
+      validation du nom (caractères de contrôle interdits). 6 tests.
+- [x] `store_memory` — VectorStore.store avec métadonnées source/tags/date ;
+      la mémoire est enfin inscriptible par l'agent. 5 tests.
+
+**67 outils · 458 tests verts (65 fichiers)** · type-check OK.
+Reste en « pas câblé » : `close_window`, `send_keys` (🟠) et les deux 🔴
+volontairement désactivés.
+
+## B6 + tests sandbox (2026-07-03)
+
+- [x] **B6 — persistance SQLite de l'historique bourse** :
+      `market/MarketHistoryStore.ts` (sql.js, `data/market.db`) — append par
+      tick du poller, réamorçage de l'historique au démarrage, purge quand un
+      symbole quitte la watchlist, plafond par symbole
+      (`CATDESK_MARKET_HISTORY_CAP`, défaut 2880 ≈ 24 h à 30 s). Échec d'init
+      non-fatal (repli mémoire pure). 9 tests. Débloque les formules
+      glissantes (B1).
+- [x] **Tests Rust de `sandbox.rs`** — la barrière de sécurité du projet
+      n'avait aucun test : 8 tests couvrent la blocklist de commandes
+      (destructives + évasion PowerShell + insensibilité à la casse + longueur
+      max), le path traversal et les racines autorisées (USERPROFILE/temp).
+      `cargo test --lib` : **15 verts** (avec tuning.rs).
+
+**Node : 467 tests (67 fichiers) · Rust : 15 tests** · type-check OK.
+
+## B1 — formules glissantes (2026-07-03)
+
+- [x] `FormulaEngine.buildScope` accepte l'historique : chaque symbole expose
+      `X.history` (série de prix), et le scope gagne `sma(serie, n)` /
+      `ema(serie, n)`. Exemples : `sma(AAPL.history, 20)`,
+      `AAPL.price - sma(AAPL.history, 50)`, `max(MSFT.history)`.
+- [x] Fenêtre en mémoire : 120 points (~1 h à 30 s) ; réamorcée depuis SQLite
+      (B6) au démarrage — les moyennes ne repartent plus de zéro.
+- [x] Guide widgets (PDF) et CAPACITES mis à jour ; B1 + B6 cochés au backlog.
+
+**Node : 471 tests (67 fichiers) · Rust : 15** · type-check OK.
 
 ## Travail — Session 2 (2026-06-11)
 
@@ -506,80 +625,3 @@ Lancer : `pnpm --filter @catdesk/agent-runtime test`.
       JS/SPA, astuce `wait_until="networkidle"`).
 - Résultat : sur une page comme gameslantern (SPA), l'agent reçoit un signal
   explicite pour basculer sur le navigateur qui exécute le JS.
-
-## Prochaines pistes (par valeur)
-
-1. ⬜ Persister le mode/les modèles choisis (settings) entre sessions.
-2. ⬜ Réduire la friction : `browser_navigate` est en risk `high` (confirmation).
-3. ⬜ Implémenter la capture écran côté Rust (`screen.rs` stub) OU assumer que
-   tout passe par le sidecar Python.
-4. ⬜ Packaging / distribution.
-
-_Aucun commit effectué — tout est dans l'arbre de travail._
-_(Note 2026-07-02 : obsolète — tout a été commité depuis sur `feat/dashboard-platform`.)_
-
-## Hygiène du repo — Session 3 (2026-07-02)
-
-Audit complet du projet, puis corrections :
-
-- [x] Docs resynchronisées avec la réalité du code : compte d'outils (57→62),
-      état actuel ci-dessus, [LIMITES.md](LIMITES.md) §4 (mémoire warm et RAG
-      hybride BM25 sont câblés), CHANGELOG réellement rempli,
-      [CATDESK-CONCEPTS-AVANCES.md](../CATDESK-CONCEPTS-AVANCES.md) annoté avec
-      l'état d'implémentation par section.
-- [x] PR #1 (`feat/dashboard-platform`, 32 commits) mergée dans `master`.
-- [x] Outil orphelin `analyze_logs` (branche `feat/analyze-logs-tool`, complet + testé mais jamais intégré) rapatrié dans `master`.
-- [x] Branches mortes supprimées (0 commit unique) ; `dev` remise au niveau de
-      `master`.
-- Vérifié au passage : `build-dist/` n'est **pas** tracké par git (bien ignoré),
-  et les modules « avancés » (warm memory, cache sémantique, EvolutionDaemon,
-  SpiralMonitor) sont tous réellement branchés dans `index.ts` — pas de code mort.
-
-## Phase 1 — les 4 outils manquants (2026-07-03)
-
-Les 4 actions qui avaient une fiche de permission sans outil câblé
-(LIMITES.md §1) sont maintenant implémentées, testées et enregistrées :
-
-- [x] `write_file` — écrit/append UTF-8 ou base64, crée les dossiers parents,
-      **bloque les répertoires système** (Windows, Program Files, ProgramData),
-      plafond 5 Mo. 10 tests.
-- [x] `write_clipboard` — Set-Clipboard via fichier temporaire UTF-8 (accents
-      préservés, zéro problème de quoting). Tests de validation (le vrai
-      presse-papier n'est pas touché par la suite).
-- [x] `open_app` — Start-Process avec échappement PowerShell anti-injection,
-      validation du nom (caractères de contrôle interdits). 6 tests.
-- [x] `store_memory` — VectorStore.store avec métadonnées source/tags/date ;
-      la mémoire est enfin inscriptible par l'agent. 5 tests.
-
-**67 outils · 458 tests verts (65 fichiers)** · type-check OK.
-Reste en « pas câblé » : `close_window`, `send_keys` (🟠) et les deux 🔴
-volontairement désactivés.
-
-## B6 + tests sandbox (2026-07-03)
-
-- [x] **B6 — persistance SQLite de l'historique bourse** :
-      `market/MarketHistoryStore.ts` (sql.js, `data/market.db`) — append par
-      tick du poller, réamorçage de l'historique au démarrage, purge quand un
-      symbole quitte la watchlist, plafond par symbole
-      (`CATDESK_MARKET_HISTORY_CAP`, défaut 2880 ≈ 24 h à 30 s). Échec d'init
-      non-fatal (repli mémoire pure). 9 tests. Débloque les formules
-      glissantes (B1).
-- [x] **Tests Rust de `sandbox.rs`** — la barrière de sécurité du projet
-      n'avait aucun test : 8 tests couvrent la blocklist de commandes
-      (destructives + évasion PowerShell + insensibilité à la casse + longueur
-      max), le path traversal et les racines autorisées (USERPROFILE/temp).
-      `cargo test --lib` : **15 verts** (avec tuning.rs).
-
-**Node : 467 tests (67 fichiers) · Rust : 15 tests** · type-check OK.
-
-## B1 — formules glissantes (2026-07-03)
-
-- [x] `FormulaEngine.buildScope` accepte l'historique : chaque symbole expose
-      `X.history` (série de prix), et le scope gagne `sma(serie, n)` /
-      `ema(serie, n)`. Exemples : `sma(AAPL.history, 20)`,
-      `AAPL.price - sma(AAPL.history, 50)`, `max(MSFT.history)`.
-- [x] Fenêtre en mémoire : 120 points (~1 h à 30 s) ; réamorcée depuis SQLite
-      (B6) au démarrage — les moyennes ne repartent plus de zéro.
-- [x] Guide widgets (PDF) et CAPACITES mis à jour ; B1 + B6 cochés au backlog.
-
-**Node : 471 tests (67 fichiers) · Rust : 15** · type-check OK.

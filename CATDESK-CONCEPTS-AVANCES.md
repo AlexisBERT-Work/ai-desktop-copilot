@@ -8,7 +8,7 @@
 > `CLAUDE.md` pour ça) mais une boîte à outils d'architecture pour rendre l'agent
 > plus rapide, plus fiable et plus malin.
 >
-> **État d'implémentation (2026-07-02)** — une bonne partie est déjà câblée dans
+> **État d'implémentation (2026-07-02, non revu depuis)** — une bonne partie est déjà câblée dans
 > `packages/agent-runtime/src/index.ts` :
 > ✅ = en place · 🟡 = partiel · ⬜ = à faire
 
@@ -29,12 +29,13 @@
 ---
 
 <a name="1-le-harness"></a>
+
 ## 1. Le harness : le vrai cœur de CatDesk
 
 ### Le concept
 
 En 2026, le terme qui structure tout le domaine est le **harness** (le "harnais"). L'idée
-clé : *le modèle est une commodité, le harness est le produit*. Le harness est la couche
+clé : _le modèle est une commodité, le harness est le produit_. Le harness est la couche
 de contrôle qui enrobe le LLM et décide **ce que le modèle voit, quels outils il peut
 appeler, comment l'état persiste, et quand l'humain intervient**.
 
@@ -46,6 +47,7 @@ consolider les apprentissages et réécrire l'index mémoire.
 ### Pourquoi ça marche
 
 Le modèle raisonne, le harness agit. Cette séparation te permet de :
+
 - changer de modèle Ollama sans réécrire ta logique d'agent,
 - ajouter des garde-fous indépendants du modèle,
 - garder un contrôle total sur ce qui rentre dans le contexte (le facteur n°1 de qualité).
@@ -117,6 +119,7 @@ impl Harness {
 ---
 
 <a name="2-context-engineering"></a>
+
 ## 2. Context engineering : pourquoi plus de tokens = pire
 
 ### Le concept
@@ -175,6 +178,7 @@ principale reste focalisée sur l'orchestration. Pas de pollution croisée entre
 ---
 
 <a name="3-mémoire-hiérarchique"></a>
+
 ## 3. Mémoire hiérarchique multi-couches
 
 ### Le concept
@@ -190,12 +194,12 @@ persistante qui évolue.
 
 ### Architecture en couches
 
-| Couche | Contenu | Vitesse | Exemple CatDesk |
-|---|---|---|---|
-| **Working** | Tour courant + N derniers | Instantané | Ce que tu tapes maintenant |
-| **Warm** | Faits structurés, préférences extraites async | Très rapide | "D code en Rust + Next.js" |
-| **Episodic** | Trajectoires d'actions passées | Rapide | "La fois où on a fixé le bug X comme ça" |
-| **Semantic** | Connaissance vectorielle du projet | Moyen | Doc, fichiers indexés |
+| Couche       | Contenu                                       | Vitesse     | Exemple CatDesk                          |
+| ------------ | --------------------------------------------- | ----------- | ---------------------------------------- |
+| **Working**  | Tour courant + N derniers                     | Instantané  | Ce que tu tapes maintenant               |
+| **Warm**     | Faits structurés, préférences extraites async | Très rapide | "D code en Rust + Next.js"               |
+| **Episodic** | Trajectoires d'actions passées                | Rapide      | "La fois où on a fixé le bug X comme ça" |
+| **Semantic** | Connaissance vectorielle du projet            | Moyen       | Doc, fichiers indexés                    |
 
 ### Techniques 2026 à intégrer
 
@@ -231,12 +235,12 @@ sur ton poste.
 ---
 
 <a name="4-rag-local-moderne"></a>
+
 ## 4. RAG local moderne : hybrid search + reranking + GraphRAG
 
 ### Le concept
 
-Le RAG "naïf" (chunker en 512 tokens → embeddings → cosine similarity) est de la techno
-2023. En 2026, un pipeline RAG local performant combine **plusieurs méthodes de recherche**
+Le RAG "naïf" (chunker en 512 tokens → embeddings → cosine similarity) est de la techno 2023. En 2026, un pipeline RAG local performant combine **plusieurs méthodes de recherche**
 puis affine avec un re-ranking. Le gain est réel : sur du multi-hop, des équipes rapportent
 +340% de précision et -65% d'hallucinations en passant de naïf à hybrid GraphRAG.
 
@@ -289,6 +293,7 @@ construire → réserve-le à ta base de code et tes notes, pas à tout.
 ---
 
 <a name="5-optimisation-dinférence"></a>
+
 ## 5. Optimisation d'inférence : 2-3x de vitesse gratuite
 
 ### Le concept
@@ -300,10 +305,11 @@ techniques 2026 donnent des gains réels sans changer de modèle ni de matériel
 
 **A. `keep_alive` — garder le modèle chaud**
 Déjà sur ta roadmap. Évite le rechargement du modèle entre deux requêtes. Réglage Ollama :
+
 ```bash
 # Garde le modèle en RAM 30 min après le dernier appel
 curl http://localhost:11434/api/generate -d '{
-  "model": "qwen3.5",
+  "model": "qwen3:14b",
   "keep_alive": "30m"
 }'
 ```
@@ -318,6 +324,12 @@ Pour CatDesk : associe un draft (ex : un 1-3B) à ton modèle principal. Sur du 
 texte structuré, les taux d'acceptation sont élevés → gros gain.
 
 **C. Quantification du KV cache (4-bit) — moitié moins de RAM**
+
+> ⚠️ **Implémenté, mais le sujet est litigieux sur CE GPU.** `commands/tuning.rs`
+> active `q4_0` quand la VRAM est serrée, alors que `CLAUDE.md` et
+> `docs/CAPACITES.md` affirment qu'il corrompt la sortie sur la RX 6700.
+> Contradiction non tranchée : lire `docs/AMELIORATIONS.md` §1.1 avant d'agir.
+
 Le KV cache est le goulot d'étranglement mémoire en long contexte. Le quantifier en 4-bit
 réduit la mémoire de moitié avec <1% de perte de qualité. Combiné au self-speculative decoding
 (QuantSpec), on atteint ~2.5x de speedup avec >90% de taux d'acceptation sur du long contexte.
@@ -350,13 +362,14 @@ speculative decoding (selon support Ollama de ta version) → KV cache 4-bit (av
 ---
 
 <a name="6-multi-agents"></a>
+
 ## 6. Architecture multi-agents : orchestrateur + sous-agents
 
 ### Le concept
 
 Au lieu d'un agent généraliste qui fait tout, tu **délègues à des agents spécialisés**.
-L'idée clé contre-intuitive : *le bénéfice principal des sous-agents n'est pas le
-parallélisme, c'est la gestion du contexte*. En déléguant, le contexte de l'orchestrateur
+L'idée clé contre-intuitive : _le bénéfice principal des sous-agents n'est pas le
+parallélisme, c'est la gestion du contexte_. En déléguant, le contexte de l'orchestrateur
 reste léger — on a mesuré des réductions de plus de 90% des tokens de contexte.
 
 Un orchestrateur de haut niveau **n'interagit pas directement avec l'environnement**. Il
@@ -377,16 +390,17 @@ exploser les limites.
 
 ### Les 3 patterns d'exécution
 
-| Pattern | Quand | Exemple CatDesk |
-|---|---|---|
-| **Synchrone** | Résultat immédiat nécessaire | "analyse ce stacktrace" → réponse directe |
+| Pattern        | Quand                            | Exemple CatDesk                                   |
+| -------------- | -------------------------------- | ------------------------------------------------- |
+| **Synchrone**  | Résultat immédiat nécessaire     | "analyse ce stacktrace" → réponse directe         |
 | **Asynchrone** | Tâches parallèles non bloquantes | cherche web + lit fichiers + indexe en même temps |
-| **Scheduled** | Exécution future | veille nocturne, consolidation mémoire |
+| **Scheduled**  | Exécution future                 | veille nocturne, consolidation mémoire            |
 
 ### Le piège à éviter : le bon niveau de contexte
 
 La recherche (AOrchestra) est claire : il faut passer aux sous-agents **un contexte curé**,
 ni trop ni trop peu.
+
 - **No-context** (juste l'instruction) → échoue par manque de traces d'exécution critiques.
 - **Full-context** (tout hériter) → introduit de l'info non pertinente et dégrade le contexte.
 - **Curated context** (l'orchestrateur choisit quoi passer) → gagnant.
@@ -411,6 +425,7 @@ ni trop ni trop peu.
 ---
 
 <a name="7-sécurité"></a>
+
 ## 7. Sécurité défense en profondeur
 
 ### Le concept
@@ -461,6 +476,7 @@ masque les PII/secrets avant que le LLM ne les voie, et bloque les tentatives d'
 ### Comment mettre en place dans CatDesk
 
 Tu as déjà : sandbox Rust, permissions risk-gated, audit. Il manque :
+
 1. **Pre-check déterministe** sur les inputs (regex patterns d'injection connus).
 2. **Post-execution scan** sur les outputs d'outils (le plus important — surtout pour la
    lecture web et l'OCR qui ingèrent du contenu non fiable).
@@ -473,13 +489,14 @@ Tu as déjà : sandbox Rust, permissions risk-gated, audit. Il manque :
 ---
 
 <a name="8-auto-amélioration"></a>
+
 ## 8. Auto-amélioration : l'agent qui apprend de ses traces
 
 ### Le concept
 
 Le saut qualitatif ultime : un agent qui **devient meilleur au fil du temps** en analysant
 ses propres exécutions. Le pattern (inspiré de hermes-agent-self-evolution) : lire les traces
-d'exécution pour comprendre *pourquoi* quelque chose a échoué, puis proposer des améliorations
+d'exécution pour comprendre _pourquoi_ quelque chose a échoué, puis proposer des améliorations
 ciblées de ses prompts et skills.
 
 ### Les briques
@@ -519,38 +536,43 @@ Quand l'agent résout un problème nouveau de façon réutilisable, il **écrit 
 ---
 
 <a name="9-roadmap"></a>
+
 ## 9. Roadmap d'intégration suggérée
 
 Par ratio impact / effort, en partant de ce que tu as déjà :
 
 ### Phase 1 — Fondations (gains immédiats)
-| Tâche | Pourquoi maintenant | Effort |
-|---|---|---|
-| Formaliser le harness (boucle ReAct) | Tout le reste s'appuie dessus | ~1 sem |
-| `keep_alive` + routage de modèles | Vitesse gratuite, déjà sur roadmap | ~2j |
-| Compaction + checkpoints Git | Débloque les longues sessions | ~3j |
-| Lazy loading des outils MCP | -95% de contexte gaspillé | ~2j |
+
+| Tâche                                | Pourquoi maintenant                | Effort |
+| ------------------------------------ | ---------------------------------- | ------ |
+| Formaliser le harness (boucle ReAct) | Tout le reste s'appuie dessus      | ~1 sem |
+| `keep_alive` + routage de modèles    | Vitesse gratuite, déjà sur roadmap | ~2j    |
+| Compaction + checkpoints Git         | Débloque les longues sessions      | ~3j    |
+| Lazy loading des outils MCP          | -95% de contexte gaspillé          | ~2j    |
 
 ### Phase 2 — Intelligence
-| Tâche | Pourquoi | Effort |
-|---|---|---|
-| RAG hybrid (tantivy + vector + RRF) | Saut de qualité sur la recherche locale | ~4j |
+
+| Tâche                                       | Pourquoi                                      | Effort |
+| ------------------------------------------- | --------------------------------------------- | ------ |
+| RAG hybrid (tantivy + vector + RRF)         | Saut de qualité sur la recherche locale       | ~4j    |
 | Mémoire hiérarchique (warm SQLite + daemon) | Mémoire qui évolue, pas juste un vector store | ~1 sem |
-| Post-execution security hook | Critique dès que tu ajoutes lecture web/OCR | ~3j |
+| Post-execution security hook                | Critique dès que tu ajoutes lecture web/OCR   | ~3j    |
 
 ### Phase 3 — Autonomie
-| Tâche | Pourquoi | Effort |
-|---|---|---|
-| Sous-agents (orchestrateur + Task tool) | Le vrai saut architectural | ~1-2 sem |
-| Semantic cache | -70% d'appels sur requêtes répétées | ~2j |
-| Speculative decoding / KV cache 4-bit | Vitesse avancée | selon support Ollama |
+
+| Tâche                                   | Pourquoi                            | Effort               |
+| --------------------------------------- | ----------------------------------- | -------------------- |
+| Sous-agents (orchestrateur + Task tool) | Le vrai saut architectural          | ~1-2 sem             |
+| Semantic cache                          | -70% d'appels sur requêtes répétées | ~2j                  |
+| Speculative decoding / KV cache 4-bit   | Vitesse avancée                     | selon support Ollama |
 
 ### Phase 4 — Auto-amélioration
-| Tâche | Pourquoi | Effort |
-|---|---|---|
-| Playbook + traces structurées | Base de l'apprentissage | ~3j |
-| Daemon d'évolution nocturne | L'agent s'améliore seul (validé par toi) | ~1 sem |
-| Auto-génération de skills | La bibliothèque grossit toute seule | ~4j |
+
+| Tâche                         | Pourquoi                                 | Effort |
+| ----------------------------- | ---------------------------------------- | ------ |
+| Playbook + traces structurées | Base de l'apprentissage                  | ~3j    |
+| Daemon d'évolution nocturne   | L'agent s'améliore seul (validé par toi) | ~1 sem |
+| Auto-génération de skills     | La bibliothèque grossit toute seule      | ~4j    |
 
 ---
 

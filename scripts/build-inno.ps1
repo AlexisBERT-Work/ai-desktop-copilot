@@ -19,7 +19,7 @@
   Produce ONE .exe instead of the default ~2 GB slices. Only works if the
   total payload stays under ~4.2 GB — Inno Setup hard-refuses a single
   Setup.exe past that regardless of destination (not a FAT32-only limit).
-  CatDesk's model-bundled payload (~22 GB) exceeds this, so this flag is only
+  CatDesk's model-bundled payload (~18 GB) exceeds this, so this flag is only
   useful for a lighter build (e.g. no models / update artifact).
 #>
 [CmdletBinding()]

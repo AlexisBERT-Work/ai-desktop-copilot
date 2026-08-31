@@ -1,9 +1,13 @@
 # Dashboard P3 — module Bourse (données live)
 
+> ⚠️ **Document de cadrage historique** (état de sa date de rédaction). Il garde
+> la trace des décisions prises et de leurs raisons ; il n'est **pas maintenu**.
+> Pour l'état réel du projet : [SUIVI.md](../SUIVI.md) « État actuel »,
+> [CAPACITES.md](../CAPACITES.md) et [LIMITES.md](../LIMITES.md).
+
 **Date :** 2026-06-28
-**Statut :** Implémenté (type-check + lint verts, 9 tests bourse). Le bras Rust
-`market.update` n'a pas été compilé ici (pas de `cargo build` dans la boucle) —
-miroir exact de `proactive.suggestion`.
+**Statut :** **Livré.** Le bras Rust `market.update` est compilé et expédié
+depuis les installeurs 0.1.x.
 **Auteur :** @alexis.bert1412
 
 > Le module bourse du Pilier A : cotations **en direct** dans le dashboard +
@@ -71,6 +75,7 @@ volontaire sur le v8 par-symbole, suffisant à la minute.)
 
 Contexte = un objet par symbole : `AAPL.price`, `AAPL.change`,
 `AAPL.changePercent`, `AAPL.volume`. Exemples :
+
 - `AAPL.price / MSFT.price` (ratio croisé)
 - `max(AAPL.changePercent, MSFT.changePercent)`
 - `AAPL.change * 100 + MSFT.change`
@@ -88,22 +93,22 @@ nom sur `computed`), avec valeur ou « erreur » par formule.
 
 ## 5. Outils agent
 
-| Outil | Rôle | Risque |
-|---|---|:--:|
-| `get_market` | Instantané courant (rafraîchi) : cotations + formules | 🟢 low |
-| `add_to_watchlist` | Ajoute un symbole + rafraîchit | 🟡 medium |
-| `remove_from_watchlist` | Retire un symbole | 🟡 medium |
-| `set_formula` | Crée/modifie une formule (mathjs) | 🟡 medium |
-| `remove_formula` | Supprime une formule | 🟡 medium |
+| Outil                   | Rôle                                                  |  Risque   |
+| ----------------------- | ----------------------------------------------------- | :-------: |
+| `get_market`            | Instantané courant (rafraîchi) : cotations + formules |  🟢 low   |
+| `add_to_watchlist`      | Ajoute un symbole + rafraîchit                        | 🟡 medium |
+| `remove_from_watchlist` | Retire un symbole                                     | 🟡 medium |
+| `set_formula`           | Crée/modifie une formule (mathjs)                     | 🟡 medium |
+| `remove_formula`        | Supprime une formule                                  | 🟡 medium |
 
 ---
 
 ## 6. Configuration (env du sidecar)
 
-| Variable | Défaut | Rôle |
-|---|---|---|
-| `CATDESK_WATCHLIST` | `AAPL,MSFT,TSLA` | Watchlist de départ |
-| `CATDESK_MARKET_INTERVAL_MS` | `30000` | Cadence de rafraîchissement |
+| Variable                     | Défaut           | Rôle                        |
+| ---------------------------- | ---------------- | --------------------------- |
+| `CATDESK_WATCHLIST`          | `AAPL,MSFT,TSLA` | Watchlist de départ         |
+| `CATDESK_MARKET_INTERVAL_MS` | `30000`          | Cadence de rafraîchissement |
 
 ---
 

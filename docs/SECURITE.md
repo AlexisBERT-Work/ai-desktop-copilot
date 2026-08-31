@@ -26,22 +26,23 @@ commande/chemin, et le **scan post-exécution §7**.
 Le sandbox Rust (`apps/desktop/src-tauri/src/core/sandbox.rs`,
 `commands/system.rs`) **n'est PAS sur le chemin d'exécution des outils de
 l'agent**. Les outils tournent dans Node et appellent `execFile` directement
-(`RunCommandTool.ts:63`, `OpenAppTool.ts:49`). Il existe donc **deux blocklists
+(`RunCommandTool`, `OpenAppTool` — via `lib/runProcess`). Il existe donc **deux blocklists
 qui ont divergé** (Rust `substring` vs Node `regex`) ; le Rust ne protège que
 d'éventuels appels directs depuis React. Toute la sécurité réelle de l'agent
-repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
+repose sur le code Node. → _Objectif de fond : une source de vérité unique._
 
 ---
 
 ## Vulnérabilités ouvertes
 
 ### Vuln 1 — Lecture de fichier arbitraire via traversal dans `read_file` (auto-approuvé)
+
 - **Sévérité : HAUTE** · `path_traversal` · confiance élevée · **STATUT : ✅ CORRIGÉ (2026-07-03)**
 - **Correctif appliqué** : `isPathAllowed` (`PermissionEngine.ts`) rejette désormais
   tout segment `..` et exige un match à la frontière de dossier (`allowed + '/'`,
   fini le faux match `Documents` ↔ `Documents-evil`). 3 tests de non-régression
   ajoutés (`PermissionEngine.test.ts`). Suite : 474 tests verts, type-check OK.
-- `permissions/PermissionEngine.ts:124-143` — `isPathAllowed` fait
+- `permissions/PermissionEngine.ts` — `isPathAllowed` fait
   `normalized.startsWith(allowed)` **sans bloquer `../`** ni canonicaliser.
   `tools/filesystem/ReadFileTool.ts` est `low` / auto-approuvé et lit le chemin
   **brut**.
@@ -59,24 +60,24 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   une seule fonction `assertPathAllowed`.
 
 ### Vuln 2 — `open_app` = exécution de commande arbitraire contournant la blocklist de `run_command`
+
 - **Sévérité : HAUTE** · `command_injection` / `risk_misclassification` · confiance élevée · **STATUT : ✅ CORRIGÉ (2026-07-03)**
 - **Correctif appliqué** : `open_app` reclassé `medium` → `high` (`OpenAppTool.ts`
-  + `permissions.ts`), ce qui supprime l'auto-approbation « se souvenir » de
-  session. `validateAppName` refuse désormais les interpréteurs/LOLBins comme
-  cible (powershell/pwsh/cmd/wscript/cscript/mshta/rundll32/regsvr32/python/node/
-  bash…), fermant le contournement de `run_command`. Test dédié. 478 tests verts.
+  - `permissions.ts`), ce qui supprime l'auto-approbation « se souvenir » de
+    session. `validateAppName` refuse désormais les interpréteurs/LOLBins comme
+    cible (powershell/pwsh/cmd/wscript/cscript/mshta/rundll32/regsvr32/python/node/
+    bash…), fermant le contournement de `run_command`. Test dédié. 478 tests verts.
 - **Résiduel** : un exécutable « légitime » peut toujours recevoir des arguments ;
   la vraie borne reste la confirmation `high`. Le durcissement va plus loin en
   Vuln 4 (source de validation unique).
-- `tools/system/OpenAppTool.ts:38-49` construit
+- `tools/system/OpenAppTool.ts` construit
   `Start-Process -FilePath '<name>' -ArgumentList '<args>'`. Le nom peut être
   **n'importe quel exécutable**, les args sont arbitraires. Classé `medium`
-  (`shared-types/src/permissions.ts:63`) alors que `run_command` équivalent est
-  `high` (`permissions.ts:111`).
+  alors que `run_command`, équivalent en portée, est `high`.
 - **Exploit** : `open_app(name="powershell", args="-enc <base64>")` exécute du code
   arbitraire. La blocklist qui bloque `powershell -enc`, `iex`, `downloadstring`
   dans `run_command` **ne s'applique pas ici**. Étant `medium`, une approbation
-  « se souvenir » (`PermissionEngine.ts:73-75`) en fait une primitive persistante ;
+  « se souvenir » (`PermissionEngine.resolvePermissionRequest`) en fait une primitive persistante ;
   et la confirmation affiche un blob base64 opaque, pas « exécute cette commande ».
 - **Correctif** : reclasser `open_app` en `high` (pas de session-remember), valider
   la cible contre une allow-list d'applications, refuser les interpréteurs
@@ -84,13 +85,15 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   validation avec `run_command`.
 
 ### Vuln 3 — La whitelist de chemins ne s'applique qu'aux outils dont le nom contient `"file"`
+
 - **Sévérité : MOYENNE** · `broken_access_control` · confiance élevée · **STATUT : ✅ CORRIGÉ (2026-07-03)**
 - **Correctif appliqué** : le gate (`PermissionEngine.check`) valide désormais tout
   argument `path` **et** `db_path` par `isPathAllowed`, quel que soit le nom de
   l'outil (`workdir` volontairement exclu — c'est un cwd de commande, pas une
   cible de lecture/écriture). 3 tests ajoutés (parse_document, run_sqlite cookies,
   chemin whitelisté autorisé). 477 tests verts.
-- `PermissionEngine.ts:45` : `if (request.tool.includes('file') || request.tool === 'list_directory')`.
+- `PermissionEngine` : la vérification de chemin ne s'applique qu'aux arguments
+  nommés `path`/`db_path` (le filtrage par nom d'outil a été remplacé).
   Or `parse_document`, `analyze_data`, `read_calendar`, `transcribe_audio` prennent
   un `path` et lisent le disque **sans jamais passer par cette vérification**, et
   sont `low`/auto-approuvés.
@@ -104,6 +107,7 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   soit le nom de l'outil (dans `BaseTool` ou le gate, piloté par le schéma).
 
 ### Vuln 4 — Blocklist `run_command` contournable (deny-list poreuse)
+
 - **Sévérité : MOYENNE (défense en profondeur)** · `insufficient_input_validation` · **STATUT : ✅ ATTÉNUÉ (2026-07-03)**
 - **Correctif appliqué** : politique extraite dans `security/commandPolicy.ts`
   (source unique côté Node, utilisée par `run_command`). Motifs durcis pour couvrir
@@ -113,7 +117,7 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 - **Rappel** : ça reste une deny-list, pas une frontière — la vraie borne est la
   confirmation `high` de `run_command`. La divergence Rust (`sandbox.rs`) subsiste
   mais ce code n'est pas sur le chemin de l'agent (cf. constat d'architecture).
-- `tools/system/RunCommandTool.ts:17-30`. Contournements : `-enc` bloqué mais
+- `security/commandPolicy.ts` (extrait de RunCommandTool). Contournements : `-enc` bloqué mais
   PowerShell accepte les abréviations `-e`/`-en`/`-ec` ; `/iex\s*\(/` rate
   `iex $x` (sans parenthèse) ; `downloadstring` ne couvre pas
   `Invoke-WebRequest`/`iwr`/`Invoke-RestMethod`/`curl` ; `rm -rf /` et `del /[sf]`
@@ -137,8 +141,9 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   normalisation casse/slash de `isPathAllowed` est correcte — mais c'est cette
   même fonction qui reste vulnérable au `../` (Vuln 1).
 - **Gate de permissions** bien invoqué avant **chaque** appel d'outil
-  (`AgentOrchestrator.ts:312`) ; safe-mode, outils critiques désactivés
-  (`delete_file`, `run_as_admin`), timeout 60 s sur les confirmations. Ossature saine.
+  (`AgentOrchestrator`) ; safe-mode ; timeout 60 s sur les confirmations.
+  Ossature saine. Aucun outil n'est classé `critical` : le niveau existe pour
+  qu'un futur outil destructeur soit désactivé par défaut.
 - **Tests Rust `sandbox.rs`** (7ba00e6) : couvrent la blocklist, mais le chemin
   réellement exécuté est Node — ces tests protègent du code peu utilisé.
 
@@ -165,11 +170,11 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
 ## Plan de réparation priorisé
 
 1. ~~**`isPathAllowed` durci** (Vuln 1)~~ — ✅ **FAIT (2026-07-03)**. `..` interdit
-   + match à la frontière de dossier.
+   - match à la frontière de dossier.
 2. ~~**Étendre le contrôle de chemin à tout argument `path`/`db_path`** (Vuln 3)~~
    — ✅ **FAIT (2026-07-03)**.
 3. ~~**Durcir `open_app`** (Vuln 2)~~ — ✅ **FAIT (2026-07-03)**. Reclassé `high`
-   + blocage des interpréteurs/LOLBins.
+   - blocage des interpréteurs/LOLBins.
 4. ~~**Politique de commande unique + alias/abréviations** (Vuln 4)~~ — ✅ **FAIT
    (2026-07-03)** dans `security/commandPolicy.ts`.
 5. ~~**Boucher les angles morts §7**~~ — ✅ **FAIT (2026-07-03)**. Scan appliqué à
@@ -200,11 +205,40 @@ repose sur le code Node. → *Objectif de fond : une source de vérité unique.*
   cmdlets de download, `Remove-Item -Recurse`). 27 tests. 505 tests verts.
 - **2026-07-03** — **Vuln 5 corrigée** (angles morts §7) : scan appliqué aussi aux
   sorties d'erreur (`AgentOrchestrator.ts`) + rédaction des URL de webhook
-  Discord/Slack (`sanitizeToolOutput.ts`). 2 tests. 507 tests verts.
+  Discord/Slack (`sanitizeToolOutput.ts`).
 - **2026-07-03** — ✅ **Toutes les vulnérabilités du diagnostic traitées.**
 
 ---
 
-*Méthode : diagnostic en lecture directe du chemin d'exécution (références
+_Méthode : diagnostic en lecture directe du chemin d'exécution (références
 `fichier:ligne` vérifiables), pas d'exécution de code. À actualiser en cochant le
-STATUT de chaque vuln au fur et à mesure des correctifs.*
+STATUT de chaque vuln au fur et à mesure des correctifs._
+
+---
+
+## Mise à jour 2026-08-31 — surface d'attaque réduite
+
+- **10 commandes Tauri supprimées** faute d'appelant : `file_read`, `file_write`,
+  `dir_list`, `system_run_command`, `open_application`, `clipboard_read`,
+  `clipboard_write`, `screen_capture`, `screen_capture_active_window`,
+  `get_ollama_models`. C'était **40 % de la surface IPC**, dont les deux
+  handlers les plus sensibles. L'agent Node fait ces opérations par ses propres
+  outils, soumis à `PermissionEngine` et `commandPolicy`.
+- **Trou refermé au passage** : `open_application` lançait
+  `Command::new(<nom fourni par l'appelant>)` **sans `sandbox::check_command()`**,
+  contournant donc la blocklist. Il n'avait aucun appelant ; il a été supprimé
+  plutôt que colmaté.
+- `core/sandbox.rs` est **conservé sans appelant** (`#![allow(dead_code)]`,
+  rationnel en tête de module) : c'est le contrôle obligatoire de toute future
+  commande touchant au disque ou au shell, et ses 11 tests documentent des
+  contournements réels déjà corrigés.
+- **Audit élargi** : cinq commandes à effet de bord n'en laissaient aucune
+  trace, dont `update_settings` — qui bascule `safeMode`, donc le blocage de
+  tous les outils à risque ≥ medium.
+- **Bug de permissions corrigé** : les réponses de l'utilisateur aux dialogues de
+  confirmation n'atteignaient jamais l'agent (`permission.response` n'avait aucun
+  handler). Tout outil `high` restait bloqué 60 s puis échouait — l'utilisateur
+  ne pouvait donc pas _autoriser_, seulement subir un timeout. Voir le CHANGELOG.
+- **Exception assumée non documentée** : le webview parle directement à Supabase
+  (HTTPS + WebSocket), hors du passage obligé par Rust. Voir
+  [AMELIORATIONS.md](AMELIORATIONS.md) §1.2.

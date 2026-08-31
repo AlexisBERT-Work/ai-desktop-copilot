@@ -1,30 +1,34 @@
 # CE QUE CATDESK NE SAIT PAS (ENCORE) FAIRE
 
-> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-07-02**.
+> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-08-31**.
 > Liste honnête des bornes actuelles, pour ne pas survendre l'outil.
 
 ---
 
-## 1. Outils prévus mais **pas encore câblés**
+## 1. Actions que l'agent ne sait pas faire
 
-Ces actions ont une **fiche de permission** dans
-[permissions.ts](../packages/shared-types/src/permissions.ts) mais **aucun outil
-correspondant n'est enregistré** dans
-[index.ts](../packages/agent-runtime/src/index.ts) — l'agent **ne peut donc pas
-les appeler aujourd'hui** :
+Ces actions n'existent ni comme outil, ni comme fiche de permission — l'agent ne
+peut pas les appeler, et rien n'est « à moitié câblé ».
 
-> **Câblés le 2026-07-03** : `write_file`, `write_clipboard`, `open_app`,
-> `store_memory` — ils ne manquent plus (voir [CAPACITES.md](CAPACITES.md)).
+| Action manquante                  | Contournement actuel                          |
+| --------------------------------- | --------------------------------------------- |
+| **Fermer une fenêtre**            | —                                             |
+| **Gérer/déplacer les fenêtres**   | —                                             |
+| **Envoyer des frappes clavier**   | `browser_type`, pour le navigateur uniquement |
+| **Supprimer un fichier**          | volontairement absent                         |
+| **Élever les privilèges (admin)** | volontairement absent                         |
 
-| Action manquante                  | Permission déclarée | Contournement actuel                         |
-| --------------------------------- | ------------------- | -------------------------------------------- |
-| **Fermer une fenêtre**            | `close_window` (🟠) | —                                            |
-| **Envoyer des frappes clavier**   | `send_keys` (🟠)    | `browser_type` pour le navigateur uniquement |
-| **Supprimer un fichier**          | `delete_file` (🔴)  | désactivé par design                         |
-| **Élever les privilèges (admin)** | `run_as_admin` (🔴) | désactivé par design                         |
+Suppression de fichier et élévation de privilèges sont des **absences
+délibérées**, pas des trous à combler : le niveau de risque `critical` existe
+dans le moteur de permissions pour qu'un tel outil, s'il arrivait un jour, soit
+désactivé par défaut plutôt que rajouté après coup. Aucun outil n'est
+aujourd'hui classé `critical`.
 
-> Les deux 🔴 (`delete_file`, `run_as_admin`) sont **volontairement désactivés**
-> (`enabled: false`) : ce n'est pas un manque, c'est un garde-fou.
+> Note historique : cette section décrivait jusqu'en août 2026 quatre outils
+> (`close_window`, `send_keys`, `delete_file`, `run_as_admin`) comme « ayant une
+> fiche de permission mais pas d'implémentation ». Ces fiches n'existent nulle
+> part dans `permissions.ts` — la section entière reposait sur une prémisse
+> fausse.
 
 ## 2. Plateforme
 
@@ -47,8 +51,11 @@ les appeler aujourd'hui** :
 
 ## 4. Capacités partielles / à durcir
 
-- **Capture écran côté Rust** : [screen.rs](../apps/desktop/src-tauri/src/commands/screen.rs)
-  est un **stub** — tout passe par le sidecar Python.
+- **Pas de capture écran côté Rust** : tout passe par le sidecar Python
+  (`vision/screenshot.py`, mss). Les deux commandes Tauri qui devaient s'en
+  charger étaient restées des stubs renvoyant une chaîne vide depuis le MVP et
+  ont été supprimées le 2026-08-31 — c'est le sidecar qui fait le travail, et
+  ça marche.
 - **Mémoire sémantique** : sans `nomic-embed-text`, retombe sur un repli mots-clés
   (moins précis). La mémoire hiérarchique **warm est implémentée** (WarmMemoryStore
   - FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
@@ -79,8 +86,16 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 
 ## 6. Tests & qualité
 
-- Couverture de tests **partielle** : socle vitest (~67 tests verts) sur la
-  mémoire, l'analyse, le cron, git et le web — mais pas d'e2e ni de tests Rust.
+- Couverture **inégale** plutôt que faible : 640 tests agent (77 fichiers),
+  37 tests desktop, 23 tests Rust (sandbox, contrat IPC, auto-tune, audit,
+  erreurs) et 7 tests Python. Il n'y a **pas d'e2e**.
+- Les trous sont concentrés là où ça compte : `RunCommandTool`, `ReadFileTool` /
+  `ListDirTool`, le parseur NDJSON d'`OllamaClient`, `lib/ocrSidecar`,
+  `AuditLogger`, et les familles `browser/`, `automation/`, `market/`,
+  `screen/`, `audio/`. Détail et priorités dans
+  [AMELIORATIONS.md](AMELIORATIONS.md) §2.
+- **Aucun `vitest.config.ts`** : les tests DOM ne passent que grâce à un
+  `// @vitest-environment jsdom` répété en tête de chaque fichier.
 
 ## 7. Distribution
 
@@ -93,7 +108,8 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 - Machines **faible VRAM** : depuis la v0.1.3 le bundle ne contient plus que
   `qwen3:14b` (~9 Go). Sous ~10 Go de VRAM il déborde en RAM (lent mais cohérent).
   Pour de la vitesse sur une machine contrainte, pull manuellement un modèle plus
-  petit (ex. `qwen2.5:7b`) et impose-le via `CATDESK_MODEL`.
+  petit et impose-le via **`CATDESK_MODEL_SMALL`** (opt-in prévu pour ça ;
+  `CATDESK_MODEL` remplacerait le modèle principal, y compris pour les digests).
 
 ## 8. Tableau de bord & Bourse
 
@@ -107,10 +123,9 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   [dashboard-p2.md](projects/dashboard-p2.md).
 - **Local-first nuancé** : bourse et news ajoutent des **flux réseau sortants en
   lecture seule** (allow-listés). L'inférence, elle, reste 100 % locale.
-- **Câblage Rust** (bras `market.update`, commande `set_market_watchlist`) : effectif
-  après recompilation (`pnpm dev` / `cargo build`).
-- **Placement libre des widgets** (drag x/y façon Grafana) : non — ordre + tailles
-  par pas seulement (react-grid-layout en suivi).
+- **Pas de partage de tableau de bord** : la disposition (canvas libre, tailles,
+  styles, affichages enregistrés) vit dans le `localStorage` du poste. Rien ne
+  l'exporte ni ne la synchronise entre machines.
 
 ---
 

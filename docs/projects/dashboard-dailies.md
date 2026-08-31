@@ -1,8 +1,13 @@
 # Dashboard — Dailys (flux éditorial filtrable)
 
+> ⚠️ **Document de cadrage historique** (état de sa date de rédaction). Il garde
+> la trace des décisions prises et de leurs raisons ; il n'est **pas maintenu**.
+> Pour l'état réel du projet : [SUIVI.md](../SUIVI.md) « État actuel »,
+> [CAPACITES.md](../CAPACITES.md) et [LIMITES.md](../LIMITES.md).
+
 **Date :** 2026-06-29
-**Statut :** Implémenté côté code + SQL (type-check 3/3, lint 0 erreur). Reste à
-appliquer la migration sur le projet Supabase (`db push`).
+**Statut :** **Livré**, y compris la publication ouverte à tout poste
+(migration `20260720000000_press_digest_open_publish.sql`).
 **Auteur :** @alexis.bert1412
 
 > Extension du **Pilier B**. La **news** (alertes ponctuelles : bandeau coloré

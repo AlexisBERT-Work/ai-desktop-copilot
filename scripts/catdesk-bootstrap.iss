@@ -1,5 +1,5 @@
 ; CatDesk — installeur "bootstrap" : UN SEUL petit .exe (quelques Mo) à donner
-; à un proche. Ne contient PAS le payload (~22 Go) : il le télécharge lui-même
+; à un proche. Ne contient PAS le payload (~18 Go) : il le télécharge lui-même
 ; (PowerShell natif, aucun outil tiers) puis lance l'installeur complet déjà
 ; validé (scripts/catdesk.iss) en silencieux. Zéro fichier à garder ensemble,
 ; zéro commande à taper côté destinataire — voir docs/DISTRIBUTION.md.
