@@ -3,7 +3,7 @@
 // des sources (ids intégrés et/ou URLs de flux RSS/Atom) + des règles de tri
 // (mots-clés, regex inclure/exclure). Le planificateur agent-runtime l'exécute
 // chaque jour et publie une daily par journal, visible de tous les clients.
-// Voir docs/projects/dashboard-dailies.md.
+// Voir docs/projects/dashboard.md §6.4.
 
 import type { DailyCategory } from './dailies';
 

@@ -1,6 +1,6 @@
 -- CatDesk — Pilier B : news pilotée par l'admin (P2)
 -- À exécuter dans le SQL Editor du projet Supabase.
--- Mise en route complète : docs/projects/dashboard-p2.md
+-- Mise en route : supabase/DEPLOY.md · conception : docs/projects/dashboard.md §5
 
 -- ─── Table ─────────────────────────────────────────────────────
 create table if not exists public.news (

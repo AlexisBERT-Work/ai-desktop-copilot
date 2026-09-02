@@ -187,7 +187,7 @@ Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
 ## 10. Tableau de bord & Bourse
 
 Interface d'accueil = **canvas libre de widgets configurables** (KPI, stats, actions,
-bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
+bourse, news) — voir [dashboard.md](projects/dashboard.md).
 
 | Capacité                                           | Outil(s)                | Risque |
 | -------------------------------------------------- | ----------------------- | :----: |
@@ -205,7 +205,7 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
   des widgets pilotent la watchlist du sidecar (synchro automatique).
 - **News** : annonce rédigée par l'**admin seul** (Supabase + RLS), diffusée à
   tous les clients en lecture seule (bandeau + widget). Setup :
-  [dashboard-p2.md](projects/dashboard-p2.md).
+  [dashboard.md](projects/dashboard.md) §5.
 
 ## 11. Modèles & inférence
 

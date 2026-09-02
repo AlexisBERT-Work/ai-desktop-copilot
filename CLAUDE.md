@@ -15,17 +15,20 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 
 | Question                                       | Réponse dans                                                            |
 | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| **Où en est le projet ?**                      | `docs/SUIVI.md` (§ « État actuel » en tête)                             |
+| **Que reste-t-il à faire ?**                   | `docs/AMELIORATIONS.md` (§ 0 = ce qui bloque sur l'utilisateur)         |
 | Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                              |
 | Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                       |
-| État actuel + historique du travail            | `docs/SUIVI.md` (§ « État actuel » en tête)                             |
 | Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                      |
 | Installeur offline + auto-update               | `docs/DISTRIBUTION.md`                                                  |
 | Techniques d'architecture agent (✅/🟡/⬜)     | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer) |
-| Dashboard / bourse / news / dailys             | `docs/projects/` + `supabase/README.md`                                 |
+| Dashboard / bourse / news / dailys             | `docs/projects/dashboard.md` (décisions, non maintenu) + `supabase/`    |
 | Choix de stack                                 | `docs/architecture/adr-*.md`                                            |
-| Choix non tranchés + dettes connues            | `docs/AMELIORATIONS.md`                                                 |
-| Reprendre la refonte d'août 2026               | `docs/REPRISE.md` — point de reprise, actions ouvertes                  |
-| `docs/archive/`                                | **Obsolète — ne jamais lire ni citer**                                  |
+| Historique versionné                           | `CHANGELOG.md`                                                          |
+
+Deux documents portent le suivi, et **un seul** répond à chaque question : SUIVI
+= l'état, AMELIORATIONS = le reste à faire. Ne pas recréer un troisième point de
+reprise : ce qui bloque va dans `AMELIORATIONS.md` § 0.
 
 Matériel réel : AMD RX 6700, **10 Go VRAM**. Modèles (tri « un seul modèle, le
 plus fort » — v0.1.3, 2026-08) : **`qwen3:14b` est le modèle de chat UNIQUE** du
@@ -62,6 +65,17 @@ personnalisés, miroir Discord).
   `packages/agent-runtime/src/tools/registerTools.ts` (registrations) — pas de
   scan du dossier `tools/`, et pas `index.ts`, qui n'en enregistre aucun.
 - Lire les gros fichiers par tranches (`offset`/`limit`), pas en entier.
+
+## Pièges de cet environnement (déjà payés, ne pas re-payer)
+
+- **`node_modules/.bin/` est vide** (pnpm isolé) : passer par
+  `pnpm --filter <package> exec <binaire>`, jamais par le chemin direct.
+- **Les remplacements regex de masse sur du code sont dangereux** — trois dégâts
+  sur la passe d'août 2026 (virgule mangée, ligne d'import effacée, fichier
+  découpé sur une mauvaise frontière). **Toujours relire le diff** d'un
+  remplacement automatisé.
+- **La console Windows est en cp1252** : un `print` contenant une flèche Unicode
+  fait planter un script Python de maintenance.
 
 ## Key Commands
 
@@ -109,8 +123,16 @@ Full procedure: `CONTRIBUTING.md`.
 - Result pattern for fallible ops (never throw across module boundaries).
   `ToolResult` is a discriminated union — `if (result.success)` narrows
 - Named exports only (no default except React components)
-- Reuse the shared helpers instead of re-rolling one: `lib/runProcess` (never
-  `promisify(execFile)`), `lib/httpGet`, `lib/dataDir`, `llm/completion`
+- Reuse the shared helpers instead of re-rolling one — c'est la raison d'être du
+  refactoring d'août 2026, **importer au lieu de recopier** :
+  - agent : `lib/runProcess` (jamais `promisify(execFile)`), `lib/httpGet`,
+    `lib/dataDir`, `lib/readableText`, `lib/discord`, `llm/completion`
+    (`complete`, `extractJsonObject`, `extractJsonArray`), `news/*` pour le
+    vocabulaire « presse », `tools/base/testResult` (`expectOk`/`expectFail`)
+  - desktop : `shared/ui/tokens.ts` (FIELD/OPTION/LABEL/BTN\_\*),
+    `features/news/supabaseCrud.ts` (`makeTableCrud`),
+    `features/dailies/useCrudConsole.ts` (machine à états des consoles admin)
+  - Python : `ocr-vision/deps.py::require` pour les gardes de dépendances
 - Domain code must NOT import from `tools/` — tools are call sites; shared
   vocabulary lives in `news/`, `llm/` or `lib/`
 

@@ -120,7 +120,7 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 - **Cotations possiblement différées** selon la place ; l'horodatage est affiché.
 - **News** : nécessite un **projet Supabase configuré** (URL + clé anon + migration +
   rôle admin) ; sans config, la news est simplement masquée. Voir
-  [dashboard-p2.md](projects/dashboard-p2.md).
+  [dashboard.md](projects/dashboard.md) §5.
 - **Local-first nuancé** : bourse et news ajoutent des **flux réseau sortants en
   lecture seule** (allow-listés). L'inférence, elle, reste 100 % locale.
 - **Pas de partage de tableau de bord** : la disposition (canvas libre, tailles,

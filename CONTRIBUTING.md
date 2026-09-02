@@ -66,8 +66,10 @@ files.
    pnpm type-check
    pnpm lint
    pnpm test
+   pnpm format                                   # must be a no-op
    cargo test   --manifest-path apps/desktop/src-tauri/Cargo.toml
    cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --tests -- -D warnings
+   cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
    cd packages/ocr-vision; python -m pytest -q
    ```
 3. Keep PRs focused — one feature or fix each

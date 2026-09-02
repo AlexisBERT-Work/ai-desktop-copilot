@@ -1,6 +1,6 @@
 -- CatDesk — Journaux personnalisés (revue de presse pilotée par l'admin)
 -- À exécuter dans le SQL Editor du projet Supabase (après la migration dailies).
--- Mise en route complète : docs/projects/dashboard-dailies.md
+-- Mise en route : supabase/DEPLOY.md · conception : docs/projects/dashboard.md §6.4
 --
 -- Modèle : l'admin définit des « recettes » de collecte (sources + URLs de flux
 -- + règles de tri par mots-clés/regex). Le planificateur agent-runtime les lit,

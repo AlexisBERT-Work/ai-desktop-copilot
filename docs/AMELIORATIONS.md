@@ -1,12 +1,31 @@
 # AMÉLIORATIONS POSSIBLES & CHOIX OUVERTS
 
-> À jour au 2026-08-31. Ce document existe pour que les contradictions et les
-> manques **cessent d'être implicites**. Rien ici n'est un bug bloquant : ce sont
-> des décisions que quelqu'un doit prendre, et des dettes assumées.
+> **Ce document répond à une seule question : que reste-t-il à faire ?**
+> Il existe pour que les contradictions et les manques **cessent d'être
+> implicites**. Rien ici n'est un bug bloquant : ce sont des décisions que
+> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-09-02.
 >
-> Voir aussi : [CAPACITES.md](CAPACITES.md) (ce que l'agent sait faire) ·
-> [LIMITES.md](LIMITES.md) (ce qu'il ne sait pas faire) ·
-> [SUIVI.md](SUIVI.md) (journal).
+> Où en est le projet : [SUIVI.md](SUIVI.md) · ce que l'agent sait faire :
+> [CAPACITES.md](CAPACITES.md) · ce qu'il ne sait pas faire :
+> [LIMITES.md](LIMITES.md).
+
+---
+
+## 0. Ce qui bloque sur toi
+
+Trois choses restent ouvertes depuis la refonte d'août 2026, et **aucune ne peut
+être faite sans toi** :
+
+| #   | Action                                           | Pourquoi c'est à toi                                                                                                                                                            |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Lancer `pnpm dev` et regarder l'app.**         | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va. |
+| 2   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1. | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                             |
+| 3   | **Décider du push et des tags.**                 | 13 commits sur `refactor/etat-propre`, **rien n'est poussé, aucun tag créé**. Le CHANGELOG reconstruit 0.1.1 → 0.1.3 mais ne les tague pas : c'est une décision à part.         |
+
+Ensuite, par ordre de rentabilité : **§ 1.1** (tranche une contradiction qui
+traîne depuis juin) → **§ 2.2** (`vitest.config.ts`, 20 min) → **§ 2.1**
+(tester `RunCommandTool`) → **§ 3** (remonter `qwen3:14b` et l'URL Ollama dans
+`shared-types`) → **§ 1.2** (décider pour Supabase depuis le webview).
 
 ---
 
@@ -152,9 +171,9 @@ sont testables trivialement et n'ont rien.
 - **Les sélecteurs Zustand sont mélangés** : la moitié des consommateurs
   déstructurent le store entier (`const { x } = useStore()`), ce qui re-rend à
   **chaque** changement, l'autre moitié utilise des sélecteurs atomiques.
-- **`docs/projects/`** décrit l'état de juin 2026 et sert de mémoire des
-  décisions ; les statuts ont été corrigés, mais ces documents ne sont pas
-  maintenus. `SUIVI.md` fait foi.
+- **[`projects/dashboard.md`](projects/dashboard.md)** est une mémoire de
+  décisions, **pas un état** : il fige le « pourquoi » de juin-juillet 2026 et
+  n'est pas maintenu. `SUIVI.md` fait foi.
 
 ---
 
@@ -175,3 +194,28 @@ rien à faire au milieu d'un journal.
   `browser_type`… qui sont eux aussi `high`. À trancher ensemble.
 - **Linux / macOS** — `sandbox.rs`, les scripts PowerShell et les outils
   presse-papiers/OpenApp sont écrits pour Windows.
+
+---
+
+## 5. À ne pas « nettoyer »
+
+Ces choses **ont l'air** d'être du code mort ou de la duplication. Elles sont
+justes telles quelles ; à lire avant d'y toucher.
+
+- **`core/sandbox.rs`** est sans appelant depuis la suppression des 10 commandes
+  Tauri, et **conservé exprès** (`#![allow(dead_code)]` + commentaire de module) :
+  c'est le garde-fou obligatoire de toute commande future touchant au disque ou
+  au shell, et ses 11 tests documentent des contournements réels déjà corrigés.
+- **`lib/dataDir.ts` résout `CATDESK_DATA_DIR` à l'appel, pas à l'import.** La
+  paresse est voulue — les tests réaffectent la variable par cas. Un commentaire
+  le dit ; ne pas « optimiser » en figeant la valeur.
+- **`model_mode` / `light_model` / `code_model`** (`chat.rs`) ne sont pas de la
+  surface de protocole morte : `AgentOrchestrator.pickModel` les consomme. Un
+  audit a déjà affirmé le contraire, à tort.
+- **`shared-types/src/permissions.ts`** (554 l.) est à ~510 lignes de données,
+  pas de logique. Le patron View/Widget des 11 widgets, `PressFeedsManager` (le
+  modèle à imiter), le barrel `news/pressDigest.ts`, le test miroir Rust↔TS
+  `ipc/protocol.rs` (`include_str!`) et les 19 `!` de production (tous précédés
+  d'un garde) sont dans le même cas.
+- **`build-release.ps1`** : le contournement robocopy des chemins > 260
+  caractères est documenté et justifié.

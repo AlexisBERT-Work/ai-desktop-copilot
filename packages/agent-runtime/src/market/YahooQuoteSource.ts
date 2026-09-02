@@ -2,7 +2,7 @@ import type { Quote } from '@catdesk/shared-types';
 
 // Endpoint chart public de Yahoo : pas de crumb/cookie requis, une requête par
 // symbole. Suffisant à la cadence ~1 min pour une watchlist de quelques dizaines
-// de titres. Voir docs/projects/dashboard-platform.md §6.4.
+// de titres. Voir docs/projects/dashboard.md §4.3.
 const ENDPOINT = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 
 function num(x: unknown): number | null {
