@@ -4,12 +4,24 @@ import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
 import { useChatStore } from '../chat/store/chatStore';
 import { openDashboardWindow } from '../dashboard/openDashboardWindow';
+import { VoiceButton } from '../voice/VoiceButton';
+import { useVoiceStore } from '../voice/voiceStore';
+
+/** Le champ dit ce que fait la voix : on sait qu'on est écouté sans regarder le bouton. */
+const VOICE_PLACEHOLDER: Record<string, string> = {
+  listening: 'Je vous écoute…',
+  transcribing: 'Je transcris…',
+  speaking: 'Je parle — Ctrl+Espace ou le micro pour me couper',
+};
 
 export function MiniMode() {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const { setMode } = useOverlayStore();
   const { sendMessage, activeConversationId } = useChatStore();
+  const voiceState = useVoiceStore(s => s.state);
+  const voiceHint = useVoiceStore(s => s.hint);
+  const placeholder = VOICE_PLACEHOLDER[voiceState] ?? voiceHint ?? 'Ask anything...';
 
   const handleSubmit = async () => {
     const text = input.trim();
@@ -48,11 +60,12 @@ export function MiniMode() {
             }
             if (e.key === 'Escape') setMode('hidden');
           }}
-          placeholder="Ask anything..."
+          placeholder={placeholder}
           className="flex-1 bg-transparent text-white placeholder-white/30
                      outline-none text-sm font-medium tracking-[-0.01em]"
         />
         <div className="flex items-center gap-1.5 shrink-0">
+          <VoiceButton size="sm" />
           <button
             onClick={() => setMode('chat')}
             className="p-1.5 rounded-lg text-white/30 hover:text-white/60

@@ -4,6 +4,7 @@ pub mod permissions;
 pub mod press;
 pub mod settings;
 pub mod tuning;
+pub mod voice;
 
 use crate::core::error::CatdeskError;
 use crate::ipc::bridge::send_to_agent;

@@ -41,6 +41,14 @@ llava — chargé à la demande ; seul swap restant : chat↔vision) ·
 `nomic-embed-text` (embeddings). `qwen2.5-coder:14b` retiré (bot sans codage).
 `CATDESK_MODEL_SMALL` reste un opt-in env (non injecté par le launcher).
 
+Voix (mode « Jarvis », 2026-09) : **100 % CPU**, jamais de VRAM — `sherpa-onnx`
+(VAD Silero + Parakeet TDT v3 + Piper `fr_FR-miro-high`) et `cpal`, tout en
+Rust dans `core/voice/`. Modèles (~800 Mo) hors git :
+`scripts/fetch-voice-models.ps1` → `%LOCALAPPDATA%\nd-voice-models`. Pocket
+TTS et Kokoro **écartés** (plus lents que le temps réel en français sur ce
+CPU), whisper.cpp/Vulkan et Kyutai STT écartés (VRAM). `SpeechRecognition` ne
+marche pas dans WebView2 : ne pas réessayer côté webview.
+
 KV-cache : **contradiction non tranchée** entre cette doc (« `q4_0` corrompt la
 sortie sur ce GPU », incident 2026-06-15/16) et `commands/tuning.rs`, qui
 l'active quand la VRAM est serrée — mesures à l'appui, scopé au process Ollama

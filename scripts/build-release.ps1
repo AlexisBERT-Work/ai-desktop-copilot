@@ -10,12 +10,18 @@
     resources/agent/   node.exe + bundled agent (dist/index.js) + node_modules
     resources/ollama/  ollama.exe + the model blobs
     resources/ocr/     PyInstaller OCR sidecar + tessdata   (skippable)
+    resources/voice/   VAD + Parakeet + Piper voice models   (skippable, ~800 MB)
 
   The resulting installer is LARGE (the LLM model alone is several GB). It can
   only be shared via USB / cloud link, not email.
 
 .PARAMETER SkipOcr
   Don't build/bundle the Python OCR sidecar (smaller, faster build).
+
+.PARAMETER SkipVoice
+  Don't bundle the voice models. The app then greys out the microphone and
+  reads answers with the Windows voice; models dropped later into
+  %APPDATA%\CatDesk\data\voice are picked up without reinstalling.
 
 .PARAMETER ModelsPath
   Source Ollama models directory. Default: $env:USERPROFILE\.ollama\models
@@ -36,6 +42,7 @@
 [CmdletBinding()]
 param(
   [switch]$SkipOcr,
+  [switch]$SkipVoice,
   [switch]$Update,
   [string]$ModelsPath = (Join-Path $env:USERPROFILE ".ollama\models")
 )
@@ -193,6 +200,20 @@ if ($SkipOcr) {
     Write-Warning "tessdata not found at $tessSrc — OCR text recognition will fail without it."
   }
   Write-Host "OCR staged → $(Join-Path $resDir 'ocr')"
+}
+
+# ── 4b. Voice models (VAD + Parakeet + Piper, all CPU) ───────────
+# Fetched once into %LOCALAPPDATA%\nd-voice-models (same convention as
+# nd-tessdata) and copied here on every build, since resources/ is wiped above.
+if ($SkipVoice) {
+  Step "Skipping voice models (-SkipVoice)"
+} else {
+  Step "Staging voice models"
+  $voiceCache = Join-Path $env:LOCALAPPDATA "nd-voice-models"
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "fetch-voice-models.ps1") -Dest $voiceCache
+  if ($LASTEXITCODE -ne 0) { throw "fetch-voice-models.ps1 failed (exit $LASTEXITCODE)" }
+  Copy-Item -Recurse -Force $voiceCache (Join-Path $resDir "voice")
+  Write-Host "Voice models staged → $(Join-Path $resDir 'voice')"
 }
 
 # ── 5. Build the app ─────────────────────────────────────────────

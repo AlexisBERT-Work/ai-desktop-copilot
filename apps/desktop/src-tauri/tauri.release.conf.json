@@ -6,7 +6,8 @@
     "resources": {
       "resources/agent": "agent",
       "resources/ollama": "ollama",
-      "resources/ocr": "ocr"
+      "resources/ocr": "ocr",
+      "resources/voice": "voice"
     },
     "windows": {
       "nsis": {

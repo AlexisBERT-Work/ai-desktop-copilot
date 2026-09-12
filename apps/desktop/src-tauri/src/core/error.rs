@@ -26,6 +26,10 @@ pub enum CatdeskError {
     #[error("Erreur d'accès au fichier ({0})")]
     Io(String),
 
+    /// Micro ou haut-parleurs absents, occupés, ou modèle voix introuvable.
+    #[error("Audio indisponible ({0})")]
+    Audio(String),
+
     /// Refus délibéré (validation, garde-fou) — le message est DÉJÀ en français
     /// et se suffit à lui-même, on ne le réhabille pas.
     #[error("{0}")]

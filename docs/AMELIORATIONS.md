@@ -3,7 +3,7 @@
 > **Ce document répond à une seule question : que reste-t-il à faire ?**
 > Il existe pour que les contradictions et les manques **cessent d'être
 > implicites**. Rien ici n'est un bug bloquant : ce sont des décisions que
-> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-09-02.
+> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-09-11.
 >
 > Où en est le projet : [SUIVI.md](SUIVI.md) · ce que l'agent sait faire :
 > [CAPACITES.md](CAPACITES.md) · ce qu'il ne sait pas faire :
@@ -182,8 +182,30 @@ sont testables trivialement et n'ont rien.
 Reprises de l'ancienne section « Prochaines pistes » de `SUIVI.md`, qui n'avait
 rien à faire au milieu d'un journal.
 
-- **Entrée vocale dans le chat** — `transcribe_audio` existe déjà et fonctionne ;
-  il manque le câblage UI (bouton micro, capture, envoi).
+- **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
+  livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
+  reste pour que ça « sonne » Jarvis :
+  - **Mode oral côté agent** : `chat.send` gagnerait un `voiceMode` →
+    instruction système « 1 à 3 phrases, pas de Markdown, chiffres en toutes
+    lettres ». Aujourd'hui le modèle répond comme à l'écrit, et la voix lit
+    des listes.
+  - **Phrases de transition** pendant les outils (« Je regarde… ») sur
+    `agent:tool_call`, pour couvrir les secondes de silence.
+  - **Barge-in** (couper CatDesk en parlant) : le VAD est prêt, mais sans
+    annulation d'écho le haut-parleur se réentend dans le micro. Piste : seuil
+    VAD plus haut pendant `speaking`, ou un casque comme prérequis affiché.
+  - **Mains libres** : `sherpa_onnx::KeywordSpotter` (zipformer 3,3M, anglais,
+    mots-clés par tokens, « HEY JARVIS » convient) — micro permanent ~1 % CPU,
+    STT lancé seulement après détection. Repli : openWakeWord `hey_jarvis`
+    (Python). **Off par défaut**, indicateur visible obligatoire.
+  - **Choix ouvert — Pocket TTS** (Kyutai, meilleure voix française
+    entendue au test d'écoute) est **plus lent que le temps réel sur le
+    Ryzen 5 5500** (RTF 1,24–1,31, 24 couches obligatoires en français, ni
+    int8 ni 6 threads n'y changent rien : autorégressif). Deux issues non
+    testées : le crate Rust/Candle `pocket-tts` (annonce ×3,1 vs Python →
+    RTF ~0,4) et `PocketTTS.cpp`. Support français à confirmer avant tout.
+  - Sur une machine à GPU NVIDIA : Kyutai STT (VAD sémantique, sait quand
+    l'utilisateur a fini) remplacerait avantageusement VAD + Parakeet.
 - **Annuaire d'uid pour les news ciblées** — cibler un poste précis passe encore
   par Supabase Studio (Authentication → Users). Chantier à part.
 - **Système de plugins** — la voie est ouverte (`BaseTool` + `registerTools` +

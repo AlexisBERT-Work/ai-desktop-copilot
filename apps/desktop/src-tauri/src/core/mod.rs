@@ -6,3 +6,4 @@ pub mod resources;
 pub mod sandbox;
 pub mod tray;
 pub mod updater;
+pub mod voice;

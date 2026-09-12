@@ -10,7 +10,7 @@
 
   Expects, beforehand:
     - the release exe built (scripts/build-release.ps1 runs tauri build --no-bundle), and
-    - resources staged under apps/desktop/src-tauri/resources/ (agent/ ollama/ ocr/).
+    - resources staged under apps/desktop/src-tauri/resources/ (agent/ ollama/ ocr/ voice/).
 
 .PARAMETER ExeDir
   Directory containing the built catdesk.exe. Auto-detected if omitted.
@@ -61,9 +61,10 @@ $hasModels = Test-Path (Join-Path $resDir "ollama\models\manifests")
 # laissé par -SkipOcr) — sinon le Source wildcard de catdesk.iss ferait
 # échouer ISCC ("No files found matching").
 $hasOcr = [bool](Get-ChildItem (Join-Path $resDir "ocr") -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1)
+$hasVoice = [bool](Get-ChildItem (Join-Path $resDir "voice") -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1)
 Write-Host "ISCC:      $iscc"
 Write-Host "exe dir:   $ExeDir"
-Write-Host "resources: $resDir (models bundled: $hasModels, ocr bundled: $hasOcr)"
+Write-Host "resources: $resDir (models bundled: $hasModels, ocr bundled: $hasOcr, voice bundled: $hasVoice)"
 Write-Host "output:    $(if ($SingleFile) { 'single .exe (cloud/NTFS/exFAT only)' } else { '~2 GB FAT32-safe slices' })"
 
 # Compile
@@ -71,6 +72,7 @@ Step "Building Inno Setup installer (large, may take a while)"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $isccArgs = @("/Qp", "/DExeDir=$ExeDir", "/DResDir=$resDir", "/DOutputDir=$outDir")
 if ($hasOcr) { $isccArgs += "/DHasOcr=1" }
+if ($hasVoice) { $isccArgs += "/DHasVoice=1" }
 if ($SingleFile) { $isccArgs += "/DSingleFile=1" }
 & $iscc @isccArgs $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed (exit $LASTEXITCODE)" }

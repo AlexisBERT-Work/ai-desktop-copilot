@@ -33,7 +33,9 @@ aujourd'hui classé `critical`.
 ## 2. Plateforme
 
 - **Windows uniquement** pour l'instant. Pas de build Linux/macOS (prévu V2).
-- Dépend de **WebView2** (préinstallé sur Windows 11).
+- Dépend de **WebView2** (préinstallé sur Windows 11). WebView2 n'implémente
+  pas `SpeechRecognition` (l'API existe mais ne renvoie jamais rien) — c'est
+  pour ça que la reconnaissance vocale est native, en Rust.
 
 ## 3. Modèles & matériel
 
@@ -48,6 +50,17 @@ aujourd'hui classé `critical`.
   **câblés** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §3, §8),
   mais les propositions d'évolution restent à valider par l'humain et le
   système de _skills_ n'existe pas encore.
+- **La voix tourne sur CPU, pas sur GPU** — par nécessité (pas de CUDA sur
+  AMD, VRAM déjà prise par `qwen3:14b`). Conséquence mesurée le 2026-09-11 sur
+  le Ryzen 5 5500 : les synthèses récentes de meilleure qualité (**Pocket TTS
+  français 24 couches, Kokoro**) sont **plus lentes que le temps réel**
+  (RTF 1,3–1,4) et bégaieraient ; seul Piper tient (RTF 0,05). Même verdict
+  côté reconnaissance pour Kyutai STT / Voxtral (GPU obligatoire). Sur une
+  machine à GPU NVIDIA, ces choix seraient à rouvrir.
+- **La voix n'a pas de mot d'activation** : il faut `Ctrl+Espace` ou le bouton
+  micro. Et CatDesk ne se laisse pas encore couper en parlant par-dessus
+  (barge-in) — le haut-parleur repasserait dans le micro sans annulation
+  d'écho. Voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 
 ## 4. Capacités partielles / à durcir
 

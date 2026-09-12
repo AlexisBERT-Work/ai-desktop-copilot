@@ -242,3 +242,31 @@ STATUT de chaque vuln au fur et à mesure des correctifs._
 - **Exception assumée non documentée** : le webview parle directement à Supabase
   (HTTPS + WebSocket), hors du passage obligé par Rust. Voir
   [AMELIORATIONS.md](AMELIORATIONS.md) §1.2.
+
+## Mise à jour 2026-09-11 — la voix (micro + haut-parleurs)
+
+Huit commandes Tauri de plus (`voice_*`, [commands/voice.rs](../apps/desktop/src-tauri/src/commands/voice.rs)),
+et un capteur sensible de plus : **le micro**. Ce qui le borne :
+
+- **Tout est local, sur CPU** : VAD, reconnaissance (Parakeet) et synthèse
+  (Piper) tournent dans le process Rust via `sherpa-onnx`, sans réseau. Aucun
+  audio n'est écrit sur disque ; la prise de parole vit en mémoire le temps de
+  la transcription (< 0,5 s), puis seul le texte circule — comme un message tapé.
+- **Le micro n'est jamais ouvert en permanence** (phase 1) : il s'ouvre sur
+  `Ctrl+Espace` ou le bouton micro, et se ferme dès la prise de parole obtenue,
+  après 8 s sans parole, ou quand la bulle se ferme. Pas de mot d'activation
+  → pas d'écoute de fond. Une écoute permanente (phase 3) devra rester **off
+  par défaut** avec un indicateur visible en continu.
+- **Trace d'audit** : `VOICE_LISTEN_START` / `VOICE_LISTEN_STOP` dans le
+  journal, comme toute action à effet de bord.
+- **Validation Rust des entrées UI** : le nom de voix est comparé au disque
+  (`models::piper` refuse tout `/`, `\` ou `.` — jamais de chemin composé
+  depuis l'UI), la vitesse est bornée, une phrase à dire est plafonnée à
+  1 000 caractères.
+- **L'assistant ne parle jamais par-dessus l'utilisateur** : une phrase à lire
+  qui arrive pendant l'écoute est jetée (machine à états, testée).
+- **Modèles tiers** : Parakeet TDT v3 (NVIDIA, CC-BY-4.0), Silero VAD (MIT),
+  Piper `fr_FR-miro-high` / `siwis` (MIT), téléchargés depuis les releases
+  GitHub de `k2-fsa/sherpa-onnx` par `scripts/fetch-voice-models.ps1`. Pas
+  de vérification d'empreinte à ce jour — à ajouter si ces modèles entrent dans
+  le pipeline de release automatisé.

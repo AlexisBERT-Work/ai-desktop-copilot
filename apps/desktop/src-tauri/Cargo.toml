@@ -33,6 +33,13 @@ chrono = { version = "0.4", features = ["serde"] }
 dunce = "1"
 reqwest = { version = "0.12", features = ["json"] }
 
+# Voix (mode « Jarvis », 2026-09) — tout sur CPU, jamais de VRAM : la RX 6700
+# est déjà saturée par qwen3:14b. sherpa-onnx couvre VAD (Silero), STT
+# (Parakeet TDT v3) et TTS (Piper) avec une seule dépendance ; cpal tient le
+# micro et la sortie audio en natif, ce qui marche fenêtre cachée.
+sherpa-onnx = "1.13"
+cpal = "0.15"
+
 [profile.release]
 opt-level = 3
 lto = true

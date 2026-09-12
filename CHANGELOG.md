@@ -12,6 +12,24 @@ the release commits and the shipped installers.
 
 ## [Unreleased]
 
+### Added
+
+- **Talk to CatDesk, hear it answer ("Jarvis" mode, phase 1).** `Ctrl+Space` opens the
+  bubble and the microphone; the utterance ends on 0.7 s of silence, is transcribed
+  locally and sent as a chat message; the answer is read aloud sentence by sentence
+  while the model is still writing. Everything runs on the **CPU** through a single
+  Rust dependency, `sherpa-onnx` (Silero VAD, Parakeet TDT 0.6B v3 for recognition —
+  French WER 4.97 %, better than Whisper large-v3 — and Piper `fr_FR-miro-high` for
+  synthesis), so the GPU stays entirely with `qwen3:14b`. Measured on a Ryzen 5 5500:
+  5 s of speech transcribed in 0.3 s, first audio in 83 ms. New Tauri commands
+  `voice_*`, events `voice:state|transcript|level`, a **Voice** settings tab, a mic
+  button in the bubble and the chat, and `window.speechSynthesis` as the fallback voice
+  when the models are missing. Models (~800 MB) are staged by
+  `scripts/fetch-voice-models.ps1` and bundled by `build-release.ps1` (`-SkipVoice`
+  to opt out). Not yet: wake word, barge-in, spoken-style answers — see
+  `docs/AMELIORATIONS.md` § 4.
+- `CatdeskError::Audio` — French wording for microphone / speaker / voice-model failures.
+
 ### Fixed
 
 - **Permission dialogs never resolved.** `permission.response`, emitted by Rust, had no

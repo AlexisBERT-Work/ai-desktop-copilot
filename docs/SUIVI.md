@@ -8,11 +8,59 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-09-02.
+> Dernière mise à jour : 2026-09-11.
 
 ---
 
-## État actuel — 2026-08-31
+## État actuel — 2026-09-11
+
+Branche `refactor/etat-propre`, **13 commits d'avance sur `master` + le
+chantier voix non commité**, rien n'est poussé, aucun tag.
+
+**Portes** : type-check 3/3, lint 0, **47 tests desktop** (37 + 10 voix),
+**36 Rust** (23 + 13 voix, dont 4 de fumée sur les vrais modèles, ignorés en
+CI), `cargo clippy -D warnings`, `cargo fmt --check`. 640 tests agent
+inchangés.
+
+**Ce qui bloque sur toi** : les trois points de [AMELIORATIONS.md](AMELIORATIONS.md) § 0,
+plus **un essai au micro** — tout a été vérifié sauf ta voix (voir ci-dessous).
+
+## 2026-09-11 — CatDesk parle et écoute (mode « Jarvis », phase 1)
+
+Demande : « l'utiliser comme un Jarvis ». Recherche d'abord (synthèse et
+reconnaissance locales, 2026), puis un test d'écoute, puis l'implémentation.
+
+**Ce que la recherche a fixé.** La RX 6700 n'a ni CUDA ni VRAM libre
+(`qwen3:14b` prend ~9 Go) → toute la chaîne voix tourne sur **CPU**, ce qui
+écarte d'office les modèles vedettes 2026 (Qwen3-TTS, Chatterbox, Kyutai TTS
+1.6B/STT, Voxtral). Et WebView2 n'implémente pas `SpeechRecognition` → la
+reconnaissance est native. Une seule dépendance Rust, **`sherpa-onnx`
+1.13.8**, couvre VAD Silero, Parakeet TDT 0.6B v3 (WER fr 4,97 %, meilleur que
+Whisper large-v3) et Piper ; `cpal` tient micro et sortie.
+
+**Test d'écoute (Ryzen 5 5500, 4 threads)** — une surprise : **Pocket TTS
+(Kyutai) et Kokoro sont plus lents que le temps réel en français** (RTF
+1,24–1,44), quel que soit le réglage ; Piper est à 0,05 avec 64–83 ms au
+premier son. Choix : **Piper `fr_FR-miro-high`** (« la plus rapide et la plus
+efficace »), `siwis` en option.
+
+**Livré** : module Rust `core/voice/` (deux threads dédiés, machine à états
+pure testée : _l'assistant ne parle jamais par-dessus l'utilisateur_), 8
+commandes `voice_*`, 3 événements, store React + découpeur de phrases (strip
+Markdown, abréviations, décimales, blocs de code), bouton micro (bulle + chat),
+onglet **Paramètres › Voix**, voix Windows en secours, packaging
+(`fetch-voice-models.ps1`, `build-release.ps1 -SkipVoice`, Inno). Vérifié en
+réel dans l'app : Piper prêt en 1,5 s, VAD + Parakeet en 3,1 s, 5 s de
+français transcrits en 0,3 s (wav de test). **Non vérifié : ta voix dans ton
+micro** — c'est le seul maillon que je ne peux pas tester.
+
+Détail : [CAPACITES.md](CAPACITES.md) § 1 bis · suite (phases 2–3, Pocket TTS
+en Rust) : [AMELIORATIONS.md](AMELIORATIONS.md) § 4 · sécurité :
+[SECURITE.md](SECURITE.md) (mise à jour 2026-09-11).
+
+---
+
+## État au 2026-08-31 (archivé)
 
 Branche `refactor/etat-propre`, **13 commits d'avance sur `master`, rien n'est
 poussé, aucun tag**. Arbre propre.

@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-08-31**. Inventaire basé sur les **68 outils du catalogue**
+> À jour au **2026-09-11**. Inventaire basé sur les **68 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -77,6 +77,33 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
 Les quatre outils « documents » passent par le sidecar Python (`files/`), lancé
 à la demande.
+
+### 1 bis. Lui parler, l'entendre répondre (mode « Jarvis », 2026-09-11)
+
+Ce n'est **pas un outil de l'agent** mais une entrée/sortie de l'app, tenue en
+Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
+
+| Capacité                                                                    | Moteur (100 % CPU, `sherpa-onnx`)                | Mesuré (Ryzen 5 5500)         |
+| --------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------- |
+| **`Ctrl+Espace` ouvre la bulle et le micro** ; fin de phrase au silence     | VAD Silero (0,7 s de silence = fin de tour)      | —                             |
+| **Reconnaissance** du français (25 langues détectées, ponctuation comprise) | Parakeet TDT 0.6B v3 int8 (NVIDIA, CC-BY-4.0)    | 5 s d'audio en 0,3 s          |
+| **Lecture des réponses à voix haute**, phrase par phrase pendant l'écriture | Piper `fr_FR-miro-high` (voix `siwis` en option) | 1er son 83 ms, 18× temps réel |
+| Voix de secours sans modèle                                                 | `speechSynthesis` Windows (Hortense)             | —                             |
+
+- Le micro se ferme **dès la prise de parole obtenue** (un tour), après 8 s
+  sans parole, ou quand la bulle se ferme (Échap). Un clic sur le bouton micro
+  ou `Ctrl+Espace` pendant que CatDesk parle **le coupe** ; le bouton Stop du
+  chat aussi.
+- Le Markdown est retiré avant lecture (puces, gras, liens → texte ; un bloc
+  de code devient « Bloc de code omis »).
+- Option « réécouter après une réponse orale » : enchaîner sans raccourci.
+- **Rien ne touche la VRAM** : la RX 6700 reste entière pour `qwen3:14b`.
+- Modèles (~800 Mo) : embarqués par l'installeur (`resources/voice/`), ou
+  `scripts/fetch-voice-models.ps1` en dev, ou déposés dans
+  `%APPDATA%\CatDesk\data\voice`. Absents → micro grisé, voix Windows.
+- Pas encore : mot d'activation mains libres (« Hey Jarvis »), coupure de la
+  voix en parlant par-dessus (barge-in), réponses volontairement orales du
+  modèle — voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 
 ## 2. Web & navigateur
 
@@ -238,12 +265,14 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
 - **Sandbox Rust** : `check_path` + `check_command` avant tout accès FS/shell.
 - **Permissions risk-gated** à 4 niveaux (auto / une fois / confirmer / désactivé).
 - **Safe mode** : un toggle bloque tous les outils medium+.
-- **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat).
+- **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat) —
+  et chaque ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).
 - **Isolation de processus** : agent et sidecar OCR tournent séparément.
 
 ## 13. Distribution
 
-- **Installeur Windows hors-ligne** (Inno Setup, ~18 Go avec modèles, v0.1.3) :
+- **Installeur Windows hors-ligne** (Inno Setup, ~18 Go avec modèles, v0.1.3 ;
+  +~0,8 Go de modèles voix depuis 2026-09, `-SkipVoice` pour s'en passer) :
   install/désinstall silencieux vérifiés de bout en bout.
 - Le **modèle** (lourd, immuable) est séparé du code → les **mises à jour
   auto** (GitHub Releases, signées) ne transportent que le code (~50–300 Mo).

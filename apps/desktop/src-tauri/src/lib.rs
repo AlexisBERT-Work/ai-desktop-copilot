@@ -49,9 +49,21 @@ pub fn run() {
             commands::tuning::get_kv_cache_status,
             commands::tuning::set_kv_cache_type,
             commands::tuning::get_recommended_model,
+            commands::voice::voice_status,
+            commands::voice::voice_listen_start,
+            commands::voice::voice_listen_stop,
+            commands::voice::voice_speak,
+            commands::voice::voice_speak_end,
+            commands::voice::voice_stop_speaking,
+            commands::voice::voice_configure,
+            commands::voice::voice_warmup,
         ])
         .setup(|app| {
             info!("CatDesk starting up");
+
+            // Threads voix (écoute / parole). Aucun modèle n'est chargé ici :
+            // l'UI appelle `voice_warmup` quand la voix est activée.
+            app.manage(core::voice::spawn(app.handle().clone()));
 
             // Start the embedded Ollama server first (no-op in dev, where the
             // developer runs their own). The agent connects to it lazily, so a
