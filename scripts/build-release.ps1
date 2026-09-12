@@ -103,6 +103,9 @@ Remove-DirRobust $resDir
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "agent") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ollama") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ocr") | Out-Null
+# voice/ est declare dans tauri.release.conf.json : le dossier doit exister meme
+# vide (-SkipVoice, -Update), sinon le bundler NSIS echoue sur la ressource absente.
+New-Item -ItemType Directory -Force -Path (Join-Path $resDir "voice") | Out-Null
 
 # ── 2. Bundle the Node agent ─────────────────────────────────────
 Step "Building agent runtime (esbuild)"

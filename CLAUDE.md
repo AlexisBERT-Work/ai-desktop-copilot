@@ -84,6 +84,12 @@ personnalisés, miroir Discord).
   remplacement automatisé.
 - **La console Windows est en cp1252** : un `print` contenant une flèche Unicode
   fait planter un script Python de maintenance.
+- **Deux lignes de distribution qui ne doivent jamais se croiser** (2026-09) :
+  0.1.x sans voix, **figée**, auto-update sur `catdesk-releases` ; 0.2.x voix
+  sur `catdesk-releases-voice`. Une release « latest » > 0.1.3 sur
+  `catdesk-releases` migrerait tous les anciens exe en silence.
+  `publish-update.ps1` déduit le dépôt de l'endpoint et refuse le reste — ne
+  pas contourner. Détail : `docs/DISTRIBUTION.md` § 0 bis.
 
 ## Key Commands
 

@@ -8,22 +8,46 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-09-11.
+> Dernière mise à jour : 2026-09-12.
 
 ---
 
-## État actuel — 2026-09-11
+## État actuel — 2026-09-12
 
-Branche `refactor/etat-propre`, **13 commits d'avance sur `master` + le
-chantier voix non commité**, rien n'est poussé, aucun tag.
+Branche `refactor/etat-propre`, **18 commits d'avance sur `master`** (refonte
+d'août, guide des widgets, voix, séparation des lignes de distribution) ;
+tag **`v0.1.3`** posé sur `master` = l'exe 0.1.3 tel que distribué.
+
+**Deux lignes de distribution** depuis aujourd'hui, la version du dépôt passe à
+**0.2.0** : la 0.1.x (sans voix) est **figée** sur `catdesk-releases`, la
+0.2.x (voix) vit sur `catdesk-releases-voice` — dépôt **à créer** (une
+commande). Règle, raisons et garde-fou dans
+[DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.
 
 **Portes** : type-check 3/3, lint 0, **47 tests desktop** (37 + 10 voix),
 **36 Rust** (23 + 13 voix, dont 4 de fumée sur les vrais modèles, ignorés en
 CI), `cargo clippy -D warnings`, `cargo fmt --check`. 640 tests agent
 inchangés.
 
-**Ce qui bloque sur toi** : les trois points de [AMELIORATIONS.md](AMELIORATIONS.md) § 0,
-plus **un essai au micro** — tout a été vérifié sauf ta voix (voir ci-dessous).
+**Ce qui bloque sur toi** : les cinq points de [AMELIORATIONS.md](AMELIORATIONS.md) § 0
+— créer `catdesk-releases-voice`, construire l'installeur 0.2.0, un essai au
+micro, regarder l'app, trancher le KV-cache.
+
+## 2026-09-12 — Deux lignes d'installeur, l'ancienne figée
+
+Demande : « un .exe avec l'option de voix et un ancien qui ne contient pas
+les dernières mises à jour ». Le piège était l'auto-update : chaque exe
+installé lit `releases/latest/download/latest.json` **du dépôt cuit dans son
+binaire**, donc publier 0.2.0 en « latest » sur `catdesk-releases` aurait
+migré tous les anciens postes en silence. Réponse : un dépôt de releases par
+ligne (`catdesk-releases` figé à 0.1.3, `catdesk-releases-voice` pour 0.2.x),
+l'endpoint de `tauri.release.conf.json` repointé, et `publish-update.ps1` qui
+**déduit** le dépôt de cet endpoint et refuse tout autre `-Repo`. Versions
+0.2.0 partout (`tauri.conf.json`, `package.json`, `Cargo.toml`, les deux
+`.iss`) ; `build-release.ps1` crée désormais `resources/voice/` même vide
+(`-SkipVoice`, `-Update`), sinon le bundler NSIS échouait sur la ressource
+déclarée. Tag `v0.1.3` sur `master` pour reconstruire l'ancien exe à
+l'identique.
 
 ## 2026-09-11 — CatDesk parle et écoute (mode « Jarvis », phase 1)
 

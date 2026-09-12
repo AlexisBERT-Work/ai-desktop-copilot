@@ -12,8 +12,24 @@ the release commits and the shipped installers.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.2.0] — 2026-09-12
+
+> **Two release lines from here on.** 0.2.x is the voice line and self-updates from the
+> public `catdesk-releases-voice` repository. The 0.1.x installers already in the field
+> keep polling `catdesk-releases`, which stays **frozen at 0.1.3** (git tag `v0.1.3`):
+> they are deliberately _not_ upgraded to 0.2.x. `publish-update.ps1` now reads the
+> target repository from the updater endpoint baked into the build and refuses any
+> other, so a 0.2.x build cannot be published where 0.1.x users look. Details and the
+> rationale: `docs/DISTRIBUTION.md` § 0 bis.
+
 ### Added
 
+- **Widget guide redesigned.** Numbered table of contents (gestures, "I want…", widgets,
+  formulas, origins, shortcuts) tracked while scrolling, full-text filter over the
+  widgets with a highlight on arrival, `Escape` clears the filter then closes, instant
+  scrolling under `prefers-reduced-motion`. The content moved to `guideContent.tsx`.
 - **Talk to CatDesk, hear it answer ("Jarvis" mode, phase 1).** `Ctrl+Space` opens the
   bubble and the microphone; the utterance ends on 0.7 s of silence, is transcribed
   locally and sent as a chat message; the answer is read aloud sentence by sentence

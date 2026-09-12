@@ -13,14 +13,15 @@
 
 ## 0. Ce qui bloque sur toi
 
-Trois choses restent ouvertes depuis la refonte d'août 2026, et **aucune ne peut
-être faite sans toi** :
+Cinq choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
-| #   | Action                                           | Pourquoi c'est à toi                                                                                                                                                            |
-| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Lancer `pnpm dev` et regarder l'app.**         | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va. |
-| 2   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1. | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                             |
-| 3   | **Décider du push et des tags.**                 | 13 commits sur `refactor/etat-propre`, **rien n'est poussé, aucun tag créé**. Le CHANGELOG reconstruit 0.1.1 → 0.1.3 mais ne les tague pas : c'est une décision à part.         |
+| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe. |
+| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                |
+| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                      |
+| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
+| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
 
 Ensuite, par ordre de rentabilité : **§ 1.1** (tranche une contradiction qui
 traîne depuis juin) → **§ 2.2** (`vitest.config.ts`, 20 min) → **§ 2.1**
@@ -191,6 +192,12 @@ rien à faire au milieu d'un journal.
     des listes.
   - **Phrases de transition** pendant les outils (« Je regarde… ») sur
     `agent:tool_call`, pour couvrir les secondes de silence.
+  - **Semer les modèles voix** dans le dossier persistant, comme
+    `seed_models` le fait pour Ollama : aujourd'hui `build-release.ps1
+-Update` embarque les ~800 Mo de `voice/` dans **chaque** artefact de
+    mise à jour, faute de garantie que `{app}\voice` survive à une
+    réinstallation NSIS. Les copier une fois dans `%APPDATA%\CatDesk\data\voice`
+    (déjà sondé par `models.rs`) ramènerait les updates à 50–300 Mo.
   - **Barge-in** (couper CatDesk en parlant) : le VAD est prêt, mais sans
     annulation d'écho le haut-parleur se réentend dans le micro. Piste : seuil
     VAD plus haut pendant `speaking`, ou un casque comme prérequis affiché.

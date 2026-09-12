@@ -12,12 +12,24 @@
   Installed apps check `releases/latest/download/latest.json` on launch and
   self-update silently (core/updater.rs).
 
+  TWO RELEASE LINES coexist (docs/DISTRIBUTION.md § 4) and must never cross:
+    0.1.x  no voice, FROZEN  -> repo catdesk-releases        (git tag v0.1.3)
+    0.2.x  voice             -> repo catdesk-releases-voice  (this branch)
+  The updater endpoint baked into each build (tauri.release.conf.json) says
+  which repo its users poll. This script publishes THERE and refuses anything
+  else: a 0.2.x build pushed to catdesk-releases as "latest" would silently
+  upgrade every 0.1.x install.
+
 .PARAMETER Version
   New semantic version, e.g. 0.1.1. MUST be greater than the installed one or
   clients won't update.
 
 .PARAMETER Notes
   Release notes shown on GitHub (optional).
+
+.PARAMETER Repo
+  GitHub repo receiving the release. Defaults to the repo of the updater
+  endpoint in tauri.release.conf.json; passing a different one is an error.
 
 .PREREQUISITES
   - One-time: generate a signing key →  pnpm exec tauri signer generate -w "$HOME\.tauri\catdesk.key"
@@ -30,21 +42,21 @@
 .EXAMPLE
   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "secret"
-  pwsh -File scripts/publish-update.ps1 -Version 0.1.1 -Notes "Nouveau: outil X"
+  pwsh -File scripts/publish-update.ps1 -Version 0.2.1 -Notes "Nouveau: outil X"
 #>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$Version,
   [string]$Notes = "",
-  # Releases are published to the dedicated CatDesk repo, not the dev repo this
-  # source lives in. Override only if you move the release repo.
-  [string]$Repo = "AlexisBERT-Work/catdesk-releases"
+  # Resolved from the updater endpoint below when omitted (see .PARAMETER Repo).
+  [string]$Repo = ""
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $tauriDir = Join-Path $root "apps\desktop\src-tauri"
 $confPath = Join-Path $tauriDir "tauri.conf.json"
+$releaseConfPath = Join-Path $tauriDir "tauri.release.conf.json"
 
 # The Rust target dir is often relocated (CARGO_TARGET_DIR, passed through by
 # turbo.json) to keep paths short on Windows — probe the same candidates as
@@ -71,6 +83,20 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
   throw "TAURI_SIGNING_PRIVATE_KEY is not set. See the .PREREQUISITES section of this script."
 }
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh CLI not found." }
+
+# ── Which release line? The endpoint baked into the build decides ─
+$endpoint = (Get-Content $releaseConfPath -Raw | ConvertFrom-Json).plugins.updater.endpoints[0]
+if (-not ($endpoint -match '^https://github\.com/([^/]+/[^/]+)/releases/latest/download/latest\.json$')) {
+  throw "Unexpected updater endpoint in tauri.release.conf.json: $endpoint"
+}
+$endpointRepo = $Matches[1]
+if (-not $Repo) {
+  $Repo = $endpointRepo
+} elseif ($Repo -ne $endpointRepo) {
+  throw ("-Repo '$Repo' does not match the updater endpoint repo '$endpointRepo' " +
+    "(tauri.release.conf.json). Installed apps of this line poll '$endpointRepo': publishing " +
+    "elsewhere is invisible to them, or upgrades the users of ANOTHER line. Change the endpoint instead.")
+}
 $repo = $Repo
 # Confirm the release repo exists / is reachable before doing the heavy build.
 & gh repo view $repo --json nameWithOwner | Out-Null

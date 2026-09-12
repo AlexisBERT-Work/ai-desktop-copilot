@@ -9,8 +9,9 @@ Ce guide explique :
 3. comment garantir **zéro différence de fonctionnalités** entre ton PC et le leur.
 
 > ⚠️ **Taille de l'installeur initial : ~18 Go** (v0.1.3, avec les trois modèles
-> du bundle ; c'était ~22 Go avant le tri « un seul modèle »). La valeur exacte
-> dépend des modèles présents dans `~/.ollama/models` au moment du build.
+> du bundle ; c'était ~22 Go avant le tri « un seul modèle »), **+ ~0,8 Go de
+> modèles voix en 0.2.x**. La valeur exacte dépend des modèles présents dans
+> `~/.ollama/models` au moment du build.
 > Impossible par mail ou WeTransfer gratuit.
 > Deux façons de le distribuer :
 >
@@ -31,6 +32,7 @@ Ce guide explique :
 | Ollama          | `ollama.exe` (+ DLLs GPU/CPU)                                 | dans l'app (mis à jour)                                               |
 | **Modèle LLM**  | blobs des modèles                                             | **dossier persistant** `%LOCALAPPDATA%\com.catdesk.app\ollama-models` |
 | OCR / vision    | sidecar Python (PyInstaller) + données Tesseract              | dans l'app (mis à jour)                                               |
+| Voix (0.2.x)    | modèles VAD + Parakeet + Piper (`voice/`, ~800 Mo)            | dans l'app (mis à jour — donc réexpédiés à chaque update, cf. note)   |
 
 **Idée clé :** le modèle (lourd, immuable) est _séparé_ du code. Le gros
 installeur initial le « sème » une fois dans le dossier persistant
@@ -46,6 +48,54 @@ Au lancement, le cœur Rust :
 3. lance l'agent Node bundlé ;
 4. vérifie GitHub Releases et **s'auto-met à jour en silence** si une nouvelle
    version signée existe ([updater.rs](../apps/desktop/src-tauri/src/core/updater.rs)).
+
+> Note voix : contrairement au modèle LLM, les modèles voix ne sont pas encore
+> « semés » dans un dossier persistant — ils voyagent dans chaque artefact
+> d'update (~800 Mo au lieu de 50–300). Piste dans
+> [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+
+---
+
+## 0 bis. Deux lignes de distribution — à ne jamais croiser
+
+Depuis 0.2.0 (voix, 2026-09), **deux lignes coexistent**, chacune avec son
+propre dépôt de releases. La raison : l'URL d'auto-update est **cuite dans
+chaque exe installé** et ne peut plus changer après coup.
+
+| Ligne | Contenu               | Source git                                           | Dépôt de releases (endpoint updater) | État              |
+| ----- | --------------------- | ---------------------------------------------------- | ------------------------------------ | ----------------- |
+| 0.1.x | sans voix             | tag `v0.1.3` (= `master` avant la refonte d'août)    | `catdesk-releases`                   | **figée à 0.1.3** |
+| 0.2.x | voix + refonte d'août | `refactor/etat-propre` → `master` une fois fusionnée | `catdesk-releases-voice`             | vivante           |
+
+**La règle.** Une release marquée « latest » sur `catdesk-releases` avec une
+version > 0.1.3 mettrait à jour **en silence, au lancement suivant**, tous
+les exe 0.1.x installés — c'est exactement ce que la séparation empêche.
+Donc :
+
+- **jamais** de build 0.2.x publié sur `catdesk-releases` ;
+- `publish-update.ps1` lit le dépôt cible dans l'endpoint de
+  `tauri.release.conf.json` et **refuse** tout `-Repo` différent — c'est le
+  garde-fou, ne pas le contourner ;
+- pour corriger la ligne 0.1.x un jour : brancher depuis `v0.1.3`, garder
+  l'endpoint `catdesk-releases`, publier 0.1.4. Les 0.2.x ne bougent pas
+  (l'updater ne rétrograde jamais).
+
+**À faire une fois** pour la ligne 0.2.x — créer le dépôt public :
+
+```powershell
+gh repo create AlexisBERT-Work/catdesk-releases-voice --public `
+  --description "CatDesk 0.2.x (voix) — installeurs et mises à jour"
+```
+
+Tant qu'il n'existe pas, un exe 0.2.x logue un 404 à chaque lancement et ne
+se met pas à jour, sans autre effet.
+
+Deux précisions : installer la 0.2.x sur un poste qui a la 0.1.x **la
+remplace** (même `AppId` Inno, même identifiant Tauri) — les deux lignes ne
+cohabitent pas sur une même machine ; et le bootstrap (§3bis) porte la
+version, le dépôt et le nombre de tranches (`PartCount`) de **sa** ligne :
+vérifier `PartCount` après chaque build complet, les ~800 Mo de voix peuvent
+ajouter une tranche.
 
 ---
 
@@ -162,11 +212,12 @@ d'authentification pour télécharger un asset d'une release publique).
 
 1. Build l'installeur complet comme au §3 (`scripts/build-release.ps1` puis
    `scripts/build-inno.ps1`) → les 13 fichiers dans `dist-installer/`.
-2. Crée (ou réutilise) une release sur `catdesk-releases` et uploade-les :
+2. Crée (ou réutilise) une release sur **le dépôt de la ligne** (§0 bis —
+   `catdesk-releases-voice` pour 0.2.x) et uploade-les :
    ```powershell
-   gh release create v0.1.3 --repo AlexisBERT-Work/catdesk-releases `
-     --title "CatDesk 0.1.3" --notes "..." dist-installer/*.bin dist-installer/*.exe
-   gh release edit v0.1.3 --repo AlexisBERT-Work/catdesk-releases --draft=false
+   gh release create v0.2.0 --repo AlexisBERT-Work/catdesk-releases-voice `
+     --title "CatDesk 0.2.0" --notes "..." dist-installer/*.bin dist-installer/*.exe
+   gh release edit v0.2.0 --repo AlexisBERT-Work/catdesk-releases-voice --draft=false
    ```
    > Une release fraîchement créée reste en **draft** tant qu'elle n'est pas
    > publiée explicitement — un asset "uploadé" sur un brouillon n'est PAS
@@ -197,20 +248,23 @@ Une fois la clé en place (§2.1) et la clé privée dans l'environnement :
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<mot de passe de la clé>"
 
-# Publier la version 0.1.3
-pwsh -File scripts/publish-update.ps1 -Version 0.1.3 -Notes "Nouveau: outil X, fix Y"
+# Publier la version 0.2.1
+pwsh -File scripts/publish-update.ps1 -Version 0.2.1 -Notes "Nouveau: outil X, fix Y"
 ```
 
 Le script :
 
-1. bumpe la version dans `tauri.conf.json` ;
-2. build un **artefact de mise à jour léger** (sans le modèle) et le signe ;
-3. génère `latest.json` (le manifeste que lisent les apps) ;
-4. crée la **release GitHub** `v0.1.3` et y uploade l'installeur + `latest.json`.
+1. lit le dépôt cible dans l'endpoint updater de `tauri.release.conf.json`
+   (§0 bis) — un `-Repo` différent est refusé ;
+2. bumpe la version dans `tauri.conf.json` ;
+3. build un **artefact de mise à jour** (sans le modèle LLM) et le signe ;
+4. génère `latest.json` (le manifeste que lisent les apps) ;
+5. crée la **release GitHub** `v0.2.1` et y uploade l'installeur + `latest.json`.
 
 Les apps de tes proches vérifient
-`releases/latest/download/latest.json` **à chaque lancement** et se mettent à
-jour toutes seules. Aucun re-téléchargement du modèle.
+`releases/latest/download/latest.json` **du dépôt de leur ligne, à chaque
+lancement**, et se mettent à jour toutes seules. Aucun re-téléchargement du
+modèle LLM.
 
 > Pense à committer le bump de version (`tauri.conf.json`) après publication.
 > La version DOIT augmenter à chaque update sinon les clients ne bougent pas.
