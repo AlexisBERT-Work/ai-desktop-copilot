@@ -1,53 +1,19 @@
-import type { DailyCategory, PressFeed } from '@catdesk/shared-types';
-import { isDailyCategory } from '@catdesk/shared-types';
-import { signIn, type SupabaseAdminConfig } from './SupabasePublisher';
+import type { PressFeed } from '@catdesk/shared-types';
+import {
+  authHeaders,
+  signIn,
+  supabaseUrl,
+  SUPABASE_TIMEOUT_MS,
+  type SupabaseAdminConfig,
+} from './supabaseRest';
+import { pressFeedFromRecord } from './pressFeedRecord';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:press-feed-store');
 
-function base(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
-function asStringArray(x: unknown): string[] {
-  return Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string') : [];
-}
-
-function asCategory(x: unknown): DailyCategory {
-  return isDailyCategory(x) ? x : 'misc';
-}
-
-function asPositiveInt(x: unknown, fallback: number): number {
-  const n = typeof x === 'number' ? x : Number(x);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
-}
-
 /** Convertit une ligne `press_feeds` (snake_case) en PressFeed. Tolérant. */
 export function rowToPressFeed(r: Record<string, unknown>): PressFeed | null {
-  const id = typeof r['id'] === 'string' ? r['id'] : null;
-  const name = typeof r['name'] === 'string' ? r['name'].trim() : '';
-  if (id === null || name.length === 0) return null;
-  const includeRegex =
-    typeof r['include_regex'] === 'string' && r['include_regex'].length > 0
-      ? r['include_regex']
-      : null;
-  const excludeRegex =
-    typeof r['exclude_regex'] === 'string' && r['exclude_regex'].length > 0
-      ? r['exclude_regex']
-      : null;
-  return {
-    id,
-    name,
-    category: asCategory(r['category']),
-    sourceIds: asStringArray(r['source_ids']),
-    feedUrls: asStringArray(r['feed_urls']),
-    includeKeywords: asStringArray(r['include_keywords']),
-    includeRegex,
-    excludeRegex,
-    sinceHours: asPositiveInt(r['since_hours'], 24),
-    articleLimit: asPositiveInt(r['article_limit'], 12),
-    enabled: r['enabled'] !== false,
-  };
+  return pressFeedFromRecord(r, 'snake');
 }
 
 /**
@@ -66,8 +32,9 @@ export async function fetchEnabledPressFeeds(cfg: SupabaseAdminConfig): Promise<
 
   try {
     const q = 'enabled=eq.true&select=*';
-    const res = await fetch(`${base(cfg.url)}/rest/v1/press_feeds?${q}`, {
-      headers: { apikey: cfg.anonKey, Authorization: `Bearer ${jwt}` },
+    const res = await fetch(supabaseUrl(cfg, `/rest/v1/press_feeds?${q}`), {
+      headers: authHeaders(cfg, jwt),
+      signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
     });
     if (!res.ok) {
       log.warn('Press feeds: fetch failed', { status: res.status });

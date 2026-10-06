@@ -11,3 +11,4 @@ export * from './pressFeeds';
 export * from './pressSources';
 export * from './market';
 export * from './voice';
+export * from './models';
