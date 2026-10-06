@@ -152,16 +152,11 @@ export class CronScheduler {
 
     try {
       const result = await this.runner.run(job.task, { maxIterations: 6 });
-      const summary = result.success
-        ? (result.output ?? 'Terminé').slice(0, MAX_RESULT_CHARS)
-        : `Échec: ${result.error ?? 'erreur inconnue'}`.slice(0, MAX_RESULT_CHARS);
-
       if (result.success) {
-        lastResult = summary;
+        lastResult = (result.output || 'Terminé').slice(0, MAX_RESULT_CHARS);
       } else {
-        lastError = summary;
+        lastError = `Échec: ${result.error ?? 'erreur inconnue'}`.slice(0, MAX_RESULT_CHARS);
       }
-
       log.info('Scheduled job completed', {
         id: job.id,
         success: result.success,
@@ -170,27 +165,29 @@ export class CronScheduler {
     } catch (err) {
       lastError = String(err).slice(0, MAX_RESULT_CHARS);
       log.error('Scheduled job threw', { id: job.id, error: lastError });
+    } finally {
+      this.running.delete(job.id);
     }
 
-    // Update in-memory state
-    const updated: ScheduledJob = {
+    // Annulée pendant son exécution : ne pas la ressusciter (ni en mémoire,
+    // ni en base — sa ligne a déjà été supprimée).
+    if (!this.jobs.has(job.id)) return;
+
+    const outcome = {
+      ...(lastResult !== undefined ? { lastResult } : {}),
+      ...(lastError !== undefined ? { lastError } : {}),
+    };
+    this.jobs.set(job.id, {
       ...job,
       lastRunAt: startedAt,
       nextRunAt,
       runCount: job.runCount + 1,
-      ...(lastResult !== undefined ? { lastResult } : {}),
-      ...(lastError !== undefined ? { lastError } : {}),
-    };
-    this.jobs.set(job.id, updated);
-
-    // Persist
-    this.store.updateScheduledTaskRun(job.id, {
-      lastRunAt: startedAt,
-      nextRunAt,
-      ...(lastResult !== undefined ? { lastResult } : {}),
-      ...(lastError !== undefined ? { lastError } : {}),
+      ...outcome,
     });
-
-    this.running.delete(job.id);
+    try {
+      this.store.updateScheduledTaskRun(job.id, { lastRunAt: startedAt, nextRunAt, ...outcome });
+    } catch (err) {
+      log.warn('Scheduled job state not persisted', { id: job.id, error: String(err) });
+    }
   }
 }

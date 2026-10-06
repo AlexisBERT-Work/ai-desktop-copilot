@@ -10,6 +10,12 @@ export interface MemoryConsolidatorOptions {
   maxAgeMs?: number;
   /** Below this confidence, a stale fact is pruned. High-confidence facts persist. Default 0.5. */
   minConfidence?: number;
+  /**
+   * Délai du premier passage après start(). Default 2 min. Sans lui, le premier
+   * passage n'avait lieu qu'au bout de `intervalMs` (6 h) : une app lancée
+   * le matin et fermée le soir ne consolidait jamais.
+   */
+  initialDelayMs?: number;
 }
 
 /**
@@ -24,8 +30,10 @@ export interface MemoryConsolidatorOptions {
  */
 export class MemoryConsolidator {
   private timer: ReturnType<typeof setInterval> | undefined;
+  private firstRun: ReturnType<typeof setTimeout> | undefined;
 
   private readonly intervalMs: number;
+  private readonly initialDelayMs: number;
   private readonly maxAgeMs: number;
   private readonly minConfidence: number;
 
@@ -36,17 +44,22 @@ export class MemoryConsolidator {
     this.intervalMs = opts.intervalMs ?? 6 * 60 * 60 * 1000;
     this.maxAgeMs = opts.maxAgeMs ?? 30 * 24 * 60 * 60 * 1000;
     this.minConfidence = opts.minConfidence ?? 0.5;
+    this.initialDelayMs = opts.initialDelayMs ?? 2 * 60 * 1000;
   }
 
   start(): void {
     if (this.timer !== undefined) return;
+    this.firstRun = setTimeout(() => this.runOnce(), this.initialDelayMs);
     this.timer = setInterval(() => this.runOnce(), this.intervalMs);
     // Don't keep the process alive just for maintenance.
-    (this.timer as { unref?: () => void }).unref?.();
+    this.firstRun.unref?.();
+    this.timer.unref?.();
     log.info('MemoryConsolidator started', { intervalMs: this.intervalMs });
   }
 
   stop(): void {
+    clearTimeout(this.firstRun);
+    this.firstRun = undefined;
     if (this.timer !== undefined) {
       clearInterval(this.timer);
       this.timer = undefined;

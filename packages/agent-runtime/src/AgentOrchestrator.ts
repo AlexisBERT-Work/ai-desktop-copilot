@@ -45,58 +45,64 @@ const MAX_TOKENS = CONFIG.maxTokens;
 // prompt tokens → slow prompt eval on local models. We send only the relevant
 // subset (see selectTools). Set to 0 to disable the filter and send all.
 const TOOL_LIMIT = CONFIG.toolLimit;
+const DEFAULT_MAX_ITERATIONS = 10;
+
+/**
+ * Dépendances de l'orchestrateur. Les cinq premières sont requises ; les
+ * suivantes activent chacune une technique optionnelle (voir
+ * CATDESK-CONCEPTS-AVANCES) et peuvent manquer sans rien casser.
+ */
+export interface OrchestratorDeps {
+  llm: OllamaClient;
+  tools: ToolRegistry;
+  permissions: PermissionEngine;
+  context: ContextManager;
+  audit: AuditLogger;
+  /**
+   * Modèle léger : s'il est fourni, l'orchestrateur peut rétrograder vers lui
+   * pour les tâches triviales. Sinon, le modèle de la requête est utilisé tel quel.
+   */
+  smallModel?: string | undefined;
+  /** Planificateur (utilisé seulement si `config.usePlanning`). */
+  planner?: Planner | undefined;
+  /** Suivi d'activité (alimente la détection de spirale). */
+  activity?: ActivityTracker | undefined;
+  /** Mode passif : garde le modèle chaud pendant un run, le décharge après. */
+  idleUnloader?: IdleUnloader | undefined;
+  /** Extraction de faits durables après une réponse (mémoire warm, §3). */
+  factExtractor?: FactExtractor | undefined;
+  /** Compaction de l'historique ancien en résumé glissant (§2A). */
+  compactor?: Compactor | undefined;
+  /** Mémoire de stratégie : approche gagnante par type de tâche (§8). */
+  playbook?: PlaybookStore | undefined;
+  /** Cache sémantique des réponses aux questions autonomes (§E). */
+  cache?: SemanticCache | undefined;
+}
+
+/**
+ * Arguments d'un tool call tels qu'émis par le modèle : objet, ou chaîne JSON
+ * — éventuellement invalide (un modèle local tronque volontiers son JSON). Un
+ * argument illisible devient `{}` : la validation zod de l'outil renverra au
+ * LLM une erreur actionnable, au lieu de faire tomber tout le run.
+ */
+export function parseToolArgs(raw: string | Record<string, unknown>): Record<string, unknown> {
+  if (typeof raw !== 'string') return raw;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
 
 export class AgentOrchestrator {
-  private readonly defaultMaxIterations = 10;
-
-  constructor(
-    private llm: OllamaClient,
-    private tools: ToolRegistry,
-    private permissions: PermissionEngine,
-    private context: ContextManager,
-    private audit: AuditLogger,
-    /**
-     * Modèle léger optionnel. S'il est fourni, l'orchestrateur peut rétrograder
-     * vers ce modèle pour les tâches triviales (gain ressources). Sinon, le
-     * modèle de la requête est toujours utilisé tel quel.
-     */
-    private smallModel?: string,
-    /** Planificateur optionnel (utilisé seulement si config.usePlanning). */
-    private planner?: Planner,
-    /** Suivi d'activité optionnel (alimente la détection de spirale). */
-    private activity?: ActivityTracker,
-    /**
-     * Mode passif optionnel : garde le modèle chaud pendant un run, puis le
-     * décharge de la VRAM après une fenêtre d'inactivité (libère le GPU).
-     */
-    private idleUnloader?: IdleUnloader,
-    /**
-     * Extracteur de faits warm optionnel : après une réponse réussie, mine la
-     * conversation (en tâche de fond) pour mémoriser les faits durables sur
-     * l'utilisateur. Voir CATDESK-CONCEPTS-AVANCES §3.
-     */
-    private factExtractor?: FactExtractor,
-    /**
-     * Compaction optionnelle : après un tour, replie l'historique ancien en un
-     * résumé glissant quand il devient long (CATDESK-CONCEPTS-AVANCES §2A).
-     */
-    private compactor?: Compactor,
-    /**
-     * Playbook optionnel : consulte avant la tâche l'approche qui a marché pour
-     * ce type de tâche, et enregistre l'issue après (CATDESK-CONCEPTS-AVANCES §8).
-     */
-    private playbook?: PlaybookStore,
-    /**
-     * Cache sémantique optionnel : pour une requête autonome (sans historique),
-     * sert une réponse déjà calculée pour une question équivalente sans appeler
-     * le LLM (CATDESK-CONCEPTS-AVANCES §E). Désactivable via CATDESK_SEMANTIC_CACHE=0.
-     */
-    private cache?: SemanticCache,
-  ) {}
+  constructor(private readonly deps: OrchestratorDeps) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
   private pickModel(input: string, usesTools: boolean, config: AgentConfig): string {
-    const light = config.lightModel ?? this.smallModel;
+    const light = config.lightModel ?? this.deps.smallModel;
     const decision = resolveModel({
       mode: config.modelMode ?? 'auto',
       requested: config.model,
@@ -116,18 +122,23 @@ export class AgentOrchestrator {
   }
 
   updatePermissions(config: Partial<PermissionConfig>): void {
-    this.permissions.updateConfig(config);
+    this.deps.permissions.updateConfig(config);
   }
 
   /**
    * Réponse de l'utilisateur à une demande de confirmation (dialogue de
    * permission). Débloque le `requestUserConfirmation()` en attente — sans
-   * cela, tout outil à risque `high` reste bloqué jusqu'à son timeout de 60 s.
+   * cela, tout outil à risque `high` reste bloqué jusqu'à son délai.
    */
   resolvePermission(requestId: string, granted: boolean, remember?: boolean): void {
-    this.permissions.resolvePermissionRequest(requestId, granted, remember);
+    this.deps.permissions.resolvePermissionRequest(requestId, granted, remember);
   }
 
+  /**
+   * Exécute un run. Ne lève jamais vers l'appelant : une erreur inattendue
+   * devient une étape `error` (code INTERNAL) et le run est audité comme tel —
+   * sinon l'UI, qui n'attend que des étapes, resterait en « réfléchit… ».
+   */
   async *process(
     input: string,
     conversationId: string,
@@ -136,10 +147,28 @@ export class AgentOrchestrator {
   ): AsyncGenerator<AgentStep> {
     const runId = crypto.randomUUID();
     log.info('Run started', { runId, conversationId, model: config.model });
-    this.audit.startRun(runId, conversationId, input);
+    this.deps.audit.startRun(runId, conversationId, input);
+    try {
+      yield* this.run(runId, input, conversationId, config, signal);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.error('Run failed', { runId, error: message });
+      this.deps.audit.completeRun(runId, 'error');
+      yield { type: 'error', content: `Erreur interne de l'agent : ${message}`, code: 'INTERNAL' };
+    }
+  }
+
+  private async *run(
+    runId: string,
+    input: string,
+    conversationId: string,
+    config: AgentConfig,
+    signal: AbortSignal | undefined,
+  ): AsyncGenerator<AgentStep> {
+    const { llm, tools, context, audit, playbook, idleUnloader, planner } = this.deps;
 
     // Build context (messages + memories + screen context)
-    const ctx = await this.context.buildContext(conversationId, input);
+    const ctx = await context.buildContext(conversationId, input);
 
     // A query is "standalone" when the conversation has no prior turns: its
     // answer can't depend on earlier context, so it's safe to serve/store in the
@@ -160,12 +189,12 @@ export class AgentOrchestrator {
 
     // Only expose a small, query-relevant subset to keep the prompt small and
     // fast (the full ~50-tool schema set dominates local-model latency).
-    const enabledTools = this.tools.getEnabled(config.enabledTools);
+    const enabledTools = tools.getEnabled(config.enabledTools);
     const availableTools = selectTools(enabledTools, input, TOOL_LIMIT);
 
     // Playbook (§8): classify the task and pull the approach that worked before.
     const taskType = classifyTask(input);
-    const best = this.playbook?.bestApproach(taskType);
+    const best = playbook?.bestApproach(taskType);
     const playbookHint = best
       ? `Type de tâche : « ${taskType} ». Approche qui a réussi par le passé : ${best.approach} ` +
         `(${Math.round(best.successRate * 100)}% de succès sur ${best.attempts} essais). Inspire-t'en si pertinent.`
@@ -173,23 +202,28 @@ export class AgentOrchestrator {
     // Tools actually executed this run → the "approach" we record at the end.
     const usedTools: string[] = [];
 
-    const messages = [...ctx.messages];
-    // Add user message
-    messages.push({ role: 'user', content: input });
+    const messages = [...ctx.messages, { role: 'user' as const, content: input }];
 
     // Choix du modèle (auto/light/code) une fois par run.
     const model = this.pickModel(input, availableTools.length > 0, config);
 
+    const interrupted = (iteration: number): boolean => {
+      if (!signal?.aborted) return false;
+      log.info('Run interrupted', { runId, iteration });
+      audit.completeRun(runId, 'interrupted');
+      return true;
+    };
+
     // Mode passif : garder le modèle chaud pendant ce run. Le `finally` plus bas
     // réarme le minuteur d'inactivité quel que soit le chemin de sortie
     // (succès, erreur, interruption, abandon du consommateur).
-    this.idleUnloader?.begin(model);
+    idleUnloader?.begin(model);
     try {
       // Phase de planification optionnelle (opt-in). Le plan est généré une fois
       // puis injecté comme guidage dans le system prompt.
       let plan: string[] = [];
-      if (config.usePlanning && this.planner) {
-        plan = await this.planner.plan(input, model);
+      if (config.usePlanning && planner) {
+        plan = await planner.plan(input, model, signal);
         if (plan.length > 0) {
           log.info('Planning enabled', { runId, steps: plan.length });
           yield { type: 'plan', steps: plan };
@@ -201,21 +235,14 @@ export class AgentOrchestrator {
         plan,
       );
 
-      const maxIterations = config.maxIterations ?? this.defaultMaxIterations;
-      let iterations = 0;
-
-      while (iterations < maxIterations) {
+      const maxIterations = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+      for (let iteration = 1; iteration <= maxIterations; iteration++) {
         // Interruption (bouton Stop) : on s'arrête net entre deux étapes.
-        if (signal?.aborted) {
-          log.info('Run interrupted', { runId, iteration: iterations });
-          this.audit.completeRun(runId, 'interrupted');
-          return;
-        }
-        iterations++;
-        log.debug('Iteration', { runId, iteration: iterations });
+        if (interrupted(iteration)) return;
+        log.debug('Iteration', { runId, iteration });
 
         // ─── LLM Call ───────────────────────────────────────────
-        const stream = this.llm.streamChat({
+        const stream = llm.streamChat({
           model,
           messages,
           tools: availableTools.map(t => t.toOllamaSchema()),
@@ -223,15 +250,11 @@ export class AgentOrchestrator {
           temperature: config.temperature ?? 0.7,
           numCtx: NUM_CTX,
           maxTokens: MAX_TOKENS,
-          // think:false — coupe le raisonnement des modèles qwen3 sur le chat
-          // interactif. Sans ça, qwen3:14b (choisi par le launcher sur ≥ 9 GiB
-          // de VRAM) génère un long bloc <think> caché AVANT chaque réponse :
-          // gros coût de latence au premier token pour un bot recentré sur la
-          // recherche/les articles, où le raisonnement explicite n'apporte rien.
-          // Les digests coupent déjà le raisonnement (digestLlm.ts) ; le chat
-          // avait été oublié. Ollama tolère le champ sur les modèles sans
-          // raisonnement (ex. qwen2.5:7b), donc l'envoyer inconditionnellement
-          // est sûr. Le raisonnement multi-étapes reste disponible via le
+          // think:false — coupe le raisonnement caché des modèles qwen3 sur le
+          // chat interactif : sans ça, un long bloc <think> précède chaque
+          // réponse (gros coût au premier token, rien gagné pour un bot de
+          // recherche). Ollama tolère le champ sur les modèles sans
+          // raisonnement. Le raisonnement multi-étapes reste disponible via le
           // Planner opt-in (config.usePlanning).
           think: false,
           ...(signal ? { signal } : {}),
@@ -239,9 +262,14 @@ export class AgentOrchestrator {
 
         const turn = yield* this.streamAssistantTurn(stream);
         if (turn.errored) {
-          this.audit.completeRun(runId, 'error');
+          audit.completeRun(runId, 'error');
           return;
         }
+        // Un Stop pendant le flux le termine sans erreur : la réponse est
+        // TRONQUÉE. Elle ne doit ni être finalisée, ni surtout entrer dans le
+        // cache sémantique, qui la resservirait plus tard comme complète.
+        if (interrupted(iteration)) return;
+
         let fullResponse = turn.text;
         const toolCalls = turn.toolCalls;
 
@@ -303,6 +331,7 @@ export class AgentOrchestrator {
               conversationId,
               ...(ctx.activeWindow !== undefined ? { activeWindow: ctx.activeWindow } : {}),
               usedTools,
+              signal,
             }),
           );
         }
@@ -310,9 +339,9 @@ export class AgentOrchestrator {
 
       // Max iterations reached
       log.warn('Max iterations reached', { runId, maxIterations });
-      this.audit.completeRun(runId, 'max_iterations');
+      audit.completeRun(runId, 'max_iterations');
       // Playbook (§8): this approach did not converge for this task type.
-      this.playbook?.record(taskType, approachSignature(usedTools), false);
+      playbook?.record(taskType, approachSignature(usedTools), false);
       yield {
         type: 'error',
         content: `Limite d'itérations atteinte (${maxIterations}). Réponse partielle disponible.`,
@@ -320,7 +349,7 @@ export class AgentOrchestrator {
       };
     } finally {
       // Run terminé (ou interrompu) : (re)programme le déchargement du modèle.
-      this.idleUnloader?.end();
+      idleUnloader?.end();
     }
   }
 
@@ -335,17 +364,18 @@ export class AgentOrchestrator {
     model: string,
     runId: string,
   ): Promise<string | null> {
-    if (!this.cache) return null;
-    const hit = await this.cache.lookup(input).catch(() => null);
+    const { cache, audit, context } = this.deps;
+    if (!cache) return null;
+    const hit = await cache.lookup(input).catch(() => null);
     if (!hit) return null;
     log.info('Semantic cache hit — skipping LLM', {
       runId,
       similarity: Number(hit.similarity.toFixed(3)),
       exact: hit.exact,
     });
-    this.audit.completeRun(runId, 'success', hit.answer);
+    audit.completeRun(runId, 'success', hit.answer);
     // Record the turn so follow-ups keep conversational memory.
-    this.context.recordTurn(conversationId, model, input, hit.answer);
+    context.recordTurn(conversationId, model, input, hit.answer);
     return hit.answer;
   }
 
@@ -391,10 +421,7 @@ export class AgentOrchestrator {
         toolCalls.push({
           id: chunk.toolCall.id,
           name: chunk.toolCall.function.name,
-          args:
-            typeof chunk.toolCall.function.arguments === 'string'
-              ? JSON.parse(chunk.toolCall.function.arguments)
-              : chunk.toolCall.function.arguments,
+          args: parseToolArgs(chunk.toolCall.function.arguments),
         });
       } else if (chunk.type === 'error') {
         yield { type: 'error', content: chunk.error };
@@ -411,46 +438,56 @@ export class AgentOrchestrator {
    */
   private async *runToolCall(
     toolCall: ToolCall,
-    opts: { runId: string; conversationId: string; activeWindow?: string; usedTools: string[] },
+    opts: {
+      runId: string;
+      conversationId: string;
+      activeWindow?: string;
+      usedTools: string[];
+      signal: AbortSignal | undefined;
+    },
   ): AsyncGenerator<AgentStep, OllamaMessage> {
+    const { tools, permissions, audit, activity } = this.deps;
     yield { type: 'tool_start', toolName: toolCall.name, args: toolCall.args };
 
-    // Permission gate
-    const permission = await this.permissions.check({
-      tool: toolCall.name,
-      args: toolCall.args,
-      context: {
-        conversationId: opts.conversationId,
-        ...(opts.activeWindow !== undefined ? { activeWindow: opts.activeWindow } : {}),
-      },
-    });
-
-    if (!permission.granted) {
-      yield {
-        type: 'tool_blocked',
-        toolName: toolCall.name,
-        reason: permission.reason ?? 'denied',
-      };
-      return {
-        role: 'tool',
-        content: JSON.stringify({ error: `Permission denied: ${permission.reason}` }),
-        tool_call_id: toolCall.id,
-      };
-    }
-
-    // Execute tool
     try {
+      // Permission gate. Les chemins à vérifier sont ceux que l'OUTIL déclare
+      // (pathArgs), pas une liste de clés devinée ici.
+      const permission = await permissions.check(
+        {
+          tool: toolCall.name,
+          args: toolCall.args,
+          paths: tools.filesystemTargets(toolCall.name, toolCall.args),
+          context: {
+            conversationId: opts.conversationId,
+            ...(opts.activeWindow !== undefined ? { activeWindow: opts.activeWindow } : {}),
+          },
+        },
+        opts.signal,
+      );
+
+      if (!permission.granted) {
+        const reason = permission.reason ?? 'refusé';
+        yield { type: 'tool_blocked', toolName: toolCall.name, reason };
+        return {
+          role: 'tool',
+          content: JSON.stringify({ error: `Permission denied: ${reason}` }),
+          tool_call_id: toolCall.id,
+        };
+      }
+
       opts.usedTools.push(toolCall.name); // record the approach for the playbook
-      const result = await this.tools.execute(toolCall.name, toolCall.args);
-      this.audit.logToolCall(opts.runId, toolCall.name, toolCall.args, result);
-      this.activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
+      const result = await tools.execute(toolCall.name, toolCall.args);
+      audit.logToolCall(opts.runId, toolCall.name, toolCall.args, result);
+      activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
 
       yield { type: 'tool_result', toolName: toolCall.name, result };
       // Post-execution safety scan (§7): a tool output becomes LLM context,
       // so redact secrets and neutralize injection BEFORE it gets there.
       // Applied to BOTH success and error branches — an error message can
       // echo file contents, injected text, or secrets just as easily.
-      const rawContent = JSON.stringify(result.success ? result.data : { error: result.error });
+      // `?? 'null'` : JSON.stringify(undefined) vaut undefined, pas une chaîne.
+      const rawContent =
+        JSON.stringify(result.success ? result.data : { error: result.error }) ?? 'null';
       const scan = sanitizeToolOutput(rawContent);
       if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {
         log.warn('Tool output sanitized', {
@@ -464,7 +501,7 @@ export class AgentOrchestrator {
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       log.error('Tool execution failed', { tool: toolCall.name, error });
-      this.activity?.recordToolCall(toolCall.name, toolCall.args, false);
+      activity?.recordToolCall(toolCall.name, toolCall.args, false);
       yield { type: 'tool_error', toolName: toolCall.name, error };
       return {
         role: 'tool',
@@ -490,35 +527,36 @@ export class AgentOrchestrator {
     taskType: TaskType;
     usedTools: string[];
   }): void {
+    const { audit, context, cache, playbook, compactor, factExtractor } = this.deps;
     const { runId, conversationId, model, input, answer } = opts;
-    this.audit.completeRun(runId, 'success', answer);
+    audit.completeRun(runId, 'success', answer);
     // Persist the exchange so the next turn has conversational memory.
-    this.context.recordTurn(conversationId, model, input, answer);
+    context.recordTurn(conversationId, model, input, answer);
     // Index it for cross-conversation semantic recall (fire-and-forget).
-    void this.context
+    void context
       .rememberExchange(conversationId, input, answer)
       .catch(err => log.debug('rememberExchange failed', { error: String(err) }));
     // Semantic cache (§E): only cache tool-free answers to a standalone
     // query — a tool result reflects mutable world state, and a follow-up
     // answer depends on context that won't be present next time.
-    if (this.cache && opts.standalone && opts.usedTools.length === 0) {
-      void this.cache
+    if (cache && opts.standalone && opts.usedTools.length === 0) {
+      void cache
         .put(input, answer)
         .catch(err => log.debug('Semantic cache put failed', { error: String(err) }));
     }
     // Playbook (§8): this approach worked for this task type.
-    this.playbook?.record(opts.taskType, approachSignature(opts.usedTools), true);
+    playbook?.record(opts.taskType, approachSignature(opts.usedTools), true);
     // Compact older history into a rolling summary if it's grown long.
-    if (this.compactor) {
-      void this.compactor
+    if (compactor) {
+      void compactor
         .maybeCompact(conversationId)
         .catch(err => log.debug('Compaction failed', { error: String(err) }));
     }
     // Mine durable facts from this exchange in the background (warm memory).
     // Fire-and-forget: never block or fail the user's response.
-    if (this.factExtractor) {
+    if (factExtractor) {
       const transcript = [...opts.messages, { role: 'assistant' as const, content: answer }];
-      void this.factExtractor
+      void factExtractor
         .extractAndStore(transcript, conversationId)
         .catch(err => log.debug('Fact extraction failed', { error: String(err) }));
     }

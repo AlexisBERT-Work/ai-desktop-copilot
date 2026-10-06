@@ -1,4 +1,5 @@
 import type {
+  AgentConfig,
   JsonRpcRequest,
   JsonRpcResponse,
   PermissionResponsePayload,
@@ -9,6 +10,7 @@ import type {
 } from '@catdesk/shared-types';
 import { RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
+import { stdoutNotifier, type NotifyFn } from './Notifier';
 import { createLogger } from '../logger';
 
 const log = createLogger('ipc:bridge');
@@ -44,6 +46,55 @@ export interface LocalPressControl {
   getStatus: () => PressRunStatus | null;
 }
 
+export interface StdinBridgeDeps {
+  orchestrator: AgentOrchestrator;
+  /** Config bourse poussée par l'UI (symboles + formules des widgets `stocks`). */
+  setMarketConfig?: (
+    symbols: string[],
+    formulas: { name: string; expression: string }[],
+  ) => void | Promise<void>;
+  /** Publication immédiate de la revue de presse partagée (bouton admin). */
+  runPressDigest?: () => void | Promise<void>;
+  /** Journaux personnalisés locaux — absent si non câblé (tests). */
+  localPress?: LocalPressControl;
+  /**
+   * L'hôte a fermé stdin (CatDesk quitte, ou l'a tué). Défaut : sortie
+   * immédiate ; le runtime y branche son arrêt propre (OCR, navigateur, VRAM).
+   */
+  onClose?: () => void;
+  /** Émission des notifications (défaut : stdout). */
+  notify?: NotifyFn;
+}
+
+interface AgentProcessParams {
+  input: string;
+  conversationId: string;
+  messageId?: string;
+  config: AgentConfig;
+}
+
+/** Valide les paramètres d'`agent.process` (ils viennent de l'extérieur). Pur. */
+export function parseAgentProcessParams(params: unknown): AgentProcessParams | null {
+  if (params === null || typeof params !== 'object') return null;
+  const p = params as Record<string, unknown>;
+  const config = p['config'];
+  if (
+    typeof p['input'] !== 'string' ||
+    typeof p['conversationId'] !== 'string' ||
+    config === null ||
+    typeof config !== 'object' ||
+    typeof (config as Record<string, unknown>)['model'] !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    input: p['input'],
+    conversationId: p['conversationId'],
+    ...(typeof p['messageId'] === 'string' ? { messageId: p['messageId'] } : {}),
+    config: config as AgentConfig,
+  };
+}
+
 /**
  * JSON-RPC 2.0 bridge over stdin/stdout
  * Handles communication between Tauri Rust core and Node.js agent runtime
@@ -52,18 +103,11 @@ export class StdinBridge {
   private buffer = '';
   /** Abort controller for the run in progress, used by the Stop button. */
   private currentAbort: AbortController | null = null;
+  private readonly notify: NotifyFn;
 
-  constructor(
-    private orchestrator: AgentOrchestrator,
-    private onSetConfig?: (
-      symbols: string[],
-      formulas: { name: string; expression: string }[],
-    ) => void | Promise<void>,
-    /** Déclenche une publication immédiate de la revue de presse (bouton admin). */
-    private onRunPressDigest?: () => void | Promise<void>,
-    /** Journaux personnalisés locaux — absent si non câblé (tests). */
-    private localPress?: LocalPressControl,
-  ) {}
+  constructor(private readonly deps: StdinBridgeDeps) {
+    this.notify = deps.notify ?? stdoutNotifier;
+  }
 
   start(): void {
     process.stdin.setEncoding('utf-8');
@@ -73,7 +117,8 @@ export class StdinBridge {
     });
     process.stdin.on('end', () => {
       log.info('stdin closed — shutting down');
-      process.exit(0);
+      if (this.deps.onClose) this.deps.onClose();
+      else process.exit(0);
     });
     log.info('StdinBridge listening on stdin');
   }
@@ -108,6 +153,7 @@ export class StdinBridge {
    */
   private async handleRequest(request: JsonRpcRequest): Promise<void> {
     log.debug('Request received', { id: request.id, method: request.method });
+    const { orchestrator, localPress } = this.deps;
 
     try {
       switch (request.method) {
@@ -122,9 +168,9 @@ export class StdinBridge {
           return;
 
         case RPC_METHODS.settingsUpdate: {
-          const params = request.params as { safeMode?: boolean };
-          this.orchestrator.updatePermissions({
-            ...(params.safeMode !== undefined ? { safeMode: params.safeMode } : {}),
+          const params = request.params as { safeMode?: unknown };
+          orchestrator.updatePermissions({
+            ...(typeof params.safeMode === 'boolean' ? { safeMode: params.safeMode } : {}),
           });
           this.sendResponse(request.id, { ok: true });
           return;
@@ -135,11 +181,11 @@ export class StdinBridge {
         // actif — on répond ok sans rien faire. Le run est lancé sans l'attendre
         // (~1 min) : les dailys arrivent via Realtime.
         case RPC_METHODS.pressRunNow: {
-          if (this.onRunPressDigest === undefined) {
+          if (this.deps.runPressDigest === undefined) {
             this.sendResponse(request.id, { ok: false, reason: 'press-digest-inactive' });
             return;
           }
-          void this.onRunPressDigest();
+          void this.deps.runPressDigest();
           this.sendResponse(request.id, { ok: true });
           return;
         }
@@ -149,44 +195,38 @@ export class StdinBridge {
         // `press.feeds` après chaque écriture — l'UI n'a pas de canal
         // requête/réponse, elle écoute les events.
         case RPC_METHODS.pressFeedsSave: {
-          if (this.localPress === undefined) {
+          if (localPress === undefined) {
             this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
             return;
           }
           try {
-            const feed = this.localPress.saveFeed(
-              request.params as PressFeedInput & { id?: string },
-            );
+            const feed = localPress.saveFeed(request.params as PressFeedInput & { id?: string });
             this.sendResponse(request.id, { ok: true, id: feed.id });
           } catch (err) {
             this.sendError(request.id, -32602, String(err));
           }
-          this.sendNotification(RPC_NOTIFICATIONS.pressFeeds, {
-            feeds: this.localPress.listFeeds(),
-          });
+          this.notify(RPC_NOTIFICATIONS.pressFeeds, { feeds: localPress.listFeeds() });
           return;
         }
 
         case RPC_METHODS.pressFeedsDelete: {
-          if (this.localPress === undefined) {
+          if (localPress === undefined) {
             this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
             return;
           }
-          const { id } = request.params as { id?: string };
-          const removed = typeof id === 'string' ? this.localPress.deleteFeed(id) : false;
+          const { id } = request.params as { id?: unknown };
+          const removed = typeof id === 'string' ? localPress.deleteFeed(id) : false;
           this.sendResponse(request.id, { ok: removed });
-          this.sendNotification(RPC_NOTIFICATIONS.pressFeeds, {
-            feeds: this.localPress.listFeeds(),
-          });
+          this.notify(RPC_NOTIFICATIONS.pressFeeds, { feeds: localPress.listFeeds() });
           return;
         }
 
         case RPC_METHODS.pressLocalRunNow: {
-          if (this.localPress === undefined) {
+          if (localPress === undefined) {
             this.sendResponse(request.id, { ok: false, reason: 'local-press-inactive' });
             return;
           }
-          void this.localPress.runNow();
+          void localPress.runNow();
           this.sendResponse(request.id, { ok: true });
           return;
         }
@@ -194,20 +234,16 @@ export class StdinBridge {
         // Resynchronisation à la demande (montage de l'UI) : repousse l'état
         // complet des journaux locaux et de leurs dailys déjà générées.
         case RPC_METHODS.pressLocalSync: {
-          if (this.localPress !== undefined) {
-            this.sendNotification(RPC_NOTIFICATIONS.pressFeeds, {
-              feeds: this.localPress.listFeeds(),
-            });
-            this.sendNotification(RPC_NOTIFICATIONS.dailiesLocal, {
-              dailies: this.localPress.listDailies(),
-            });
+          if (localPress !== undefined) {
+            this.notify(RPC_NOTIFICATIONS.pressFeeds, { feeds: localPress.listFeeds() });
+            this.notify(RPC_NOTIFICATIONS.dailiesLocal, { dailies: localPress.listDailies() });
             // Un run peut être en cours au montage de l'UI : repousser son statut.
-            const status = this.localPress.getStatus();
+            const status = localPress.getStatus();
             if (status !== null) {
-              this.sendNotification(RPC_NOTIFICATIONS.pressLocalProgress, { status });
+              this.notify(RPC_NOTIFICATIONS.pressLocalProgress, { status });
             }
           }
-          this.sendResponse(request.id, { ok: this.localPress !== undefined });
+          this.sendResponse(request.id, { ok: localPress !== undefined });
           return;
         }
 
@@ -226,7 +262,7 @@ export class StdinBridge {
                   : [];
               })
             : [];
-          await this.onSetConfig?.(symbols, formulas);
+          await this.deps.setMarketConfig?.(symbols, formulas);
           this.sendResponse(request.id, { ok: true });
           return;
         }
@@ -240,7 +276,7 @@ export class StdinBridge {
             log.warn('permission.response mal formée', { params: request.params });
             return;
           }
-          this.orchestrator.resolvePermission(
+          orchestrator.resolvePermission(
             p.requestId,
             p.granted,
             typeof p.remember === 'boolean' ? p.remember : undefined,
@@ -272,19 +308,23 @@ export class StdinBridge {
       return;
     }
 
-    const params = request.params as {
-      input: string;
-      conversationId: string;
-      messageId?: string;
-      config: Parameters<AgentOrchestrator['process']>[2];
-    };
+    const params = parseAgentProcessParams(request.params);
+    if (params === null) {
+      this.sendError(requestId, -32602, 'agent.process: paramètres invalides');
+      return;
+    }
+    const emit = (step: Record<string, unknown>): void =>
+      this.notify(
+        RPC_NOTIFICATIONS.agentStep,
+        buildStepNotification(requestId, step, params.conversationId, params.messageId),
+      );
 
     // Fresh abort controller for this run so a later `agent.cancel` can stop it.
     const abort = new AbortController();
     this.currentAbort = abort;
 
     try {
-      for await (const step of this.orchestrator.process(
+      for await (const step of this.deps.orchestrator.process(
         params.input,
         params.conversationId,
         params.config,
@@ -292,16 +332,19 @@ export class StdinBridge {
       )) {
         // Inject conversation/message ids so Tauri can route the event to the
         // right message (the orchestrator steps don't carry them).
-        this.sendNotification(
-          RPC_NOTIFICATIONS.agentStep,
-          buildStepNotification(requestId, step, params.conversationId, params.messageId),
-        );
+        emit(step);
       }
-
-      // Final response
-      this.sendResponse(request.id, { done: true });
+      this.sendResponse(requestId, { done: true });
     } catch (err) {
-      this.sendError(request.id, -32603, String(err));
+      // Dernier recours (l'orchestrateur convertit déjà ses erreurs en étape) :
+      // le côté Rust ignore les RÉPONSES d'erreur JSON-RPC, seule une étape
+      // `error` sort l'UI de son état « réfléchit… ».
+      emit({
+        type: 'error',
+        content: `Erreur interne de l'agent : ${String(err)}`,
+        code: 'INTERNAL',
+      });
+      this.sendError(requestId, -32603, String(err));
     } finally {
       if (this.currentAbort === abort) this.currentAbort = null;
     }
@@ -326,10 +369,5 @@ export class StdinBridge {
       error: { code, message },
     };
     process.stdout.write(JSON.stringify(response) + '\n');
-  }
-
-  private sendNotification(method: string, params: unknown): void {
-    const notification = { jsonrpc: '2.0', method, params };
-    process.stdout.write(JSON.stringify(notification) + '\n');
   }
 }

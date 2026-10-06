@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { AgentOrchestrator } from './AgentOrchestrator';
+import { AgentOrchestrator, parseToolArgs } from './AgentOrchestrator';
 import type { OllamaClient } from './llm/OllamaClient';
 import type { ToolRegistry } from './ToolRegistry';
 import type { PermissionEngine } from './permissions/PermissionEngine';
@@ -68,6 +68,7 @@ function makeHarness(opts: HarnessOptions = {}) {
       },
     ],
     execute: executeTool,
+    filesystemTargets: () => [],
   } as unknown as ToolRegistry;
 
   const check = vi.fn(async () =>
@@ -104,21 +105,15 @@ function makeHarness(opts: HarnessOptions = {}) {
       } as unknown as SemanticCache)
     : undefined;
 
-  const orchestrator = new AgentOrchestrator(
+  const orchestrator = new AgentOrchestrator({
     llm,
     tools,
     permissions,
     context,
     audit,
-    undefined, // smallModel
-    undefined, // planner
-    undefined, // activity
-    undefined, // idleUnloader
-    undefined, // factExtractor
-    undefined, // compactor
     playbook,
     cache,
-  );
+  });
 
   return {
     orchestrator,
@@ -333,6 +328,68 @@ describe('AgentOrchestrator — fins de run', () => {
     expect(h.completeRun).toHaveBeenCalledWith(expect.any(String), 'interrupted');
   });
 
+  it('un Stop pendant le flux ne finalise pas la réponse tronquée (ni cache, ni done)', async () => {
+    const controller = new AbortController();
+    const h = makeHarness({ withCache: true, turns: [] });
+    // Flux qui s'interrompt au milieu, comme OllamaClient quand le signal tombe.
+    (h.orchestrator as unknown as { deps: { llm: OllamaClient } }).deps.llm = {
+      async *streamChat() {
+        yield token('début de rép');
+        controller.abort();
+      },
+    } as unknown as OllamaClient;
+
+    const steps = await collect(
+      h.orchestrator.process('question', 'conv-1', CONFIG, controller.signal),
+    );
+
+    expect(steps).toEqual([{ type: 'token', content: 'début de rép' }]);
+    expect(h.cachePut).not.toHaveBeenCalled();
+    expect(h.recordTurn).not.toHaveBeenCalled();
+    expect(h.completeRun).toHaveBeenCalledWith(expect.any(String), 'interrupted');
+  });
+
+  it('transforme une erreur interne en étape error (code INTERNAL), auditée', async () => {
+    const h = makeHarness({ turns: [] });
+    (h.orchestrator as unknown as { deps: { context: ContextManager } }).deps.context.buildContext =
+      async () => {
+        throw new Error('base illisible');
+      };
+
+    const steps = await collect(h.orchestrator.process('salut', 'conv-1', CONFIG));
+
+    expect(steps).toEqual([
+      {
+        type: 'error',
+        content: "Erreur interne de l'agent : base illisible",
+        code: 'INTERNAL',
+      },
+    ]);
+    expect(h.completeRun).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it("des arguments d'outil en JSON invalide deviennent {} au lieu de faire tomber le run", async () => {
+    const h = makeHarness({
+      turns: [
+        [
+          {
+            type: 'tool_call',
+            toolCall: {
+              id: 'c1',
+              type: 'function',
+              function: { name: 'echo', arguments: '{"x": 1, tronqué' },
+            },
+          },
+        ],
+        [token('ok')],
+      ],
+    });
+    const steps = await collect(h.orchestrator.process('utilise echo', 'conv-1', CONFIG));
+
+    expect(h.executeTool).toHaveBeenCalledWith('echo', {});
+    expect(steps.at(-1)).toEqual({ type: 'done', content: 'ok' });
+  });
+
   it("émet MAX_ITERATIONS et enregistre l'échec au playbook quand la boucle ne converge pas", async () => {
     const h = makeHarness({
       turns: [[nativeCall('echo', { n: 1 }, 'c1')], [nativeCall('echo', { n: 2 }, 'c2')]],
@@ -346,5 +403,18 @@ describe('AgentOrchestrator — fins de run', () => {
     expect(last && 'code' in last ? last.code : undefined).toBe('MAX_ITERATIONS');
     expect(h.completeRun).toHaveBeenCalledWith(expect.any(String), 'max_iterations');
     expect(h.playbookRecord).toHaveBeenCalledWith(expect.any(String), 'echo', false);
+  });
+});
+
+describe('parseToolArgs', () => {
+  it('garde un objet tel quel, parse une chaîne JSON objet', () => {
+    expect(parseToolArgs({ a: 1 })).toEqual({ a: 1 });
+    expect(parseToolArgs('{"a":1}')).toEqual({ a: 1 });
+  });
+
+  it('rend {} pour un JSON invalide ou qui n’est pas un objet', () => {
+    expect(parseToolArgs('{tronqué')).toEqual({});
+    expect(parseToolArgs('[1,2]')).toEqual({});
+    expect(parseToolArgs('null')).toEqual({});
   });
 });

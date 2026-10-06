@@ -7,7 +7,7 @@ import { enrichExcerpts } from '../../news/enrich';
 import { buildDiscordEmbeds, MAX_CONTENT, MAX_EMBEDS, truncate } from '../../news/discordEmbeds';
 import { isDiscordWebhookUrl, postToDiscord } from '../../lib/discord';
 import type { OllamaClient } from '../../llm/OllamaClient';
-import { summarizeDigest } from '../../llm/NewsSummarizer';
+import { summarizeDigest } from '../../news/NewsSummarizer';
 import { createLogger } from '../../logger';
 
 const log = createLogger('tool:tech-news-discord');

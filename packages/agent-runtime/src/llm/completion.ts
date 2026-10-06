@@ -2,7 +2,7 @@ import type { OllamaClient } from './OllamaClient';
 
 // Plomberie LLM générique : accumuler une complétion, et récupérer le JSON
 // d'une réponse de modèle. Vit sous llm/ et non sous news/ : rien ici ne
-// connaît la presse, et NewsSummarizer (llm/) en dépend aussi.
+// connaît la presse ; les planificateurs, résumés et extractions en dépendent.
 
 /** Accumule une complétion non-streamée. */
 export async function complete(
@@ -10,7 +10,13 @@ export async function complete(
   model: string,
   system: string,
   user: string,
-  opts: { numCtx?: number; timeoutMs?: number; temperature?: number; think?: boolean } = {},
+  opts: {
+    numCtx?: number;
+    timeoutMs?: number;
+    temperature?: number;
+    think?: boolean;
+    signal?: AbortSignal | undefined;
+  } = {},
 ): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
@@ -21,6 +27,7 @@ export async function complete(
     ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     ...(opts.think !== undefined ? { think: opts.think } : {}),
+    ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
   });
   for await (const chunk of stream) {
     if (chunk.type === 'token') text += chunk.content;

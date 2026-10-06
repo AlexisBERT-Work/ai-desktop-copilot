@@ -1,5 +1,6 @@
 import type { OllamaClient } from '../llm/OllamaClient';
 import { createLogger } from '../logger';
+import { complete } from '../llm/completion';
 
 const log = createLogger('memory:summarizer');
 
@@ -51,17 +52,14 @@ export class ConversationSummarizer {
       (prior ? `Résumé précédent :\n${prior}\n\n` : '') +
       `Nouveaux échanges à intégrer :\n${transcript}`;
 
-    let text = '';
+    let text: string;
     try {
-      const stream = this.llm.streamChat({
-        model: this.model,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: userContent }],
+      // think:false — tâche de fond : le raisonnement caché de qwen3 ne ferait
+      // qu'occuper le GPU plus longtemps, sans meilleur résumé.
+      text = await complete(this.llm, this.model, SYSTEM, userContent, {
         temperature: 0.2,
+        think: false,
       });
-      for await (const chunk of stream) {
-        if (chunk.type === 'token') text += chunk.content;
-      }
     } catch (err) {
       log.warn('Summarize call failed', {
         error: err instanceof Error ? err.message : String(err),

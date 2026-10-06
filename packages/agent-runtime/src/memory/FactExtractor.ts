@@ -2,6 +2,7 @@ import type { OllamaClient } from '../llm/OllamaClient';
 import type { OllamaMessage } from '@catdesk/shared-types';
 import type { WarmMemoryStore, WarmFactInput, WarmFactKind } from './WarmMemoryStore';
 import { createLogger } from '../logger';
+import { complete, extractJsonArray } from '../llm/completion';
 
 const log = createLogger('memory:extractor');
 
@@ -55,17 +56,14 @@ export class FactExtractor {
     const transcript = FactExtractor.toTranscript(messages);
     if (transcript.length < 20) return 0; // nothing meaningful to mine
 
-    let text = '';
+    let text: string;
     try {
-      const stream = this.llm.streamChat({
-        model: this.model,
-        system: EXTRACT_SYSTEM,
-        messages: [{ role: 'user', content: transcript }],
+      // think:false — sortie JSON stricte : le raisonnement de qwen3 la
+      // polluerait (crochets parasites) et doublerait le temps GPU.
+      text = await complete(this.llm, this.model, EXTRACT_SYSTEM, transcript, {
         temperature: 0,
+        think: false,
       });
-      for await (const chunk of stream) {
-        if (chunk.type === 'token') text += chunk.content;
-      }
     } catch (err) {
       log.warn('Extraction call failed', {
         error: err instanceof Error ? err.message : String(err),
@@ -91,17 +89,8 @@ const VALID_KINDS: ReadonlySet<string> = new Set<WarmFactKind>(['preference', 'f
  * extracting the first JSON array, and drops malformed entries.
  */
 export function parseFacts(text: string): WarmFactInput[] {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end <= start) return [];
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
+  const parsed = extractJsonArray(text);
+  if (parsed === null) return [];
 
   const out: WarmFactInput[] = [];
   for (const item of parsed) {
