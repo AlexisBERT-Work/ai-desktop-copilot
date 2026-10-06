@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Daily } from '@catdesk/shared-types';
 import type { JournalDraft } from './pressDigest';
 import { createLogger } from '../logger';
+import { readJsonFile, writeJsonFile } from '../lib/persistence';
 
 const log = createLogger('news:local-dailies');
 
@@ -104,28 +104,20 @@ export class LocalDailyStore {
   }
 
   private load(): void {
-    if (!existsSync(this.path)) return;
-    try {
-      const raw: unknown = JSON.parse(readFileSync(this.path, 'utf8'));
-      if (Array.isArray(raw)) {
-        this.items = raw.filter(
-          (d): d is Daily =>
-            d !== null &&
-            typeof d === 'object' &&
-            typeof (d as Daily).id === 'string' &&
-            typeof (d as Daily).title === 'string' &&
-            typeof (d as Daily).body === 'string' &&
-            typeof (d as Daily).publishedAt === 'string',
-        );
-      }
-    } catch (err) {
-      log.warn('Local dailies unreadable — starting empty', { error: String(err) });
-      this.items = [];
-    }
+    const raw = readJsonFile(this.path, log);
+    if (!Array.isArray(raw)) return;
+    this.items = raw.filter(
+      (d): d is Daily =>
+        d !== null &&
+        typeof d === 'object' &&
+        typeof (d as Daily).id === 'string' &&
+        typeof (d as Daily).title === 'string' &&
+        typeof (d as Daily).body === 'string' &&
+        typeof (d as Daily).publishedAt === 'string',
+    );
   }
 
   private persist(): void {
-    mkdirSync(dirname(this.path), { recursive: true });
-    writeFileSync(this.path, JSON.stringify(this.items, null, 2), 'utf8');
+    writeJsonFile(this.path, this.items, log, true);
   }
 }

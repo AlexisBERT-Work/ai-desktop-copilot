@@ -47,4 +47,17 @@ describe('ConversationStore summary + getMessagesSince', () => {
     // Nothing after a far-future timestamp.
     expect(db.getMessagesSince('c', Date.now() + 100000)).toHaveLength(0);
   });
+
+  it('recordExchange : question puis réponse, horodatages distincts, ordre garanti', () => {
+    db.recordExchange('c', 'm', 'question', 'réponse');
+    const rows = db.getMessagesSince('c', 0, 10);
+    expect(rows.map(r => r.role)).toEqual(['user', 'assistant']);
+    expect(rows[1]!.createdAt).toBeGreaterThan(rows[0]!.createdAt);
+  });
+
+  it('getLatestMessagesSince renvoie les PLUS RÉCENTS, en ordre chronologique', () => {
+    for (let i = 0; i < 6; i++) db.recordExchange('c', 'm', `q${i}`, `r${i}`);
+    const latest = db.getLatestMessagesSince('c', 0, 4).map(r => r.content);
+    expect(latest).toEqual(['q4', 'r4', 'q5', 'r5']);
+  });
 });

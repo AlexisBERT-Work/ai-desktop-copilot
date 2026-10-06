@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createLogger } from '../logger';
-import { loadSqlJs, type Database, type ParamsObject } from '../lib/sqljs';
+import type { Database, ParamsObject } from '../lib/sqljs';
+import { SqliteFile } from '../lib/persistence';
 import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('memory:warm');
@@ -38,9 +38,24 @@ export interface WarmFactInput {
   source?: string;
 }
 
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS warm_facts (
+    id         TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL,
+    subject    TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0.7,
+    source     TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    active     INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE INDEX IF NOT EXISTS idx_warm_active_subject ON warm_facts(active, subject);
+`;
+
 export class WarmMemoryStore {
   // Affectée dans initialize() — tout accès avant est un bug d'ordre de démarrage.
-  private db!: Database;
+  private file!: SqliteFile;
   private readonly dbPath: string;
 
   constructor(dataDir?: string) {
@@ -48,25 +63,12 @@ export class WarmMemoryStore {
   }
 
   async initialize(): Promise<void> {
-    const SqlJs = await loadSqlJs();
-    this.db = existsSync(this.dbPath)
-      ? new SqlJs.Database(readFileSync(this.dbPath))
-      : new SqlJs.Database();
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS warm_facts (
-        id         TEXT PRIMARY KEY,
-        kind       TEXT NOT NULL,
-        subject    TEXT NOT NULL,
-        value      TEXT NOT NULL,
-        confidence REAL NOT NULL DEFAULT 0.7,
-        source     TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        active     INTEGER NOT NULL DEFAULT 1
-      );
-      CREATE INDEX IF NOT EXISTS idx_warm_active_subject ON warm_facts(active, subject);
-    `);
+    this.file = await SqliteFile.open(this.dbPath, SCHEMA, log);
     log.info('WarmMemoryStore initialized', { path: this.dbPath });
+  }
+
+  private get db(): Database {
+    return this.file.db;
   }
 
   /**
@@ -205,14 +207,10 @@ export class WarmMemoryStore {
   }
 
   private persist(): void {
-    try {
-      writeFileSync(this.dbPath, Buffer.from(this.db.export()));
-    } catch (err) {
-      log.warn('Persist failed', { error: err instanceof Error ? err.message : String(err) });
-    }
+    this.file.persist();
   }
 
   close(): void {
-    this.db?.close();
+    this.file?.close();
   }
 }

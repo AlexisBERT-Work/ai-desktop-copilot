@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import type { Embedder } from './VectorStore';
+import { cosineSimilarity, TolerantEmbedder, type Embedder } from './embedding';
 import { createLogger } from '../logger';
 import { dataPath } from '../lib/dataDir';
+import { readJsonFile, writeJsonFile } from '../lib/persistence';
 
 const log = createLogger('memory:semcache');
 
@@ -56,12 +56,10 @@ export class SemanticCache {
   private readonly threshold: number;
   private readonly ttlMs: number;
   private readonly maxEntries: number;
-  private embeddingsDisabled = false;
+  private readonly embedder: TolerantEmbedder;
 
-  constructor(
-    private embedder?: Embedder,
-    opts: SemanticCacheOptions = {},
-  ) {
+  constructor(embedder?: Embedder, opts: SemanticCacheOptions = {}) {
+    this.embedder = new TolerantEmbedder(embedder, log);
     this.filePath = dataPath('semantic-cache.json', opts.dataDir);
     this.threshold = opts.threshold ?? 0.95;
     this.ttlMs = opts.ttlMs ?? 24 * 60 * 60 * 1000;
@@ -69,20 +67,13 @@ export class SemanticCache {
   }
 
   initialize(): void {
-    if (existsSync(this.filePath)) {
-      try {
-        const parsed = JSON.parse(readFileSync(this.filePath, 'utf-8')) as CacheEntry[];
-        if (Array.isArray(parsed)) this.entries = parsed;
-      } catch (err) {
-        log.warn('Could not load semantic cache — starting empty', { error: String(err) });
-        this.entries = [];
-      }
-    }
+    const parsed = readJsonFile(this.filePath, log);
+    if (Array.isArray(parsed)) this.entries = parsed as CacheEntry[];
     this.initialized = true;
     log.info('SemanticCache initialized', {
       path: this.filePath,
       count: this.entries.length,
-      embedder: !!this.embedder,
+      embedder: this.embedder.configured,
     });
   }
 
@@ -95,7 +86,7 @@ export class SemanticCache {
     this.pruneExpired();
     if (this.entries.length === 0) return null;
 
-    const queryEmbedding = await this.tryEmbed(q);
+    const queryEmbedding = await this.embedder.tryEmbed(q);
     if (queryEmbedding) {
       let best: CacheEntry | undefined;
       let bestSim = -Infinity;
@@ -127,7 +118,7 @@ export class SemanticCache {
     if (q.length < 8 || a.length < 16) return; // not worth caching
 
     const norm = q.toLowerCase();
-    const embedding = (await this.tryEmbed(q)) ?? [];
+    const embedding = (await this.embedder.tryEmbed(q)) ?? [];
 
     // Replace an existing entry for the same exact query rather than duplicating.
     this.entries = this.entries.filter(e => e.queryNorm !== norm);
@@ -163,40 +154,7 @@ export class SemanticCache {
     if (this.entries.length !== before) this.persist();
   }
 
-  private async tryEmbed(text: string): Promise<number[] | null> {
-    if (!this.embedder || this.embeddingsDisabled) return null;
-    try {
-      const vec = await this.embedder.embed(text);
-      return Array.isArray(vec) && vec.length > 0 ? vec : null;
-    } catch (err) {
-      if (!this.embeddingsDisabled) {
-        log.warn('Embeddings indisponibles — cache en repli texte exact', { error: String(err) });
-        this.embeddingsDisabled = true;
-      }
-      return null;
-    }
-  }
-
   private persist(): void {
-    try {
-      writeFileSync(this.filePath, JSON.stringify(this.entries), 'utf-8');
-    } catch (err) {
-      log.warn('Could not persist semantic cache', { error: String(err) });
-    }
+    writeJsonFile(this.filePath, this.entries, log);
   }
-}
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i] ?? 0;
-    const bi = b[i] ?? 0;
-    dot += ai * bi;
-    normA += ai * ai;
-    normB += bi * bi;
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }

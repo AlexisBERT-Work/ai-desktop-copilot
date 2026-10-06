@@ -30,25 +30,31 @@ export class ContextManager {
 
   async buildContext(conversationId: string, userInput: string): Promise<AgentContext> {
     // If older turns were compacted, load only the messages after the marker
-    // and surface the rolling summary instead of the dropped history.
-    const summaryRow = this.db.getSummary(conversationId);
-    const sinceTs = summaryRow?.throughTs ?? 0;
+    // and surface the rolling summary instead of the dropped history. Store
+    // reads are synchronous: wrapped so a failure degrades to an empty history
+    // instead of throwing out of the run (allSettled can't catch a sync throw).
+    let summaryRow: { summary: string; throughTs: number } | null = null;
+    let messages: OllamaMessage[] = [];
+    try {
+      summaryRow = this.db.getSummary(conversationId);
+      messages = this.db
+        .getLatestMessagesSince(
+          conversationId,
+          summaryRow?.throughTs ?? 0,
+          RECENT_MESSAGES_LIMIT * 2,
+        )
+        .map(m => ({ role: m.role as OllamaMessage['role'], content: m.content }));
+    } catch (err) {
+      log.warn('History read failed', { error: err instanceof Error ? err.message : String(err) });
+    }
 
-    const [recentMessages, relevantMemories] = await Promise.allSettled([
-      Promise.resolve(this.db.getMessagesSince(conversationId, sinceTs, RECENT_MESSAGES_LIMIT * 2)),
-      this.vectorStore.search(userInput, { limit: 5, minScore: 0.65 }),
-    ]);
-
-    const messages: OllamaMessage[] =
-      recentMessages.status === 'fulfilled'
-        ? recentMessages.value.map(m => ({
-            role: m.role as OllamaMessage['role'],
-            content: m.content,
-          }))
-        : [];
-
-    const memories: string[] =
-      relevantMemories.status === 'fulfilled' ? relevantMemories.value.map(r => r.content) : [];
+    let memories: string[] = [];
+    try {
+      const hits = await this.vectorStore.search(userInput, { limit: 5, minScore: 0.65 });
+      memories = hits.map(r => r.content);
+    } catch (err) {
+      log.debug('Semantic recall failed', { error: String(err) });
+    }
 
     // Warm facts are a tiny, instantly-queryable structured set — read synchronously.
     let warmFacts: string[] = [];
@@ -86,21 +92,7 @@ export class ContextManager {
    */
   recordTurn(conversationId: string, model: string, userText: string, assistantText: string): void {
     try {
-      this.db.createConversation(conversationId, model);
-      if (userText.trim()) {
-        this.db.addMessage(conversationId, {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: userText,
-        });
-      }
-      if (assistantText.trim()) {
-        this.db.addMessage(conversationId, {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: assistantText,
-        });
-      }
+      this.db.recordExchange(conversationId, model, userText, assistantText);
     } catch (err) {
       log.warn('recordTurn failed', { error: err instanceof Error ? err.message : String(err) });
     }
