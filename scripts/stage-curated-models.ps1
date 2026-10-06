@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Build a curated copy of the Ollama models dir containing only the CatDesk
   bundled lineup, so the offline installer ships exactly those models.
