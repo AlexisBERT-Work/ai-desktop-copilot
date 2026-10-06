@@ -3,8 +3,14 @@ import type {
   PermissionResult,
   PermissionConfig,
   PermissionGrant,
+  RiskLevel,
 } from '@catdesk/shared-types';
-import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
+import {
+  DEFAULT_PERMISSION_CONFIG,
+  PERMISSION_TIMEOUT_MS,
+  RPC_NOTIFICATIONS,
+} from '@catdesk/shared-types';
+import { stdoutNotifier, type NotifyFn } from '../ipc/Notifier';
 import { createLogger } from '../logger';
 
 const log = createLogger('security:permissions');
@@ -13,20 +19,24 @@ export class PermissionEngine {
   private sessionGrants = new Map<string, PermissionGrant>();
   private config: PermissionConfig = DEFAULT_PERMISSION_CONFIG;
 
-  // Called by IPC bridge when user responds to permission dialog in UI
-  private pendingRequests = new Map<
-    string,
-    {
-      resolve: (result: PermissionResult) => void;
-      reject: (err: Error) => void;
-    }
-  >();
+  /** Demandes de confirmation en attente d'une réponse de l'UI, par requestId. */
+  private pendingRequests = new Map<string, (result: PermissionResult) => void>();
+
+  constructor(
+    private readonly notify: NotifyFn = stdoutNotifier,
+    private readonly timeoutMs: number = PERMISSION_TIMEOUT_MS,
+  ) {}
 
   updateConfig(config: Partial<PermissionConfig>): void {
     this.config = { ...this.config, ...config };
   }
 
-  async check(request: PermissionRequest): Promise<PermissionResult> {
+  /**
+   * Décide si un outil peut s'exécuter. Ne lève jamais : un délai de réponse
+   * dépassé ou un run interrompu (`signal`) valent refus — avant, le délai
+   * REJETAIT, et l'exception remontait jusqu'à faire échouer le run entier.
+   */
+  async check(request: PermissionRequest, signal?: AbortSignal): Promise<PermissionResult> {
     const toolConfig = this.config.tools[request.tool];
 
     if (!toolConfig) {
@@ -58,16 +68,12 @@ export class PermissionEngine {
       };
     }
 
-    // Filesystem path validation — applies to ANY tool carrying a filesystem
-    // path argument, not just those whose name contains "file". Otherwise
-    // path-taking tools like parse_document, analyze_data, read_calendar,
-    // transcribe_audio or run_sqlite (db_path) read arbitrary files outside the
-    // whitelist (e.g. the Chrome cookies SQLite DB), defeating the whole point
-    // of the whitelist. `workdir` is intentionally excluded: it is a working
-    // directory for command tools (git/docker), not a read/write target.
-    for (const key of ['path', 'db_path'] as const) {
-      const candidate = request.args[key];
-      if (typeof candidate === 'string' && candidate.length > 0 && !this.isPathAllowed(candidate)) {
+    // Liste blanche des chemins : appliquée aux chemins que l'outil DÉCLARE
+    // (BaseTool.pathArgs → request.paths), quel que soit son niveau de risque
+    // — sinon un outil `low` lirait n'importe quel fichier (ex. la base de
+    // cookies de Chrome), ce qui ruinerait la liste blanche.
+    for (const candidate of request.paths ?? []) {
+      if (!this.isPathAllowed(candidate)) {
         return { granted: false, reason: `Chemin non autorisé: ${candidate}` };
       }
     }
@@ -78,20 +84,21 @@ export class PermissionEngine {
     }
 
     // MEDIUM risk: check session cache
-    if (toolConfig.riskLevel === 'medium') {
-      const cached = this.sessionGrants.get(request.tool);
-      if (cached?.granted) {
-        return { granted: true, reason: 'Autorisé (session)' };
-      }
+    if (toolConfig.riskLevel === 'medium' && this.sessionGrants.get(request.tool)?.granted) {
+      return { granted: true, reason: 'Autorisé (session)' };
     }
 
-    // HIGH / critical: always ask user
     if (!toolConfig.requiresConfirmation) {
       return { granted: true, reason: 'Autorisé (aucune confirmation requise)' };
     }
 
     // Request user confirmation via UI
-    const result = await this.requestUserConfirmation(request, toolConfig.riskLevel);
+    const result = await this.requestUserConfirmation(
+      request,
+      toolConfig.riskLevel,
+      toolConfig.description,
+      signal,
+    );
 
     if (result.granted && toolConfig.riskLevel === 'medium' && result.remember) {
       this.sessionGrants.set(request.tool, { granted: true, timestamp: Date.now() });
@@ -100,47 +107,48 @@ export class PermissionEngine {
     return result;
   }
 
-  /**
-   * Called from IPC bridge when user responds to a permission dialog
-   */
+  /** Réponse de l'utilisateur au dialogue de permission (relayée par le bridge). */
   resolvePermissionRequest(requestId: string, granted: boolean, remember?: boolean): void {
-    const pending = this.pendingRequests.get(requestId);
-    if (pending) {
-      pending.resolve({ granted, ...(remember !== undefined ? { remember } : {}) });
-      this.pendingRequests.delete(requestId);
-    }
+    this.pendingRequests.get(requestId)?.({
+      granted,
+      ...(remember !== undefined ? { remember } : {}),
+    });
   }
 
-  private async requestUserConfirmation(
+  private requestUserConfirmation(
     request: PermissionRequest,
-    riskLevel: string,
+    riskLevel: RiskLevel,
+    description: string,
+    signal: AbortSignal | undefined,
   ): Promise<PermissionResult> {
-    return new Promise((resolve, reject) => {
+    if (signal?.aborted) return Promise.resolve({ granted: false, reason: 'Run interrompu' });
+
+    return new Promise(resolve => {
       const requestId = crypto.randomUUID();
-      this.pendingRequests.set(requestId, { resolve, reject });
-
-      // Send permission request event to Tauri (via IPC bridge)
-      // The bridge listens to this and forwards to React UI
-      process.stdout.write(
-        JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'permission.request',
-          params: {
-            requestId,
-            tool: request.tool,
-            args: request.args,
-            riskLevel,
-          },
-        }) + '\n',
+      // Réponse de l'UI, délai dépassé ou run interrompu : le premier arrivé
+      // règle la demande, les suivants ne font rien.
+      const settle = (result: PermissionResult): void => {
+        if (!this.pendingRequests.delete(requestId)) return;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        resolve(result);
+      };
+      const onAbort = (): void => settle({ granted: false, reason: 'Run interrompu' });
+      const timer = setTimeout(
+        () => settle({ granted: false, reason: 'Pas de réponse au dialogue de permission' }),
+        this.timeoutMs,
       );
+      this.pendingRequests.set(requestId, settle);
+      signal?.addEventListener('abort', onAbort, { once: true });
 
-      // Timeout after 60 seconds
-      setTimeout(() => {
-        if (this.pendingRequests.has(requestId)) {
-          this.pendingRequests.delete(requestId);
-          reject(new Error('Permission request timed out'));
-        }
-      }, 60_000);
+      // Le bridge Rust relaie la notification à l'UI (dialogue de permission).
+      this.notify(RPC_NOTIFICATIONS.permissionRequest, {
+        requestId,
+        tool: request.tool,
+        description,
+        args: request.args,
+        riskLevel,
+      });
     });
   }
 

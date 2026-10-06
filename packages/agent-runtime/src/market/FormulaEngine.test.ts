@@ -78,3 +78,16 @@ describe('FormulaEngine — formules glissantes (B1)', () => {
     expect(evaluateFormula('sma(MSFT.history, 20)', scope)).toEqual({ value: 400 });
   });
 });
+
+describe('FormulaEngine — fonctions dangereuses désactivées', () => {
+  it.each([
+    'import({x: 1}, {override: true})',
+    'evaluate("1+1")',
+    'parse("1+1")',
+    'createUnit("foo")',
+  ])('refuse %s', expression => {
+    const r = evaluateFormula(expression, {});
+    expect(r.value).toBeNull();
+    expect(r.error).toContain('désactivée');
+  });
+});

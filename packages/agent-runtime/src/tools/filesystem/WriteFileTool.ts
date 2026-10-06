@@ -46,6 +46,7 @@ export class WriteFileTool extends BaseTool<Args> {
   riskLevel = 'medium' as const;
   requiresConfirmation = true;
   override readonly argsSchema = argsSchema;
+  override readonly pathArgs = ['path'] as const;
   schema = jsonSchemaFrom(argsSchema);
 
   async execute(args: Args): Promise<ToolResult> {

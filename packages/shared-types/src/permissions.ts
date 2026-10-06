@@ -2,9 +2,17 @@ import type { RiskLevel } from './ipc';
 
 // ─── Permission System ─────────────────────────────────────────
 
+/**
+ * Délai de réponse à une demande de confirmation. Au-delà, l'agent la traite
+ * comme un refus et l'UI ferme le dialogue — une seule valeur pour les deux.
+ */
+export const PERMISSION_TIMEOUT_MS = 60_000;
+
 export interface PermissionRequest {
   tool: string;
   args: Record<string, unknown>;
+  /** Chemins du disque visés, à vérifier contre la liste blanche (BaseTool.pathArgs). */
+  paths?: string[];
   context?: {
     conversationId?: string;
     activeWindow?: string;

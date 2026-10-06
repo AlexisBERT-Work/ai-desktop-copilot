@@ -185,6 +185,7 @@ export class SemanticSearchTool extends BaseTool<Args> {
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
+  override readonly pathArgs = ['paths'] as const;
   readonly schema = jsonSchemaFrom(argsSchema);
 
   async execute(rawArgs: Args): Promise<ToolResult> {

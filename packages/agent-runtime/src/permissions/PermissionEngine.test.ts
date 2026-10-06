@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { join } from 'path';
 import { PermissionEngine } from './PermissionEngine';
+import { ParseDocumentTool } from '../tools/files/ParseDocumentTool';
+import { RunSqliteTool } from '../tools/infra/RunSqliteTool';
+import { ObsidianNotesTool } from '../tools/connectors/ObsidianNotesTool';
+import { SemanticSearchTool } from '../tools/search/SemanticSearchTool';
+import { SummarizeGitLogTool } from '../tools/git/SummarizeGitLogTool';
 
 const req = (path: string) => ({
   tool: 'read_file',
   args: { path },
+  paths: [path],
   context: { conversationId: 'c' },
 });
 
@@ -72,34 +78,104 @@ describe('PermissionEngine path whitelist', () => {
   });
 
   // ─── Vuln 3 (docs/SECURITE.md): path check must cover non-"file" tools ───
-  it('enforces the whitelist on a path-taking tool not named *file* (parse_document)', async () => {
-    const r = await engine.check({
-      tool: 'parse_document',
-      args: { path: 'C:/Windows/System32/config/SAM' },
+  // Les chemins viennent de l'OUTIL (pathArgs), exactement comme dans l'orchestrateur.
+  const through = (
+    tool: { name: string; filesystemTargets(a: Record<string, unknown>): string[] },
+    args: Record<string, unknown>,
+  ) =>
+    engine.check({
+      tool: tool.name,
+      args,
+      paths: tool.filesystemTargets(args),
       context: { conversationId: 'c' },
     });
+
+  it('enforces the whitelist on a path-taking tool not named *file* (parse_document)', async () => {
+    const r = await through(new ParseDocumentTool(), { path: 'C:/Windows/System32/config/SAM' });
     expect(r.granted).toBe(false);
     expect(r.reason).toContain('Chemin non autorisé');
   });
 
   it('enforces the whitelist on run_sqlite db_path (Chrome cookies DB)', async () => {
-    const r = await engine.check({
-      tool: 'run_sqlite',
-      args: {
-        db_path: 'C:/Users/other/AppData/Local/Google/Chrome/User Data/Default/Cookies',
-        query: 'SELECT 1',
-      },
-      context: { conversationId: 'c' },
+    const r = await through(new RunSqliteTool(), {
+      db_path: 'C:/Users/other/AppData/Local/Google/Chrome/User Data/Default/Cookies',
+      query: 'SELECT 1',
     });
     expect(r.granted).toBe(false);
   });
 
+  it('enforces the whitelist on obsidian_notes `vault` (lisait tout le disque)', async () => {
+    const r = await through(new ObsidianNotesTool(), { vault: 'C:/', query: 'mot de passe' });
+    expect(r.granted).toBe(false);
+  });
+
+  it('enforces the whitelist on EVERY entry of semantic_search `paths`', async () => {
+    const r = await through(new SemanticSearchTool(), {
+      query: 'x',
+      paths: [join(HOME, 'Documents'), 'C:/Users/other'],
+    });
+    expect(r.granted).toBe(false);
+  });
+
+  it('ne traite pas une pathspec git (relative au dépôt) comme un chemin disque', async () => {
+    const r = await through(new SummarizeGitLogTool(), { workdir: 'D:/repo', path: 'src/' });
+    expect(r.granted).toBe(true);
+  });
+
   it('still allows a whitelisted path for a non-file tool', async () => {
-    const r = await engine.check({
-      tool: 'parse_document',
-      args: { path: join(HOME, 'Documents', 'rapport.pdf') },
-      context: { conversationId: 'c' },
+    const r = await through(new ParseDocumentTool(), {
+      path: join(HOME, 'Documents', 'rapport.pdf'),
     });
     expect(r.granted).toBe(true);
+  });
+});
+
+describe('PermissionEngine — confirmation utilisateur', () => {
+  const highRequest = {
+    tool: 'run_command',
+    args: { command: 'dir' },
+    context: { conversationId: 'c' },
+  };
+
+  it("notifie l'UI avec la description de l'outil, puis applique sa réponse", async () => {
+    const sent: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const engine = new PermissionEngine((method, params) =>
+      sent.push({ method, params: params as Record<string, unknown> }),
+    );
+    const pending = engine.check(highRequest);
+    await Promise.resolve();
+    expect(sent[0]?.method).toBe('permission.request');
+    expect(sent[0]?.params['description']).toBeTruthy();
+    expect(sent[0]?.params['riskLevel']).toBe('high');
+
+    engine.resolvePermissionRequest(String(sent[0]?.params['requestId']), true);
+    expect((await pending).granted).toBe(true);
+  });
+
+  it('un délai dépassé vaut REFUS — il ne fait plus échouer le run', async () => {
+    const engine = new PermissionEngine(() => {}, 10);
+    const r = await engine.check(highRequest);
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('Pas de réponse');
+  });
+
+  it("un run interrompu pendant l'attente vaut refus immédiat", async () => {
+    const engine = new PermissionEngine(() => {}, 60_000);
+    const controller = new AbortController();
+    const pending = engine.check(highRequest, controller.signal);
+    controller.abort();
+    const r = await pending;
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('interrompu');
+  });
+
+  it('une réponse tardive (après le délai) est ignorée sans erreur', async () => {
+    let requestId = '';
+    const engine = new PermissionEngine((_m, p) => {
+      requestId = String((p as { requestId: string }).requestId);
+    }, 10);
+    const r = await engine.check(highRequest);
+    expect(() => engine.resolvePermissionRequest(requestId, true)).not.toThrow();
+    expect(r.granted).toBe(false);
   });
 });
