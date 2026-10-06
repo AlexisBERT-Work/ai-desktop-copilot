@@ -32,6 +32,35 @@ prettier no-op — et **CI verte** sur la PR #24 (elle était rouge sur `master`
 depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
 antérieures, suivies dans #25 (jalon 0.2.1).
 
+## 2026-10-07 — Audit complet et refonte (branche `refactor/audit-complet`)
+
+Demande : « refacto, analyser et corriger tout le code ». 14 commits sur
+`refactor/audit-complet` (depuis `dev`, non poussée). Portes : type-check
+3/3, lint 0, `format:check` (nouveau, en CI), **≈ 700 tests agent**,
+54 desktop, 34 Rust, 14 Python, clippy `-D warnings`.
+
+- **Bugs corrigés** : dailys partagées invisibles de l'agent sur un poste
+  installé ; contexte qui gardait les 40 PLUS ANCIENS messages ; délai de
+  permission qui faisait échouer le run ; erreur interne → UI bloquée en
+  « réfléchit… » ; réponse tronquée par Stop mise en cache ; Ollama géré
+  jamais arrêté (et pris pour « externe » ensuite) ; agent jamais relancé ;
+  safe mode perdu si l'agent démarrait lentement ; Réglages › Modèle sans
+  effet ; embeddings coupés à vie après un échec ; démons 6 h/24 h jamais
+  exécutés ; tâche cron annulée ressuscitée.
+- **Sécurité** : chemins déclarés par outil (`pathArgs` — `vault`/`paths`
+  lisaient tout le disque) ; audit expurgé (mots de passe, tokens) ;
+  dot-commands `sqlite3` refusées ; mathjs bridé ; webhook Discord borné ;
+  CSP et capacités réduites.
+- **Architecture** : un client HTTP (`lib/http`), une persistance atomique
+  (`lib/persistence`), `news/supabaseRest`, `memory/embedding`,
+  `lifecycle.ts`, orchestrateur à dépendances nommées, superviseur Rust.
+
+**Reste à faire** (non commencé) : mettre à jour CAPACITES / SECURITE /
+AMELIORATIONS / CHANGELOG / la liste des helpers de CLAUDE.md ; retirer
+`@tauri-apps/plugin-notification` de `apps/desktop/package.json` (demande
+un `pnpm install`) ; décider du numéro de version puis ouvrir la PR vers
+`dev`. Non vérifié en réel : l'app lancée (`pnpm dev`).
+
 ## 2026-10-06 — Nettoyage, branche `dev` et jalons de version
 
 Demande : « tout rendre propre, puis une nouvelle branche, et des points pour
