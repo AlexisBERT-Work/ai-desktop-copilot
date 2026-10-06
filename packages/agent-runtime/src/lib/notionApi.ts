@@ -1,3 +1,5 @@
+import { API_USER_AGENT, fetchJson } from './http';
+
 const NOTION_API = 'https://api.notion.com';
 const NOTION_VERSION = '2022-06-28';
 
@@ -11,48 +13,22 @@ export async function notionFetch(
   method: 'GET' | 'POST' = 'GET',
   body?: unknown,
 ): Promise<unknown> {
-  const { default: https } = await import('https');
-  const payload = body !== undefined ? JSON.stringify(body) : undefined;
-
-  return new Promise((resolve, reject) => {
-    const url = new URL(path.startsWith('http') ? path : `${NOTION_API}${path}`);
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-      'Notion-Version': NOTION_VERSION,
-      'User-Agent': 'catdesk-agent/1.0',
-    };
-    if (payload !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      headers['Content-Length'] = String(Buffer.byteLength(payload));
-    }
-
-    const req = https.request(
-      {
-        method,
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        headers,
-      },
-      res => {
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString()));
-          } catch {
-            reject(new Error('Invalid JSON from Notion API'));
-          }
-        });
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(12_000, () => {
-      req.destroy();
-      reject(new Error('Notion API timeout'));
-    });
-    if (payload !== undefined) req.write(payload);
-    req.end();
-  });
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'Notion-Version': NOTION_VERSION,
+    'User-Agent': API_USER_AGENT,
+  };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  return fetchJson(
+    path.startsWith('http') ? path : `${NOTION_API}${path}`,
+    {
+      method,
+      headers,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      timeoutMs: 12_000,
+    },
+    'Notion API',
+  );
 }
 
 interface RichText {

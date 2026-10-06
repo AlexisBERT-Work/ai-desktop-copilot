@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { postJson } from '../../lib/http';
 
 type Platform = 'discord' | 'slack';
 
@@ -40,40 +41,6 @@ export function resolveWebhookUrl(platform: Platform, argUrl?: string): string {
   if (typeof argUrl === 'string' && argUrl.length > 0) return argUrl;
   const envKey = platform === 'slack' ? 'SLACK_WEBHOOK_URL' : 'DISCORD_WEBHOOK_URL';
   return process.env[envKey] ?? '';
-}
-
-async function postJson(url: string, body: unknown): Promise<{ status: number; text: string }> {
-  const { default: https } = await import('https');
-  const payload = JSON.stringify(body);
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = https.request(
-      {
-        method: 'POST',
-        hostname: u.hostname,
-        path: u.pathname + u.search,
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': String(Buffer.byteLength(payload)),
-          'User-Agent': 'catdesk-agent/1.0',
-        },
-      },
-      res => {
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () =>
-          resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf-8') }),
-        );
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(10_000, () => {
-      req.destroy();
-      reject(new Error('Webhook timeout'));
-    });
-    req.write(payload);
-    req.end();
-  });
 }
 
 export class SendWebhookMessageTool extends BaseTool<Args> {

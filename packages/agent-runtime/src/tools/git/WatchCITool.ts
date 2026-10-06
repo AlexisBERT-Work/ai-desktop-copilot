@@ -3,8 +3,7 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { runGit } from '../../lib/git';
-
-const GH_API = 'https://api.github.com';
+import { ghFetch, resolveToken, validateRepo } from '../../lib/githubApi';
 
 const argsSchema = z.object({
   repo: z.string().min(1).describe('GitHub repo in "owner/name" format (e.g. "alexis/catdesk")'),
@@ -41,42 +40,6 @@ interface FailedStep {
   name: string;
   conclusion: string;
   number: number;
-}
-
-// Minimal fetch using Node.js built-in (available in Node 18+)
-async function ghFetch(path: string, token: string): Promise<unknown> {
-  const { default: https } = await import('https');
-  return new Promise((resolve, reject) => {
-    const url = new URL(path.startsWith('http') ? path : `${GH_API}${path}`);
-    const req = https.get(
-      {
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/vnd.github+json',
-          'User-Agent': 'catdesk-agent/1.0',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      },
-      res => {
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString()));
-          } catch {
-            reject(new Error('Invalid JSON from GitHub API'));
-          }
-        });
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(10_000, () => {
-      req.destroy();
-      reject(new Error('GitHub API timeout'));
-    });
-  });
 }
 
 async function getCurrentBranch(cwd: string): Promise<string | null> {
@@ -121,11 +84,11 @@ export class WatchCITool extends BaseTool<Args> {
   async execute(args: Args): Promise<ToolResult> {
     const { repo, branch, token: argToken, limit } = args;
 
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+    if (!validateRepo(repo)) {
       return this.fail('Format repo invalide. Utilise "owner/nom-du-repo" (ex: "alexis/catdesk").');
     }
 
-    const token = argToken ?? process.env['GITHUB_TOKEN'] ?? '';
+    const token = resolveToken(argToken);
     if (!token) {
       return this.fail(
         "Token GitHub manquant. Passe `token` en argument ou définis la variable d'environnement GITHUB_TOKEN.",
