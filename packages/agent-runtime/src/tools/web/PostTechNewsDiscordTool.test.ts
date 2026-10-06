@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildDiscordEmbeds, relativeAge } from './PostTechNewsDiscordTool';
-import type { NewsItem } from './FetchTechNewsTool';
+import { buildDiscordEmbeds, relativeAge } from '../../news/discordEmbeds';
+import type { NewsItem } from '../../news/newsItem';
 
 describe('relativeAge', () => {
   const now = Date.parse('2025-06-10T12:00:00Z');
@@ -22,7 +22,14 @@ describe('buildDiscordEmbeds', () => {
 
   it('construit un embed cliquable avec métadonnées', () => {
     const items: NewsItem[] = [
-      { title: 'GPT-5 sort', url: 'https://x/1', source: 'Hacker News', points: 120, comments: 45, publishedAt: '2025-06-10T08:00:00Z' },
+      {
+        title: 'GPT-5 sort',
+        url: 'https://x/1',
+        source: 'Hacker News',
+        points: 120,
+        comments: 45,
+        publishedAt: '2025-06-10T08:00:00Z',
+      },
     ];
     const [embed] = buildDiscordEmbeds(items, [], now);
     expect(embed!.title).toBe('GPT-5 sort');
@@ -38,7 +45,11 @@ describe('buildDiscordEmbeds', () => {
     const items: NewsItem[] = [
       { title: 'GPT-5 sort', url: 'https://x/1', source: 'Hacker News', points: 120 },
     ];
-    const [embed] = buildDiscordEmbeds(items, ['OpenAI dévoile GPT-5 avec un raisonnement amélioré.'], now);
+    const [embed] = buildDiscordEmbeds(
+      items,
+      ['OpenAI dévoile GPT-5 avec un raisonnement amélioré.'],
+      now,
+    );
     expect(embed!.description!.startsWith('OpenAI dévoile GPT-5')).toBe(true);
     expect(embed!.description).toContain('▲ 120');
   });

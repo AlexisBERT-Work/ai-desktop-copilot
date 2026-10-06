@@ -2,6 +2,8 @@ use tauri::{App, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tracing::{info, warn};
 
+use crate::ipc::protocol::EVENT_UI_OVERLAY_TOGGLE;
+
 pub fn register_global_hotkeys(app: &mut App) -> anyhow::Result<()> {
     // Toggle the overlay. Ctrl+Space is the primary hotkey, but Windows can
     // swallow it (it toggles the IME when one is installed) or another app may
@@ -19,7 +21,10 @@ pub fn register_global_hotkeys(app: &mut App) -> anyhow::Result<()> {
             if event.state == ShortcutState::Pressed {
                 info!("Global hotkey triggered: toggle overlay");
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.emit("ui:overlay-toggle", ());
+                    // Constante, pas un littéral : le test de contrat
+                    // protocol.rs ne voit pas les chaînes en dur, un renommage
+                    // côté TypeScript passerait donc inaperçu ici.
+                    let _ = window.emit(EVENT_UI_OVERLAY_TOGGLE, ());
                 }
             }
         }) {

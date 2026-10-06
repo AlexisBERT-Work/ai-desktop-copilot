@@ -1,14 +1,13 @@
 """CSV file parser"""
 
-import logging
 import csv
-import chardet
 from typing import Dict, Any
 
-log = logging.getLogger(__name__)
+from deps import require
 
 
 def parse_csv_file(path: str, max_rows: int = 1000) -> Dict[str, Any]:
+    chardet = require("chardet")
     # Detect encoding
     with open(path, "rb") as f:
         raw = f.read(50_000)

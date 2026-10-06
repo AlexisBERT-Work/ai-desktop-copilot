@@ -26,6 +26,16 @@ describe('SettingsWindow', () => {
     expect(screen.queryByText(/LanceDB/)).toBeNull();
   });
 
+  it("l'onglet Voix montre l'interrupteur et l'état des moteurs, sans modèles", () => {
+    render(<SettingsWindow />);
+    fireEvent.click(screen.getByText('Voix'));
+    expect(screen.getByText('Parler à CatDesk')).toBeTruthy();
+    // Sans `voice_status` (pas de Tauri en test), rien n'est disponible et
+    // l'onglet doit le dire plutôt que planter.
+    expect(screen.getByText(/modèles absents — micro désactivé/)).toBeTruthy();
+    expect(screen.getByText(/voix Windows en secours/)).toBeTruthy();
+  });
+
   it("l'onglet Raccourcis liste le raccourci global", () => {
     render(<SettingsWindow />);
     fireEvent.click(screen.getByText('Raccourcis'));

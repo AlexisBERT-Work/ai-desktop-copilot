@@ -17,6 +17,9 @@ pub const EVENT_MARKET_UPDATE: &str = "market:update";
 pub const EVENT_PRESS_FEEDS: &str = "press:feeds";
 pub const EVENT_DAILIES_LOCAL: &str = "dailies:local";
 pub const EVENT_PRESS_PROGRESS: &str = "press:progress";
+pub const EVENT_VOICE_STATE: &str = "voice:state";
+pub const EVENT_VOICE_TRANSCRIPT: &str = "voice:transcript";
+pub const EVENT_VOICE_LEVEL: &str = "voice:level";
 
 // ─── Méthodes JSON-RPC hôte → agent ────────────────────────────
 pub const RPC_AGENT_PROCESS: &str = "agent.process";
@@ -78,6 +81,9 @@ mod tests {
         EVENT_PRESS_FEEDS,
         EVENT_DAILIES_LOCAL,
         EVENT_PRESS_PROGRESS,
+        EVENT_VOICE_STATE,
+        EVENT_VOICE_TRANSCRIPT,
+        EVENT_VOICE_LEVEL,
         RPC_AGENT_PROCESS,
         RPC_AGENT_CANCEL,
         RPC_PERMISSION_RESPONSE,

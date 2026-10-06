@@ -1,13 +1,10 @@
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { readFile } from 'fs/promises';
 import { join, isAbsolute } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 const argsSchema = z.object({
   workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
@@ -108,7 +105,7 @@ export class ResolveConflictsTool extends BaseTool<Args> {
         files = [path];
       } else {
         // List unmerged paths.
-        const { stdout } = await exec('git', ['diff', '--name-only', '--diff-filter=U'], { cwd });
+        const { stdout } = await runGit(['diff', '--name-only', '--diff-filter=U'], { cwd });
         files = stdout
           .split('\n')
           .map(l => l.trim())

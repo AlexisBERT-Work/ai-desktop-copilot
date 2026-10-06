@@ -1,7 +1,7 @@
 // ─── Dailys (Pilier B, flux éditorial) ─────────────────────────
 // Briefings quotidiens rédigés par l'admin et diffusés en lecture seule.
 // Distinct de `news` (alertes ponctuelles) : un flux catégorisé que chaque
-// client filtre selon ses centres d'intérêt. Voir docs/projects/dashboard-dailies.md.
+// client filtre selon ses centres d'intérêt. Voir docs/projects/dashboard.md §6.
 
 /** Catégories de daily (liste fixe). Sert au filtrage côté client. */
 export const DAILY_CATEGORIES = ['markets', 'tech', 'crypto', 'macro', 'product', 'misc'] as const;

@@ -1,16 +1,11 @@
 """DOCX file parser using python-docx"""
 
-import logging
 from typing import Dict, Any
-
-log = logging.getLogger(__name__)
+from deps import require
 
 
 def parse_docx_file(path: str) -> Dict[str, Any]:
-    try:
-        from docx import Document
-    except ImportError:
-        raise RuntimeError("python-docx not installed. Run: pip install python-docx")
+    Document = require("docx").Document
 
     doc = Document(path)
 

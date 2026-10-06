@@ -20,6 +20,9 @@ export const TAURI_EVENTS = {
   pressFeeds: 'press:feeds',
   dailiesLocal: 'dailies:local',
   pressProgress: 'press:progress',
+  voiceState: 'voice:state',
+  voiceTranscript: 'voice:transcript',
+  voiceLevel: 'voice:level',
 } as const;
 
 export type TauriEventName = (typeof TAURI_EVENTS)[keyof typeof TAURI_EVENTS];

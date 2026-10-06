@@ -23,8 +23,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_clipboard_manager::init());
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
 
     // The updater plugin requires a `plugins.updater` config block, which only
     // exists in the release config (tauri.release.conf.json). Registering it in
@@ -43,26 +42,28 @@ pub fn run() {
             commands::press::delete_local_press_feed,
             commands::press::run_local_press_now,
             commands::press::sync_local_press,
-            commands::models::get_ollama_models,
             commands::models::get_ollama_models_info,
             commands::models::get_gpu_vram_bytes,
-            commands::screen::screen_capture,
-            commands::screen::screen_capture_active_window,
-            commands::filesystem::file_read,
-            commands::filesystem::file_write,
-            commands::filesystem::dir_list,
-            commands::system::system_run_command,
-            commands::system::open_application,
-            commands::clipboard::clipboard_read,
-            commands::clipboard::clipboard_write,
             commands::permissions::permission_respond,
             commands::settings::update_settings,
             commands::tuning::get_kv_cache_status,
             commands::tuning::set_kv_cache_type,
             commands::tuning::get_recommended_model,
+            commands::voice::voice_status,
+            commands::voice::voice_listen_start,
+            commands::voice::voice_listen_stop,
+            commands::voice::voice_speak,
+            commands::voice::voice_speak_end,
+            commands::voice::voice_stop_speaking,
+            commands::voice::voice_configure,
+            commands::voice::voice_warmup,
         ])
         .setup(|app| {
             info!("CatDesk starting up");
+
+            // Threads voix (écoute / parole). Aucun modèle n'est chargé ici :
+            // l'UI appelle `voice_warmup` quand la voix est activée.
+            app.manage(core::voice::spawn(app.handle().clone()));
 
             // Start the embedded Ollama server first (no-op in dev, where the
             // developer runs their own). The agent connects to it lazily, so a

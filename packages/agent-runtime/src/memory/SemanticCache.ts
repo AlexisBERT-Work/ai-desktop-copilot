@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import type { Embedder } from './VectorStore';
 import { createLogger } from '../logger';
+import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('memory:semcache');
 
@@ -58,10 +58,11 @@ export class SemanticCache {
   private readonly maxEntries: number;
   private embeddingsDisabled = false;
 
-  constructor(private embedder?: Embedder, opts: SemanticCacheOptions = {}) {
-    const dir = opts.dataDir ?? process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    mkdirSync(dir, { recursive: true });
-    this.filePath = join(dir, 'semantic-cache.json');
+  constructor(
+    private embedder?: Embedder,
+    opts: SemanticCacheOptions = {},
+  ) {
+    this.filePath = dataPath('semantic-cache.json', opts.dataDir);
     this.threshold = opts.threshold ?? 0.95;
     this.ttlMs = opts.ttlMs ?? 24 * 60 * 60 * 1000;
     this.maxEntries = opts.maxEntries ?? 200;
@@ -78,7 +79,11 @@ export class SemanticCache {
       }
     }
     this.initialized = true;
-    log.info('SemanticCache initialized', { path: this.filePath, count: this.entries.length, embedder: !!this.embedder });
+    log.info('SemanticCache initialized', {
+      path: this.filePath,
+      count: this.entries.length,
+      embedder: !!this.embedder,
+    });
   }
 
   /** Look up a cached answer for a semantically-equivalent query, or null. */
@@ -97,7 +102,10 @@ export class SemanticCache {
       for (const e of this.entries) {
         if (e.embedding.length !== queryEmbedding.length) continue;
         const sim = cosineSimilarity(queryEmbedding, e.embedding);
-        if (sim > bestSim) { bestSim = sim; best = e; }
+        if (sim > bestSim) {
+          bestSim = sim;
+          best = e;
+        }
       }
       if (best && bestSim >= this.threshold) {
         log.debug('Semantic cache hit', { similarity: Number(bestSim.toFixed(3)) });
@@ -123,7 +131,14 @@ export class SemanticCache {
 
     // Replace an existing entry for the same exact query rather than duplicating.
     this.entries = this.entries.filter(e => e.queryNorm !== norm);
-    this.entries.push({ id: crypto.randomUUID(), query: q, queryNorm: norm, embedding, answer: a, createdAt: Date.now() });
+    this.entries.push({
+      id: crypto.randomUUID(),
+      query: q,
+      queryNorm: norm,
+      embedding,
+      answer: a,
+      createdAt: Date.now(),
+    });
 
     // Evict oldest beyond the cap.
     if (this.entries.length > this.maxEntries) {

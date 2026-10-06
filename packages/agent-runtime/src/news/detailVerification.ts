@@ -1,6 +1,7 @@
 import type { OllamaClient } from '../llm/OllamaClient';
-import { cutAtSentence, type NewsItem } from '../tools/web/FetchTechNewsTool';
-import { looksLikeProse, startsMidSentence } from '../tools/web/ReadWebpageTool';
+import { cutAtSentence } from './newsText';
+import type { NewsItem } from './newsItem';
+import { looksLikeProse, startsMidSentence } from '../lib/readableText';
 import { articleCharBudget, complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { createLogger } from '../logger';
 

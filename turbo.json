@@ -10,7 +10,7 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "out/**", "target/**"]
+      "outputs": ["dist/**"]
     },
     "lint": {
       "dependsOn": ["^build"]
@@ -21,9 +21,6 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": []
-    },
-    "clean": {
-      "cache": false
     }
   }
 }

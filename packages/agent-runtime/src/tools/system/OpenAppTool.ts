@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   name: z.string().min(1).describe('Application name or executable path'),
@@ -90,11 +91,9 @@ export class OpenAppTool extends BaseTool<Args> {
     }
 
     try {
-      const { execFile } = await import('child_process');
-      const { promisify } = await import('util');
-      const exec = promisify(execFile);
-
-      await exec('powershell.exe', ['-NoProfile', '-Command', command], { timeout: 15000 });
+      await runProcess('powershell.exe', ['-NoProfile', '-Command', command], {
+        timeoutMs: 15_000,
+      });
 
       return this.ok({ launched: true, app: args.name, ...(args.args ? { args: args.args } : {}) });
     } catch (err) {

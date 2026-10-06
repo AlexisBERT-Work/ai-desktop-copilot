@@ -12,6 +12,8 @@ use tauri::AppHandle;
 use tracing::info;
 
 use crate::commands::models::{detect_vram_bytes, heaviest_model};
+use crate::core::audit;
+use crate::core::error::CatdeskError;
 use crate::core::ollama;
 
 /// Heuristic: which KV-cache type suits a model of `model_bytes` on a GPU with
@@ -152,16 +154,23 @@ pub struct ApplyResult {
 #[tauri::command]
 pub async fn set_kv_cache_type(app: AppHandle, value: String) -> Result<ApplyResult, String> {
     info!(value = %value, "set_kv_cache_type");
-    ollama::set_kv_cache_setting(&app, &value).map_err(|e| e.to_string())?;
+    // Message déjà en français et explicite (« doit être f16 ou q4_0 ») :
+    // Refused le laisse passer tel quel.
+    ollama::set_kv_cache_setting(&app, &value).map_err(|e| CatdeskError::Refused(e.to_string()))?;
     // Restart on a background thread (kill + respawn blocks briefly).
     let restarted = if ollama::is_managed() {
         let app2 = app.clone();
         tauri::async_runtime::spawn_blocking(move || ollama::restart(&app2))
             .await
-            .map_err(|e| e.to_string())?
+            .map_err(|e| CatdeskError::Ollama(e.to_string()))?
     } else {
         false
     };
+    // Écrit un fichier de config ET redémarre un processus : à tracer.
+    audit::log(
+        "KV_CACHE_SET",
+        serde_json::json!({ "value": value, "restarted": restarted }),
+    );
     Ok(ApplyResult { restarted })
 }
 

@@ -1,11 +1,8 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   port: z
@@ -82,9 +79,8 @@ export class InspectPortTool extends BaseTool<Args> {
   async execute({ port }: Args): Promise<ToolResult> {
     let netstatOut: string;
     try {
-      const { stdout } = await exec('netstat', ['-ano'], {
+      const { stdout } = await runProcess('netstat', ['-ano'], {
         maxBuffer: 4_000_000,
-        windowsHide: true,
       });
       netstatOut = stdout;
     } catch (err) {
@@ -99,9 +95,8 @@ export class InspectPortTool extends BaseTool<Args> {
     let names = new Map<number, string>();
     if (listeners.length > 0) {
       try {
-        const { stdout } = await exec('tasklist', ['/fo', 'csv', '/nh'], {
+        const { stdout } = await runProcess('tasklist', ['/fo', 'csv', '/nh'], {
           maxBuffer: 8_000_000,
-          windowsHide: true,
         });
         names = parseTasklist(stdout);
       } catch {

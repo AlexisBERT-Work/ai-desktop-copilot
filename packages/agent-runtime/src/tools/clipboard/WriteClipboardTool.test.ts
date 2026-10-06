@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { WriteClipboardTool } from './WriteClipboardTool';
+import { expectFail } from '../base/testResult';
 
 // Tests de validation uniquement : on n'écrase pas le presse-papier réel
 // de la machine qui exécute la suite.
@@ -14,7 +15,6 @@ describe('WriteClipboardTool — validation', () => {
 
   it('refuse un contenu trop grand', async () => {
     const res = await tool.run({ content: 'a'.repeat(1_000_001) });
-    expect(res.success).toBe(false);
-    expect(res.error).toContain('trop grand');
+    expect(expectFail(res).error).toContain('trop grand');
   });
 });

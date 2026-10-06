@@ -1,8 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import type { OllamaMessage, ConversationSummary } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
 import { loadSqlJs, type Database } from '../lib/sqljs';
+import { dataPath } from '../lib/dataDir';
 
 export interface ScheduledJob {
   id: string;
@@ -26,9 +26,7 @@ export class ConversationStore {
   private dbPath: string;
 
   constructor() {
-    const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    mkdirSync(dataDir, { recursive: true });
-    this.dbPath = join(dataDir, 'conversations.db');
+    this.dbPath = dataPath('conversations.db');
   }
 
   async initialize(): Promise<void> {

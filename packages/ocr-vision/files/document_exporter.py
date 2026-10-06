@@ -6,12 +6,11 @@
 - docx   : a small block-level Markdown -> python-docx converter.
 """
 
-import logging
 import os
 import re
 from typing import Dict, Any, Optional
+from deps import require
 
-log = logging.getLogger(__name__)
 
 SUPPORTED = {"pdf", "docx", "html", "md", "markdown", "txt"}
 
@@ -47,10 +46,7 @@ def _infer_format(path: str, explicit: Optional[str]) -> str:
 
 
 def _md_to_html(content: str, title: Optional[str]) -> str:
-    try:
-        import markdown as md
-    except ImportError:
-        raise RuntimeError("markdown not installed. Run: pip install markdown")
+    md = require("markdown")
     body = md.markdown(content, extensions=["extra", "sane_lists", "tables", "fenced_code", "nl2br"])
     heading = f"<h1>{_escape(title)}</h1>\n" if title else ""
     safe_title = _escape(title or "Document")
@@ -73,10 +69,7 @@ def _write_text(path: str, text: str) -> None:
 
 
 def _export_pdf(content: str, path: str, title: Optional[str]) -> None:
-    try:
-        from xhtml2pdf import pisa
-    except ImportError:
-        raise RuntimeError("xhtml2pdf not installed. Run: pip install xhtml2pdf")
+    pisa = require("xhtml2pdf").pisa
     html = _md_to_html(content, title)
     with open(path, "wb") as f:
         status = pisa.CreatePDF(html, dest=f, encoding="utf-8")
@@ -104,10 +97,7 @@ def _add_inline_runs(paragraph, text: str) -> None:
 
 
 def _export_docx(content: str, path: str, title: Optional[str]) -> None:
-    try:
-        from docx import Document
-    except ImportError:
-        raise RuntimeError("python-docx not installed. Run: pip install python-docx")
+    Document = require("docx").Document
 
     doc = Document()
     if title:

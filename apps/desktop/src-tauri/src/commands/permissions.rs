@@ -3,6 +3,7 @@ use serde_json::json;
 use tracing::info;
 
 use crate::core::audit;
+use crate::core::error::CatdeskError;
 use crate::ipc::bridge::send_permission_response;
 
 #[derive(Debug, Deserialize)]
@@ -29,7 +30,7 @@ pub async fn permission_respond(args: PermissionResponseArgs) -> Result<(), Stri
         args.remember.unwrap_or(false),
     )
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| CatdeskError::Agent(e.to_string()))?;
 
     audit::log(
         "PERMISSION_DECISION",

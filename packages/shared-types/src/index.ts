@@ -10,3 +10,4 @@ export * from './dailies';
 export * from './pressFeeds';
 export * from './pressSources';
 export * from './market';
+export * from './voice';

@@ -24,7 +24,7 @@ export function TableView({ symbols, quotes }: TableViewProps) {
         </tr>
       </thead>
       <tbody>
-        {symbols.map((sym) => {
+        {symbols.map(sym => {
           const q = quotes[sym.toUpperCase()];
           return (
             <tr key={sym} className="border-t border-white/5">
@@ -34,10 +34,16 @@ export function TableView({ symbols, quotes }: TableViewProps) {
               </td>
               <td
                 className={`py-1 text-right tabular-nums ${
-                  q !== undefined ? (q.change >= 0 ? 'text-green-400' : 'text-red-400') : 'text-white/25'
+                  q !== undefined
+                    ? q.change >= 0
+                      ? 'text-green-400'
+                      : 'text-red-400'
+                    : 'text-white/25'
                 }`}
               >
-                {q !== undefined ? `${q.change >= 0 ? '+' : ''}${q.changePercent.toFixed(2)}%` : '—'}
+                {q !== undefined
+                  ? `${q.change >= 0 ? '+' : ''}${q.changePercent.toFixed(2)}%`
+                  : '—'}
               </td>
               <td className="py-1 text-right tabular-nums text-white/50">
                 {q !== undefined && q.volume !== null ? q.volume.toLocaleString('fr-FR') : '—'}
@@ -52,7 +58,7 @@ export function TableView({ symbols, quotes }: TableViewProps) {
 
 /** Widget table : plusieurs symboles avec prix / variation / volume. */
 export function TableWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
+  const quotes = useMarketStore(s => s.quotes);
   const symbols = Array.isArray(widget.config.symbols)
     ? widget.config.symbols.filter((s): s is string => typeof s === 'string')
     : [];

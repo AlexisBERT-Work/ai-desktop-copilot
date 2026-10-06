@@ -3,7 +3,7 @@
 Runbook **reproductible** pour provisionner le backend de la news (Pilier B) avec
 le **CLI Supabase**, déjà installé en devDependency (`pnpm exec supabase`).
 
-> Contexte fonctionnel et modèle de données : [../docs/projects/dashboard-p2.md](../docs/projects/dashboard-p2.md).
+> Contexte fonctionnel et modèle de données : [../docs/projects/dashboard.md](../docs/projects/dashboard.md) §5 et §6.
 > Schéma appliqué : [migrations/20260628000000_news.sql](migrations/20260628000000_news.sql).
 
 Ce qui est **déjà fait dans le repo** (rien à refaire) :

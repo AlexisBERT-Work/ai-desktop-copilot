@@ -10,12 +10,18 @@
     resources/agent/   node.exe + bundled agent (dist/index.js) + node_modules
     resources/ollama/  ollama.exe + the model blobs
     resources/ocr/     PyInstaller OCR sidecar + tessdata   (skippable)
+    resources/voice/   VAD + Parakeet + Piper voice models   (skippable, ~800 MB)
 
   The resulting installer is LARGE (the LLM model alone is several GB). It can
   only be shared via USB / cloud link, not email.
 
 .PARAMETER SkipOcr
   Don't build/bundle the Python OCR sidecar (smaller, faster build).
+
+.PARAMETER SkipVoice
+  Don't bundle the voice models. The app then greys out the microphone and
+  reads answers with the Windows voice; models dropped later into
+  %APPDATA%\CatDesk\data\voice are picked up without reinstalling.
 
 .PARAMETER ModelsPath
   Source Ollama models directory. Default: $env:USERPROFILE\.ollama\models
@@ -36,6 +42,7 @@
 [CmdletBinding()]
 param(
   [switch]$SkipOcr,
+  [switch]$SkipVoice,
   [switch]$Update,
   [string]$ModelsPath = (Join-Path $env:USERPROFILE ".ollama\models")
 )
@@ -96,6 +103,9 @@ Remove-DirRobust $resDir
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "agent") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ollama") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $resDir "ocr") | Out-Null
+# voice/ est declare dans tauri.release.conf.json : le dossier doit exister meme
+# vide (-SkipVoice, -Update), sinon le bundler NSIS echoue sur la ressource absente.
+New-Item -ItemType Directory -Force -Path (Join-Path $resDir "voice") | Out-Null
 
 # ── 2. Bundle the Node agent ─────────────────────────────────────
 Step "Building agent runtime (esbuild)"
@@ -195,20 +205,52 @@ if ($SkipOcr) {
   Write-Host "OCR staged → $(Join-Path $resDir 'ocr')"
 }
 
-# ── 5. Build the app (no bundling) ───────────────────────────────
-# NSIS (Tauri's Windows bundler) caps near 2 GB and cannot package CatDesk's GPU
-# runtime + multi-GB models, so build the exe WITHOUT bundling and package it
-# with Inno Setup below (no size limit; disk-spanned for the >4 GB payload).
-Step "Building Windows app (tauri build --no-bundle)"
+# ── 4b. Voice models (VAD + Parakeet + Piper, all CPU) ───────────
+# Fetched once into %LOCALAPPDATA%\nd-voice-models (same convention as
+# nd-tessdata) and copied here on every build, since resources/ is wiped above.
+if ($SkipVoice) {
+  Step "Skipping voice models (-SkipVoice)"
+} else {
+  Step "Staging voice models"
+  $voiceCache = Join-Path $env:LOCALAPPDATA "nd-voice-models"
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "fetch-voice-models.ps1") -Dest $voiceCache
+  if ($LASTEXITCODE -ne 0) { throw "fetch-voice-models.ps1 failed (exit $LASTEXITCODE)" }
+  Copy-Item -Recurse -Force $voiceCache (Join-Path $resDir "voice")
+  Write-Host "Voice models staged → $(Join-Path $resDir 'voice')"
+}
+
+# ── 5. Build the app ─────────────────────────────────────────────
+# Two different packagings, because the two artifacts have very different sizes:
+#
+#  - FULL install: NSIS (Tauri's Windows bundler) caps near 2 GB and cannot
+#    package CatDesk's GPU runtime + multi-GB models, so build the exe WITHOUT
+#    bundling and package it with Inno Setup below (no size limit; disk-spanned
+#    for the >4 GB payload).
+#  - UPDATE artifact: no model is staged, so the payload fits NSIS comfortably —
+#    and we NEED the bundler, because it is what produces the `.sig` file the
+#    Tauri updater verifies. `--no-bundle` here would silently yield no installer
+#    and no signature, which is what publish-update.ps1 then failed to find.
+if ($Update) {
+  Step "Building Windows update artifact (tauri build --bundles nsis)"
+  $bundleArgs = @('--bundles', 'nsis')
+} else {
+  Step "Building Windows app (tauri build --no-bundle)"
+  $bundleArgs = @('--no-bundle')
+}
 Push-Location (Join-Path $root "apps\desktop")
-pnpm exec tauri build --config $releaseConf --no-bundle
+pnpm exec tauri build --config $releaseConf @bundleArgs
 $tauriExit = $LASTEXITCODE
 Pop-Location
 if ($tauriExit -ne 0) { throw "tauri build failed (exit $tauriExit)" }
 
 # ── 6. Package the offline installer (Inno Setup) ────────────────
-Step "Packaging offline installer (Inno Setup)"
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-inno.ps1")
-if ($LASTEXITCODE -ne 0) { throw "Inno packaging failed (exit $LASTEXITCODE)" }
+# Full installs only: an update artifact is already a complete NSIS installer.
+if ($Update) {
+  Step "Skipping Inno packaging (update artifact is the NSIS installer)"
+} else {
+  Step "Packaging offline installer (Inno Setup)"
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-inno.ps1")
+  if ($LASTEXITCODE -ne 0) { throw "Inno packaging failed (exit $LASTEXITCODE)" }
+}
 
 Step "Done"

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { StoreMemoryTool } from './StoreMemoryTool';
 import type { VectorStore } from '../../memory/VectorStore';
+import { expectFail, expectOk } from '../base/testResult';
 
 function makeStore() {
   return { store: vi.fn(async () => 'id-123') } as unknown as VectorStore & {
@@ -18,8 +19,7 @@ describe('StoreMemoryTool', () => {
   it('refuse un content trop long', async () => {
     const tool = new StoreMemoryTool(makeStore());
     const res = await tool.run({ content: 'a'.repeat(10_001) });
-    expect(res.success).toBe(false);
-    expect(res.error).toContain('trop long');
+    expect(expectFail(res).error).toContain('trop long');
   });
 
   it('refuse des tags non-tableau', async () => {
@@ -30,16 +30,14 @@ describe('StoreMemoryTool', () => {
   it('refuse un tag non-string (validation zod)', async () => {
     const tool = new StoreMemoryTool(makeStore());
     const res = await tool.run({ content: 'x', tags: ['a', 42] });
-    expect(res.success).toBe(false);
-    expect(res.error).toContain('Arguments invalides');
+    expect(expectFail(res).error).toContain('Arguments invalides');
   });
 
   it('stocke avec métadonnées source + tags vides filtrés', async () => {
     const store = makeStore();
     const tool = new StoreMemoryTool(store);
     const res = await tool.run({ content: '  fait important  ', tags: ['projet', ''] });
-    expect(res.success).toBe(true);
-    expect((res.data as { id: string }).id).toBe('id-123');
+    expect((expectOk(res).data as { id: string }).id).toBe('id-123');
     expect(store.store).toHaveBeenCalledWith(
       'fait important',
       expect.objectContaining({ source: 'store_memory', tags: ['projet'] }),
@@ -51,7 +49,6 @@ describe('StoreMemoryTool', () => {
     store.store.mockRejectedValueOnce(new Error('disque plein'));
     const tool = new StoreMemoryTool(store);
     const res = await tool.run({ content: 'x' });
-    expect(res.success).toBe(false);
-    expect(res.error).toContain('disque plein');
+    expect(expectFail(res).error).toContain('disque plein');
   });
 });

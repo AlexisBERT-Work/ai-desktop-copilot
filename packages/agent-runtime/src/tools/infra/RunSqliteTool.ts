@@ -1,12 +1,9 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { access } from 'fs/promises';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   db_path: z.string().min(1).describe('Path to the SQLite database file'),
@@ -70,9 +67,8 @@ export class RunSqliteTool extends BaseTool<Args> {
     // -readonly enforces it at the SQLite layer too, not just our guard.
     const cliArgs = read_only ? ['-json', '-readonly', db_path, query] : ['-json', db_path, query];
     try {
-      const { stdout } = await exec('sqlite3', cliArgs, {
+      const { stdout } = await runProcess('sqlite3', cliArgs, {
         maxBuffer: 8_000_000,
-        windowsHide: true,
       });
       const text = stdout.trim();
       let rows: unknown = text;

@@ -1,11 +1,8 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   all: z.boolean().default(false).describe('Include stopped containers (docker ps -a)'),
@@ -69,7 +66,7 @@ export class DockerPsTool extends BaseTool<Args> {
 
     let containers: Container[];
     try {
-      const { stdout } = await exec('docker', psArgs, { maxBuffer: 4_000_000, windowsHide: true });
+      const { stdout } = await runProcess('docker', psArgs, { maxBuffer: 4_000_000 });
       containers = parseDockerPs(stdout);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -83,10 +80,10 @@ export class DockerPsTool extends BaseTool<Args> {
     let logs: string | undefined;
     if (typeof logs_for === 'string' && logs_for.length > 0) {
       try {
-        const { stdout, stderr } = await exec(
+        const { stdout, stderr } = await runProcess(
           'docker',
           ['logs', '--tail', String(Math.max(1, tail)), logs_for],
-          { maxBuffer: 2_000_000, windowsHide: true },
+          { maxBuffer: 2_000_000 },
         );
         // Docker writes app logs to both streams; merge.
         logs = (stdout + stderr).slice(-8000);

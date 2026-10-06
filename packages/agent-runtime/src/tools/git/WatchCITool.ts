@@ -1,11 +1,8 @@
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 const GH_API = 'https://api.github.com';
 
@@ -84,7 +81,7 @@ async function ghFetch(path: string, token: string): Promise<unknown> {
 
 async function getCurrentBranch(cwd: string): Promise<string | null> {
   try {
-    const { stdout } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
+    const { stdout } = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
     return stdout.trim();
   } catch {
     return null;

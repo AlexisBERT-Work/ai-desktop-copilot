@@ -14,8 +14,7 @@ export const useOverlayStore = create<OverlayState>(set => ({
   mode: 'hidden',
   isVisible: false,
 
-  setMode: mode =>
-    set({ mode, isVisible: mode !== 'hidden' }),
+  setMode: mode => set({ mode, isVisible: mode !== 'hidden' }),
 
   toggle: () =>
     set(s => ({

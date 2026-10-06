@@ -1,11 +1,8 @@
 import { z } from 'zod';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runGit } from '../../lib/git';
 
 const argsSchema = z.object({
   workdir: z.string().optional().describe('Git repo root (defaults to current directory)'),
@@ -197,7 +194,7 @@ export class ReviewDiffTool extends BaseTool<Args> {
           : ['diff', 'HEAD', '--unified=3'];
 
     try {
-      const { stdout: diff } = await exec('git', diffArgs, { cwd, maxBuffer: 5_000_000 });
+      const { stdout: diff } = await runGit(diffArgs, { cwd, maxBuffer: 5_000_000 });
 
       if (diff.trim().length === 0) {
         return this.ok({

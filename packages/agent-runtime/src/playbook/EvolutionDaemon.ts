@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import type { PlaybookStore } from './PlaybookStore';
 import { analyzeEvolution, type EvolutionProposal, type AnalyzeOptions } from './analyzeEvolution';
 import { proposeSkills, type ProposeSkillsOptions } from './proposeSkills';
 import { createLogger } from '../logger';
+import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('playbook:evolution');
 
@@ -39,11 +40,13 @@ export class EvolutionDaemon {
   private readonly analyzeOpts: AnalyzeOptions;
   private readonly skillOpts: ProposeSkillsOptions;
 
-  constructor(private store: PlaybookStore, opts: EvolutionDaemonOptions = {}) {
+  constructor(
+    private store: PlaybookStore,
+    opts: EvolutionDaemonOptions = {},
+  ) {
     this.intervalMs = opts.intervalMs ?? 24 * 60 * 60 * 1000;
-    this.dir = opts.dataDir ?? process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    mkdirSync(this.dir, { recursive: true });
-    this.reportPath = join(this.dir, 'evolution-proposals.json');
+    this.reportPath = dataPath('evolution-proposals.json', opts.dataDir);
+    this.dir = dirname(this.reportPath);
     this.analyzeOpts = {
       ...(opts.minAttempts !== undefined ? { minAttempts: opts.minAttempts } : {}),
       ...(opts.goodRate !== undefined ? { goodRate: opts.goodRate } : {}),
@@ -103,7 +106,9 @@ export class EvolutionDaemon {
         });
       }
     } catch (err) {
-      log.warn('Evolution pass failed', { error: err instanceof Error ? err.message : String(err) });
+      log.warn('Evolution pass failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     return report;
   }

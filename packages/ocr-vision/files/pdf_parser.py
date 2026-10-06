@@ -1,16 +1,11 @@
 """PDF file parser using pypdf"""
 
-import logging
 from typing import Dict, Any
-
-log = logging.getLogger(__name__)
+from deps import require
 
 
 def parse_pdf_file(path: str, max_pages: int = 50) -> Dict[str, Any]:
-    try:
-        from pypdf import PdfReader
-    except ImportError:
-        raise RuntimeError("pypdf not installed. Run: pip install pypdf")
+    PdfReader = require("pypdf").PdfReader
 
     reader = PdfReader(path)
     total_pages = len(reader.pages)

@@ -41,10 +41,6 @@ pub fn log(event: &str, data: Value) {
     write_log(format!("{entry}\n"));
 }
 
-pub fn log_command(command: &str, shell: &str) {
-    log("COMMAND", json!({ "shell": shell, "cmd": command }));
-}
-
 fn write_log(entry: String) {
     let path = audit_log_path();
     if let Ok(mut file) = OpenOptions::new().append(true).create(true).open(path) {
@@ -70,7 +66,11 @@ mod tests {
             "FILE_WRITE",
             json!({ "path": "C:\\tmp\\x.txt", "bytes": 42, "append": false }),
         );
-        log_command("git status \"avec quotes\"", "powershell");
+        // Les valeurs contenant des guillemets doivent rester du JSON valide.
+        log(
+            "COMMAND",
+            json!({ "shell": "powershell", "cmd": "git status \"avec quotes\"" }),
+        );
 
         let content = fs::read_to_string(audit_log_path()).expect("log lisible");
         std::env::remove_var("CATDESK_DATA_DIR");
@@ -83,7 +83,8 @@ mod tests {
             assert!(v.get("ts").is_some());
             assert!(v.get("event").is_some());
         }
-        // log_command garde sa forme historique à plat {ts, event, shell, cmd}.
+        // Forme à plat {ts, event, ...data} — les données fusionnent au premier
+        // niveau, elles ne sont pas imbriquées sous une clé.
         let last: Value = serde_json::from_str(lines.last().unwrap()).unwrap();
         assert_eq!(last["event"], "COMMAND");
         assert_eq!(last["shell"], "powershell");

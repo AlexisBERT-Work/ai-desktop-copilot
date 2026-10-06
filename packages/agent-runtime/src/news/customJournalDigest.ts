@@ -1,7 +1,8 @@
 import type { PressFeed } from '@catdesk/shared-types';
 import type { OllamaClient } from '../llm/OllamaClient';
-import { aggregateNews, filterByRegex, type NewsItem } from '../tools/web/FetchTechNewsTool';
-import { enrichArticleTexts } from '../tools/web/PostTechNewsDiscordTool';
+import { aggregateNews, filterByRegex } from './aggregate';
+import type { NewsItem } from './newsItem';
+import { enrichArticleTexts } from './enrich';
 import { analyzeJournal, buildJournalBody, journalTitle, type JournalDraft } from './pressDigest';
 import { createLogger } from '../logger';
 

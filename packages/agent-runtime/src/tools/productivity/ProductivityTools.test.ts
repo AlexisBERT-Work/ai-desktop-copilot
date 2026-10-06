@@ -1,20 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { detectSpiral, normalizeSignature, type ActivityEvent } from './DetectSpiralTool';
+import { detectSpiral, normalizeSignature, type ActivityEvent } from '../../spiral';
 import { commitsToBullets } from './GenerateStandupTool';
 import type { Commit } from '../git/SummarizeGitLogTool';
 
 describe('normalizeSignature', () => {
   it('collapse adresses, lignes et nombres', () => {
-    expect(normalizeSignature('Error at file.ts:10:5 ptr 0xABCD')).toBe(normalizeSignature('Error at file.ts:88:2 ptr 0x1234'));
+    expect(normalizeSignature('Error at file.ts:10:5 ptr 0xABCD')).toBe(
+      normalizeSignature('Error at file.ts:88:2 ptr 0x1234'),
+    );
   });
 });
 
 function evt(minutesAgoStart: number, signature: string, kind?: string): ActivityEvent {
-  return { at: new Date(Date.now() - minutesAgoStart * 60000).toISOString(), signature, ...(kind ? { kind } : {}) };
+  return {
+    at: new Date(Date.now() - minutesAgoStart * 60000).toISOString(),
+    signature,
+    ...(kind ? { kind } : {}),
+  };
 }
 
 describe('detectSpiral', () => {
-  it('ne conclut pas avec trop peu d\'événements', () => {
+  it("ne conclut pas avec trop peu d'événements", () => {
     expect(detectSpiral([evt(10, 'a'), evt(5, 'b')], 45).spiraling).toBe(false);
   });
 
@@ -45,7 +51,12 @@ describe('detectSpiral', () => {
 
 describe('commitsToBullets', () => {
   const mk = (subject: string, scope: string | null = null): Commit => ({
-    hash: 'h', author: 'a', date: 'd', subject, type: 'feat', scope,
+    hash: 'h',
+    author: 'a',
+    date: 'd',
+    subject,
+    type: 'feat',
+    scope,
   });
 
   it('retire le préfixe conventional, déduplique et ignore les merges', () => {

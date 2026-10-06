@@ -1,11 +1,8 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   pid: z.number().int().positive().describe('Process ID to terminate'),
@@ -40,7 +37,7 @@ export class KillProcessTool extends BaseTool<Args> {
     if (force) taskkillArgs.push('/F');
 
     try {
-      const { stdout } = await exec('taskkill', taskkillArgs, { windowsHide: true });
+      const { stdout } = await runProcess('taskkill', taskkillArgs);
       return this.ok({ pid, force, message: stdout.trim() || `Processus ${pid} terminé.` });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveImapConfig, buildSearchCriteria, ReadEmailTool } from './ReadEmailTool';
+import { expectFail } from '../base/testResult';
 
 describe('resolveImapConfig', () => {
   it('utilise les args en priorité', () => {
@@ -69,7 +70,6 @@ describe('ReadEmailTool', () => {
 
   it('échoue proprement sans configuration', async () => {
     const r = await tool.run({});
-    expect(r.success).toBe(false);
-    expect(r.error).toContain('host');
+    expect(expectFail(r).error).toContain('host');
   });
 });

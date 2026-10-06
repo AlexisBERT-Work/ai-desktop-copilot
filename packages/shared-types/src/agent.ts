@@ -67,12 +67,15 @@ export interface ToolDefinition {
   schema: JSONSchemaObject;
 }
 
-export interface ToolResult {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  metadata?: Record<string, unknown>;
-}
+/**
+ * Issue d'un appel d'outil, en union discriminee : `success` est un litteral,
+ * donc `if (result.success)` NARROW reellement `data` et `error`. Avec un
+ * `success: boolean` et deux champs optionnels, chaque consommateur devait
+ * revérifier ce que le type aurait du garantir.
+ */
+export type ToolResult =
+  | { success: true; data?: unknown; metadata?: Record<string, unknown> }
+  | { success: false; error: string; metadata?: Record<string, unknown> };
 
 export interface ToolCall {
   id: string;

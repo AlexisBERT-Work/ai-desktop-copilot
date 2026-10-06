@@ -2,7 +2,7 @@ import type { Quote } from '@catdesk/shared-types';
 
 // Endpoint chart public de Yahoo : pas de crumb/cookie requis, une requête par
 // symbole. Suffisant à la cadence ~1 min pour une watchlist de quelques dizaines
-// de titres. Voir docs/projects/dashboard-platform.md §6.4.
+// de titres. Voir docs/projects/dashboard.md §4.3.
 const ENDPOINT = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 
 function num(x: unknown): number | null {
@@ -63,9 +63,7 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
 
 /** Récupère les cotations en parallèle. Les symboles en échec sont absents. */
 export async function fetchQuotes(symbols: string[]): Promise<Map<string, Quote>> {
-  const pairs = await Promise.all(
-    symbols.map(async (s) => [s, await fetchQuote(s)] as const),
-  );
+  const pairs = await Promise.all(symbols.map(async s => [s, await fetchQuote(s)] as const));
   const map = new Map<string, Quote>();
   for (const [s, q] of pairs) {
     if (q !== null) map.set(s, q);

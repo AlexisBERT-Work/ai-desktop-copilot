@@ -1,7 +1,7 @@
 # ADR-001 — Technology Stack Selection
 
 **Date:** 2026-05-27
-**Status:** Accepted
+**Status:** Accepted — _partiellement superseded, voir la note en fin de document_
 **Deciders:** @alexis.bert1412
 
 ---
@@ -46,3 +46,27 @@ We need to choose the desktop framework, UI layer, LLM backend, and storage solu
 - Python required for OCR/vision extensions
 - Three runtimes (Rust, Node, Python) increase setup complexity
   → Mitigated by `scripts/setup.ps1` automation
+
+---
+
+## Note de supersession — 2026-08-31
+
+Un ADR ne se réécrit pas ; voici ce que la réalité a démenti depuis.
+
+**Le stockage vectoriel n'utilise pas LanceDB.** Il n'a jamais été intégré. Le
+`VectorStore` est une implémentation maison (cosinus + BM25, persistée en JSON)
+qui prend ses embeddings d'Ollama (`nomic-embed-text`) — motivation : zéro
+dépendance native à compiler sur les trois plateformes. Le choix est assez
+structurant pour que `SettingsWindow.test.tsx` porte un test de non-régression
+explicite contre une réintroduction de LanceDB. SQLite (via sql.js) reste bien
+en place pour les conversations, l'historique bourse, le playbook et la mémoire
+warm.
+
+**« Supports all target models (Qwen, Llama, DeepSeek, Mistral) » est caduc.**
+Depuis la v0.1.3, CatDesk embarque **un seul modèle de chat**, `qwen3:14b` — le
+duo 14B/7B ne tenait pas dans 10 Go de VRAM et chaque rétrogradation forçait un
+swap plus coûteux que le gain. Ollama reste polyvalent, mais le produit ne l'est
+plus : voir `CLAUDE.md` et `docs/CAPACITES.md` §11.
+
+**Le reste tient.** Tauri 2, le sidecar Node, Python cantonné à l'OCR/vision et
+au parsing de documents : ces trois décisions n'ont pas été remises en cause.

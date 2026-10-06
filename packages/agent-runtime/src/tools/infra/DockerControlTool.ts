@@ -1,11 +1,8 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-const exec = promisify(execFile);
+import { runProcess } from '../../lib/runProcess';
 
 const argsSchema = z.object({
   action: z
@@ -67,9 +64,9 @@ export class DockerControlTool extends BaseTool<Args> {
     const built = buildDockerArgs(action, target);
     if (!built.ok) return this.fail(built.error);
 
-    const opts = { maxBuffer: 4_000_000, windowsHide: true, ...(workdir ? { cwd: workdir } : {}) };
+    const opts = { maxBuffer: 4_000_000, ...(workdir ? { cwd: workdir } : {}) };
     try {
-      const { stdout, stderr } = await exec('docker', built.args, opts);
+      const { stdout, stderr } = await runProcess('docker', built.args, opts);
       return this.ok({
         action,
         ...(target ? { target } : {}),

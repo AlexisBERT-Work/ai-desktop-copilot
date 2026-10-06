@@ -1,9 +1,11 @@
 import type { DailyCategory } from '@catdesk/shared-types';
 import type { OllamaClient } from '../llm/OllamaClient';
-import { aggregateNews, type NewsItem } from '../tools/web/FetchTechNewsTool';
-import { enrichExcerpts } from '../tools/web/PostTechNewsDiscordTool';
+import { aggregateNews } from './aggregate';
+import type { NewsItem } from './newsItem';
+import { enrichExcerpts } from './enrich';
 import { complete, DIGEST_LLM_OPTS, type JournalDraft } from './pressDigest';
 import { createLogger } from '../logger';
+import { extractJsonObject } from '../llm/completion';
 
 const log = createLogger('news:topic-digest');
 
@@ -17,7 +19,7 @@ export const NEWS_TOPICS = [
   { name: 'Culture & sport', category: 'misc' },
 ] as const satisfies readonly { name: string; category: DailyCategory }[];
 
-const TOPIC_CATEGORY = new Map<string, DailyCategory>(NEWS_TOPICS.map((t) => [t.name, t.category]));
+const TOPIC_CATEGORY = new Map<string, DailyCategory>(NEWS_TOPICS.map(t => [t.name, t.category]));
 
 export function categoryForTopic(name: string): DailyCategory {
   return TOPIC_CATEGORY.get(name) ?? 'misc';
@@ -48,17 +50,9 @@ export interface TopicGroup {
 
 /** Parse la réponse JSON de regroupement par sujet. Pur, tolérant. */
 export function parseTopicJson(text: string, allowed: readonly string[]): TopicGroup[] {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return [];
-  }
-  if (typeof parsed !== 'object' || parsed === null) return [];
-  const arr = (parsed as Record<string, unknown>)['sujets'];
+  const obj = extractJsonObject(text);
+  if (obj === null) return [];
+  const arr = obj['sujets'];
   if (!Array.isArray(arr)) return [];
 
   const allow = new Set(allowed);
@@ -70,7 +64,9 @@ export function parseTopicJson(text: string, allowed: readonly string[]): TopicG
     if (!allow.has(topic)) continue;
     const summary = typeof o['resume'] === 'string' ? o['resume'].trim() : '';
     const indices = Array.isArray(o['articles'])
-      ? o['articles'].filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0)
+      ? o['articles'].filter(
+          (n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0,
+        )
       : [];
     if (summary.length === 0 && indices.length === 0) continue;
     out.push({ topic, summary, indices });
@@ -88,7 +84,7 @@ export function topicTitle(topic: string, now = new Date()): string {
 export function buildTopicBody(summary: string, items: NewsItem[]): string {
   const blocks: string[] = [];
   if (summary.length > 0) blocks.push(summary);
-  const bullets = items.map((it) => `- [${it.title}](${it.url}) _(${it.source})_`).join('\n');
+  const bullets = items.map(it => `- [${it.title}](${it.url}) _(${it.source})_`).join('\n');
   if (bullets.length > 0) blocks.push(bullets);
   return blocks.join('\n\n');
 }
@@ -126,7 +122,7 @@ export async function buildTopicDigest(deps: TopicDigestDeps): Promise<JournalDr
   if (items.length === 0) return [];
 
   await enrichExcerpts(items);
-  const names = NEWS_TOPICS.map((t) => t.name);
+  const names = NEWS_TOPICS.map(t => t.name);
 
   let raw: string;
   try {
@@ -139,9 +135,7 @@ export async function buildTopicDigest(deps: TopicDigestDeps): Promise<JournalDr
   const groups = parseTopicJson(raw, names);
   const drafts: JournalDraft[] = [];
   for (const g of groups) {
-    const picked = g.indices
-      .map((i) => items[i])
-      .filter((x): x is NewsItem => x !== undefined);
+    const picked = g.indices.map(i => items[i]).filter((x): x is NewsItem => x !== undefined);
     if (picked.length === 0 && g.summary.length === 0) continue;
     drafts.push({
       journal: g.topic,

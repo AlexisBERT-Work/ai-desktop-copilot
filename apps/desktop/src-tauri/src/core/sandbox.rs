@@ -1,3 +1,16 @@
+//! Garde-fous chemins/commandes du cœur Rust (règle d'architecture n°2).
+//!
+//! Aucun appelant en production depuis le retrait des commandes Tauri
+//! filesystem/system (elles étaient mortes : l'agent Node fait ces opérations
+//! par ses propres outils, avec ses propres garde-fous — `security/commandPolicy.ts`,
+//! `WriteFileTool.isBlockedPath`). Le module est **conservé volontairement** :
+//! c'est le contrôle obligatoire de toute future commande Tauri touchant au
+//! disque ou au shell, et ses 11 tests documentent des contournements réels
+//! déjà corrigés (traversée, préfixe voisin, casse, évasion PowerShell).
+//! Le supprimer reviendrait à devoir le réécrire — et à le réécrire sans ces
+//! tests. Voir docs/SECURITE.md.
+#![allow(dead_code)]
+
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 

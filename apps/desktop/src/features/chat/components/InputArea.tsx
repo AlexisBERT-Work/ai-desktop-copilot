@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { ArrowUp, Camera, Square } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
+import { VoiceButton } from '../../voice/VoiceButton';
 
 interface Props {
   conversationId: string;
@@ -67,9 +68,7 @@ export function InputArea({ conversationId }: Props) {
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="mb-2 text-center text-xs text-brand-400 py-1">
-          Drop files to attach
-        </div>
+        <div className="mb-2 text-center text-xs text-brand-400 py-1">Drop files to attach</div>
       )}
 
       <div className="flex items-end gap-2">
@@ -90,6 +89,7 @@ export function InputArea({ conversationId }: Props) {
 
         {/* Actions */}
         <div className="flex items-center gap-1 mb-0.5">
+          <VoiceButton />
           <button
             onClick={captureScreen}
             title="Capture screen"

@@ -1,5 +1,5 @@
 import type { NewsItem, NewsSeverity } from '@catdesk/shared-types';
-import { supabase } from './supabaseClient';
+import { makeTableCrud } from './supabaseCrud';
 import { rowToNews, type NewsRow } from './model';
 
 /** Données saisies à la création/édition d'une news. */
@@ -13,26 +13,15 @@ export interface NewsInput {
   expiresAt: string | null;
 }
 
-const NOT_CONFIGURED = 'Supabase non configuré.';
-
 /**
- * Toutes les news (y compris expirées et ciblées) — réservé à l'admin : la
- * policy `news_admin_write` (for all) lui ouvre aussi la lecture intégrale,
- * comme pour les dailys (cf. dailiesAdmin.ts).
+ * CRUD des news — réservé à l'admin : la policy `news_admin_write` (for all)
+ * lui ouvre aussi la lecture intégrale, expirées et ciblées comprises.
  */
-export async function listAllNews(): Promise<{ items: NewsItem[]; error: string | null }> {
-  if (supabase === null) return { items: [], error: NOT_CONFIGURED };
-  const { data, error } = await supabase
-    .from('news')
-    .select('*')
-    .order('published_at', { ascending: false });
-  if (error) return { items: [], error: error.message };
-  return { items: ((data ?? []) as NewsRow[]).map(rowToNews), error: null };
-}
-
-export async function createNews(input: NewsInput): Promise<{ error: string | null }> {
-  if (supabase === null) return { error: NOT_CONFIGURED };
-  const { error } = await supabase.from('news').insert({
+/** Backend CRUD complet — consommé tel quel par `useCrudConsole`. */
+export const newsCrud = makeTableCrud<NewsRow, NewsItem, NewsInput>({
+  table: 'news',
+  toModel: rowToNews,
+  toRow: input => ({
     title: input.title,
     body: input.body,
     severity: input.severity,
@@ -42,27 +31,10 @@ export async function createNews(input: NewsInput): Promise<{ error: string | nu
     // TOUJOURS du formulaire (case « tous les postes » cochée par défaut).
     audience_client_id: input.audienceClientId,
     expires_at: input.expiresAt,
-  });
-  return { error: error?.message ?? null };
-}
+  }),
+});
 
-export async function updateNews(id: string, input: NewsInput): Promise<{ error: string | null }> {
-  if (supabase === null) return { error: NOT_CONFIGURED };
-  const { error } = await supabase
-    .from('news')
-    .update({
-      title: input.title,
-      body: input.body,
-      severity: input.severity,
-      audience_client_id: input.audienceClientId,
-      expires_at: input.expiresAt,
-    })
-    .eq('id', id);
-  return { error: error?.message ?? null };
-}
-
-export async function deleteNews(id: string): Promise<{ error: string | null }> {
-  if (supabase === null) return { error: NOT_CONFIGURED };
-  const { error } = await supabase.from('news').delete().eq('id', id);
-  return { error: error?.message ?? null };
-}
+export const listAllNews = newsCrud.listAll;
+export const createNews = newsCrud.create;
+export const updateNews = newsCrud.update;
+export const deleteNews = newsCrud.remove;

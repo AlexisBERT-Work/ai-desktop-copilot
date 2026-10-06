@@ -116,7 +116,16 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
 }
 
 async fn launch_sidecar(app: AppHandle) -> Result<()> {
-    let mut launch = resolve_agent_launch(&app)?;
+    let child = spawn_agent_process(&app).await?;
+    wire_agent_streams(app, child)?;
+    Ok(())
+}
+
+/// Démarre le processus agent (résolution des paramètres + spawn), sans toucher
+/// à ses flux. Séparé de `wire_agent_streams` : « comment on lance » et
+/// « comment on écoute » n'ont aucune raison de changer ensemble.
+async fn spawn_agent_process(app: &AppHandle) -> Result<tokio::process::Child> {
+    let mut launch = resolve_agent_launch(app)?;
 
     // Default the agent's model to what this machine can run well — the same
     // VRAM-based rule the chat UI uses. Without this the agent falls back to a
@@ -150,8 +159,13 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut child = cmd.spawn().context("Failed to start agent runtime")?;
+    cmd.spawn().context("Failed to start agent runtime")
+}
 
+/// Prend les trois tuyaux de l'enfant et lance les tâches de fond : lecture du
+/// stdout (JSON-RPC → événements Tauri), journalisation du stderr, et attente
+/// de sortie (évite un zombie).
+fn wire_agent_streams(app: AppHandle, mut child: tokio::process::Child) -> Result<()> {
     let stdin = child
         .stdin
         .take()
@@ -217,7 +231,7 @@ async fn launch_sidecar(app: AppHandle) -> Result<()> {
         }
     });
 
-    info!("Agent sidecar started (dev mode)");
+    info!("Agent sidecar started");
     Ok(())
 }
 

@@ -5,12 +5,10 @@ Recurring events (RRULE) are expanded inside the window via
 occurrence, not just the series master.
 """
 
-import logging
 import os
 from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional
-
-log = logging.getLogger(__name__)
+from deps import require
 
 
 def _parse_window_date(value: Optional[str]) -> Optional[date]:
@@ -70,11 +68,8 @@ def read_calendar(
     days: int = 30,
     limit: int = 50,
 ) -> Dict[str, Any]:
-    try:
-        from icalendar import Calendar
-        import recurring_ical_events
-    except ImportError:
-        raise RuntimeError("icalendar not installed. Run: pip install icalendar recurring-ical-events")
+    Calendar = require("icalendar").Calendar
+    recurring_ical_events = require("recurring_ical_events", extra="recurring-ical-events")
 
     with open(path, "rb") as f:
         calendar = Calendar.from_ical(f.read())

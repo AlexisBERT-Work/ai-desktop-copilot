@@ -5,8 +5,8 @@
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::ipc::bridge::send_to_agent;
-use crate::ipc::protocol::{self, rpc_request};
+use crate::commands::forward_to_agent;
+use crate::ipc::protocol;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,7 +57,7 @@ pub async fn chat_send(args: ChatSendArgs) -> Result<(), String> {
         config["usePlanning"] = serde_json::json!(planning);
     }
 
-    let payload = rpc_request(
+    forward_to_agent(
         protocol::RPC_AGENT_PROCESS,
         serde_json::json!({
             "input": args.message,
@@ -65,17 +65,15 @@ pub async fn chat_send(args: ChatSendArgs) -> Result<(), String> {
             "messageId": args.message_id,
             "config": config
         }),
-    );
-
-    send_to_agent(payload).await.map_err(|e| e.to_string())
+    )
+    .await
 }
 
 /// Interrupt the run currently in progress (Stop button).
 #[tauri::command]
 pub async fn chat_cancel() -> Result<(), String> {
     info!("chat_cancel");
-    let payload = rpc_request(protocol::RPC_AGENT_CANCEL, serde_json::json!({}));
-    send_to_agent(payload).await.map_err(|e| e.to_string())
+    forward_to_agent(protocol::RPC_AGENT_CANCEL, serde_json::json!({})).await
 }
 
 /// A user-defined formula carried from the dashboard to the agent.
@@ -92,9 +90,9 @@ pub async fn set_market_watchlist(
     symbols: Vec<String>,
     formulas: Vec<FormulaDef>,
 ) -> Result<(), String> {
-    let payload = rpc_request(
+    forward_to_agent(
         protocol::RPC_MARKET_SET_WATCHLIST,
         serde_json::json!({ "symbols": symbols, "formulas": formulas }),
-    );
-    send_to_agent(payload).await.map_err(|e| e.to_string())
+    )
+    .await
 }

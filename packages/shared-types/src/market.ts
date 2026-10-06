@@ -1,6 +1,6 @@
 // ─── Market / Bourse (Pilier A, module bourse) ─────────────────
 // Cotations normalisées + formules, partagées entre le sidecar (provider) et
-// l'UI (widget `stocks`). Voir docs/projects/dashboard-platform.md §6.
+// l'UI (widget `stocks`). Voir docs/projects/dashboard.md §4.
 
 /** Cotation normalisée, indépendante de la source. */
 export interface Quote {

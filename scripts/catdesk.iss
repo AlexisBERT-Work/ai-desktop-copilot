@@ -6,11 +6,11 @@
 ;
 ; Paths are injected by scripts/build-inno.ps1 via ISCC /D defines:
 ;   ExeDir    dir containing the built catdesk.exe
-;   ResDir    staged resources dir (agent/ ollama/ ocr/)
+;   ResDir    staged resources dir (agent/ ollama/ ocr/ voice/)
 ;   OutputDir where the installer .exe is written
 
 #define MyAppName "CatDesk"
-#define MyAppVersion "0.1.3"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "CatDesk"
 #define MyAppExeName "catdesk.exe"
 
@@ -66,6 +66,10 @@ Source: "{#ResDir}\ollama\*"; DestDir: "{app}\ollama"; Flags: ignoreversion recu
 ; moins un fichier réel dans resources\ocr\ (define HasOcr).
 #ifdef HasOcr
 Source: "{#ResDir}\ocr\*";    DestDir: "{app}\ocr";    Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
+; Modèles voix (VAD + Parakeet + Piper) — même logique optionnelle (-SkipVoice).
+#ifdef HasVoice
+Source: "{#ResDir}\voice\*";  DestDir: "{app}\voice";  Flags: ignoreversion recursesubdirs createallsubdirs
 #endif
 
 [Icons]

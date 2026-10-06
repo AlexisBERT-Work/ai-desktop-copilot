@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveExportFormat, ExportDocumentTool } from './ExportDocumentTool';
+import { expectFail } from '../base/testResult';
 
 describe('resolveExportFormat', () => {
   it("déduit le format depuis l'extension", () => {
@@ -38,7 +39,6 @@ describe('ExportDocumentTool', () => {
 
   it('rejette un format indéterminable avant le sidecar', async () => {
     const r = await tool.run({ content: 'x', path: 'archive.zip' });
-    expect(r.success).toBe(false);
-    expect(r.error).toContain('Format');
+    expect(expectFail(r).error).toContain('Format');
   });
 });

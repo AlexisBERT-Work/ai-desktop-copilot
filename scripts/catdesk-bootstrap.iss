@@ -1,21 +1,24 @@
 ; CatDesk — installeur "bootstrap" : UN SEUL petit .exe (quelques Mo) à donner
-; à un proche. Ne contient PAS le payload (~22 Go) : il le télécharge lui-même
+; à un proche. Ne contient PAS le payload (~18 Go) : il le télécharge lui-même
 ; (PowerShell natif, aucun outil tiers) puis lance l'installeur complet déjà
 ; validé (scripts/catdesk.iss) en silencieux. Zéro fichier à garder ensemble,
 ; zéro commande à taper côté destinataire — voir docs/DISTRIBUTION.md.
 ;
-; BaseUrl pointe par défaut sur la release GitHub publique catdesk-releases ;
-; surchargeable à la compilation pour tester en local (voir scripts/
-; test-bootstrap-local.ps1) : ISCC /DBaseUrl=http://127.0.0.1:8000 ...
+; BaseUrl pointe par défaut sur la release GitHub publique catdesk-releases-voice
+; (ligne 0.2.x ; la ligne 0.1.x figée reste sur catdesk-releases) ;
+; surchargeable à la compilation pour tester en local (voir
+; docs/DISTRIBUTION.md § 3bis) : ISCC /DBaseUrl=http://127.0.0.1:8000 ...
+; La version (MyAppVersion, BaseName, tag de BaseUrl) est écrite par
+; scripts/bump-version.ps1 — ne pas la modifier à la main.
 
 #ifndef BaseUrl
-#define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases/releases/download/v0.1.3"
+#define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases-voice/releases/download/v0.2.0"
 #endif
 
 #define MyAppName "CatDesk"
-#define MyAppVersion "0.1.3"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "CatDesk"
-#define BaseName "CatDesk-0.1.3-offline-setup"
+#define BaseName "CatDesk-0.2.0-offline-setup"
 #define MainInstaller BaseName + ".exe"
 #define PartCount 12
 

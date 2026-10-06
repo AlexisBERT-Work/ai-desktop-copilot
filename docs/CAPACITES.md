@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-07-20**. Inventaire basé sur les **68 outils du catalogue**
+> À jour au **2026-09-11**. Inventaire basé sur les **68 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -69,8 +69,41 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 | Lire le **texte de l'écran (OCR)** Tesseract fra+eng                               | `ocr_region`       |   🟢   |
 | **Décrire visuellement** l'écran (modèle multimodal `minicpm-v`)                   | `describe_screen`  |   🟢   |
 | **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD)           | `transcribe_audio` |   🟢   |
+| **Parser un document** PDF / DOCX / CSV → texte + métadonnées                      | `parse_document`   |   🟢   |
+| **Analyser un tableau** (CSV/XLSX : agrégats, group-by, stats)                     | `analyze_data`     |   🟢   |
+| **Exporter un document** Markdown → PDF / DOCX / HTML                              | `export_document`  |   🟡   |
+| Lire un **calendrier** `.ics` (occurrences récurrentes développées)                | `read_calendar`    |   🟢   |
 
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
+Les quatre outils « documents » passent par le sidecar Python (`files/`), lancé
+à la demande.
+
+### 1 bis. Lui parler, l'entendre répondre (mode « Jarvis », 2026-09-11)
+
+Ce n'est **pas un outil de l'agent** mais une entrée/sortie de l'app, tenue en
+Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
+
+| Capacité                                                                    | Moteur (100 % CPU, `sherpa-onnx`)                | Mesuré (Ryzen 5 5500)         |
+| --------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------- |
+| **`Ctrl+Espace` ouvre la bulle et le micro** ; fin de phrase au silence     | VAD Silero (0,7 s de silence = fin de tour)      | —                             |
+| **Reconnaissance** du français (25 langues détectées, ponctuation comprise) | Parakeet TDT 0.6B v3 int8 (NVIDIA, CC-BY-4.0)    | 5 s d'audio en 0,3 s          |
+| **Lecture des réponses à voix haute**, phrase par phrase pendant l'écriture | Piper `fr_FR-miro-high` (voix `siwis` en option) | 1er son 83 ms, 18× temps réel |
+| Voix de secours sans modèle                                                 | `speechSynthesis` Windows (Hortense)             | —                             |
+
+- Le micro se ferme **dès la prise de parole obtenue** (un tour), après 8 s
+  sans parole, ou quand la bulle se ferme (Échap). Un clic sur le bouton micro
+  ou `Ctrl+Espace` pendant que CatDesk parle **le coupe** ; le bouton Stop du
+  chat aussi.
+- Le Markdown est retiré avant lecture (puces, gras, liens → texte ; un bloc
+  de code devient « Bloc de code omis »).
+- Option « réécouter après une réponse orale » : enchaîner sans raccourci.
+- **Rien ne touche la VRAM** : la RX 6700 reste entière pour `qwen3:14b`.
+- Modèles (~800 Mo) : embarqués par l'installeur (`resources/voice/`), ou
+  `scripts/fetch-voice-models.ps1` en dev, ou déposés dans
+  `%APPDATA%\CatDesk\data\voice`. Absents → micro grisé, voix Windows.
+- Pas encore : mot d'activation mains libres (« Hey Jarvis »), coupure de la
+  voix en parlant par-dessus (barge-in), réponses volontairement orales du
+  modèle — voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 
 ## 2. Web & navigateur
 
@@ -91,13 +124,14 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 
 ## 3. Connecteurs externes
 
-| Capacité                                                 | Outil(s)                 | Risque |
-| -------------------------------------------------------- | ------------------------ | :----: |
-| Chercher/lire des notes dans un vault **Obsidian** local | `obsidian_notes`         |   🟢   |
-| Chercher/lire des pages **Notion** (API)                 | `notion_search`          |   🟢   |
-| Appeler une **API REST** (GET auto ; écriture confirmée) | `call_api`               |   🟠   |
-| Poster sur un **webhook Discord/Slack**                  | `send_webhook_message`   |   🟠   |
-| Publier l'actu tech sur un webhook Discord (embeds)      | `post_tech_news_discord` |   🟡   |
+| Capacité                                                  | Outil(s)                 | Risque |
+| --------------------------------------------------------- | ------------------------ | :----: |
+| Chercher/lire des notes dans un vault **Obsidian** local  | `obsidian_notes`         |   🟢   |
+| Chercher/lire des pages **Notion** (API)                  | `notion_search`          |   🟢   |
+| Appeler une **API REST** (GET auto ; écriture confirmée)  | `call_api`               |   🟠   |
+| Poster sur un **webhook Discord/Slack**                   | `send_webhook_message`   |   🟠   |
+| Publier l'actu tech sur un webhook Discord (embeds)       | `post_tech_news_discord` |   🟡   |
+| Lire une **boîte mail IMAP** (recherche, en-têtes, corps) | `read_email`             |   🟠   |
 
 ## 4. Développement & analyse de code
 
@@ -139,12 +173,13 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | Capacité                                                       | Outil(s)         | Risque |
 | -------------------------------------------------------------- | ---------------- | :----: |
 | Exécuter une **commande** PowerShell/CMD (sandbox)             | `run_command`    |   🟠   |
-| **Ouvrir une application** (nom, chemin ou app du PATH)        | `open_app`       |   🟡   |
+| **Ouvrir une application** (nom, chemin ou app du PATH)        | `open_app`       |   🟠   |
 | Lister les **ports TCP** en écoute + processus liés            | `inspect_port`   |   🟢   |
 | **Tuer un processus** par PID                                  | `kill_process`   |   🟠   |
 | Lister les **conteneurs Docker** + logs                        | `docker_ps`      |   🟢   |
 | Contrôler Docker (start/stop/restart, compose up/down)         | `docker_control` |   🟠   |
 | Requêter une base **SQLite** locale (lecture seule par défaut) | `run_sqlite`     |   🟡   |
+| Requêter **PostgreSQL / MySQL** (SELECT, lecture seule)        | `query_database` |   🟠   |
 
 ## 8. Mémoire & RAG
 
@@ -178,8 +213,8 @@ Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
 
 ## 10. Tableau de bord & Bourse
 
-Interface d'accueil = **grille de widgets configurables** (KPI, stats, actions,
-bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
+Interface d'accueil = **canvas libre de widgets configurables** (KPI, stats, actions,
+bourse, news) — voir [dashboard.md](projects/dashboard.md).
 
 | Capacité                                           | Outil(s)                | Risque |
 | -------------------------------------------------- | ----------------------- | :----: |
@@ -197,7 +232,7 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
   des widgets pilotent la watchlist du sidecar (synchro automatique).
 - **News** : annonce rédigée par l'**admin seul** (Supabase + RLS), diffusée à
   tous les clients en lecture seule (bandeau + widget). Setup :
-  [dashboard-p2.md](projects/dashboard-p2.md).
+  [dashboard.md](projects/dashboard.md) §5.
 
 ## 11. Modèles & inférence
 
@@ -211,9 +246,14 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
   imposer un petit modèle sur une machine très contrainte.
 - **`qwen2.5-coder:14b` retiré** du bundle et de l'UI (bot sans codage).
 - Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
-  réglable par requête. ⚠️ **Pas de KV-cache 4-bit global** : `q4_0` corrompt la
-  sortie sur la RX 6700 (Vulkan) — texte illisible (incident
-  2026-06-15/16).
+  réglable par requête.
+- ⚠️ **KV-cache `q4_0` : contradiction non tranchée.** Cette doc a longtemps
+  affirmé que `q4_0` corrompt la sortie sur la RX 6700 (Vulkan — texte
+  illisible, incident 2026-06-15/16), mais `commands/tuning.rs` l'active quand
+  la VRAM est serrée, mesures à l'appui, scopé au process Ollama de CatDesk et
+  toujours avec `OLLAMA_FLASH_ATTENTION=1`. Sur la machine cible, le tuner
+  renvoie donc `q4_0`. Le test qui tranche est décrit dans
+  [AMELIORATIONS.md](AMELIORATIONS.md) §1.1.
 - Matériel cible réel : **AMD RX 6700, 10 Go VRAM** → éviter les modèles 20B+
   qui débordent en RAM (voir [LIMITES.md](LIMITES.md) §3).
 
@@ -225,12 +265,14 @@ bourse, news) — voir [dashboard-platform.md](projects/dashboard-platform.md).
 - **Sandbox Rust** : `check_path` + `check_command` avant tout accès FS/shell.
 - **Permissions risk-gated** à 4 niveaux (auto / une fois / confirmer / désactivé).
 - **Safe mode** : un toggle bloque tous les outils medium+.
-- **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat).
+- **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat) —
+  et chaque ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).
 - **Isolation de processus** : agent et sidecar OCR tournent séparément.
 
 ## 13. Distribution
 
-- **Installeur Windows hors-ligne** (Inno Setup, ~18 Go avec modèles, v0.1.3) :
+- **Installeur Windows hors-ligne** (Inno Setup, ~18 Go avec modèles, v0.1.3 ;
+  +~0,8 Go de modèles voix depuis 2026-09, `-SkipVoice` pour s'en passer) :
   install/désinstall silencieux vérifiés de bout en bout.
 - Le **modèle** (lourd, immuable) est séparé du code → les **mises à jour
   auto** (GitHub Releases, signées) ne transportent que le code (~50–300 Mo).

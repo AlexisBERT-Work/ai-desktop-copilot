@@ -33,7 +33,7 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
 
   return (
     <div className="space-y-1.5">
-      {symbols.map((sym) => {
+      {symbols.map(sym => {
         const key = sym.toUpperCase();
         const q = quotes[key];
         const hist = history[key] ?? [];
@@ -69,8 +69,8 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
 
       {formulaNames.length > 0 && (
         <div className="mt-1 space-y-1 border-t border-white/5 pt-1.5">
-          {formulaNames.map((name) => {
-            const c = computed.find((v) => v.name === name);
+          {formulaNames.map(name => {
+            const c = computed.find(v => v.name === name);
             return (
               <div key={name} className="flex items-center justify-between text-sm">
                 <span className="flex min-w-0 items-center gap-1 truncate text-brand-300/90">
@@ -104,9 +104,9 @@ export function StocksView({ symbols, formulaNames, quotes, computed, history }:
  * calculées reviennent dans `computed` et sont matchées par nom.
  */
 export function StocksWidget({ widget }: WidgetProps) {
-  const quotes = useMarketStore((s) => s.quotes);
-  const computed = useMarketStore((s) => s.computed);
-  const history = useMarketStore((s) => s.history);
+  const quotes = useMarketStore(s => s.quotes);
+  const computed = useMarketStore(s => s.computed);
+  const history = useMarketStore(s => s.history);
 
   const symbols = Array.isArray(widget.config.symbols)
     ? widget.config.symbols.filter((s): s is string => typeof s === 'string')

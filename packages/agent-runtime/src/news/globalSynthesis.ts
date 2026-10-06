@@ -1,6 +1,7 @@
 import type { OllamaClient } from '../llm/OllamaClient';
 import { complete, DIGEST_LLM_OPTS } from './digestLlm';
 import { createLogger } from '../logger';
+import { extractJsonObject } from '../llm/completion';
 
 const log = createLogger('news:press-digest');
 
@@ -35,17 +36,8 @@ export interface GlobalSynthesis {
 
 /** Extrait idées fortes + synthèse d'une réponse JSON (tolère l'ancien format sans "idees"). Pur. */
 export function parseSynthesisJson(text: string): GlobalSynthesis | null {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
+  const obj = extractJsonObject(text);
+  if (obj === null) return null;
   const s = obj['synthese'];
   const synthesis = typeof s === 'string' ? s.trim() : '';
   const rawIdeas = Array.isArray(obj['idees']) ? obj['idees'] : [];

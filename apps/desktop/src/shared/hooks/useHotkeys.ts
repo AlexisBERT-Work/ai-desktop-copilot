@@ -6,7 +6,9 @@ import { useOverlayStore } from '../../features/overlay/overlayStore';
  * Global OS-level hotkeys are registered in Rust via tauri-plugin-global-shortcut.
  */
 export function useHotkeys() {
-  const { toggle, setMode } = useOverlayStore();
+  // Sélecteur atomique : ne re-rend que si `setMode` change (jamais), pas à
+  // chaque changement du store.
+  const setMode = useOverlayStore(s => s.setMode);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -20,11 +22,6 @@ export function useHotkeys() {
         e.preventDefault();
         setMode('settings');
       }
-      // Ctrl+N → New conversation
-      if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        // Will be handled by chat store
-      }
       // Escape → close/minimize
       if (e.key === 'Escape') {
         setMode('hidden');
@@ -33,5 +30,5 @@ export function useHotkeys() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [toggle, setMode]);
+  }, [setMode]);
 }

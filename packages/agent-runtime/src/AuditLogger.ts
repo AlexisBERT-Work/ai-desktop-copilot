@@ -1,28 +1,35 @@
-import { appendFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { appendFileSync } from 'fs';
 import type { ToolResult } from '@catdesk/shared-types';
+import { dataPath } from './lib/dataDir';
 
 export class AuditLogger {
   private logPath: string;
 
   constructor() {
-    const dataDir = process.env['CATDESK_DATA_DIR'] ?? join(process.cwd(), 'data');
-    const auditDir = join(dataDir, 'audit');
-    mkdirSync(auditDir, { recursive: true });
-
+    // Un fichier par jour, sous data/audit/ — même convention que le journal
+    // d'audit du cœur Rust (core/audit.rs), pour un log combiné uniforme.
     const date = new Date().toISOString().slice(0, 10);
-    this.logPath = join(auditDir, `audit-${date}.log`);
+    this.logPath = dataPath(`audit-${date}.log`, undefined, 'audit');
   }
 
   startRun(runId: string, conversationId: string, input: string): void {
     this.write('RUN_START', { runId, conversationId, inputLength: input.length });
   }
 
-  completeRun(runId: string, status: 'success' | 'error' | 'max_iterations' | 'interrupted', output?: string): void {
+  completeRun(
+    runId: string,
+    status: 'success' | 'error' | 'max_iterations' | 'interrupted',
+    output?: string,
+  ): void {
     this.write('RUN_END', { runId, status, outputLength: output?.length ?? 0 });
   }
 
-  logToolCall(runId: string, tool: string, args: Record<string, unknown>, result: ToolResult): void {
+  logToolCall(
+    runId: string,
+    tool: string,
+    args: Record<string, unknown>,
+    result: ToolResult,
+  ): void {
     // Sanitize sensitive data from args before logging
     const safeArgs = this.sanitizeArgs(tool, args);
     this.write('TOOL_CALL', {
@@ -30,7 +37,9 @@ export class AuditLogger {
       tool,
       args: safeArgs,
       success: result.success,
-      error: result.error,
+      // `error` n'existe que sur la branche d'échec de l'union : l'omettre
+      // plutôt que d'écrire `undefined` dans la ligne d'audit.
+      ...(result.success ? {} : { error: result.error }),
     });
   }
 
