@@ -8,30 +8,57 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-09-12.
+> Dernière mise à jour : 2026-10-06.
 
 ---
 
-## État actuel — 2026-09-12
+## État actuel — 2026-10-06
 
-Branche `refactor/etat-propre`, **18 commits d'avance sur `master`** (refonte
-d'août, guide des widgets, voix, séparation des lignes de distribution) ;
-tag **`v0.1.3`** posé sur `master` = l'exe 0.1.3 tel que distribué.
+**`master` = 0.2.0, pas encore publiée** (refonte d'août, voix, deux lignes de
+distribution, cycle de version). **On travaille sur `dev`**, qui ne bouge
+`master` qu'à une sortie. Aucun exe 0.2.x n'existe : la 0.1.x installée reste
+figée à 0.1.3 sur `catdesk-releases`, et rien n'est publié tant que
+`publish-update.ps1` n'est pas lancé à la main.
 
-**Deux lignes de distribution** depuis aujourd'hui, la version du dépôt passe à
-**0.2.0** : la 0.1.x (sans voix) est **figée** sur `catdesk-releases`, la
-0.2.x (voix) vit sur `catdesk-releases-voice` — dépôt **à créer** (une
-commande). Règle, raisons et garde-fou dans
-[DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.
+**Ce qui vient** : la feuille de route 0.2.0 → 0.6.0 dans
+[AMELIORATIONS.md](AMELIORATIONS.md) § 0 bis, une issue par ligne dans les
+[Milestones GitHub](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestones).
+La prochaine est la **0.2.0 elle-même** : rien à coder, tout bloque sur toi
+(§ 0).
 
-**Portes** : type-check 3/3, lint 0, **47 tests desktop** (37 + 10 voix),
-**36 Rust** (23 + 13 voix, dont 4 de fumée sur les vrais modèles, ignorés en
-CI), `cargo clippy -D warnings`, `cargo fmt --check`. 640 tests agent
-inchangés.
+**Portes** : type-check 3/3, lint 0, 640 tests agent, 47 desktop, 32 Rust
+(+ 4 de fumée ignorés en CI), 7 Python, `clippy -D warnings`, `fmt --check`,
+prettier no-op — et **CI verte** sur la PR #24 (elle était rouge sur `master`
+depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
+antérieures, suivies dans #25 (jalon 0.2.1).
 
-**Ce qui bloque sur toi** : les cinq points de [AMELIORATIONS.md](AMELIORATIONS.md) § 0
-— créer `catdesk-releases-voice`, construire l'installeur 0.2.0, un essai au
-micro, regarder l'app, trancher le KV-cache.
+## 2026-10-06 — Nettoyage, branche `dev` et jalons de version
+
+Demande : « tout rendre propre, puis une nouvelle branche, et des points pour
+sortir les prochaines mises à jour ».
+
+- **`refactor/etat-propre` fusionnée dans `master`** (PR #24, merge commit).
+  La CI n'y avait **jamais tourné** — elle ne surveille que `master`/`dev` — et
+  sa première exécution a trouvé un vrai défaut : `autoprefixer` retiré de
+  `package.json` sans régénérer `pnpm-lock.yaml`, donc `--frozen-lockfile`
+  refusait d'installer. Corrigé.
+- **Deux PR d'août oubliées** par ce suivi, en conflit avec la refonte sur ~10
+  fichiers chacune : #5 (apparence) et #3 (skills, coupe-circuit,
+  trafilatura). Fermées, code conservé sous `archive/feat-apparence` et
+  `archive/feat-veille`, reportées par morceaux dans les jalons 0.2.1, 0.3.0 et
+  0.4.0. #4 marquée fusionnée.
+- **Branches** : il ne reste que `master` et `dev` (remise à niveau en avance
+  rapide). Supprimées : `refactor/etat-propre`, `fix/ci-pnpm-version`,
+  `securite/durcissement`, `feat/apparence`, `feat/veille-…`.
+- **La version s'écrit en un geste** : elle vit à 9 endroits et le
+  `package.json` racine disait encore 0.1.3. `scripts/bump-version.ps1` les
+  écrit tous ; `publish-update.ps1` ne bumpe plus et **refuse** de publier un
+  dépôt qui n'est pas déjà à la bonne version, avant tout build.
+- **Jalons** : 6 Milestones GitHub et 19 issues (#6 à #23, #25). Cycle de
+  sortie dans [DISTRIBUTION.md](DISTRIBUTION.md) § 4.
+
+Constaté, non modifié : le dépôt source est **public**, alors que
+DISTRIBUTION § 3bis le présente comme privé.
 
 ## 2026-09-12 — Deux lignes d'installeur, l'ancienne figée
 
