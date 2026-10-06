@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { scanDiff } from './ReviewDiffTool';
 
 function rules(diff: string): string[] {
-  return scanDiff(diff).findings.map((f) => f.rule);
+  return scanDiff(diff).findings.map(f => f.rule);
 }
 
 describe('scanDiff', () => {
@@ -41,7 +41,9 @@ describe('scanDiff', () => {
   });
 
   it('détecte un secret codé en dur (critical)', () => {
-    const diff = ['+++ b/cfg.ts', '@@ -0,0 +1 @@', '+const apiKey = "abcdef1234567890";'].join('\n');
+    const diff = ['+++ b/cfg.ts', '@@ -0,0 +1 @@', '+const apiKey = "abcdef1234567890";'].join(
+      '\n',
+    );
     const f = scanDiff(diff).findings;
     expect(f[0]?.rule).toBe('secret');
     expect(f[0]?.severity).toBe('critical');

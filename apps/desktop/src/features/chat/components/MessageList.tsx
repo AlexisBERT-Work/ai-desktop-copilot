@@ -43,9 +43,9 @@ export function MessageList({ conversationId }: Props) {
           isStreaming={isStreaming && msg.id === streamingMessageId}
         />
       ))}
-      {isStreaming && streamingMessageId && msgs.find(m => m.id === streamingMessageId)?.content === '' && (
-        <StreamingIndicator />
-      )}
+      {isStreaming &&
+        streamingMessageId &&
+        msgs.find(m => m.id === streamingMessageId)?.content === '' && <StreamingIndicator />}
       <div ref={bottomRef} />
     </div>
   );

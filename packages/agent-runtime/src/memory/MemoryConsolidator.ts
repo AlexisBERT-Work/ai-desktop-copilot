@@ -59,9 +59,14 @@ export class MemoryConsolidator {
     let pruned = 0;
     try {
       merged = this.store.dedupeByValue(now);
-      pruned = this.store.prune({ maxAgeMs: this.maxAgeMs, minConfidence: this.minConfidence }, now);
+      pruned = this.store.prune(
+        { maxAgeMs: this.maxAgeMs, minConfidence: this.minConfidence },
+        now,
+      );
     } catch (err) {
-      log.warn('Consolidation pass failed', { error: err instanceof Error ? err.message : String(err) });
+      log.warn('Consolidation pass failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return { merged, pruned };
     }
     if (merged > 0 || pruned > 0) log.info('Consolidation pass', { merged, pruned });

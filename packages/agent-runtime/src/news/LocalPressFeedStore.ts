@@ -1,7 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { isDailyCategory, type DailyCategory, type PressFeed, type PressFeedInput } from '@catdesk/shared-types';
+import {
+  isDailyCategory,
+  type DailyCategory,
+  type PressFeed,
+  type PressFeedInput,
+} from '@catdesk/shared-types';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:local-feeds');
@@ -25,9 +30,13 @@ export function sanitizeFeed(r: Record<string, unknown>): PressFeed | null {
   const name = typeof r['name'] === 'string' ? r['name'].trim() : '';
   if (id === null || name.length === 0) return null;
   const includeRegex =
-    typeof r['includeRegex'] === 'string' && r['includeRegex'].length > 0 ? r['includeRegex'] : null;
+    typeof r['includeRegex'] === 'string' && r['includeRegex'].length > 0
+      ? r['includeRegex']
+      : null;
   const excludeRegex =
-    typeof r['excludeRegex'] === 'string' && r['excludeRegex'].length > 0 ? r['excludeRegex'] : null;
+    typeof r['excludeRegex'] === 'string' && r['excludeRegex'].length > 0
+      ? r['excludeRegex']
+      : null;
   return {
     id,
     name,
@@ -66,7 +75,7 @@ export class LocalPressFeedStore {
   save(input: PressFeedInput & { id?: string }): PressFeed {
     const sanitized = sanitizeFeed({ ...input, id: input.id ?? randomUUID() });
     if (sanitized === null) throw new Error('Journal invalide : nom requis.');
-    const idx = this.feeds.findIndex((f) => f.id === sanitized.id);
+    const idx = this.feeds.findIndex(f => f.id === sanitized.id);
     if (idx === -1) this.feeds.push(sanitized);
     else this.feeds[idx] = sanitized;
     this.persist();
@@ -76,7 +85,7 @@ export class LocalPressFeedStore {
 
   delete(id: string): boolean {
     const before = this.feeds.length;
-    this.feeds = this.feeds.filter((f) => f.id !== id);
+    this.feeds = this.feeds.filter(f => f.id !== id);
     if (this.feeds.length === before) return false;
     this.persist();
     log.info('Local feed deleted', { id });

@@ -20,7 +20,11 @@ describe('WarmMemoryStore', () => {
   });
 
   it('inserts a new fact', () => {
-    const changed = store.upsert({ kind: 'preference', subject: 'editeur', value: 'préfère VS Code' });
+    const changed = store.upsert({
+      kind: 'preference',
+      subject: 'editeur',
+      value: 'préfère VS Code',
+    });
     expect(changed).toBe(true);
     expect(store.count()).toBe(1);
     expect(store.getActiveFacts()[0]?.value).toBe('préfère VS Code');
@@ -35,7 +39,12 @@ describe('WarmMemoryStore', () => {
 
   it('reaffirming the same subject+value does not add a row', () => {
     store.upsert({ kind: 'preference', subject: 'editeur', value: 'VS Code', confidence: 0.6 });
-    const changed = store.upsert({ kind: 'preference', subject: 'editeur', value: 'vs code', confidence: 0.9 });
+    const changed = store.upsert({
+      kind: 'preference',
+      subject: 'editeur',
+      value: 'vs code',
+      confidence: 0.9,
+    });
     expect(changed).toBe(false);
     expect(store.count()).toBe(1);
     // confidence is bumped to the higher value
@@ -44,7 +53,11 @@ describe('WarmMemoryStore', () => {
 
   it('supersedes the old value on contradiction (same subject, new value)', () => {
     store.upsert({ kind: 'fact', subject: 'employeur', value: 'travaille chez X' });
-    const changed = store.upsert({ kind: 'fact', subject: 'employeur', value: 'ne travaille plus chez X' });
+    const changed = store.upsert({
+      kind: 'fact',
+      subject: 'employeur',
+      value: 'ne travaille plus chez X',
+    });
     expect(changed).toBe(true);
     expect(store.count()).toBe(1); // old one retired, not piled up
     expect(store.getActiveFacts()[0]?.value).toBe('ne travaille plus chez X');

@@ -67,7 +67,9 @@ export class FactExtractor {
         if (chunk.type === 'token') text += chunk.content;
       }
     } catch (err) {
-      log.warn('Extraction call failed', { error: err instanceof Error ? err.message : String(err) });
+      log.warn('Extraction call failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return 0;
     }
 

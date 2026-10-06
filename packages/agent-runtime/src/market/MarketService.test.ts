@@ -39,10 +39,12 @@ beforeEach(() => {
 describe('MarketService + MarketHistoryStore (B6)', () => {
   it('attachHistoryStore réamorce l’historique des symboles de la watchlist', () => {
     const service = new MarketService(['AAPL']);
-    const store = makeStore(new Map([
-      ['AAPL', [98, 99]],
-      ['ZZZ', [1, 2]], // hors watchlist : ignoré
-    ]));
+    const store = makeStore(
+      new Map([
+        ['AAPL', [98, 99]],
+        ['ZZZ', [1, 2]], // hors watchlist : ignoré
+      ]),
+    );
     service.attachHistoryStore(store);
     expect(service.getHistory('AAPL')).toEqual([98, 99]);
     expect(service.getHistory('ZZZ')).toEqual([]);

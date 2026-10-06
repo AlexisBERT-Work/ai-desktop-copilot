@@ -9,8 +9,7 @@ export function ProactiveBanner() {
   const { current, dismiss } = useProactiveStore();
   if (current === null) return null;
 
-  const title =
-    current.kind === 'spiral' ? 'Tu sembles bloqué sur le même point' : 'Suggestion';
+  const title = current.kind === 'spiral' ? 'Tu sembles bloqué sur le même point' : 'Suggestion';
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">

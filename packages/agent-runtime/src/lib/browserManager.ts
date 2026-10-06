@@ -112,7 +112,9 @@ export class BrowserManager {
 
     const b64 = buf.toString('base64');
     if (b64.length > MAX_SCREENSHOT_B64) {
-      throw new Error(`Screenshot trop grande (${Math.round(b64.length / 1024)}KB). Utilisez fullPage: false ou ciblez un élément.`);
+      throw new Error(
+        `Screenshot trop grande (${Math.round(b64.length / 1024)}KB). Utilisez fullPage: false ou ciblez un élément.`,
+      );
     }
     return b64;
   }
@@ -136,7 +138,11 @@ export class BrowserManager {
     await page.locator(selector).first().click({ timeout: timeoutMs });
   }
 
-  async fill(selector: string, text: string, opts: { clearFirst?: boolean; timeoutMs?: number } = {}): Promise<void> {
+  async fill(
+    selector: string,
+    text: string,
+    opts: { clearFirst?: boolean; timeoutMs?: number } = {},
+  ): Promise<void> {
     const page = await this.ensurePage();
     const locator = page.locator(selector).first();
 

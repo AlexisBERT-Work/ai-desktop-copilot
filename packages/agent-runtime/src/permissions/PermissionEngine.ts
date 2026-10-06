@@ -1,4 +1,9 @@
-import type { PermissionRequest, PermissionResult, PermissionConfig, PermissionGrant } from '@catdesk/shared-types';
+import type {
+  PermissionRequest,
+  PermissionResult,
+  PermissionConfig,
+  PermissionGrant,
+} from '@catdesk/shared-types';
 import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
 
@@ -9,10 +14,13 @@ export class PermissionEngine {
   private config: PermissionConfig = DEFAULT_PERMISSION_CONFIG;
 
   // Called by IPC bridge when user responds to permission dialog in UI
-  private pendingRequests = new Map<string, {
-    resolve: (result: PermissionResult) => void;
-    reject: (err: Error) => void;
-  }>();
+  private pendingRequests = new Map<
+    string,
+    {
+      resolve: (result: PermissionResult) => void;
+      reject: (err: Error) => void;
+    }
+  >();
 
   updateConfig(config: Partial<PermissionConfig>): void {
     this.config = { ...this.config, ...config };
@@ -33,12 +41,21 @@ export class PermissionEngine {
     // Safe mode: block everything above low
     if (this.config.safeMode && toolConfig.riskLevel !== 'low') {
       log.info('Blocked by safe mode', { tool: request.tool, risk: toolConfig.riskLevel });
-      return { granted: false, reason: 'Mode sécurisé actif — seules les opérations de lecture sont autorisées' };
+      return {
+        granted: false,
+        reason: 'Mode sécurisé actif — seules les opérations de lecture sont autorisées',
+      };
     }
 
     // Critical tools require explicit enablement
-    if (toolConfig.riskLevel === 'critical' && !this.config.enabledCritical.includes(request.tool)) {
-      return { granted: false, reason: `Outil critique non activé dans les paramètres de sécurité` };
+    if (
+      toolConfig.riskLevel === 'critical' &&
+      !this.config.enabledCritical.includes(request.tool)
+    ) {
+      return {
+        granted: false,
+        reason: `Outil critique non activé dans les paramètres de sécurité`,
+      };
     }
 
     // Filesystem path validation — applies to ANY tool carrying a filesystem

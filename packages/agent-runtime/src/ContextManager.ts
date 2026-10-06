@@ -41,20 +41,23 @@ export class ContextManager {
 
     const messages: OllamaMessage[] =
       recentMessages.status === 'fulfilled'
-        ? recentMessages.value.map(m => ({ role: m.role as OllamaMessage['role'], content: m.content }))
+        ? recentMessages.value.map(m => ({
+            role: m.role as OllamaMessage['role'],
+            content: m.content,
+          }))
         : [];
 
     const memories: string[] =
-      relevantMemories.status === 'fulfilled'
-        ? relevantMemories.value.map(r => r.content)
-        : [];
+      relevantMemories.status === 'fulfilled' ? relevantMemories.value.map(r => r.content) : [];
 
     // Warm facts are a tiny, instantly-queryable structured set — read synchronously.
     let warmFacts: string[] = [];
     try {
       warmFacts = this.warmStore?.getActiveFacts(WARM_FACTS_LIMIT).map(f => `- ${f.value}`) ?? [];
     } catch (err) {
-      log.warn('Warm facts read failed', { error: err instanceof Error ? err.message : String(err) });
+      log.warn('Warm facts read failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // Trim messages to fit context budget
@@ -85,10 +88,18 @@ export class ContextManager {
     try {
       this.db.createConversation(conversationId, model);
       if (userText.trim()) {
-        this.db.addMessage(conversationId, { id: crypto.randomUUID(), role: 'user', content: userText });
+        this.db.addMessage(conversationId, {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: userText,
+        });
       }
       if (assistantText.trim()) {
-        this.db.addMessage(conversationId, { id: crypto.randomUUID(), role: 'assistant', content: assistantText });
+        this.db.addMessage(conversationId, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: assistantText,
+        });
       }
     } catch (err) {
       log.warn('recordTurn failed', { error: err instanceof Error ? err.message : String(err) });
@@ -100,13 +111,19 @@ export class ContextManager {
    * recall (the vector layer was never populated before this). Async: embeds via
    * Ollama, so the orchestrator calls it fire-and-forget.
    */
-  async rememberExchange(conversationId: string, userText: string, assistantText: string): Promise<void> {
+  async rememberExchange(
+    conversationId: string,
+    userText: string,
+    assistantText: string,
+  ): Promise<void> {
     const content = `Utilisateur : ${userText.trim()}\nAssistant : ${assistantText.trim()}`.trim();
     if (content.length < 16) return; // nothing worth indexing
     try {
       await this.vectorStore.store(content, { conversationId, kind: 'exchange', ts: Date.now() });
     } catch (err) {
-      log.warn('rememberExchange failed', { error: err instanceof Error ? err.message : String(err) });
+      log.warn('rememberExchange failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

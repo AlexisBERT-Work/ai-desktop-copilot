@@ -27,8 +27,14 @@ export function rowToPressFeed(r: Record<string, unknown>): PressFeed | null {
   const id = typeof r['id'] === 'string' ? r['id'] : null;
   const name = typeof r['name'] === 'string' ? r['name'].trim() : '';
   if (id === null || name.length === 0) return null;
-  const includeRegex = typeof r['include_regex'] === 'string' && r['include_regex'].length > 0 ? r['include_regex'] : null;
-  const excludeRegex = typeof r['exclude_regex'] === 'string' && r['exclude_regex'].length > 0 ? r['exclude_regex'] : null;
+  const includeRegex =
+    typeof r['include_regex'] === 'string' && r['include_regex'].length > 0
+      ? r['include_regex']
+      : null;
+  const excludeRegex =
+    typeof r['exclude_regex'] === 'string' && r['exclude_regex'].length > 0
+      ? r['exclude_regex']
+      : null;
   return {
     id,
     name,

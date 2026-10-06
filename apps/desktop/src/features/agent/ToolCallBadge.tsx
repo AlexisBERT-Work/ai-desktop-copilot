@@ -17,8 +17,10 @@ export function ToolCallBadge({ toolName }: { toolName: string }) {
   const icon = TOOL_ICONS[toolName] ?? <Globe className="w-3 h-3" />;
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-                     bg-white/5 border border-white/10 text-white/40 text-xs">
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                     bg-white/5 border border-white/10 text-white/40 text-xs"
+    >
       {icon}
       {toolName}
     </span>

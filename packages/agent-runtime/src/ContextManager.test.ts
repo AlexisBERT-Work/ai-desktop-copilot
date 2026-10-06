@@ -87,7 +87,11 @@ describe('ContextManager semantic recall (rememberExchange)', () => {
   });
 
   it('indexes an exchange so a later, different conversation can recall it', async () => {
-    await ctx.rememberExchange('conv-A', 'Quel est le port du serveur Postgres ?', 'Le port Postgres est 5544.');
+    await ctx.rememberExchange(
+      'conv-A',
+      'Quel est le port du serveur Postgres ?',
+      'Le port Postgres est 5544.',
+    );
     // A new conversation with no history asks about the same topic.
     const c = await ctx.buildContext('conv-B', 'rappelle-moi le port postgres');
     expect(c.messages).toHaveLength(0); // no shared conversation history

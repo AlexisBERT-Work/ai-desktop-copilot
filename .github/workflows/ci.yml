@@ -27,6 +27,10 @@ jobs:
 
       - run: pnpm lint
 
+      # `prettier --check .` (pas un glob) : sous Windows, l'ancien glob
+      # `**/*.{ts,tsx,json,md}` ratait des fichiers et la porte passait à tort.
+      - run: pnpm format:check
+
   # ─── Unit Tests ────────────────────────────────────────────
   test:
     name: Unit Tests
@@ -56,7 +60,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.96"
+          toolchain: '1.96'
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
@@ -78,7 +82,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
           cache: pip
           cache-dependency-path: packages/ocr-vision/requirements.txt
 
@@ -109,7 +113,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.96"
+          toolchain: '1.96'
 
       - run: pnpm install --frozen-lockfile
 

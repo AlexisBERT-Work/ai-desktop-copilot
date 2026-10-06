@@ -57,7 +57,9 @@ export class CronScheduler {
     for (const job of persisted) {
       this.jobs.set(job.id, job);
     }
-    this.tickTimer = setInterval(() => { void this.tick(); }, TICK_INTERVAL_MS);
+    this.tickTimer = setInterval(() => {
+      void this.tick();
+    }, TICK_INTERVAL_MS);
     // Run overdue jobs immediately on startup
     void this.tick();
     log.info('CronScheduler initialized', { jobs: persisted.length });
@@ -65,10 +67,16 @@ export class CronScheduler {
 
   // ─── Job CRUD ───────────────────────────────────────────────────
 
-  addJob(task: string, schedule: string, opts: { name?: string; enabled?: boolean } = {}): ScheduledJob {
+  addJob(
+    task: string,
+    schedule: string,
+    opts: { name?: string; enabled?: boolean } = {},
+  ): ScheduledJob {
     const intervalMs = parseScheduleMs(schedule);
     if (intervalMs === null) {
-      throw new Error(`Format de planification invalide: "${schedule}". Formats acceptés: ${validScheduleFormats()}`);
+      throw new Error(
+        `Format de planification invalide: "${schedule}". Formats acceptés: ${validScheduleFormats()}`,
+      );
     }
     if (intervalMs < 60_000) {
       throw new Error('Intervalle minimum: 1 minute');
@@ -89,7 +97,12 @@ export class CronScheduler {
 
     this.jobs.set(id, job);
     this.store.saveScheduledTask(job);
-    log.info('Job scheduled', { id, name: job.name, schedule, nextRunAt: new Date(job.nextRunAt).toISOString() });
+    log.info('Job scheduled', {
+      id,
+      name: job.name,
+      schedule,
+      nextRunAt: new Date(job.nextRunAt).toISOString(),
+    });
     return job;
   }
 

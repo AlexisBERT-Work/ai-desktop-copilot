@@ -24,7 +24,10 @@ export interface SummarizableMessage {
  * summary so long sessions keep their context without blowing the token budget.
  */
 export class ConversationSummarizer {
-  constructor(private llm: OllamaClient, private model: string) {}
+  constructor(
+    private llm: OllamaClient,
+    private model: string,
+  ) {}
 
   static toTranscript(messages: SummarizableMessage[], maxChars = MAX_TRANSCRIPT_CHARS): string {
     const lines: string[] = [];
@@ -44,8 +47,9 @@ export class ConversationSummarizer {
     const transcript = ConversationSummarizer.toTranscript(messages);
     if (!transcript) return prior ?? '';
 
-    const userContent = (prior ? `Résumé précédent :\n${prior}\n\n` : '')
-      + `Nouveaux échanges à intégrer :\n${transcript}`;
+    const userContent =
+      (prior ? `Résumé précédent :\n${prior}\n\n` : '') +
+      `Nouveaux échanges à intégrer :\n${transcript}`;
 
     let text = '';
     try {
@@ -59,7 +63,9 @@ export class ConversationSummarizer {
         if (chunk.type === 'token') text += chunk.content;
       }
     } catch (err) {
-      log.warn('Summarize call failed', { error: err instanceof Error ? err.message : String(err) });
+      log.warn('Summarize call failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return prior ?? '';
     }
     return text.trim() || (prior ?? '');

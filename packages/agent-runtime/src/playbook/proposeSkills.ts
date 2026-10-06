@@ -62,7 +62,11 @@ export function proposeSkills(rows: StrategyRow[], opts: ProposeSkillsOptions = 
     if (successRate < strongRate) continue;
 
     const cur = bestByType.get(r.taskType);
-    if (!cur || successRate > cur.successRate || (successRate === cur.successRate && attempts > cur.attempts)) {
+    if (
+      !cur ||
+      successRate > cur.successRate ||
+      (successRate === cur.successRate && attempts > cur.attempts)
+    ) {
       bestByType.set(r.taskType, { approach: r.approach, attempts, successRate });
     }
   }
@@ -77,7 +81,13 @@ export function proposeSkills(rows: StrategyRow[], opts: ProposeSkillsOptions = 
       successRate: w.successRate,
       attempts: w.attempts,
       slug,
-      markdown: renderSkillDraft({ taskType, approach: w.approach, successRate: w.successRate, attempts: w.attempts, slug }),
+      markdown: renderSkillDraft({
+        taskType,
+        approach: w.approach,
+        successRate: w.successRate,
+        attempts: w.attempts,
+        slug,
+      }),
     });
   }
   return drafts;
@@ -85,7 +95,10 @@ export function proposeSkills(rows: StrategyRow[], opts: ProposeSkillsOptions = 
 
 /** Render a draft SKILL.md from a proven strategy. Pure/deterministic. */
 export function renderSkillDraft(d: Omit<SkillDraft, 'markdown'>): string {
-  const tools = d.approach.split('>').map(t => t.trim()).filter(Boolean);
+  const tools = d.approach
+    .split('>')
+    .map(t => t.trim())
+    .filter(Boolean);
   const steps = tools.map((t, i) => `${i + 1}. \`${t}\``).join('\n');
   const pctRate = Math.round(d.successRate * 100);
 

@@ -19,7 +19,8 @@ describe('ConversationStore summary + getMessagesSince', () => {
 
   afterEach(() => {
     db.close();
-    if (prev === undefined) delete process.env['CATDESK_DATA_DIR']; else process.env['CATDESK_DATA_DIR'] = prev;
+    if (prev === undefined) delete process.env['CATDESK_DATA_DIR'];
+    else process.env['CATDESK_DATA_DIR'] = prev;
     rmSync(dir, { recursive: true, force: true });
   });
 

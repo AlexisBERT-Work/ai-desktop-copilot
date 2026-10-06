@@ -17,20 +17,20 @@ interface NewsState {
 
 export const useNewsStore = create<NewsState>()(
   persist(
-    (set) => ({
+    set => ({
       items: [],
       status: 'loading',
       dismissedIds: [],
 
-      setItems: (items) => set({ items }),
-      setStatus: (status) => set({ status }),
-      dismiss: (id) =>
-        set((s) => (s.dismissedIds.includes(id) ? {} : { dismissedIds: [...s.dismissedIds, id] })),
+      setItems: items => set({ items }),
+      setStatus: status => set({ status }),
+      dismiss: id =>
+        set(s => (s.dismissedIds.includes(id) ? {} : { dismissedIds: [...s.dismissedIds, id] })),
     }),
     {
       name: 'catdesk-news',
       // On ne persiste que les masquages ; les items viennent du backend.
-      partialize: (s) => ({ dismissedIds: s.dismissedIds }),
+      partialize: s => ({ dismissedIds: s.dismissedIds }),
     },
   ),
 );
@@ -44,7 +44,7 @@ export function computeActiveNews(items: NewsItem[], dismissedIds: string[]): Ne
   const now = Date.now();
   const dismissed = new Set(dismissedIds);
   return items
-    .filter((n) => !dismissed.has(n.id))
-    .filter((n) => n.expiresAt === null || Date.parse(n.expiresAt) > now)
+    .filter(n => !dismissed.has(n.id))
+    .filter(n => n.expiresAt === null || Date.parse(n.expiresAt) > now)
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 }

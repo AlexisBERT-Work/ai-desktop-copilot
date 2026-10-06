@@ -14,7 +14,9 @@ const TEMP = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
 
 describe('PermissionEngine path whitelist', () => {
   let engine: PermissionEngine;
-  beforeEach(() => { engine = new PermissionEngine(); });
+  beforeEach(() => {
+    engine = new PermissionEngine();
+  });
 
   it('allows a path under %USERPROFILE%\\Documents (backslashes)', async () => {
     const r = await engine.check(req(join(HOME, 'Documents', 'notes.txt')));
@@ -83,7 +85,10 @@ describe('PermissionEngine path whitelist', () => {
   it('enforces the whitelist on run_sqlite db_path (Chrome cookies DB)', async () => {
     const r = await engine.check({
       tool: 'run_sqlite',
-      args: { db_path: 'C:/Users/other/AppData/Local/Google/Chrome/User Data/Default/Cookies', query: 'SELECT 1' },
+      args: {
+        db_path: 'C:/Users/other/AppData/Local/Google/Chrome/User Data/Default/Cookies',
+        query: 'SELECT 1',
+      },
       context: { conversationId: 'c' },
     });
     expect(r.granted).toBe(false);
