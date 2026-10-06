@@ -6,8 +6,10 @@
 ;
 ; BaseUrl pointe par défaut sur la release GitHub publique catdesk-releases-voice
 ; (ligne 0.2.x ; la ligne 0.1.x figée reste sur catdesk-releases) ;
-; surchargeable à la compilation pour tester en local (voir scripts/
-; test-bootstrap-local.ps1) : ISCC /DBaseUrl=http://127.0.0.1:8000 ...
+; surchargeable à la compilation pour tester en local (voir
+; docs/DISTRIBUTION.md § 3bis) : ISCC /DBaseUrl=http://127.0.0.1:8000 ...
+; La version (MyAppVersion, BaseName, tag de BaseUrl) est écrite par
+; scripts/bump-version.ps1 — ne pas la modifier à la main.
 
 #ifndef BaseUrl
 #define BaseUrl "https://github.com/AlexisBERT-Work/catdesk-releases-voice/releases/download/v0.2.0"

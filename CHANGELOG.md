@@ -5,8 +5,9 @@ All notable changes to CatDesk are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) ·
 Versioning: [Semantic Versioning](https://semver.org/)
 
-Only `v0.1.0-beta.1` is tagged in git; the 0.1.x entries below are reconstructed from
-the release commits and the shipped installers.
+From 0.2.0 on, every published version is tagged `vX.Y.Z` on `master`. Before that only
+`v0.1.0-beta.1` and `v0.1.3` were tagged; the other 0.1.x entries below are reconstructed
+from the release commits and the shipped installers.
 
 ---
 
@@ -106,6 +107,16 @@ _Nothing yet._
 - Documentation rewritten against the code: the tool count (67 → **68**), the model
   lineup, the project tree, the permission table (five of its example tools did not
   exist), the clone URL and the default branch were all wrong.
+- **One command sets the version.** It is written in 9 places (four `package.json`,
+  `tauri.conf.json`, `Cargo.toml`/`Cargo.lock`, both Inno scripts) and
+  `publish-update.ps1` used to bump only `tauri.conf.json`, leaving the rest stale — the
+  root `package.json` still said 0.1.3. New `scripts/bump-version.ps1` rewrites each
+  field through a scoped regex and refuses a version that does not go up;
+  `publish-update.ps1` no longer bumps anything and refuses to publish unless the repo
+  already carries the requested version, so every published build matches a commit.
+- **Branch model**: work happens on `dev`, `master` holds the last release and is tagged
+  `vX.Y.Z`. The release cycle is in `docs/DISTRIBUTION.md` § 4, the planned versions in
+  `docs/AMELIORATIONS.md` § 0 bis.
 
 ### Added
 

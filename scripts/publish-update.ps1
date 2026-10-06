@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   One command to ship a code update to everyone who installed CatDesk:
-    1. bumps the version in tauri.conf.json,
+    1. checks that the repo already carries -Version (set by bump-version.ps1),
     2. builds a lightweight signed UPDATE artifact (no model — see build-release.ps1 -Update),
     3. assembles the Tauri `latest.json` manifest,
     4. creates a GitHub Release and uploads the installer + latest.json.
@@ -12,17 +12,18 @@
   Installed apps check `releases/latest/download/latest.json` on launch and
   self-update silently (core/updater.rs).
 
-  TWO RELEASE LINES coexist (docs/DISTRIBUTION.md § 4) and must never cross:
+  TWO RELEASE LINES coexist (docs/DISTRIBUTION.md § 0 bis) and must never cross:
     0.1.x  no voice, FROZEN  -> repo catdesk-releases        (git tag v0.1.3)
-    0.2.x  voice             -> repo catdesk-releases-voice  (this branch)
+    0.2.x  voice             -> repo catdesk-releases-voice  (master, tags v0.2.x)
   The updater endpoint baked into each build (tauri.release.conf.json) says
   which repo its users poll. This script publishes THERE and refuses anything
   else: a 0.2.x build pushed to catdesk-releases as "latest" would silently
   upgrade every 0.1.x install.
 
 .PARAMETER Version
-  New semantic version, e.g. 0.1.1. MUST be greater than the installed one or
-  clients won't update.
+  New semantic version, e.g. 0.2.1. MUST be greater than the installed one or
+  clients won't update. The repo must already be at this version: run
+  scripts/bump-version.ps1 and commit first (docs/DISTRIBUTION.md § 4).
 
 .PARAMETER Notes
   Release notes shown on GitHub (optional).
@@ -84,6 +85,22 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
 }
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh CLI not found." }
 
+# ── 1. The commit being shipped must already carry this version ──
+# bump-version.ps1 writes it in the 9 places it lives. Bumping here instead (as
+# this script used to) left 8 of them stale and shipped a binary that matched
+# no commit. Checked before anything touches the network or the disk.
+$confText = Get-Content $confPath -Raw
+if (-not ($confText -match '"version"\s*:\s*"([^"]*)"')) { throw 'No "version" field in tauri.conf.json' }
+$repoVersion = $Matches[1]
+if ($repoVersion -ne $Version) {
+  throw ("The repo is at $repoVersion, not $Version. First run`n" +
+    "  powershell -File scripts/bump-version.ps1 -Version $Version`n" +
+    "then add the CHANGELOG entry, commit, and run this script again.")
+}
+if (& git -C $root status --porcelain) {
+  Write-Warning "Uncommitted changes: the published build will not match any commit."
+}
+
 # ── Which release line? The endpoint baked into the build decides ─
 $endpoint = (Get-Content $releaseConfPath -Raw | ConvertFrom-Json).plugins.updater.endpoints[0]
 if (-not ($endpoint -match '^https://github\.com/([^/]+/[^/]+)/releases/latest/download/latest\.json$')) {
@@ -102,14 +119,6 @@ $repo = $Repo
 & gh repo view $repo --json nameWithOwner | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Release repo '$repo' not reachable via gh (does it exist? are you authed?)." }
 Write-Host "release repo: $repo   version: $Version"
-
-# ── 1. Bump version in tauri.conf.json (surgical, preserves formatting) ──
-Step "Bumping version → $Version"
-$confText = Get-Content $confPath -Raw
-$newText = [regex]::Replace($confText, '("version"\s*:\s*")[^"]*(")', "`${1}$Version`${2}", 1)
-if ($newText -eq $confText) { throw 'Could not find a "version" field to bump in tauri.conf.json' }
-Set-Content $confPath -Value $newText -Encoding utf8 -NoNewline
-Write-Host "tauri.conf.json version set to $Version"
 
 # ── 2. Build the signed update artifact ──────────────────────────
 Step "Building update artifact"
@@ -155,4 +164,5 @@ $relNotes = if ($Notes) { $Notes } else { "CatDesk $Version" }
 
 Step "Done"
 Write-Host "Published $tag. Installed apps will self-update on next launch." -ForegroundColor Green
-Write-Host "Don't forget to commit the version bump in tauri.conf.json." -ForegroundColor Yellow
+Write-Host "Tag the shipped commit in the source repo:" -ForegroundColor Yellow
+Write-Host "  git tag $tag; git push origin $tag" -ForegroundColor Yellow
