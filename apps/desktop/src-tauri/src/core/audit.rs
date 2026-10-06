@@ -11,9 +11,13 @@ fn audit_log_path() -> PathBuf {
 }
 
 fn dirs_next() -> PathBuf {
+    // CATDESK_DATA_DIR : surcharge (tests). Sinon le dossier partagé avec
+    // l'agent ; le repli APPDATA ne sert qu'avant l'initialisation.
     let base = std::env::var("CATDESK_DATA_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
+        .ok()
+        .or_else(|| crate::core::data_dir::get().cloned())
+        .unwrap_or_else(|| {
             std::env::var("APPDATA")
                 .map(|p| PathBuf::from(p).join("CatDesk").join("data"))
                 .unwrap_or_else(|_| PathBuf::from("data"))

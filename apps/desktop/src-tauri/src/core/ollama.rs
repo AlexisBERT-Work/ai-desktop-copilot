@@ -25,9 +25,30 @@
 
 use crate::core::resources::resource_subdir;
 use std::path::{Path, PathBuf};
+use std::process::Child;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 use tracing::{info, warn};
+
+/// Adresse du serveur Ollama local (embarqué ou externe).
+pub const OLLAMA_ADDR: &str = "127.0.0.1:11434";
+/// URL de base de l'API Ollama — miroir de `OLLAMA_DEFAULT_URL` (shared-types).
+pub const OLLAMA_URL: &str = "http://127.0.0.1:11434";
+/// Modèle de chat unique du bundle — miroir de `DEFAULT_CHAT_MODEL` (shared-types).
+pub const DEFAULT_CHAT_MODEL: &str = "qwen3:14b";
+
+/// Client HTTP des appels à Ollama depuis le cœur : AVEC délai. `reqwest::get`
+/// n'en a aucun — un Ollama figé gelait la commande, donc l'écran de réglages.
+pub fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_default()
+}
+
+/// Le processus `ollama serve` lancé par CatDesk, gardé pour pouvoir l'arrêter.
+static MANAGED_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -119,8 +140,8 @@ pub fn ensure_ollama_running(app: &AppHandle) {
     let models = persistent_models;
     let kv = kv_cache_setting(app);
     std::thread::spawn(move || {
-        if port_is_open("127.0.0.1:11434") {
-            info!("Ollama already listening on :11434 — reusing it (external/dev)");
+        if port_is_open(OLLAMA_ADDR) {
+            info!("Ollama already listening on {OLLAMA_ADDR} — reusing it (external/dev)");
             return;
         }
         MANAGED.store(true, Ordering::Relaxed);
@@ -157,24 +178,27 @@ pub fn restart(app: &AppHandle) -> bool {
     true
 }
 
-/// Kill the bundled Ollama (managed path only — we are the sole Ollama then).
+/// Arrête l'Ollama lancé par CatDesk, par son handle. Avant : `taskkill /F /IM
+/// ollama.exe`, qui tuait TOUS les ollama.exe de la machine.
 fn stop_managed_ollama() {
-    #[cfg(windows)]
-    {
-        let mut cmd = std::process::Command::new("taskkill");
-        cmd.args(["/F", "/IM", "ollama.exe"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        let _ = cmd.status();
+    let child = MANAGED_CHILD
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take();
+    if let Some(mut child) = child {
+        let _ = child.kill();
+        let _ = child.wait();
+        info!("Managed Ollama stopped");
     }
-    #[cfg(not(windows))]
-    {
-        let _ = std::process::Command::new("pkill")
-            .arg("-f")
-            .arg("ollama")
-            .status();
+}
+
+/// À la fermeture de CatDesk (et avant d'installer une mise à jour) : arrête
+/// l'Ollama qu'il a lancé. Sans cela il survivait à l'app — et au lancement
+/// suivant, CatDesk le prenait pour un Ollama « externe » qu'il ne doit pas
+/// toucher : le réglage KV-cache ne pouvait plus s'appliquer.
+pub fn shutdown() {
+    if is_managed() {
+        stop_managed_ollama();
     }
 }
 
@@ -231,7 +255,7 @@ fn spawn_serve(bin: &PathBuf, models: &Path, kv_cache: &str) {
 
     let mut cmd = std::process::Command::new(bin);
     cmd.arg("serve")
-        .env("OLLAMA_HOST", "127.0.0.1:11434")
+        .env("OLLAMA_HOST", OLLAMA_ADDR)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -259,9 +283,10 @@ fn spawn_serve(bin: &PathBuf, models: &Path, kv_cache: &str) {
     }
 
     match cmd.spawn() {
-        Ok(_child) => {
-            // Detached: Ollama keeps running for the app's lifetime. It exits
-            // when its stdio pipes close / the process tree is torn down.
+        Ok(child) => {
+            // Gardé pour `shutdown()` / `restart()` : Windows ne tue pas les
+            // enfants avec le parent, rien d'autre ne l'arrêterait.
+            *MANAGED_CHILD.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
             info!("Ollama server spawned");
         }
         Err(e) => warn!("Failed to spawn bundled Ollama: {e}"),
@@ -276,4 +301,19 @@ fn port_is_open(addr: &str) -> bool {
         .ok()
         .and_then(|sa| TcpStream::connect_timeout(&sa, Duration::from_millis(300)).ok())
         .is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TS_MODELS: &str = include_str!("../../../../../packages/shared-types/src/models.ts");
+
+    /// Les constantes Rust doivent rester alignées sur `@catdesk/shared-types`.
+    #[test]
+    fn mirror_matches_shared_types_models() {
+        assert!(TS_MODELS.contains(&format!("DEFAULT_CHAT_MODEL = '{DEFAULT_CHAT_MODEL}'")));
+        assert!(TS_MODELS.contains(&format!("OLLAMA_DEFAULT_URL = '{OLLAMA_URL}'")));
+        assert_eq!(OLLAMA_URL, format!("http://{OLLAMA_ADDR}"));
+    }
 }

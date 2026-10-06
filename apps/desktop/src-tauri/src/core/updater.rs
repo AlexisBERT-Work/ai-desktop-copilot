@@ -48,7 +48,12 @@ async fn check_and_install(app: &AppHandle) -> anyhow::Result<bool> {
                     info!("Update download {}/{} bytes", downloaded, total);
                 }
             },
-            || info!("Update download finished, installing"),
+            || {
+                info!("Update download finished, installing");
+                // L'installeur remplace aussi ollama.exe et l'agent : ils
+                // doivent être arrêtés, sinon leurs fichiers sont verrouillés.
+                crate::stop_children();
+            },
         )
         .await?;
 

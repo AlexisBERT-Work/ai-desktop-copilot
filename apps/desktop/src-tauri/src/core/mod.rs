@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod data_dir;
 pub mod error;
 pub mod hotkeys;
 pub mod ollama;
