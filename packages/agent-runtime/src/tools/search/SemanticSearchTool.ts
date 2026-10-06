@@ -143,29 +143,39 @@ function extractSnippet(content: string, pos: number, radius: number): string {
   return snippet;
 }
 
+/**
+ * Plafond de fichiers candidats par recherche. Sans lui, `paths: ["C:/"]`
+ * parcourait — et lisait — tout le disque.
+ */
+const MAX_FILES = 5_000;
+
+/** Extension utile : `extname('.env.example')` vaut '.example', pas '.env.example'. */
+function fileExtension(name: string): string {
+  return name === '.env.example' ? '.env.example' : extname(name).toLowerCase();
+}
+
 async function walkDir(
   dir: string,
   exts: Set<string>,
   maxSize: number,
+  results: string[] = [],
   depth = 0,
 ): Promise<string[]> {
-  if (depth > 10) return [];
-  const results: string[] = [];
+  if (depth > 10 || results.length >= MAX_FILES) return results;
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
-    return [];
+    return results;
   }
 
   for (const entry of entries) {
+    if (results.length >= MAX_FILES) break;
     if (entry.name.startsWith('.') && entry.name !== '.env.example') continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      const sub = await walkDir(full, exts, maxSize, depth + 1);
-      results.push(...sub);
-    } else if (entry.isFile() && exts.has(extname(entry.name).toLowerCase())) {
+      if (!SKIP_DIRS.has(entry.name)) await walkDir(full, exts, maxSize, results, depth + 1);
+    } else if (entry.isFile() && exts.has(fileExtension(entry.name))) {
       try {
         const s = await stat(full);
         if (s.size <= maxSize) results.push(full);
@@ -207,8 +217,7 @@ export class SemanticSearchTool extends BaseTool<Args> {
     // Collect all candidate files
     const allFiles: string[] = [];
     for (const dir of searchPaths) {
-      const found = await walkDir(dir, exts, max_file_size);
-      allFiles.push(...found);
+      await walkDir(dir, exts, max_file_size, allFiles);
     }
 
     if (allFiles.length === 0) {
