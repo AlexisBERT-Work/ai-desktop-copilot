@@ -16,8 +16,17 @@ pnpm 11.3 are hard floors, not suggestions — CI builds with exactly those.
 
 ## Branches
 
-`master` is the default branch and the only long-lived one. Work on a topic branch and
-open a PR against `master`.
+Two long-lived branches:
+
+- **`dev`** — where work happens. Branch from it and open your PR against it.
+- **`master`** — the last releasable state. It only moves when `dev` is merged in for a
+  release, and every release is tagged `vX.Y.Z` there. Committing to `master` never
+  ships anything by itself: installed apps only update when `scripts/publish-update.ps1`
+  is run by hand (release cycle: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) § 4).
+
+Work parked for a later milestone is kept under an `archive/*` tag rather than a stale
+branch. The 0.1.x line (no voice) is frozen at tag `v0.1.3`; a fix there would branch
+from that tag as `maint/0.1.x`.
 
 ```
 feat/<description>      new features
@@ -60,7 +69,7 @@ files.
 
 ## Pull requests
 
-1. Branch from `master`
+1. Branch from `dev`
 2. Run the full gate locally — all of it must pass:
    ```powershell
    pnpm type-check

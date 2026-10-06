@@ -306,8 +306,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```
 Commit style   : conventional commits (feat/fix/chore/docs/refactor)
-Default branch : master
-PR flow        : feat/* → master, CI must be green
+Branches       : dev = work in progress · master = last release, tagged vX.Y.Z
+PR flow        : feat/* → dev, CI must be green · dev → master at release time
 ```
 
 ---

@@ -65,7 +65,7 @@ chaque exe installé** et ne peut plus changer après coup.
 | Ligne | Contenu               | Source git                                           | Dépôt de releases (endpoint updater) | État              |
 | ----- | --------------------- | ---------------------------------------------------- | ------------------------------------ | ----------------- |
 | 0.1.x | sans voix             | tag `v0.1.3` (= `master` avant la refonte d'août)    | `catdesk-releases`                   | **figée à 0.1.3** |
-| 0.2.x | voix + refonte d'août | `refactor/etat-propre` → `master` une fois fusionnée | `catdesk-releases-voice`             | vivante           |
+| 0.2.x | voix + refonte d'août | `master` (tags `v0.2.x`), travail en cours sur `dev` | `catdesk-releases-voice`             | vivante           |
 
 **La règle.** Une release marquée « latest » sur `catdesk-releases` avec une
 version > 0.1.3 mettrait à jour **en silence, au lancement suivant**, tous
@@ -157,13 +157,13 @@ champ `plugins.updater.pubkey`, à la place de `la valeur actuelle de plugins.up
 
 ```powershell
 # Build complet hors-ligne (agent + Ollama + modèles + OCR)
-pwsh -File scripts/build-release.ps1
+powershell -File scripts/build-release.ps1
 
 # Variante sans OCR (plus léger/rapide)
-pwsh -File scripts/build-release.ps1 -SkipOcr
+powershell -File scripts/build-release.ps1 -SkipOcr
 
 # Avec un dossier de modèles spécifique
-pwsh -File scripts/build-release.ps1 -ModelsPath "D:\mes-modeles-ollama"
+powershell -File scripts/build-release.ps1 -ModelsPath "D:\mes-modeles-ollama"
 ```
 
 Résultat :
@@ -239,24 +239,56 @@ ISCC /DBaseUrl=http://127.0.0.1:8000 scripts/catdesk-bootstrap.iss
 
 ---
 
-## 4. Publier une mise à jour (à chaque changement)
+## 4. Sortir une version (cycle complet)
 
-Une fois la clé en place (§2.1) et la clé privée dans l'environnement :
+**Les branches.** On travaille sur `dev`. `master` porte la dernière version
+publiable et ne bouge qu'à une sortie ; chaque version publiée y reçoit un tag
+`vX.Y.Z`. Ce qui est prévu pour chaque version :
+[AMELIORATIONS.md](AMELIORATIONS.md) § « Feuille de route ».
 
-```powershell
-# Charger la clé privée + son mot de passe dans le shell courant
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<mot de passe de la clé>"
+> **Pousser sur `dev` ou `master` ne touche aucun exe installé.** Seule
+> l'étape 4 ci-dessous publie quelque chose.
 
-# Publier la version 0.2.1
-pwsh -File scripts/publish-update.ps1 -Version 0.2.1 -Notes "Nouveau: outil X, fix Y"
-```
+Une fois la clé en place (§2.1) :
 
-Le script :
+1. **Fixer la version partout**, sur `dev` :
 
-1. lit le dépôt cible dans l'endpoint updater de `tauri.release.conf.json`
+   ```powershell
+   powershell -File scripts/bump-version.ps1 -Version 0.2.1 -WhatIf   # aperçu
+   powershell -File scripts/bump-version.ps1 -Version 0.2.1
+   ```
+
+   La version vit à 9 endroits (4 `package.json`, `tauri.conf.json`,
+   `Cargo.toml` et `Cargo.lock`, `catdesk.iss`, `catdesk-bootstrap.iss`) ; le
+   script les écrit tous, s'arrête si l'un manque, et refuse une version qui ne
+   monte pas.
+
+2. **CHANGELOG** : la section `[Unreleased]` devient `[0.2.1] — <date>`. Commit
+   `chore(release): 0.2.1`.
+3. **PR `dev` → `master`**, CI verte, fusion.
+4. **Publier la mise à jour**, depuis `master` :
+
+   ```powershell
+   # Charger la clé privée + son mot de passe dans le shell courant
+   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\catdesk.key" -Raw
+   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<mot de passe de la clé>"
+
+   powershell -File scripts/publish-update.ps1 -Version 0.2.1 -Notes "Nouveau: outil X, fix Y"
+   ```
+
+5. **Taguer** le commit publié : `git tag v0.2.1` puis `git push origin v0.2.1`
+   (le script le rappelle en fin de course).
+6. **Installeur complet** — seulement si quelqu'un doit installer depuis zéro :
+   §3 puis §3bis.
+
+`publish-update.ps1` :
+
+1. vérifie que le dépôt est **déjà** à `-Version` — sinon il s'arrête et
+   renvoie à `bump-version.ps1`, avant tout build et tout appel réseau ; il
+   avertit si l'arbre git n'est pas propre (le binaire ne correspondrait à aucun
+   commit) ;
+2. lit le dépôt cible dans l'endpoint updater de `tauri.release.conf.json`
    (§0 bis) — un `-Repo` différent est refusé ;
-2. bumpe la version dans `tauri.conf.json` ;
 3. build un **artefact de mise à jour** (sans le modèle LLM) et le signe ;
 4. génère `latest.json` (le manifeste que lisent les apps) ;
 5. crée la **release GitHub** `v0.2.1` et y uploade l'installeur + `latest.json`.
@@ -266,8 +298,8 @@ Les apps de tes proches vérifient
 lancement**, et se mettent à jour toutes seules. Aucun re-téléchargement du
 modèle LLM.
 
-> Pense à committer le bump de version (`tauri.conf.json`) après publication.
-> La version DOIT augmenter à chaque update sinon les clients ne bougent pas.
+> La version DOIT augmenter à chaque update, sinon les clients ne bougent pas —
+> `bump-version.ps1` refuse de la faire stagner ou descendre.
 
 ---
 

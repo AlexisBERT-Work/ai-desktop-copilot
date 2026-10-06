@@ -13,18 +13,20 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 
 ## Carte des documents (lire AVANT d'explorer — évite les recherches inutiles)
 
-| Question                                       | Réponse dans                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| **Où en est le projet ?**                      | `docs/SUIVI.md` (§ « État actuel » en tête)                             |
-| **Que reste-t-il à faire ?**                   | `docs/AMELIORATIONS.md` (§ 0 = ce qui bloque sur l'utilisateur)         |
-| Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                              |
-| Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                       |
-| Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                      |
-| Installeur offline + auto-update               | `docs/DISTRIBUTION.md`                                                  |
-| Techniques d'architecture agent (✅/🟡/⬜)     | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer) |
-| Dashboard / bourse / news / dailys             | `docs/projects/dashboard.md` (décisions, non maintenu) + `supabase/`    |
-| Choix de stack                                 | `docs/architecture/adr-*.md`                                            |
-| Historique versionné                           | `CHANGELOG.md`                                                          |
+| Question                                       | Réponse dans                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| **Où en est le projet ?**                      | `docs/SUIVI.md` (§ « État actuel » en tête)                              |
+| **Que reste-t-il à faire ?**                   | `docs/AMELIORATIONS.md` (§ 0 = ce qui bloque sur l'utilisateur)          |
+| **Que contient la prochaine version ?**        | `docs/AMELIORATIONS.md` § 0 bis « Feuille de route » + Milestones GitHub |
+| Sortir une version (bump, tag, publication)    | `docs/DISTRIBUTION.md` § 4                                               |
+| Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                               |
+| Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                        |
+| Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                       |
+| Installeur offline + auto-update               | `docs/DISTRIBUTION.md`                                                   |
+| Techniques d'architecture agent (✅/🟡/⬜)     | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer)  |
+| Dashboard / bourse / news / dailys             | `docs/projects/dashboard.md` (décisions, non maintenu) + `supabase/`     |
+| Choix de stack                                 | `docs/architecture/adr-*.md`                                             |
+| Historique versionné                           | `CHANGELOG.md`                                                           |
 
 Deux documents portent le suivi, et **un seul** répond à chaque question : SUIVI
 = l'état, AMELIORATIONS = le reste à faire. Ne pas recréer un troisième point de
@@ -90,6 +92,23 @@ personnalisés, miroir Discord).
   `catdesk-releases` migrerait tous les anciens exe en silence.
   `publish-update.ps1` déduit le dépôt de l'endpoint et refuse le reste — ne
   pas contourner. Détail : `docs/DISTRIBUTION.md` § 0 bis.
+- **Seul Windows PowerShell 5.1 est installé** (pas de `pwsh`) : lancer les
+  scripts par `powershell -File`. Un `.ps1` **sans BOM** y est lu en cp1252 —
+  garder les nouveaux scripts en ASCII, ou les enregistrer avec BOM.
+
+## Branches et versions (2026-10)
+
+- **`dev`** = travail en cours (PR des branches de sujet vers `dev`) ·
+  **`master`** = dernière version publiable, ne bouge qu'à une sortie · tag
+  **`vX.Y.Z`** = ce qui a été publié · **`archive/*`** = travail mis de côté
+  pour un jalon futur (`archive/feat-apparence`, `archive/feat-veille`).
+- Pousser sur une branche ne publie **rien** : seul `publish-update.ps1`, lancé
+  à la main, touche les exe installés.
+- La version vit à 9 endroits : la changer **uniquement** par
+  `scripts/bump-version.ps1 -Version X.Y.Z` (`publish-update.ps1` refuse de
+  publier si le dépôt n'est pas déjà à la bonne version).
+- Ce qui va dans chaque version : `docs/AMELIORATIONS.md` § « Feuille de route »
+  (+ Milestones GitHub). Cycle de sortie : `docs/DISTRIBUTION.md` § 4.
 
 ## Key Commands
 

@@ -3,7 +3,7 @@
 > **Ce document répond à une seule question : que reste-t-il à faire ?**
 > Il existe pour que les contradictions et les manques **cessent d'être
 > implicites**. Rien ici n'est un bug bloquant : ce sont des décisions que
-> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-09-11.
+> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-10-06.
 >
 > Où en est le projet : [SUIVI.md](SUIVI.md) · ce que l'agent sait faire :
 > [CAPACITES.md](CAPACITES.md) · ce qu'il ne sait pas faire :
@@ -23,10 +23,42 @@ Cinq choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 | 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
 | 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
 
-Ensuite, par ordre de rentabilité : **§ 1.1** (tranche une contradiction qui
-traîne depuis juin) → **§ 2.2** (`vitest.config.ts`, 20 min) → **§ 2.1**
-(tester `RunCommandTool`) → **§ 3** (remonter `qwen3:14b` et l'URL Ollama dans
-`shared-types`) → **§ 1.2** (décider pour Supabase depuis le webview).
+Ces cinq points forment le jalon **0.2.0** ci-dessous.
+
+---
+
+## 0 bis. Feuille de route — les prochaines versions
+
+Chaque version est un **jalon** : un objectif, un contenu, un critère de sortie.
+Les cases à cocher vivent dans les
+[Milestones GitHub](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestones)
+(une issue par ligne) ; ce document garde le **pourquoi** et l'**ordre**. Si les
+deux divergent, c'est ici qu'on corrige l'ordre, là-bas qu'on coche. Comment
+sortir une version : [DISTRIBUTION.md](DISTRIBUTION.md) § 4.
+
+L'ordre suit la rentabilité : d'abord sortir ce qui est déjà fait, puis rendre
+les mises à jour légères (chaque update 0.2.x pèse ~800 Mo tant que les modèles
+voix ne sont pas semés), puis reporter le travail d'août mis de côté, puis la
+voix.
+
+| Version                                                                        | Objectif                         | Contenu (issues)                                                                                                                                                                                                        | Sort quand                                                                 |
+| ------------------------------------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **[0.2.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/1)** | Première sortie de la ligne voix | Dépôt `catdesk-releases-voice` (#6) · essai au micro (#7) · rendu post-Tailwind (#8) · KV-cache `q4_0`, § 1.1 (#9, recommandé avant) · installeur + publication + tag (#10). **Rien à coder** : tout est sur `master`.  | L'installeur est publié et un poste neuf s'installe puis se met à jour     |
+| **[0.2.1](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/2)** | Mises à jour légères, fiabilité  | Semer les modèles voix, § 4 (#11) · retry des dailys, `a7ffebb` (#12) · `vitest.config.ts`, § 2.2 (#13) · tests `RunCommandTool`/`ReadFileTool`/`ListDirTool`, § 2.1 (#14) · constantes modèle et URL Ollama, § 3 (#15) | L'artefact de mise à jour **suivant** (0.2.2) ne contient plus `voice/`    |
+| **[0.3.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/3)** | Apparence                        | Thème, palettes, réglages d'affichage — report de `515abec` (#16)                                                                                                                                                       | Le rendu est validé à l'œil                                                |
+| **[0.4.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/4)** | Skills et veille                 | `load_skill`, 69ᵉ outil (#17) · coupe-circuit par source (#18) · extraction trafilatura (#19)                                                                                                                           | `registerTools.test.ts` vert, `CAPACITES.md` et `LIMITES.md` à jour        |
+| **[0.5.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/5)** | Voix phase 2 : « sonner Jarvis » | Mode oral côté agent (#20) · phrases de transition (#21) · barge-in (#22) — § 4                                                                                                                                         | Une question orale obtient une réponse courte, sans Markdown, sans silence |
+| **[0.6.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/6)** | Mains libres                     | Wake word « Hey Jarvis », désactivé par défaut (#23) — § 4                                                                                                                                                              | Détection fiable au calme, indicateur visible quand le micro écoute        |
+
+**Le travail d'août mis de côté.** Les PR #5 (apparence) et #3 (skills,
+veille) ont été écrites avant la refonte et le correctif Tailwind ; les fusionner
+telles quelles touchait ~10 fichiers en conflit chacune. Elles sont fermées, leur
+code est conservé sous les tags `archive/feat-apparence` et `archive/feat-veille`,
+et chaque morceau est reporté dans le jalon ci-dessus. `git show <commit>` suffit
+à le retrouver.
+
+**Hors jalon, à trancher d'abord** : Supabase depuis le webview (§ 1.2),
+friction `browser_navigate`, système de plugins, Linux/macOS, Pocket TTS (§ 4).
 
 ---
 
@@ -154,9 +186,6 @@ sont testables trivialement et n'ont rien.
   0.1.3 a montré le coût : il a fallu les retrouver un par un.
 - **Le préfixe `nd-`** (nom du projet _avant_ CatDesk) traîne dans 4 chemins de
   `scripts/` : `nd-target`, `nd-tessdata`, `nd-agent-deploy`, `nd-empty-<guid>`.
-- **La version est dupliquée dans 4 fichiers** (`package.json` racine et desktop,
-  `Cargo.toml`, `tauri.conf.json`) et `publish-update.ps1` n'en bump **qu'un**.
-  Après une release, les trois autres sont périmés jusqu'à correction manuelle.
 - **`tsconfig.node.json` n'étend pas `tsconfig.base.json`** : il recopie cinq
   options à la main et perd au passage `exactOptionalPropertyTypes` et
   `noUncheckedIndexedAccess`. `tailwind.config.ts` et `postcss.config.js` ne sont
