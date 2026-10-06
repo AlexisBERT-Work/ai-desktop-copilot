@@ -17,8 +17,9 @@ const VOICE_PLACEHOLDER: Record<string, string> = {
 export function MiniMode() {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { setMode } = useOverlayStore();
-  const { sendMessage, activeConversationId } = useChatStore();
+  const setMode = useOverlayStore(s => s.setMode);
+  const sendMessage = useChatStore(s => s.sendMessage);
+  const activeConversationId = useChatStore(s => s.activeConversationId);
   const voiceState = useVoiceStore(s => s.state);
   const voiceHint = useVoiceStore(s => s.hint);
   const placeholder = VOICE_PLACEHOLDER[voiceState] ?? voiceHint ?? 'Ask anything...';
@@ -93,7 +94,7 @@ export function MiniMode() {
 }
 
 function QuickActions() {
-  const { setMode } = useOverlayStore();
+  const setMode = useOverlayStore(s => s.setMode);
 
   const actions = [
     {
@@ -105,7 +106,9 @@ function QuickActions() {
     { label: 'Run command', Icon: Terminal, query: 'Run a PowerShell command for me' },
   ];
 
-  const { sendMessage, activeConversationId } = useChatStore();
+  const sendMessage = useChatStore(s => s.sendMessage);
+
+  const activeConversationId = useChatStore(s => s.activeConversationId);
 
   return (
     <div className="border-t border-white/5 px-3 py-2 flex gap-1.5 flex-wrap">

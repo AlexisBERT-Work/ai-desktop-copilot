@@ -37,14 +37,12 @@ beforeAll(async () => {
         const chunks: Buffer[] = [];
         req.on('data', (c: Buffer) => chunks.push(c));
         req.on('end', () =>
-          res
-            .writeHead(201)
-            .end(
-              JSON.stringify({
-                body: Buffer.concat(chunks).toString(),
-                ct: req.headers['content-type'],
-              }),
-            ),
+          res.writeHead(201).end(
+            JSON.stringify({
+              body: Buffer.concat(chunks).toString(),
+              ct: req.headers['content-type'],
+            }),
+          ),
         );
         return;
       }

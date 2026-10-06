@@ -1,16 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-
-export interface ChatSendPayload {
-  conversationId: string;
-  message: string;
-  messageId: string;
-  modelId: string;
-  useTools: boolean;
-  modelMode?: string | undefined;
-  lightModel?: string | undefined;
-  codeModel?: string | undefined;
-  usePlanning?: boolean | undefined;
-}
+import type { ChatSendPayload } from '@catdesk/shared-types';
 
 /**
  * Lance un run agent — les tokens reviennent via les événements

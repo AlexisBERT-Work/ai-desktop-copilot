@@ -3,7 +3,7 @@ export * from './ipc-contract';
 export * from './agent';
 export * from './conversation';
 export * from './permissions';
-export * from './events';
+export * from './overlay';
 export * from './dashboard';
 export * from './news';
 export * from './dailies';

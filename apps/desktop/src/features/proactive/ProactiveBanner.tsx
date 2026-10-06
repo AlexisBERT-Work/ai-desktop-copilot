@@ -6,7 +6,8 @@ import { useProactiveStore } from './proactiveStore';
  * looping on the same problem. Non-blocking: bottom-center, easy to dismiss.
  */
 export function ProactiveBanner() {
-  const { current, dismiss } = useProactiveStore();
+  const current = useProactiveStore(s => s.current);
+  const dismiss = useProactiveStore(s => s.dismiss);
   if (current === null) return null;
 
   const title = current.kind === 'spiral' ? 'Tu sembles bloqué sur le même point' : 'Suggestion';

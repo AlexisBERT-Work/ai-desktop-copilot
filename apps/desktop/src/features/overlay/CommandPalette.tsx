@@ -24,8 +24,9 @@ interface Command {
 
 export function CommandPalette() {
   const [query, setQuery] = useState('');
-  const { setMode } = useOverlayStore();
-  const { sendMessage, activeConversationId } = useChatStore();
+  const setMode = useOverlayStore(s => s.setMode);
+  const sendMessage = useChatStore(s => s.sendMessage);
+  const activeConversationId = useChatStore(s => s.activeConversationId);
   const [selected, setSelected] = useState(0);
 
   const sendAndExpand = useCallback(

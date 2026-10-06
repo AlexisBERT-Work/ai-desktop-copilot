@@ -29,8 +29,9 @@ export function QuickActionView({ iconName, query, onClick, disabled }: QuickAct
 
 /** Une action rapide : envoie une requête prédéfinie à l'agent. */
 export function QuickActionWidget({ widget }: WidgetProps) {
-  const { setMode } = useOverlayStore();
-  const { sendMessage, activeConversationId } = useChatStore();
+  const setMode = useOverlayStore(s => s.setMode);
+  const sendMessage = useChatStore(s => s.sendMessage);
+  const activeConversationId = useChatStore(s => s.activeConversationId);
 
   const query = typeof widget.config.query === 'string' ? widget.config.query : '';
 
