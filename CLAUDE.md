@@ -38,7 +38,9 @@ bundle (chat + digests). `think:false` requis — pour les sorties JSON **et le
 chat interactif** (sinon le raisonnement caché de qwen3 plombe la latence au
 premier token). Le palier `qwen2.5:7b` a été **retiré du bundle** (machines
 cibles ≥ ~10 Go VRAM) : plus de duo → plus de swap 14b↔7b, et
-`recommend_default_model` renvoie toujours le 14b. `minicpm-v` (vision, PAS
+`get_recommended_model` renvoie toujours le 14b. Les noms de modèle et l'URL
+Ollama par défaut vivent dans `shared-types/src/models.ts` (miroir Rust testé
+dans `core/ollama.rs`) — ne plus les écrire en dur. `minicpm-v` (vision, PAS
 llava — chargé à la demande ; seul swap restant : chat↔vision) ·
 `nomic-embed-text` (embeddings). `qwen2.5-coder:14b` retiré (bot sans codage).
 `CATDESK_MODEL_SMALL` reste un opt-in env (non injecté par le launcher).
@@ -140,13 +142,17 @@ Node.js agent → stdout NDJSON → Rust bridge → Tauri emit() → React
 1. Create `packages/agent-runtime/src/tools/<category>/<Name>Tool.ts` extending `BaseTool`
 2. Declare a zod `argsSchema` and derive the JSON Schema from it
    (`schema = jsonSchemaFrom(argsSchema)`) — `argsSchema` is abstract, it is the
-   single source for validation AND for the model's schema
+   single source for validation AND for the model's schema. Any argument that is a
+   filesystem path goes in `override readonly pathArgs = ['path'] as const` — the
+   permission engine checks only declared paths (string or string[])
 3. Add permission config in `packages/shared-types/src/permissions.ts`
 4. Register in `packages/agent-runtime/src/tools/registerTools.ts` (dev/infra tools
    also go in `RESEARCH_EXCLUDED` there)
 5. Document it in `docs/CAPACITES.md`
 
-`registerTools.test.ts` asserts registrations and permission entries match exactly.
+`registerTools.test.ts` asserts registrations and permission entries match exactly,
+and fails on a path-like argument (`path`, `dir`, `file`, `vault`…) not declared
+in `pathArgs`.
 Full procedure: `CONTRIBUTING.md`.
 
 ## TypeScript Conventions
@@ -158,10 +164,17 @@ Full procedure: `CONTRIBUTING.md`.
 - Named exports only (no default except React components)
 - Reuse the shared helpers instead of re-rolling one — c'est la raison d'être du
   refactoring d'août 2026, **importer au lieu de recopier** :
-  - agent : `lib/runProcess` (jamais `promisify(execFile)`), `lib/httpGet`,
+  - agent : `lib/runProcess` (jamais `promisify(execFile)`), `lib/http`
+    (`httpRequest`/`httpGet`/`postJson`/`fetchJson` — délai et taille bornés,
+    jamais de `fetch` nu), `lib/persistence` (`writeFileAtomic`,
+    `readJsonFile`/`writeJsonFile`, `SqliteFile` pour tout store sql.js),
     `lib/dataDir`, `lib/readableText`, `lib/discord`, `llm/completion`
-    (`complete`, `extractJsonObject`, `extractJsonArray`), `news/*` pour le
-    vocabulaire « presse », `tools/base/testResult` (`expectOk`/`expectFail`)
+    (`complete`, `extractJsonObject`, `extractJsonArray`), `memory/embedding`
+    (`TolerantEmbedder`, `cosineSimilarity`), `news/*` pour le vocabulaire
+    « presse » (`news/supabaseRest` pour tout appel Supabase), `config.ts`
+    (`envString` : variable vide = absente), `lifecycle.ts` (`onShutdown` pour
+    tout ce qui doit s'arrêter proprement), `tools/base/testResult`
+    (`expectOk`/`expectFail`)
   - desktop : `shared/ui/tokens.ts` (FIELD/OPTION/LABEL/BTN\_\*),
     `features/news/supabaseCrud.ts` (`makeTableCrud`),
     `features/dailies/useCrudConsole.ts` (machine à états des consoles admin)
@@ -172,7 +185,14 @@ Full procedure: `CONTRIBUTING.md`.
 ## Rust Conventions
 
 - All Tauri commands are async and return `Result<T, String>`
-- Relaying to the agent goes through `commands::forward_to_agent`
+- Relaying to the agent goes through `commands::forward_to_agent`. The agent
+  process is supervised by `ipc/bridge.rs` (restart with backoff, settings
+  replayed after each spawn): a new runtime setting must be remembered there
+  (`remember_runtime_settings`) or it is lost on restart
+- HTTP to Ollama goes through `core::ollama::http_client()` (bounded timeout) and
+  `OLLAMA_URL` / `DEFAULT_CHAT_MODEL`; the agent's data directory through
+  `core::data_dir::get()`. Children (agent, managed Ollama) are stopped by
+  `crate::stop_children()` on exit and before an update install
 - `sandbox::check_path()` / `check_command()` before any filesystem/shell op.
   No command does either today — the filesystem/shell commands were removed as
   dead code — but the module is kept as the mandatory guard for any new one

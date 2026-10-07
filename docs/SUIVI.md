@@ -8,7 +8,7 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-10-06.
+> Dernière mise à jour : 2026-10-07.
 
 ---
 
@@ -34,7 +34,7 @@ antérieures, suivies dans #25 (jalon 0.2.1).
 
 ## 2026-10-07 — Audit complet et refonte (branche `refactor/audit-complet`)
 
-Demande : « refacto, analyser et corriger tout le code ». 14 commits sur
+Demande : « refacto, analyser et corriger tout le code ». 15 commits sur
 `refactor/audit-complet` (depuis `dev`, non poussée). Portes : type-check
 3/3, lint 0, `format:check` (nouveau, en CI), **≈ 700 tests agent**,
 54 desktop, 34 Rust, 14 Python, clippy `-D warnings`.
@@ -55,11 +55,13 @@ Demande : « refacto, analyser et corriger tout le code ». 14 commits sur
   (`lib/persistence`), `news/supabaseRest`, `memory/embedding`,
   `lifecycle.ts`, orchestrateur à dépendances nommées, superviseur Rust.
 
-**Reste à faire** (non commencé) : mettre à jour CAPACITES / SECURITE /
-AMELIORATIONS / CHANGELOG / la liste des helpers de CLAUDE.md ; retirer
-`@tauri-apps/plugin-notification` de `apps/desktop/package.json` (demande
-un `pnpm install`) ; décider du numéro de version puis ouvrir la PR vers
-`dev`. Non vérifié en réel : l'app lancée (`pnpm dev`).
+Docs à jour (CAPACITES, SECURITE, AMELIORATIONS, CHANGELOG `[Unreleased]`,
+CLAUDE.md, CONTRIBUTING) ; `@tauri-apps/plugin-notification` retiré du
+desktop. Ce qui n'a pas été fait est listé dans
+[AMELIORATIONS.md](AMELIORATIONS.md) § 3 (« Restes de l'audit »).
+
+**Reste à faire** : pousser la branche et ouvrir la PR vers `dev`, puis
+décider du numéro de version (le contenu correspond au jalon 0.2.1).
 
 ## 2026-10-06 — Nettoyage, branche `dev` et jalons de version
 

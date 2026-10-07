@@ -130,8 +130,11 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | Chercher/lire des pages **Notion** (API)                  | `notion_search`          |   🟢   |
 | Appeler une **API REST** (GET auto ; écriture confirmée)  | `call_api`               |   🟠   |
 | Poster sur un **webhook Discord/Slack**                   | `send_webhook_message`   |   🟠   |
-| Publier l'actu tech sur un webhook Discord (embeds)       | `post_tech_news_discord` |   🟡   |
+| Publier l'actu tech sur un webhook Discord (embeds)¹      | `post_tech_news_discord` |   🟡   |
 | Lire une **boîte mail IMAP** (recherche, en-têtes, corps) | `read_email`             |   🟠   |
+
+¹ URL limitée aux webhooks Discord (`discord.com/api/webhooks/…`). `obsidian_notes`
+ne lit un vault que s'il est dans la liste blanche des chemins.
 
 ## 4. Développement & analyse de code
 
@@ -181,6 +184,9 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | Requêter une base **SQLite** locale (lecture seule par défaut) | `run_sqlite`     |   🟡   |
 | Requêter **PostgreSQL / MySQL** (SELECT, lecture seule)        | `query_database` |   🟠   |
 
+`run_sqlite` refuse les dot-commands du CLI (`.shell`, `.output`…), qui
+permettaient d'exécuter une commande système.
+
 ## 8. Mémoire & RAG
 
 | Capacité                                                          | Outil(s)        | Risque |
@@ -189,9 +195,17 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 | **Stocker un fait en mémoire** persistante (tags, inter-sessions) | `store_memory`  |   🟡   |
 
 - VectorStore réel : embeddings Ollama (`nomic-embed-text`) + similarité cosinus
-  en mémoire, persistance disque (`vectors.json`).
+  en mémoire, persistance disque (`vectors.json`, écriture atomique). Les
+  échanges indexés automatiquement sont plafonnés aux 2 000 plus récents ; les
+  faits stockés explicitement ne sont jamais évincés.
 - **Repli automatique mots-clés** si les embeddings sont indisponibles → la
-  mémoire fonctionne dès l'installation.
+  mémoire fonctionne dès l'installation. Après un échec, les embeddings sont
+  suspendus une minute puis réessayés (ils restaient coupés jusqu'au redémarrage).
+- **Contexte de conversation** : les messages les **plus récents** de la
+  conversation (ils étaient pris depuis le début), plus le résumé glissant des
+  messages plus anciens et les faits durables de la mémoire tiède. Les tâches de
+  fond (consolidation 6 h, évolution 24 h) font désormais leur première passe
+  peu après le démarrage — elles n'atteignaient jamais leur premier tick.
 
 ## 9. Orchestration & autonomie
 
@@ -237,9 +251,14 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
 ## 11. Modèles & inférence
 
 - **Modèle de chat UNIQUE (v0.1.3) : `qwen3:14b`** — le plus fort qui tient sur
-  ~10 Go de VRAM. `recommend_default_model` le renvoie toujours (plus de choix
+  ~10 Go de VRAM. `get_recommended_model` le renvoie toujours (plus de choix
   selon la VRAM). Plus `minicpm-v` (vision, chargé à la demande) et
-  `nomic-embed-text` (mémoire sémantique).
+  `nomic-embed-text` (mémoire sémantique). Les noms par défaut et l'URL Ollama
+  vivent dans `@catdesk/shared-types` (`models.ts`), recopiés côté Rust sous
+  test miroir.
+- **Réglages › Modèle** (modèle, température, itérations max) sont réellement
+  appliqués à chaque message — ils étaient enregistrés mais jamais envoyés.
+  « Automatique » suit la recommandation.
 - **Plus de palier `qwen2.5:7b`** : retiré du bundle et de l'UI. Il forçait un
   swap VRAM 14b↔7b (10-20 s) et ratait les questions d'actu ; les machines
   cibles ont ≥ ~10 Go de VRAM. `CATDESK_MODEL_SMALL` reste un opt-in env pour
@@ -262,12 +281,21 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
 - **Local-first** : l'**inférence** reste 100 % locale (Ollama, aucune sortie
   réseau). Les seuls flux distants sont **en lecture seule et allow-listés** :
   cotations bourse et news (Supabase). Voir [LIMITES.md](LIMITES.md).
-- **Sandbox Rust** : `check_path` + `check_command` avant tout accès FS/shell.
+- **Contrôle des chemins côté agent** : chaque outil déclare ses arguments-chemins
+  (`BaseTool.pathArgs`) et `PermissionEngine` les vérifie tous contre la liste
+  blanche, quel que soit le niveau de risque. Le sandbox Rust (`check_path` /
+  `check_command`) reste le garde obligatoire de toute future commande Tauri
+  touchant au disque ou au shell — voir [SECURITE.md](SECURITE.md).
 - **Permissions risk-gated** à 4 niveaux (auto / une fois / confirmer / désactivé).
-- **Safe mode** : un toggle bloque tous les outils medium+.
-- **Audit** : chaque appel d'outil journalisé (horodatage, args, résultat) —
-  et chaque ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).
-- **Isolation de processus** : agent et sidecar OCR tournent séparément.
+  Sans réponse en 60 s, la demande vaut refus : l'agent continue sans l'outil.
+- **Safe mode** : un toggle bloque tous les outils medium+ (rejoué à l'agent à
+  chaque (re)démarrage).
+- **Audit** : chaque appel d'outil journalisé (horodatage, args **expurgés** —
+  mots de passe, tokens, webhooks masqués —, résultat) et chaque
+  ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).
+- **Isolation de processus** : agent et sidecar OCR tournent séparément. L'agent
+  est supervisé par Rust (relancé après un crash, jusqu'à 5 fois avec délai
+  croissant) et arrêté proprement avec l'app, comme l'Ollama qu'elle a lancé.
 
 ## 13. Distribution
 

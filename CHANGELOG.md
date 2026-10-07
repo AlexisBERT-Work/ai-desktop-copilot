@@ -13,7 +13,73 @@ from the release commits and the shipped installers.
 
 ## [Unreleased]
 
-_Nothing yet._
+Full audit and refactor of the whole repository (branch `refactor/audit-complet`). Details
+and the remaining items: `docs/SUIVI.md` (2026-10-07) and `docs/AMELIORATIONS.md`.
+
+### Fixed
+
+- **The agent could not see the shared dailies on an installed machine.** The Supabase URL
+  and anon key were only read from `.env`, which an installer does not ship; the public
+  defaults now live in `config.ts` and an empty variable counts as absent.
+- **The conversation context kept the 40 _oldest_ messages** instead of the most recent
+  ones, so long conversations lost their latest turns.
+- **A permission prompt that timed out failed the whole run.** A timeout or a Stop now
+  counts as a refusal and the agent carries on without the tool; the UI dismisses the
+  dialog at the same moment, queues concurrent requests and shows what is being asked.
+- **An internal agent error left the UI stuck on "thinking…".** It is now reported as a
+  chat error (`INTERNAL`) and audited.
+- **An answer cut short by Stop was cached** and could later be served as complete.
+- **Ollama outlived CatDesk**, and the next launch took the orphan for an external server,
+  so the KV-cache tuning no longer applied. CatDesk now stops the Ollama it started (and
+  the agent) on exit and before installing an update.
+- **The agent was never restarted after a crash.** Rust supervises it (exponential
+  backoff, at most 5 restarts), replays the runtime settings after each spawn and reports
+  a run lost mid-way (`AGENT_EXITED`) instead of leaving it hanging.
+- **Safe mode could be off in the agent while the UI showed it on** when the agent started
+  late; settings are replayed as soon as the bridge is up.
+- **Settings › Model had no effect**: model, temperature and max iterations were saved but
+  never sent. "Automatic" follows the recommended model.
+- Embeddings were disabled for the whole session after one failure; they now pause for a
+  minute and retry. The vector store caps auto-indexed exchanges at 2,000.
+- The memory consolidation (6 h) and evolution (24 h) daemons never reached their first
+  run; a cancelled cron job could come back to life.
+- HTTP: redirects and oversized bodies were handled differently by seven hand-rolled
+  clients; `call_api` treated `[::1]` as remote.
+- Python sidecar logs were invalid JSON as soon as a message contained a quote or a
+  newline.
+- Four PowerShell scripts with non-ASCII text had no BOM and were read as cp1252.
+
+### Security
+
+- **Path arguments are declared per tool** (`BaseTool.pathArgs`) and all of them are
+  checked against the whitelist. `obsidian_notes` (`vault`) and `semantic_search`
+  (`paths`), both auto-approved, could read any folder on the disk.
+- **The audit log is redacted by key name**: IMAP passwords, GitHub/Notion/`call_api`
+  tokens, SQL connection strings and webhook URLs were written in clear text.
+- **`run_sqlite` refuses CLI dot-commands** (`.shell`, `.system`, `.output`…), which ran
+  system commands behind a medium-risk tool, and `db_path` values starting with `-`.
+- **mathjs formulas are sandboxed**: `import`, `createUnit`, `evaluate`, `parse`,
+  `simplify`, `derivative`, `resolve` and `compile` are disabled.
+- **`post_tech_news_discord` only posts to Discord webhooks.**
+- **Smaller webview surface**: the CSP no longer allows the Ollama port, and the
+  capabilities drop `set-always-on-top`, notifications, global shortcuts and the updater
+  (all driven from Rust). The unused notification plugin is removed.
+
+### Changed
+
+- **Agent runtime restructured around shared modules**: one HTTP client (`lib/http`, on
+  `fetch`, bounded time and size), one persistence layer (`lib/persistence`: atomic
+  writes, `SqliteFile`; a corrupt database is set aside instead of blocking startup),
+  `news/supabaseRest` (one anonymous sign-in, timeouts), `memory/embedding`,
+  `lifecycle.ts` (ordered shutdown on SIGTERM/SIGINT/stdin close), an orchestrator with
+  named dependencies and a JSON-RPC bridge with a single error path.
+- Default model names and the Ollama URL live in `@catdesk/shared-types` (`models.ts`),
+  mirrored in Rust under test.
+- Desktop: a real `vitest.config.ts` and test setup (jest-dom), atomic Zustand selectors
+  everywhere, a versioned settings store with a tested migration, `tsconfig.node.json`
+  extends the base config, remaining English UI strings translated.
+- Prettier now covers the whole repository and `pnpm format:check` runs in CI.
+- Tests: ~700 agent (was 640), 54 desktop (was 47), 34 Rust (was 32), 14 Python (was 7).
 
 ## [0.2.0] — 2026-09-12
 

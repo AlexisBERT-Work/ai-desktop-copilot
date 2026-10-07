@@ -62,7 +62,10 @@ what you changed.
 - **Named exports only** (React components excepted)
 - **Co-locate tests**: `MyModule.test.ts` beside `MyModule.ts`
 - Prefer the shared helpers over re-rolling one: `lib/runProcess` (never
-  `promisify(execFile)` again), `lib/httpGet`, `lib/dataDir`, `llm/completion`
+  `promisify(execFile)` again), `lib/http` (never a bare `fetch`: it has no timeout
+  and no size cap), `lib/persistence` (atomic writes, `SqliteFile`), `lib/dataDir`,
+  `llm/completion`, `memory/embedding`, `news/supabaseRest`, `lifecycle.ts`. The full
+  list is in [CLAUDE.md](CLAUDE.md).
 
 Run `pnpm format` before pushing; a pre-commit hook runs ESLint and Prettier on staged
 files.
@@ -75,7 +78,7 @@ files.
    pnpm type-check
    pnpm lint
    pnpm test
-   pnpm format                                   # must be a no-op
+   pnpm format:check                             # also run in CI
    cargo test   --manifest-path apps/desktop/src-tauri/Cargo.toml
    cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --tests -- -D warnings
    cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -92,6 +95,8 @@ files.
 2. Declare a zod `argsSchema` and derive the JSON Schema from it:
    `schema = jsonSchemaFrom(argsSchema)`. This is mandatory — `argsSchema` is abstract on
    `BaseTool`, and it is the single source for validation and for the model's schema.
+   List every filesystem-path argument in `override readonly pathArgs = [...] as const`:
+   the permission engine checks only declared paths against the whitelist.
 3. Add the matching entry to `DEFAULT_PERMISSION_CONFIG` in
    `packages/shared-types/src/permissions.ts`, with a risk level.
 4. Register it in `packages/agent-runtime/src/tools/registerTools.ts` (**not**
@@ -102,7 +107,8 @@ files.
 6. Document it in `docs/CAPACITES.md` — the tool catalogue's single source of truth.
 
 `registerTools.test.ts` asserts that registrations and permission entries match exactly,
-so steps 3 and 4 fail loudly if you skip one.
+so steps 3 and 4 fail loudly if you skip one — and it fails on a path-like argument
+(`path`, `dir`, `file`, `vault`…) missing from `pathArgs`.
 
 ## Keeping the layers honest
 
