@@ -18,8 +18,9 @@
 2026-10-08) : dailys partagées, news et consoles admin sont muettes partout.
 À réactiver depuis le tableau de bord Supabase — [AMELIORATIONS.md](AMELIORATIONS.md) § 0.
 
-**Branche `refactor/audit-complet`** (depuis `dev`, non poussée) : audit complet
-du 2026-10-07 puis latence du 2026-10-08 ; PR vers `dev` à ouvrir.
+**Branche `refactor/audit-complet`** (depuis `dev`) : audit complet du
+2026-10-07 puis latence du 2026-10-08 — [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)
+vers `dev`, ouverte le 2026-10-08.
 
 **`master` = 0.2.0, pas encore publiée** (refonte d'août, voix, deux lignes de
 distribution, cycle de version). **On travaille sur `dev`**, qui ne bouge
