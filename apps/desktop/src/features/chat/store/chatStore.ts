@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { Message, Conversation } from '@catdesk/shared-types';
 import { DEFAULT_CHAT_MODEL } from '@catdesk/shared-types';
-import { chatSend, chatCancel } from '../../../shared/api/chat';
+import { chatSend, chatCancel, chatWarmup } from '../../../shared/api/chat';
 import { useSettingsStore } from '../../settings/settingsStore';
 import {
   getOllamaModelsInfo,
@@ -52,8 +52,21 @@ interface ChatState {
   setToolActivity: (tool: string | null) => void;
   setError: () => void;
   interrupt: () => Promise<void>;
+  /**
+   * L'utilisateur s'apprête à écrire (champ focalisé, frappe) : préchauffe le
+   * modèle. Limité à un appel par WARMUP_THROTTLE_MS ; l'agent l'ignore de
+   * toute façon s'il vient de servir. Ne lève jamais.
+   */
+  warmUp: () => void;
   finalizeMessage: (conversationId: string, messageId: string) => void;
 }
+
+/**
+ * Un préchauffage par minute au plus : il coûte une requête IPC, et le modèle
+ * reste chaud plusieurs minutes une fois chargé.
+ */
+const WARMUP_THROTTLE_MS = 60_000;
+let lastWarmupAt = 0;
 
 const DEFAULT_CONVERSATION_ID = crypto.randomUUID();
 const NEW_CONVERSATION_TITLE = 'Nouvelle conversation';
@@ -188,6 +201,15 @@ export const useChatStore = create<ChatState>()(
         s.status = 'error';
         s.activeTool = null;
       });
+    },
+
+    warmUp: () => {
+      const { isStreaming, selectedModel } = get();
+      const now = Date.now();
+      if (isStreaming || now - lastWarmupAt < WARMUP_THROTTLE_MS) return;
+      lastWarmupAt = now;
+      // Best-effort : un agent pas encore prêt n'est pas une erreur à montrer.
+      chatWarmup(selectedModel).catch(() => undefined);
     },
 
     interrupt: async () => {

@@ -44,6 +44,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::chat::chat_send,
             commands::chat::chat_cancel,
+            commands::chat::chat_warmup,
             commands::chat::set_market_watchlist,
             commands::press::run_press_digest,
             commands::press::save_local_press_feed,

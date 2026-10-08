@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Cat, ArrowUp, Expand, Camera, Clipboard, Terminal, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
@@ -20,9 +20,15 @@ export function MiniMode() {
   const setMode = useOverlayStore(s => s.setMode);
   const sendMessage = useChatStore(s => s.sendMessage);
   const activeConversationId = useChatStore(s => s.activeConversationId);
+  const warmUp = useChatStore(s => s.warmUp);
   const voiceState = useVoiceStore(s => s.state);
   const voiceHint = useVoiceStore(s => s.hint);
-  const placeholder = VOICE_PLACEHOLDER[voiceState] ?? voiceHint ?? 'Ask anything...';
+  const placeholder = VOICE_PLACEHOLDER[voiceState] ?? voiceHint ?? 'Pose ta question…';
+
+  // La bulle s'ouvre (Ctrl+Espace) : on charge le modèle pendant la saisie ou la dictée.
+  useEffect(() => {
+    warmUp();
+  }, [warmUp]);
 
   const handleSubmit = async () => {
     const text = input.trim();

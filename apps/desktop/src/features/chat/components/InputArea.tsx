@@ -14,6 +14,8 @@ export function InputArea({ conversationId }: Props) {
   const sendMessage = useChatStore(s => s.sendMessage);
   const isStreaming = useChatStore(s => s.isStreaming);
   const interrupt = useChatStore(s => s.interrupt);
+  // Préchauffage : le modèle se charge pendant que l'utilisateur tape.
+  const warmUp = useChatStore(s => s.warmUp);
 
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
@@ -33,6 +35,7 @@ export function InputArea({ conversationId }: Props) {
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
+    warmUp();
     // Auto-resize
     const ta = e.target;
     ta.style.height = 'auto';
@@ -81,6 +84,7 @@ export function InputArea({ conversationId }: Props) {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
+            onFocus={warmUp}
             placeholder="Écrire à CatDesk… (Maj+Entrée pour aller à la ligne)"
             rows={1}
             className="w-full bg-transparent text-sm text-white placeholder-white/30

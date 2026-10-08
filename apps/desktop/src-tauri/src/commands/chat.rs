@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::forward_to_agent;
+use crate::core::error::CatdeskError;
 use crate::ipc::{bridge, protocol};
 
 #[derive(Debug, Deserialize)]
@@ -84,6 +85,33 @@ pub async fn chat_send(args: ChatSendArgs) -> Result<(), String> {
     Ok(())
 }
 
+/// Nom de modèle Ollama plausible (`qwen3:14b`, `hf.co/org/modele:q4`) : il
+/// part dans une requête JSON-RPC, on n'y laisse passer ni vide ni caractère
+/// de contrôle.
+fn is_valid_model_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 200
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '_' | '-' | '/'))
+}
+
+/// Préchauffe le modèle quand l'utilisateur ouvre le chat ou commence à taper :
+/// l'agent le charge et lui fait lire le début fixe des requêtes pendant la
+/// saisie (~20 s retirées de la première réponse). Sans effet de bord durable,
+/// donc sans audit ; l'agent l'ignore s'il vient déjà de servir.
+#[tauri::command]
+pub async fn chat_warmup(model: String) -> Result<(), String> {
+    if !is_valid_model_name(&model) {
+        return Err(CatdeskError::Refused("Nom de modèle invalide".into()).into());
+    }
+    forward_to_agent(
+        protocol::RPC_AGENT_WARMUP,
+        serde_json::json!({ "model": model }),
+    )
+    .await
+}
+
 /// Interrupt the run currently in progress (Stop button).
 #[tauri::command]
 pub async fn chat_cancel() -> Result<(), String> {
@@ -143,5 +171,15 @@ mod tests {
         let config = agent_config(&a);
         assert_eq!(config["temperature"], 2.0);
         assert_eq!(config["maxIterations"], 1);
+    }
+
+    #[test]
+    fn prechauffage_n_accepte_que_des_noms_de_modele_plausibles() {
+        assert!(is_valid_model_name("qwen3:14b"));
+        assert!(is_valid_model_name("hf.co/org/modele-q4_K_M:latest"));
+        assert!(!is_valid_model_name(""));
+        assert!(!is_valid_model_name("qwen3 14b"));
+        assert!(!is_valid_model_name("x\"}\n{"));
+        assert!(!is_valid_model_name(&"a".repeat(201)));
     }
 }

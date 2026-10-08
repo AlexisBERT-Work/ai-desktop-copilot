@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Search,
   Terminal,
@@ -27,7 +27,13 @@ export function CommandPalette() {
   const setMode = useOverlayStore(s => s.setMode);
   const sendMessage = useChatStore(s => s.sendMessage);
   const activeConversationId = useChatStore(s => s.activeConversationId);
+  const warmUp = useChatStore(s => s.warmUp);
   const [selected, setSelected] = useState(0);
+
+  // Palette ouverte : une demande au modèle est probable, on le charge d'avance.
+  useEffect(() => {
+    warmUp();
+  }, [warmUp]);
 
   const sendAndExpand = useCallback(
     async (text: string) => {
