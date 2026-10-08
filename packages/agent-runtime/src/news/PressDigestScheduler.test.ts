@@ -15,10 +15,10 @@ const { buildPressDailies, buildTopicDigest, buildCustomJournalDailies, fetchEna
     buildCustomJournalDailies: vi.fn(),
     fetchEnabledPressFeeds: vi.fn(),
   }));
-const { publishDailies, publishDailiesOpen, hasTodaysSharedDigest } = vi.hoisted(() => ({
+const { publishDailies, publishDailiesOpen, sharedDigestState } = vi.hoisted(() => ({
   publishDailies: vi.fn(),
   publishDailiesOpen: vi.fn(),
-  hasTodaysSharedDigest: vi.fn(),
+  sharedDigestState: vi.fn(),
 }));
 const { publishDailiesToDiscord } = vi.hoisted(() => ({ publishDailiesToDiscord: vi.fn() }));
 
@@ -32,7 +32,7 @@ vi.mock('./PressFeedStore', () => ({ fetchEnabledPressFeeds }));
 vi.mock('./SupabasePublisher', () => ({
   publishDailies,
   publishDailiesOpen,
-  hasTodaysSharedDigest,
+  sharedDigestState,
 }));
 vi.mock('./DiscordDailyPublisher', () => ({ publishDailiesToDiscord }));
 
@@ -81,7 +81,7 @@ describe('dayKey / isRunDue', () => {
 
 describe('PressDigestScheduler.runOnce', () => {
   it('lot déjà publié par un autre poste : ne génère rien, renvoie vrai', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(true);
+    sharedDigestState.mockResolvedValue('published');
     const scheduler = new PressDigestScheduler(llm, 'test-model', baseConfig());
 
     const ok = await scheduler.runOnce();
@@ -93,7 +93,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('mode both : fusionne journaux + sujets puis publie en ouvert (sans admin)', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockResolvedValue([draft('Le Monde — revue du 20 juillet')]);
     buildTopicDigest.mockResolvedValue([draft('Sujet — Tech & sciences · 20 juillet')]);
     publishDailiesOpen.mockResolvedValue(emptyPublish());
@@ -118,7 +118,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it("mode 'journal' seul : ne construit pas le digest par sujet", async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockResolvedValue([draft('Le Monde — revue du 20 juillet')]);
     publishDailiesOpen.mockResolvedValue(emptyPublish());
     const scheduler = new PressDigestScheduler(llm, 'test-model', baseConfig({ mode: 'journal' }));
@@ -130,7 +130,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('avec identifiants admin : publie aussi les journaux personnalisés', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockResolvedValue([]);
     buildTopicDigest.mockResolvedValue([]);
     publishDailiesOpen.mockResolvedValue(emptyPublish());
@@ -159,7 +159,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('admin sans journal personnalisé actif : ne tente pas buildCustomJournalDailies', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockResolvedValue([]);
     buildTopicDigest.mockResolvedValue([]);
     publishDailiesOpen.mockResolvedValue(emptyPublish());
@@ -179,7 +179,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('admin + webhook + dailys neuves : miroite sur Discord', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockResolvedValue([]);
     buildTopicDigest.mockResolvedValue([]);
     const published = [draft('Le Monde — revue du 20 juillet')];
@@ -209,7 +209,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('rien de neuf à publier : pas de miroir Discord même si admin + webhook configurés', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockResolvedValue([]);
     buildTopicDigest.mockResolvedValue([]);
     publishDailiesOpen.mockResolvedValue(emptyPublish());
@@ -232,8 +232,8 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('un run concurrent renvoie faux immédiatement (garde running)', async () => {
-    hasTodaysSharedDigest.mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve(false), 20)),
+    sharedDigestState.mockImplementation(
+      () => new Promise(resolve => setTimeout(() => resolve('missing'), 20)),
     );
     buildPressDailies.mockResolvedValue([]);
     buildTopicDigest.mockResolvedValue([]);
@@ -247,7 +247,7 @@ describe('PressDigestScheduler.runOnce', () => {
   });
 
   it('erreur en cours de run : loggée, renvoie faux, libère le verrou pour le run suivant', async () => {
-    hasTodaysSharedDigest.mockResolvedValue(false);
+    sharedDigestState.mockResolvedValue('missing');
     buildPressDailies.mockRejectedValueOnce(new Error('source injoignable'));
     const scheduler = new PressDigestScheduler(llm, 'test-model', baseConfig());
 
@@ -258,5 +258,28 @@ describe('PressDigestScheduler.runOnce', () => {
     buildTopicDigest.mockResolvedValue([]);
     publishDailiesOpen.mockResolvedValue(emptyPublish());
     expect(await scheduler.runOnce()).toBe(true);
+  });
+
+  it('Supabase injoignable : ne génère RIEN (plusieurs minutes de GPU pour un lot jeté), renvoie faux', async () => {
+    sharedDigestState.mockResolvedValue('unreachable');
+    const scheduler = new PressDigestScheduler(llm, 'test-model', baseConfig());
+
+    expect(await scheduler.runOnce()).toBe(false);
+    expect(buildPressDailies).not.toHaveBeenCalled();
+    expect(buildTopicDigest).not.toHaveBeenCalled();
+    expect(publishDailiesOpen).not.toHaveBeenCalled();
+  });
+
+  it('arrêté pendant la génération : ne publie pas les replis dégradés', async () => {
+    sharedDigestState.mockResolvedValue('missing');
+    const scheduler = new PressDigestScheduler(llm, 'test-model', baseConfig());
+    buildPressDailies.mockImplementation(async () => {
+      scheduler.stop(); // CatDesk quitte pendant que le lot se construit
+      return [draft('Le Monde — extraits bruts')];
+    });
+    buildTopicDigest.mockResolvedValue([]);
+
+    expect(await scheduler.runOnce()).toBe(false);
+    expect(publishDailiesOpen).not.toHaveBeenCalled();
   });
 });

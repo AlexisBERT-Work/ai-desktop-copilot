@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  hasTodaysSharedDigest,
+  sharedDigestState,
   publishDailiesOpen,
   type SupabaseOpenConfig,
 } from './SupabasePublisher';
@@ -122,8 +122,8 @@ describe('publishDailiesOpen', () => {
   });
 });
 
-describe('hasTodaysSharedDigest', () => {
-  it('vrai si la lecture renvoie au moins une ligne', async () => {
+describe('sharedDigestState', () => {
+  it('published si la lecture renvoie au moins une ligne', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
@@ -131,10 +131,10 @@ describe('hasTodaysSharedDigest', () => {
         return jsonResponse([{ id: 'x' }]);
       }),
     );
-    expect(await hasTodaysSharedDigest(cfg)).toBe(true);
+    expect(await sharedDigestState(cfg)).toBe('published');
   });
 
-  it('faux si la lecture renvoie une liste vide', async () => {
+  it('missing si la lecture renvoie une liste vide', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
@@ -142,16 +142,27 @@ describe('hasTodaysSharedDigest', () => {
         return jsonResponse([]);
       }),
     );
-    expect(await hasTodaysSharedDigest(cfg)).toBe(false);
+    expect(await sharedDigestState(cfg)).toBe('missing');
   });
 
-  it('faux (jamais throw) si le réseau échoue — on préfère régénérer que bloquer', async () => {
+  it('unreachable (jamais throw) si le réseau échoue : la publication échouerait aussi', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
         throw new Error('network down');
       }),
     );
-    await expect(hasTodaysSharedDigest(cfg)).resolves.toBe(false);
+    await expect(sharedDigestState(cfg)).resolves.toBe('unreachable');
+  });
+
+  it('missing si la lecture est refusée (HTTP) : dans le doute on génère, la RPC est idempotente', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/auth/v1/signup')) return jsonResponse({ access_token: 'jwt-anon' });
+        return new Response('denied', { status: 403 });
+      }),
+    );
+    expect(await sharedDigestState(cfg)).toBe('missing');
   });
 });

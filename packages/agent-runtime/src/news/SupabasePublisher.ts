@@ -114,16 +114,29 @@ export async function publishDailies(
 // journaux personnalisés (press_feeds) et les dailys manuelles restent
 // publiés via `publishDailies` ci-dessus (identifiants admin, RLS directe).
 
+/** Le lot standard du jour : déjà publié, manquant, ou impossible à savoir (Supabase injoignable). */
+export type SharedDigestState = 'published' | 'missing' | 'unreachable';
+
 /**
- * Vrai si au moins une daily a déjà été publiée aujourd'hui (comparaison sur
- * le début du jour local de CE poste). Utilisé pour éviter de regénérer
- * localement (coût LLM réel) un lot déjà couvert par un autre poste. En cas de
- * doute (réseau indisponible), renvoie faux : on préfère une génération
- * redondante — rattrapée par l'idempotence de la RPC — à un jour sans daily.
+ * Le lot standard du jour est-il déjà publié (début du jour local de CE
+ * poste) ? Évite de regénérer localement (coût LLM réel : plusieurs minutes de
+ * GPU) un lot déjà couvert par un autre poste.
+ *
+ * - Lecture refusée (HTTP en erreur) → 'missing' : dans le doute on génère,
+ *   la RPC idempotente rattrape un doublon — mieux qu'un jour sans daily.
+ * - Supabase INJOIGNABLE (réseau, DNS, projet en pause, session anonyme
+ *   refusée) → 'unreachable' : la publication échouerait de la même façon.
+ *   Générer quand même, c'était plusieurs minutes de GPU à CHAQUE lancement de
+ *   CatDesk pour un lot jeté — pendant que l'utilisateur attendait sa réponse.
  */
-export async function hasTodaysSharedDigest(cfg: SupabaseOpenConfig): Promise<boolean> {
+export async function sharedDigestState(cfg: SupabaseOpenConfig): Promise<SharedDigestState> {
+  let jwt: string;
   try {
-    const jwt = await anonSignIn(cfg);
+    jwt = await anonSignIn(cfg);
+  } catch {
+    return 'unreachable';
+  }
+  try {
     const since = new Date();
     since.setHours(0, 0, 0, 0);
     const q = `select=id&published_at=gte.${encodeURIComponent(since.toISOString())}&limit=1`;
@@ -131,11 +144,11 @@ export async function hasTodaysSharedDigest(cfg: SupabaseOpenConfig): Promise<bo
       headers: authHeaders(cfg, jwt),
       signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return 'missing';
     const rows: unknown = await res.json().catch(() => null);
-    return Array.isArray(rows) && rows.length > 0;
+    return Array.isArray(rows) && rows.length > 0 ? 'published' : 'missing';
   } catch {
-    return false;
+    return 'unreachable';
   }
 }
 
