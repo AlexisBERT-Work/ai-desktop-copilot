@@ -13,8 +13,30 @@ from the release commits and the shipped installers.
 
 ## [Unreleased]
 
-Full audit and refactor of the whole repository (branch `refactor/audit-complet`). Details
-and the remaining items: `docs/SUIVI.md` (2026-10-07) and `docs/AMELIORATIONS.md`.
+Full audit and refactor of the whole repository, then a latency pass (branch
+`refactor/audit-complet`). Details and the remaining items: `docs/SUIVI.md` (2026-10-07 and
+2026-10-08) and `docs/AMELIORATIONS.md`.
+
+### Performance
+
+- **First token in ~1-2 s instead of 19-47 s** (same three chained questions, production
+  Ollama settings, measured through the agent's real protocol). Five causes:
+  - the model was **reloaded twice per message** — background calls (fact extraction,
+    summaries, planner) did not pass `num_ctx`, and Ollama reloads the whole model whenever
+    it changes. `OllamaClient` now applies one value to every call;
+  - the system prompt carried **the time to the second**, so Ollama's prompt cache could
+    never be reused (~2,600 tokens re-read on every message). The system prompt is now stable;
+    date, active window, summary, memories and plan go into the last user message;
+  - **background work** (fact extraction, compaction, press digests) started right after the
+    answer and made the next question wait. `llm/LlmScheduler` defers it until 90 s of quiet,
+    **interrupts** it as soon as a run starts, resumes it later and re-warms the cache;
+  - **noise tools**: "what is the capital of France?" pulled `describe_screen`, `browser_*`,
+    `read_email` through words like "une", "est", "seule". Stop words are ignored, the list
+    is kept stable across a conversation;
+  - **no warm-up**: the chat input (focus, first keystroke, bubble) now asks the agent to load
+    the model and read the fixed prompt prefix while the user types (`chat_warmup`).
+- Embeddings run on the CPU (~40 ms warm) and leave the whole GPU to the chat model; the
+  current conversation's own exchanges no longer come back as "memories".
 
 ### Fixed
 
@@ -39,6 +61,15 @@ and the remaining items: `docs/SUIVI.md` (2026-10-07) and `docs/AMELIORATIONS.md
   late; settings are replayed as soon as the bridge is up.
 - **Settings › Model had no effect**: model, temperature and max iterations were saved but
   never sent. "Automatic" follows the recommended model.
+- **The press digest was regenerated at every launch when Supabase was unreachable** —
+  minutes of GPU for a batch that could not be published. An unreachable Supabase now
+  postpones the run without generating anything; a refused read still generates (the
+  publishing RPC is idempotent).
+- **Quitting CatDesk during a digest could publish a degraded batch**: the cancelled LLM calls
+  fell back to raw excerpts, which were then published to every machine. A stopped scheduler
+  no longer publishes or saves anything.
+- A failed conversation summary advanced the compaction marker anyway: the folded messages
+  left the context without being summarized.
 - Embeddings were disabled for the whole session after one failure; they now pause for a
   minute and retry. The vector store caps auto-indexed exchanges at 2,000.
 - The memory consolidation (6 h) and evolution (24 h) daemons never reached their first
@@ -79,7 +110,7 @@ and the remaining items: `docs/SUIVI.md` (2026-10-07) and `docs/AMELIORATIONS.md
   everywhere, a versioned settings store with a tested migration, `tsconfig.node.json`
   extends the base config, remaining English UI strings translated.
 - Prettier now covers the whole repository and `pnpm format:check` runs in CI.
-- Tests: ~700 agent (was 640), 54 desktop (was 47), 34 Rust (was 32), 14 Python (was 7).
+- Tests: 738 agent (was 640), 54 desktop (was 47), 35 Rust (was 32), 14 Python (was 7).
 
 ## [0.2.0] — 2026-09-12
 

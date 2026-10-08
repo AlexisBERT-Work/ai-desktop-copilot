@@ -66,6 +66,21 @@ ayant lancé CatDesk (tri 2026-07-20, publication ouverte anon + RPC Postgres
 `supabase/README.md`. Identifiants admin = extras seulement (journaux
 personnalisés, miroir Discord).
 
+Latence — **le problème n°1 du produit** (2026-10-08 : premier token passé de
+19-47 s à 1-2 s). Les règles qui la tiennent, chacune gardée par un test :
+
+- **Prompt système stable** : rien qui varie d'un tour à l'autre (heure,
+  fenêtre, souvenirs, plan) — ça va dans `buildTurnContext`, préfixé au dernier
+  message. La moindre variation en tête fait relire tout le prompt à Ollama.
+- **Un seul `num_ctx`** (`CONFIG.numCtx`, appliqué par `OllamaClient`) : en
+  passer un autre au modèle de chat le fait recharger (~12 s, deux fois).
+- **Tout appel LLM de fond** passe `complete({ background: true })` ou
+  `scheduler.schedule()` : il attend le calme et cède le GPU à l'utilisateur.
+- **Outils** : noyau en tête, ordre d'enregistrement ; un mot qui ne désigne
+  aucun outil va dans `STOPWORDS` (`llm/selectTools.ts`).
+- **Mesurer** avant/après : `node scripts/latency-bench.mjs` (proxy qui
+  chronomètre chaque appel à Ollama, par le vrai protocole de l'agent).
+
 ## Économie de tokens (règles de travail)
 
 - **Ne jamais lire** : `pnpm-lock.yaml` (200 Ko), `node_modules/`,
@@ -169,7 +184,9 @@ Full procedure: `CONTRIBUTING.md`.
     jamais de `fetch` nu), `lib/persistence` (`writeFileAtomic`,
     `readJsonFile`/`writeJsonFile`, `SqliteFile` pour tout store sql.js),
     `lib/dataDir`, `lib/readableText`, `lib/discord`, `llm/completion`
-    (`complete`, `extractJsonObject`, `extractJsonArray`), `memory/embedding`
+    (`complete`, `extractJsonObject`, `extractJsonArray` — `background: true`
+    pour tout appel LLM de fond), `llm/LlmScheduler` (priorité premier plan,
+    voir « Latence »), `memory/embedding`
     (`TolerantEmbedder`, `cosineSimilarity`), `news/*` pour le vocabulaire
     « presse » (`news/supabaseRest` pour tout appel Supabase), `config.ts`
     (`envString` : variable vide = absente), `lifecycle.ts` (`onShutdown` pour

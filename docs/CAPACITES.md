@@ -264,8 +264,16 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
   cibles ont ≥ ~10 Go de VRAM. `CATDESK_MODEL_SMALL` reste un opt-in env pour
   imposer un petit modèle sur une machine très contrainte.
 - **`qwen2.5-coder:14b` retiré** du bundle et de l'UI (bot sans codage).
-- Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), `num_ctx`
-  réglable par requête.
+- **Latence** (2026-10-08) : premier token en ~1-2 s une fois le modèle chaud
+  (19-47 s avant). Le modèle est **préchauffé** dès que le champ de saisie prend
+  le focus ; le prompt système est **stable** (Ollama le garde en cache, la date
+  et le contexte du tour vont dans le dernier message) ; **un seul `num_ctx`**
+  pour tous les appels (en changer recharge le modèle) ; le **travail de fond**
+  (faits, compaction, digests) attend 90 s de calme et s'interrompt dès qu'une
+  question arrive (`llm/LlmScheduler`, `CATDESK_BACKGROUND_QUIET_MS`) ;
+  embeddings sur CPU. Détail : [SUIVI.md](SUIVI.md) 2026-10-08.
+- Efficience : `keep_alive` (modèle gardé chaud, défaut 10 min), mode passif
+  (déchargé après 5 min d'inactivité).
 - ⚠️ **KV-cache `q4_0` : contradiction non tranchée.** Cette doc a longtemps
   affirmé que `q4_0` corrompt la sortie sur la RX 6700 (Vulkan — texte
   illisible, incident 2026-06-15/16), mais `commands/tuning.rs` l'active quand
