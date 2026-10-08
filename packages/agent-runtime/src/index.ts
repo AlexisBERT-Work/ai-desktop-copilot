@@ -25,6 +25,7 @@ import { SubAgentRunner } from './SubAgentRunner';
 import { CronScheduler } from './CronScheduler';
 import { OllamaClient } from './llm/OllamaClient';
 import { IdleUnloader } from './llm/IdleUnloader';
+import { LlmScheduler } from './llm/LlmScheduler';
 import { Planner } from './llm/Planner';
 import { ConversationStore } from './memory/ConversationStore';
 import { VectorStore } from './memory/VectorStore';
@@ -64,9 +65,15 @@ async function main(): Promise<void> {
   lifecycle.onShutdown('browser', () => BrowserManager.get().close());
 
   // ─── LLM ───────────────────────────────────────────────────
+  // Priorité GPU : les questions de l'utilisateur passent devant le travail de
+  // fond (faits, compaction, digests), qui attend le calme et cède la place.
+  const scheduler = new LlmScheduler({ quietMs: CONFIG.backgroundQuietMs });
   const llm = new OllamaClient({
     baseUrl: CONFIG.ollamaBaseUrl,
     keepAlive: CONFIG.ollamaKeepAlive,
+    // Une seule fenêtre de contexte pour tous les appels : en changer recharge le modèle.
+    numCtx: CONFIG.numCtx,
+    scheduler,
   });
   log.info('Ollama status', { available: await llm.isAvailable() });
 
@@ -167,7 +174,11 @@ async function main(): Promise<void> {
       : undefined,
     playbook,
     cache,
+    scheduler,
   });
+  // Après du travail de fond, le cache d'Ollama contient SON prompt : on y
+  // remet le début fixe des requêtes de chat avant la prochaine question.
+  scheduler.setPrimer(signal => orchestrator.primeCache(signal));
 
   // Sous-agents et cron référencent l'orchestrateur : outils enregistrés après lui.
   const subAgentRunner = new SubAgentRunner(orchestrator, tools, CONFIG.model);
@@ -203,6 +214,11 @@ async function main(): Promise<void> {
   });
   spiralMonitor.start();
   lifecycle.onShutdown('spiral-monitor', () => spiralMonitor.stop());
+
+  // Inscrit AVANT les planificateurs de presse, donc arrêté APRÈS eux : ils
+  // sont déjà marqués arrêtés quand leurs appels LLM sont annulés, et ne
+  // publient pas les replis dégradés qui en résultent.
+  lifecycle.onShutdown('llm-scheduler', () => scheduler.dispose());
 
   // ─── Revue de presse partagée (tout poste, sauf CATDESK_PRESS_DIGEST=0) ──
   const pressCfg = readPressDigestConfig(process.env, CONFIG.supabase, CONFIG.pressHour);
@@ -243,6 +259,8 @@ async function main(): Promise<void> {
   // ─── IPC ───────────────────────────────────────────────────
   const bridge = new StdinBridge({
     orchestrator,
+    // L'UI ouvre le chat : charger le modèle et lire le prompt fixe pendant la saisie.
+    warmup: model => orchestrator.warmupForUser(model),
     setMarketConfig: async (symbols, formulas) => {
       market.setWatchlist(symbols);
       market.setFormulas(formulas);

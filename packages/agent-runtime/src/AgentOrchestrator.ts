@@ -17,10 +17,11 @@ import {
   looksLikeToolCallStart,
   looksLikePreamble,
 } from './llm/recoverToolCalls';
-import { selectTools } from './llm/selectTools';
+import { coreTools, selectTools } from './llm/selectTools';
 import type { Planner } from './llm/Planner';
 import type { ActivityTracker } from './ActivityTracker';
 import type { IdleUnloader } from './llm/IdleUnloader';
+import type { LlmScheduler } from './llm/LlmScheduler';
 import type { FactExtractor } from './memory/FactExtractor';
 import type { Compactor } from './memory/Compactor';
 import type { SemanticCache } from './memory/SemanticCache';
@@ -30,7 +31,7 @@ import { classifyTask, type TaskType } from './playbook/classifyTask';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
-import { buildSystemPrompt } from './prompts/systemPrompt';
+import { buildSystemPrompt, buildTurnContext, withTurnContext } from './prompts/systemPrompt';
 
 const log = createLogger('agent:orchestrator');
 
@@ -46,6 +47,11 @@ const MAX_TOKENS = CONFIG.maxTokens;
 // subset (see selectTools). Set to 0 to disable the filter and send all.
 const TOOL_LIMIT = CONFIG.toolLimit;
 const DEFAULT_MAX_ITERATIONS = 10;
+/**
+ * Un préchauffage demandé par l'UI est ignoré si le modèle a servi depuis moins
+ * que ça : il est chaud, et le cache contient déjà mieux (la vraie conversation).
+ */
+const WARMUP_SKIP_IF_ACTIVE_WITHIN_MS = 60_000;
 
 /**
  * Dépendances de l'orchestrateur. Les cinq premières sont requises ; les
@@ -77,6 +83,11 @@ export interface OrchestratorDeps {
   playbook?: PlaybookStore | undefined;
   /** Cache sémantique des réponses aux questions autonomes (§E). */
   cache?: SemanticCache | undefined;
+  /**
+   * Priorité GPU : les runs passent devant le travail de fond, qui attend le
+   * calme et cède la place (voir LlmScheduler). Sans lui, tout part tout de suite.
+   */
+  scheduler?: LlmScheduler | undefined;
 }
 
 /**
@@ -98,6 +109,15 @@ export function parseToolArgs(raw: string | Record<string, unknown>): Record<str
 }
 
 export class AgentOrchestrator {
+  /** Runs en cours (sous-agents compris) : un préchauffage ne doit pas s'y intercaler. */
+  private activeRuns = 0;
+  /** Dernière utilisation du modèle de chat au premier plan (run ou préchauffage). */
+  private lastForegroundUse = 0;
+  /** Modèle du dernier run : celui que le re-préchauffage du cache doit servir. */
+  private lastModel: string | undefined;
+  /** Outils envoyés au dernier tour de chaque conversation (voir `toolsForTurn`). */
+  private readonly turnTools = new Map<string, string[]>();
+
   constructor(private readonly deps: OrchestratorDeps) {}
 
   /** Décide du modèle effectif selon le mode (auto/light/code). */
@@ -119,6 +139,39 @@ export class AgentOrchestrator {
       });
     }
     return decision.model;
+  }
+
+  /**
+   * Outils du tour, STABLES au fil d'une conversation. Les schémas d'outils
+   * suivent le prompt système en tête de requête : si la liste change, Ollama
+   * relit tout ce qui suit (outils + historique). On garde donc la liste du
+   * tour précédent quand la nouvelle sélection n'y ajoute rien, et on ajoute
+   * les nouveaux outils EN FIN de liste quand il reste de la place ; sinon,
+   * nouvelle sélection.
+   */
+  private toolsForTurn<T extends { name: string; description: string; category: string }>(
+    conversationId: string,
+    enabledTools: T[],
+    input: string,
+  ): T[] {
+    const selected = selectTools(enabledTools, input, TOOL_LIMIT).map(t => t.name);
+    const previous = this.turnTools.get(conversationId);
+    let names = selected;
+    if (previous) {
+      const added = selected.filter(n => !previous.includes(n));
+      if (added.length === 0) names = previous;
+      else if (TOOL_LIMIT <= 0 || previous.length + added.length <= TOOL_LIMIT) {
+        names = [...previous, ...added];
+      }
+    }
+    this.turnTools.delete(conversationId); // ré-insertion : la plus récente en dernier
+    this.turnTools.set(conversationId, names);
+    if (this.turnTools.size > 100) {
+      const oldest = this.turnTools.keys().next().value;
+      if (oldest !== undefined) this.turnTools.delete(oldest);
+    }
+    const byName = new Map(enabledTools.map(t => [t.name, t]));
+    return names.flatMap(n => byName.get(n) ?? []);
   }
 
   updatePermissions(config: Partial<PermissionConfig>): void {
@@ -148,14 +201,87 @@ export class AgentOrchestrator {
     const runId = crypto.randomUUID();
     log.info('Run started', { runId, conversationId, model: config.model });
     this.deps.audit.startRun(runId, conversationId, input);
+    const { scheduler } = this.deps;
+    // Premier plan : le travail de fond en cours cède le GPU tout de suite, et
+    // tout ce que le run déclenche (outils compris) est marqué premier plan.
+    scheduler?.beginForeground();
+    this.activeRuns++;
+    const steps = this.run(runId, input, conversationId, config, signal);
     try {
-      yield* this.run(runId, input, conversationId, config, signal);
+      for (;;) {
+        const next = scheduler
+          ? await scheduler.inForeground(() => steps.next())
+          : await steps.next();
+        if (next.done) return;
+        yield next.value;
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error('Run failed', { runId, error: message });
       this.deps.audit.completeRun(runId, 'error');
       yield { type: 'error', content: `Erreur interne de l'agent : ${message}`, code: 'INTERNAL' };
+    } finally {
+      // Consommateur parti en cours de route : déroule les `finally` du run.
+      await steps.return(undefined);
+      this.activeRuns--;
+      this.lastForegroundUse = Date.now();
+      scheduler?.endForeground();
     }
+  }
+
+  /**
+   * Préchauffage demandé par l'UI (ouverture du chat, début de saisie) : charge
+   * le modèle et lui fait lire le début fixe de la prochaine requête pendant
+   * que l'utilisateur tape — mesuré : ~11 s de chargement + ~10 s de lecture du
+   * prompt système, retirés de la première réponse. Ignoré si un run tourne ou
+   * vient de finir (modèle chaud, cache déjà meilleur). Ne lève jamais.
+   */
+  async warmupForUser(model: string): Promise<void> {
+    if (this.activeRuns > 0) return;
+    if (Date.now() - this.lastForegroundUse < WARMUP_SKIP_IF_ACTIVE_WITHIN_MS) return;
+    this.lastForegroundUse = Date.now();
+    this.lastModel = model;
+    const { scheduler, idleUnloader } = this.deps;
+    scheduler?.beginForeground();
+    // Mode passif : un chat ouvert puis délaissé ne doit pas garder la VRAM.
+    idleUnloader?.begin(model);
+    const started = Date.now();
+    try {
+      await this.primeCache(undefined, model);
+      log.info('Model warmed up', { model, ms: Date.now() - started });
+    } catch (err) {
+      log.debug('Warmup failed (ignored)', { model, error: String(err) });
+    } finally {
+      idleUnloader?.end();
+      this.lastForegroundUse = Date.now();
+      scheduler?.endForeground();
+    }
+  }
+
+  /**
+   * Fait lire au modèle le début FIXE de toute requête de chat — prompt système
+   * puis noyau d'outils, dans l'ordre exact où `run` les envoie — pour qu'Ollama
+   * l'ait en cache. Sert au préchauffage et, via LlmScheduler, à réparer le
+   * cache après du travail de fond. Lève sur erreur ou interruption.
+   */
+  async primeCache(signal?: AbortSignal, model = this.lastModel): Promise<void> {
+    if (model === undefined) return;
+    const { llm, tools, context } = this.deps;
+    const stream = llm.streamChat({
+      model,
+      system: buildSystemPrompt(context.getWarmFacts()),
+      messages: [{ role: 'user', content: '.' }],
+      tools: coreTools(tools.getEnabled(), TOOL_LIMIT).map(t => t.toOllamaSchema()),
+      temperature: 0,
+      numCtx: NUM_CTX,
+      maxTokens: 1,
+      think: false,
+      ...(signal ? { signal } : {}),
+    });
+    for await (const chunk of stream) {
+      if (chunk.type === 'error') throw new Error(chunk.error);
+    }
+    if (signal?.aborted) throw new Error('Préchauffage interrompu');
   }
 
   private async *run(
@@ -190,7 +316,7 @@ export class AgentOrchestrator {
     // Only expose a small, query-relevant subset to keep the prompt small and
     // fast (the full ~50-tool schema set dominates local-model latency).
     const enabledTools = tools.getEnabled(config.enabledTools);
-    const availableTools = selectTools(enabledTools, input, TOOL_LIMIT);
+    const availableTools = this.toolsForTurn(conversationId, enabledTools, input);
 
     // Playbook (§8): classify the task and pull the approach that worked before.
     const taskType = classifyTask(input);
@@ -202,10 +328,13 @@ export class AgentOrchestrator {
     // Tools actually executed this run → the "approach" we record at the end.
     const usedTools: string[] = [];
 
-    const messages = [...ctx.messages, { role: 'user' as const, content: input }];
+    // L'échange tel qu'il s'est dit (sans le contexte injecté) : c'est lui
+    // qu'on mémorise et dont on extrait des faits.
+    const transcript: OllamaMessage[] = [...ctx.messages, { role: 'user', content: input }];
 
     // Choix du modèle (auto/light/code) une fois par run.
     const model = this.pickModel(input, availableTools.length > 0, config);
+    this.lastModel = model;
 
     const interrupted = (iteration: number): boolean => {
       if (!signal?.aborted) return false;
@@ -230,10 +359,17 @@ export class AgentOrchestrator {
         }
       }
 
-      const systemPrompt = buildSystemPrompt(
+      // Latence : le prompt système est STABLE (Ollama le garde en cache d'un
+      // tour à l'autre) ; tout ce qui varie part dans le dernier message.
+      const systemPrompt = buildSystemPrompt(ctx.warmFacts);
+      const turnContext = buildTurnContext(
         { ...ctx, ...(playbookHint ? { playbookHint } : {}) },
         plan,
       );
+      const messages: OllamaMessage[] = [
+        ...ctx.messages,
+        { role: 'user', content: withTurnContext(input, turnContext) },
+      ];
 
       const maxIterations = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
       for (let iteration = 1; iteration <= maxIterations; iteration++) {
@@ -302,7 +438,7 @@ export class AgentOrchestrator {
             model,
             input,
             answer: fullResponse,
-            messages,
+            transcript,
             standalone,
             taskType,
             usedTools,
@@ -522,12 +658,12 @@ export class AgentOrchestrator {
     model: string;
     input: string;
     answer: string;
-    messages: OllamaMessage[];
+    transcript: OllamaMessage[];
     standalone: boolean;
     taskType: TaskType;
     usedTools: string[];
   }): void {
-    const { audit, context, cache, playbook, compactor, factExtractor } = this.deps;
+    const { audit, context, cache, playbook, compactor, factExtractor, scheduler } = this.deps;
     const { runId, conversationId, model, input, answer } = opts;
     audit.completeRun(runId, 'success', answer);
     // Persist the exchange so the next turn has conversational memory.
@@ -546,19 +682,28 @@ export class AgentOrchestrator {
     }
     // Playbook (§8): this approach worked for this task type.
     playbook?.record(opts.taskType, approachSignature(opts.usedTools), true);
-    // Compact older history into a rolling summary if it's grown long.
+
+    // Compaction et extraction de faits appellent le LLM : c'est du travail de
+    // FOND. Lancé ici, juste après la réponse, il faisait attendre la question
+    // suivante et vidait le cache du prompt. L'ordonnanceur le diffère au
+    // premier vrai silence et, par conversation, ne garde que le plus récent.
+    const background = (key: string, task: () => Promise<unknown>): void => {
+      if (scheduler) {
+        scheduler.schedule(key, async () => {
+          await task();
+        });
+        return;
+      }
+      void task().catch(err => log.debug('Background task failed', { key, error: String(err) }));
+    };
     if (compactor) {
-      void compactor
-        .maybeCompact(conversationId)
-        .catch(err => log.debug('Compaction failed', { error: String(err) }));
+      background(`compact:${conversationId}`, () => compactor.maybeCompact(conversationId));
     }
-    // Mine durable facts from this exchange in the background (warm memory).
-    // Fire-and-forget: never block or fail the user's response.
     if (factExtractor) {
-      const transcript = [...opts.messages, { role: 'assistant' as const, content: answer }];
-      void factExtractor
-        .extractAndStore(transcript, conversationId)
-        .catch(err => log.debug('Fact extraction failed', { error: String(err) }));
+      const transcript = [...opts.transcript, { role: 'assistant' as const, content: answer }];
+      background(`facts:${conversationId}`, () =>
+        factExtractor.extractAndStore(transcript, conversationId),
+      );
     }
   }
 }

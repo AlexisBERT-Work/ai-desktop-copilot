@@ -59,10 +59,12 @@ export class FactExtractor {
     let text: string;
     try {
       // think:false — sortie JSON stricte : le raisonnement de qwen3 la
-      // polluerait (crochets parasites) et doublerait le temps GPU.
+      // polluerait (crochets parasites) et doublerait le temps GPU. background :
+      // cède le GPU à l'utilisateur (LlmScheduler).
       text = await complete(this.llm, this.model, EXTRACT_SYSTEM, transcript, {
         temperature: 0,
         think: false,
+        background: true,
       });
     } catch (err) {
       log.warn('Extraction call failed', {

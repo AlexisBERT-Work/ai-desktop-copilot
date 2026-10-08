@@ -28,6 +28,22 @@ export class ContextManager {
     private warmStore?: WarmMemoryStore,
   ) {}
 
+  /**
+   * Faits durables (mémoire warm), formatés pour le prompt système. Petit jeu
+   * structuré, lu en synchrone ; ordre stable (`updated_at`) — il entre dans le
+   * prompt système, dont le moindre changement invalide le cache d'Ollama.
+   */
+  getWarmFacts(): string[] {
+    try {
+      return this.warmStore?.getActiveFacts(WARM_FACTS_LIMIT).map(f => `- ${f.value}`) ?? [];
+    } catch (err) {
+      log.warn('Warm facts read failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  }
+
   async buildContext(conversationId: string, userInput: string): Promise<AgentContext> {
     // If older turns were compacted, load only the messages after the marker
     // and surface the rolling summary instead of the dropped history. Store
@@ -50,21 +66,24 @@ export class ContextManager {
 
     let memories: string[] = [];
     try {
-      const hits = await this.vectorStore.search(userInput, { limit: 5, minScore: 0.65 });
-      memories = hits.map(r => r.content);
+      const hits = await this.vectorStore.search(userInput, { limit: 10, minScore: 0.65 });
+      // Les échanges de CETTE conversation sont déjà dans l'historique (ou dans
+      // son résumé) : les resservir en « souvenirs » doublait leur coût en
+      // tokens à chaque tour.
+      memories = hits
+        .filter(
+          r =>
+            !(
+              r.metadata?.['kind'] === 'exchange' && r.metadata['conversationId'] === conversationId
+            ),
+        )
+        .slice(0, 5)
+        .map(r => r.content);
     } catch (err) {
       log.debug('Semantic recall failed', { error: String(err) });
     }
 
-    // Warm facts are a tiny, instantly-queryable structured set — read synchronously.
-    let warmFacts: string[] = [];
-    try {
-      warmFacts = this.warmStore?.getActiveFacts(WARM_FACTS_LIMIT).map(f => `- ${f.value}`) ?? [];
-    } catch (err) {
-      log.warn('Warm facts read failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const warmFacts = this.getWarmFacts();
 
     // Trim messages to fit context budget
     const trimmed = this.trimMessages(messages, MAX_CONTEXT_CHARS);

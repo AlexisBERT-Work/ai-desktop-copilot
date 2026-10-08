@@ -7,6 +7,8 @@ import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
 import type { PlaybookStore } from './playbook/PlaybookStore';
 import type { SemanticCache } from './memory/SemanticCache';
+import type { FactExtractor } from './memory/FactExtractor';
+import { LlmScheduler } from './llm/LlmScheduler';
 import type {
   AgentConfig,
   AgentStep,
@@ -35,14 +37,27 @@ interface HarnessOptions {
   /** Active un cache sémantique ; `cacheHit` fait répondre lookup(). */
   withCache?: boolean;
   cacheHit?: string;
+  /** Mémoire long terme (prompt système) et souvenirs du tour (dernier message). */
+  warmFacts?: string[];
+  relevantMemories?: string[];
+  scheduler?: LlmScheduler;
+  withFactExtractor?: boolean;
+  /** Outils exposés (défaut : le seul outil echo). */
+  toolDefs?: Array<{ name: string; description: string }>;
 }
 
 function makeHarness(opts: HarnessOptions = {}) {
   const turns = opts.turns ?? [];
   let turnIndex = 0;
-  const llmCalls: Array<{ model: string; messages: OllamaMessage[]; system?: string }> = [];
+  const llmCalls: Array<{
+    model: string;
+    messages: OllamaMessage[];
+    system?: string;
+    tools?: unknown[];
+    maxTokens?: number;
+  }> = [];
   const llm = {
-    async *streamChat(params: { model: string; messages: OllamaMessage[]; system?: string }) {
+    async *streamChat(params: (typeof llmCalls)[number]) {
       llmCalls.push(params);
       const turn = turns[turnIndex++];
       if (!turn) throw new Error('streamChat appelé plus souvent que scripté');
@@ -54,19 +69,27 @@ function makeHarness(opts: HarnessOptions = {}) {
     if (opts.toolThrows) throw new Error(opts.toolThrows);
     return opts.toolResult ?? { success: true, data: { echoed: args } };
   });
+  const mkTool = (name: string, description: string) => ({
+    name,
+    description,
+    category: 'test',
+    riskLevel: 'low',
+    toOllamaSchema: () => ({ type: 'function', function: { name, description, parameters: {} } }),
+  });
   const tools = {
-    getEnabled: () => [
-      {
-        name: 'echo',
-        description: 'Renvoie ses arguments (outil de test)',
-        category: 'system',
-        riskLevel: 'low',
-        toOllamaSchema: () => ({
-          type: 'function',
-          function: { name: 'echo', description: 'Echo', parameters: { type: 'object' } },
-        }),
-      },
-    ],
+    getEnabled: () =>
+      opts.toolDefs?.map(t => mkTool(t.name, t.description)) ?? [
+        {
+          name: 'echo',
+          description: 'Renvoie ses arguments (outil de test)',
+          category: 'system',
+          riskLevel: 'low',
+          toOllamaSchema: () => ({
+            type: 'function',
+            function: { name: 'echo', description: 'Echo', parameters: { type: 'object' } },
+          }),
+        },
+      ],
     execute: executeTool,
     filesystemTargets: () => [],
   } as unknown as ToolRegistry;
@@ -81,7 +104,12 @@ function makeHarness(opts: HarnessOptions = {}) {
   const recordTurn = vi.fn();
   const rememberExchange = vi.fn(async () => {});
   const context = {
-    buildContext: async () => ({ messages: opts.priorMessages ?? [] }),
+    buildContext: async () => ({
+      messages: opts.priorMessages ?? [],
+      ...(opts.warmFacts ? { warmFacts: opts.warmFacts } : {}),
+      ...(opts.relevantMemories ? { relevantMemories: opts.relevantMemories } : {}),
+    }),
+    getWarmFacts: () => opts.warmFacts ?? [],
     recordTurn,
     rememberExchange,
   } as unknown as ContextManager;
@@ -105,6 +133,11 @@ function makeHarness(opts: HarnessOptions = {}) {
       } as unknown as SemanticCache)
     : undefined;
 
+  const extractAndStore = vi.fn(async () => 0);
+  const factExtractor = opts.withFactExtractor
+    ? ({ extractAndStore } as unknown as FactExtractor)
+    : undefined;
+
   const orchestrator = new AgentOrchestrator({
     llm,
     tools,
@@ -113,6 +146,8 @@ function makeHarness(opts: HarnessOptions = {}) {
     audit,
     playbook,
     cache,
+    factExtractor,
+    scheduler: opts.scheduler,
   });
 
   return {
@@ -126,6 +161,7 @@ function makeHarness(opts: HarnessOptions = {}) {
     logToolCall,
     playbookRecord,
     cachePut,
+    extractAndStore,
   };
 }
 
@@ -150,7 +186,11 @@ describe('AgentOrchestrator — réponse directe', () => {
       { type: 'done', content: 'Bonjour !' },
     ]);
     expect(h.llmCalls[0]?.model).toBe('qwen3:14b');
-    expect(h.llmCalls[0]?.messages.at(-1)).toEqual({ role: 'user', content: 'salut' });
+    // Le dernier message porte le contexte du tour (date…), puis la demande intacte.
+    const last = h.llmCalls[0]?.messages.at(-1);
+    expect(last?.role).toBe('user');
+    expect(last?.content.startsWith('[Contexte]\nDate et heure actuelles : ')).toBe(true);
+    expect(last?.content.endsWith('salut')).toBe(true);
   });
 
   it('persiste le tour, audite le succès et enregistre le playbook', async () => {
@@ -416,5 +456,82 @@ describe('parseToolArgs', () => {
     expect(parseToolArgs('{tronqué')).toEqual({});
     expect(parseToolArgs('[1,2]')).toEqual({});
     expect(parseToolArgs('null')).toEqual({});
+  });
+});
+
+// ─── Latence : cache de prompt, travail de fond, préchauffage ──────────────
+
+describe('AgentOrchestrator — latence', () => {
+  it("le prompt système est IDENTIQUE d'un tour à l'autre (Ollama le garde en cache)", async () => {
+    const h = makeHarness({
+      turns: [[token('a')], [token('b')]],
+      warmFacts: ['- préfère les sources françaises'],
+      relevantMemories: ['souvenir du tour'],
+    });
+    await collect(h.orchestrator.process('première', 'conv-1', CONFIG));
+    await new Promise(r => setTimeout(r, 1100)); // l'horloge a changé de seconde
+    await collect(h.orchestrator.process('seconde', 'conv-1', CONFIG));
+
+    const [first, second] = h.llmCalls;
+    expect(first?.system).toBe(second?.system);
+    // Mémoire long terme : dans le système. Souvenirs du tour : dans le dernier message.
+    expect(first?.system).toContain('préfère les sources françaises');
+    expect(first?.system).not.toContain('souvenir du tour');
+    expect(first?.messages.at(-1)?.content).toContain('souvenir du tour');
+  });
+
+  it("l'extraction de faits est DIFFÉRÉE au premier silence, pas lancée après la réponse", async () => {
+    const scheduler = new LlmScheduler({ quietMs: 60_000 });
+    const h = makeHarness({ turns: [[token('réponse')]], scheduler, withFactExtractor: true });
+    await collect(h.orchestrator.process('salut', 'conv-1', CONFIG));
+
+    expect(h.extractAndStore).not.toHaveBeenCalled();
+    expect(scheduler.pendingCount).toBe(1);
+    scheduler.dispose();
+  });
+
+  it('préchauffage : lit le prompt système exact des runs et le noyau d’outils, sans générer', async () => {
+    const h = makeHarness({ turns: [[], [token('ok')]], warmFacts: ['- fait'] });
+    await h.orchestrator.warmupForUser('qwen3:14b');
+    await collect(h.orchestrator.process('salut', 'conv-1', CONFIG));
+
+    const [warm, run] = h.llmCalls;
+    expect(warm?.maxTokens).toBe(1);
+    expect(warm?.system).toBe(run?.system);
+    expect(warm?.tools).toEqual(run?.tools);
+  });
+
+  it('préchauffage ignoré si le modèle vient de servir (déjà chaud, cache meilleur)', async () => {
+    const h = makeHarness({ turns: [[token('ok')]] });
+    await collect(h.orchestrator.process('salut', 'conv-1', CONFIG));
+    await h.orchestrator.warmupForUser('qwen3:14b');
+    expect(h.llmCalls).toHaveLength(1);
+  });
+
+  it("la liste d'outils reste IDENTIQUE au tour suivant quand la question n'en demande pas de nouveau", async () => {
+    const core = [
+      'search_dailies',
+      'read_webpage',
+      'fetch_tech_news',
+      'search_memory',
+      'read_clipboard',
+      'list_scheduled_tasks',
+      'schedule_task',
+    ];
+    const toolDefs = [
+      ...core.map(name => ({ name, description: 'outil de base' })),
+      { name: 'post_tech_news_discord', description: 'Publie sur Discord' },
+      { name: 'git_log', description: 'Historique git' },
+      { name: 'docker_ps', description: 'Conteneurs docker' },
+      { name: 'kill_process', description: 'Tue un processus' },
+    ];
+    const h = makeHarness({ turns: [[token('a')], [token('b')]], toolDefs });
+    await collect(h.orchestrator.process('publie ça sur discord', 'conv-1', CONFIG));
+    await collect(h.orchestrator.process('et ensuite ?', 'conv-1', CONFIG));
+
+    const names = (call: (typeof h.llmCalls)[number] | undefined) =>
+      (call?.tools as Array<{ function: { name: string } }> | undefined)?.map(t => t.function.name);
+    expect(names(h.llmCalls[0])).toContain('post_tech_news_discord');
+    expect(names(h.llmCalls[1])).toEqual(names(h.llmCalls[0]));
   });
 });

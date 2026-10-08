@@ -2,8 +2,17 @@ import type { OllamaMessage, OllamaToolSchema, StreamChunk } from '@catdesk/shar
 import { createLogger } from '../logger';
 import { CONFIG } from '../config';
 import { withRetry } from '../lib/retry';
+import type { LlmScheduler } from './LlmScheduler';
 
 const log = createLogger('llm:ollama');
+
+/**
+ * Embeddings sur CPU (`num_gpu: 0`). nomic-embed-text y répond en ~40 ms une
+ * fois chaud (mesuré sur Ryzen 5 5500), et toute la VRAM reste au modèle de
+ * chat : chargé sur GPU, il lui prend 0,3 Go — une couche de qwen3:14b de
+ * moins sur une carte de 10 Go déjà pleine — et peut l'en évincer.
+ */
+const EMBED_OPTIONS = { num_gpu: 0 } as const;
 
 /**
  * Ollama expects `tool_calls[].function.arguments` as an OBJECT in request
@@ -87,6 +96,15 @@ export interface OllamaConfig {
    * Garder le modèle chaud évite un rechargement coûteux à chaque appel.
    */
   keepAlive?: string;
+  /**
+   * num_ctx appliqué à TOUT appel qui n'en précise pas. Ollama recharge le
+   * modèle entier dès que num_ctx change (mesuré : 12 s de chargement + relecture
+   * du prompt, à l'aller puis au retour) : un appel de fond oubliant num_ctx
+   * coûtait ainsi ~45 s à la question suivante. Une seule valeur pour tous.
+   */
+  numCtx?: number;
+  /** Priorité premier plan / fond (voir LlmScheduler) — lu par `complete({ background })`. */
+  scheduler?: LlmScheduler;
 }
 
 export interface ChatParams {
@@ -119,11 +137,17 @@ export interface ChatParams {
 export class OllamaClient {
   constructor(private config: OllamaConfig) {}
 
+  /** Ordonnanceur premier plan / fond partagé, s'il a été câblé. */
+  get scheduler(): LlmScheduler | undefined {
+    return this.config.scheduler;
+  }
+
   async *streamChat(params: ChatParams): AsyncGenerator<StreamChunk> {
     const url = `${this.config.baseUrl}/api/chat`;
 
     // keep_alive : garde le modèle chaud en RAM entre les requêtes (gain latence).
     const keepAlive = params.keepAlive ?? this.config.keepAlive ?? '10m';
+    const numCtx = params.numCtx ?? this.config.numCtx;
 
     const body = {
       model: params.model,
@@ -138,7 +162,7 @@ export class OllamaClient {
       options: {
         temperature: params.temperature ?? 0.7,
         ...(params.maxTokens ? { num_predict: params.maxTokens } : {}),
-        ...(params.numCtx ? { num_ctx: params.numCtx } : {}),
+        ...(numCtx ? { num_ctx: numCtx } : {}),
       },
     };
 
@@ -262,7 +286,7 @@ export class OllamaClient {
         const response = await fetch(`${this.config.baseUrl}/api/embeddings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, prompt: text }),
+          body: JSON.stringify({ model, prompt: text, options: EMBED_OPTIONS }),
           signal: AbortSignal.timeout(30_000),
         });
 

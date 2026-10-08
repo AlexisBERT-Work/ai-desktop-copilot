@@ -75,8 +75,15 @@ export const CONFIG = {
   embedModel: envString('CATDESK_EMBED_MODEL', DEFAULT_EMBED_MODEL),
   /** Extraction de faits : un 3B est trop faible (renvoie []) — modèle principal par défaut. */
   extractModel: envString('CATDESK_EXTRACT_MODEL', model),
+  /** Appliqué à TOUT appel du modèle de chat : une autre valeur le fait recharger. */
   numCtx: envNumber('CATDESK_NUM_CTX', 8192),
   maxTokens: envNumber('CATDESK_MAX_TOKENS', 1024),
+  /**
+   * Silence exigé après le dernier échange avant que le travail de fond
+   * (extraction de faits, compaction, digests) ne prenne le GPU — voir
+   * LlmScheduler. Assez long pour couvrir la lecture d'une réponse.
+   */
+  backgroundQuietMs: envNumber('CATDESK_BACKGROUND_QUIET_MS', 90_000),
   // 10 (et non 14) : chaque schéma d'outil coûte des tokens de prompt à CHAQUE
   // itération — mesuré trop lent sur RX 6700 avec 14 (réponses > 1 min).
   toolLimit: envNumber('CATDESK_TOOL_LIMIT', 10),

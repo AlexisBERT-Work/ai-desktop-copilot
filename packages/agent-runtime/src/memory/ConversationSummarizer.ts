@@ -43,8 +43,14 @@ export class ConversationSummarizer {
     return t;
   }
 
-  /** Produce an updated summary from a prior summary + a batch of messages. */
-  async summarize(messages: SummarizableMessage[], prior?: string): Promise<string> {
+  /**
+   * Produce an updated summary from a prior summary + a batch of messages.
+   * `null` = pas de résumé exploitable (appel en échec, réponse vide) : l'appelant
+   * ne doit RIEN enregistrer. Rendre l'ancien résumé à la place faisait avancer
+   * le marqueur de compaction — les messages repliés disparaissaient du contexte
+   * sans avoir été résumés.
+   */
+  async summarize(messages: SummarizableMessage[], prior?: string): Promise<string | null> {
     const transcript = ConversationSummarizer.toTranscript(messages);
     if (!transcript) return prior ?? '';
 
@@ -55,17 +61,19 @@ export class ConversationSummarizer {
     let text: string;
     try {
       // think:false — tâche de fond : le raisonnement caché de qwen3 ne ferait
-      // qu'occuper le GPU plus longtemps, sans meilleur résumé.
+      // qu'occuper le GPU plus longtemps, sans meilleur résumé. background :
+      // cède le GPU à l'utilisateur (LlmScheduler).
       text = await complete(this.llm, this.model, SYSTEM, userContent, {
         temperature: 0.2,
         think: false,
+        background: true,
       });
     } catch (err) {
       log.warn('Summarize call failed', {
         error: err instanceof Error ? err.message : String(err),
       });
-      return prior ?? '';
+      return null;
     }
-    return text.trim() || (prior ?? '');
+    return text.trim() || null;
   }
 }

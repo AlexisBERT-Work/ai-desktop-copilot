@@ -103,4 +103,14 @@ describe('ContextManager semantic recall (rememberExchange)', () => {
     const c = await ctx.buildContext('c2', 'ok');
     expect(c.relevantMemories ?? []).toHaveLength(0);
   });
+
+  it("ne resservit pas en « souvenirs » les échanges de la MÊME conversation (déjà dans l'historique)", async () => {
+    await ctx.rememberExchange(
+      'conv-A',
+      'Quel est le port du serveur Postgres ?',
+      'Le port Postgres est 5544.',
+    );
+    const c = await ctx.buildContext('conv-A', 'rappelle-moi le port postgres');
+    expect(c.relevantMemories ?? []).toHaveLength(0);
+  });
 });
