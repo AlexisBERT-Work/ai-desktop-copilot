@@ -7,12 +7,14 @@ describe('deriveSignature', () => {
     expect(deriveSignature('read_file', { path: 'src/a.ts' })).toBe('file:src/a.ts');
   });
   it('utilise la première ligne de stacktrace', () => {
-    expect(deriveSignature('analyze_stacktrace', { stacktrace: 'TypeError: boom\n at x' })).toBe('error:TypeError: boom');
+    expect(deriveSignature('analyze_stacktrace', { stacktrace: 'TypeError: boom\n at x' })).toBe(
+      'error:TypeError: boom',
+    );
   });
   it('réduit une commande à son premier token', () => {
     expect(deriveSignature('run_command', { command: 'npm run test -- foo' })).toBe('cmd:npm');
   });
-  it('retombe sur le nom de l\'outil', () => {
+  it("retombe sur le nom de l'outil", () => {
     expect(deriveSignature('docker_ps', {})).toBe('tool:docker_ps');
   });
 });
@@ -41,10 +43,13 @@ describe('ActivityTracker', () => {
     expect(recent[0]?.signature).toBe('b');
   });
 
-  it('plafonne le nombre d\'événements', () => {
+  it("plafonne le nombre d'événements", () => {
     let now = 0;
     const t = new ActivityTracker(10_000_000, 3, () => now);
-    for (let i = 0; i < 5; i++) { now += 1; t.record(`s${i}`); }
+    for (let i = 0; i < 5; i++) {
+      now += 1;
+      t.record(`s${i}`);
+    }
     expect(t.recent()).toHaveLength(3);
   });
 });
@@ -69,11 +74,14 @@ describe('SpiralMonitor', () => {
     return tracker;
   }
 
-  it('émet une suggestion quand l\'utilisateur boucle', () => {
+  it("émet une suggestion quand l'utilisateur boucle", () => {
     const now = () => 10_000_000;
     const tracker = stuckTracker(now);
     const sent: Array<{ method: string; params: unknown }> = [];
-    const monitor = new SpiralMonitor(tracker, (method, params) => sent.push({ method, params }), { thresholdMinutes: 45, now });
+    const monitor = new SpiralMonitor(tracker, (method, params) => sent.push({ method, params }), {
+      thresholdMinutes: 45,
+      now,
+    });
     const { verdict, notified } = monitor.tick();
     expect(verdict.spiraling).toBe(true);
     expect(notified).toBe(true);
@@ -84,7 +92,11 @@ describe('SpiralMonitor', () => {
     let clock = 10_000_000;
     const tracker = stuckTracker(() => 10_000_000);
     const sent: unknown[] = [];
-    const monitor = new SpiralMonitor(tracker, (_m, p) => sent.push(p), { thresholdMinutes: 45, cooldownMs: 30 * 60_000, now: () => clock });
+    const monitor = new SpiralMonitor(tracker, (_m, p) => sent.push(p), {
+      thresholdMinutes: 45,
+      cooldownMs: 30 * 60_000,
+      now: () => clock,
+    });
     expect(monitor.tick().notified).toBe(true);
     clock += 60_000; // 1 min later, same topic
     expect(monitor.tick().notified).toBe(false);

@@ -9,9 +9,9 @@ import { NEWS_BANNER_STYLE, NEWS_ICON, NEWS_ICON_COLOR } from './newsStyles';
  * récente, masquable. Les suivantes apparaissent une fois la première ignorée.
  */
 export function NewsBanner() {
-  const items = useNewsStore((s) => s.items);
-  const dismissedIds = useNewsStore((s) => s.dismissedIds);
-  const dismiss = useNewsStore((s) => s.dismiss);
+  const items = useNewsStore(s => s.items);
+  const dismissedIds = useNewsStore(s => s.dismissedIds);
+  const dismiss = useNewsStore(s => s.dismiss);
 
   const active = useMemo(() => computeActiveNews(items, dismissedIds), [items, dismissedIds]);
   const top = active[0];

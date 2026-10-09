@@ -14,7 +14,8 @@ describe('recoverToolCalls', () => {
   });
 
   it('recovers a <tool_call> tagged call with args', () => {
-    const text = '<tool_call>{"name":"schedule_task","arguments":{"task":"news","schedule":"daily"}}</tool_call>';
+    const text =
+      '<tool_call>{"name":"schedule_task","arguments":{"task":"news","schedule":"daily"}}</tool_call>';
     const { calls } = recoverToolCalls(text, known);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.name).toBe('schedule_task');
@@ -29,7 +30,8 @@ describe('recoverToolCalls', () => {
   });
 
   it('parses stringified arguments', () => {
-    const text = '{"name":"schedule_task","arguments":"{\\"task\\":\\"y\\",\\"schedule\\":\\"hourly\\"}"}';
+    const text =
+      '{"name":"schedule_task","arguments":"{\\"task\\":\\"y\\",\\"schedule\\":\\"hourly\\"}"}';
     const { calls } = recoverToolCalls(text, known);
     expect(calls[0]?.args).toEqual({ task: 'y', schedule: 'hourly' });
   });
@@ -48,8 +50,9 @@ describe('recoverToolCalls', () => {
   });
 
   it('deduplicates identical calls', () => {
-    const text = '<tool_call>{"name":"run_subagent","arguments":{"task":"x"}}</tool_call>'
-      + '<tool_call>{"name":"run_subagent","arguments":{"task":"x"}}</tool_call>';
+    const text =
+      '<tool_call>{"name":"run_subagent","arguments":{"task":"x"}}</tool_call>' +
+      '<tool_call>{"name":"run_subagent","arguments":{"task":"x"}}</tool_call>';
     const { calls } = recoverToolCalls(text, known);
     expect(calls).toHaveLength(1);
   });
@@ -69,7 +72,9 @@ describe('looksLikeToolCallStart', () => {
 
 describe('looksLikePreamble', () => {
   it('flags "I will do X / hang on" preambles before a tool call', () => {
-    expect(looksLikePreamble('Je vais capturer l’écran actuel et te dire ce que je vois.')).toBe(true);
+    expect(looksLikePreamble('Je vais capturer l’écran actuel et te dire ce que je vois.')).toBe(
+      true,
+    );
     expect(looksLikePreamble('Ok, je vais ouvrir le fichier.')).toBe(true);
     expect(looksLikePreamble('Attends une seconde, je prépare la capture.')).toBe(true);
     expect(looksLikePreamble('Laisse-moi regarder ça.')).toBe(true);

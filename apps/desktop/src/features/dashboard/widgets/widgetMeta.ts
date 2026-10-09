@@ -133,5 +133,5 @@ export const WIDGET_META: readonly WidgetMeta[] = [
 
 /** Libellé lisible d'un type (pour les titres/placeholders). */
 export function widgetLabel(type: WidgetType): string {
-  return WIDGET_META.find((m) => m.type === type)?.label ?? type;
+  return WIDGET_META.find(m => m.type === type)?.label ?? type;
 }

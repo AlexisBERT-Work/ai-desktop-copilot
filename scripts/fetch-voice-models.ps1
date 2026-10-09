@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Télécharge les modèles de la voix (mode « Jarvis ») dans un cache local.
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectTools, type SelectableTool } from './selectTools';
+import { coreTools, selectTools, type SelectableTool } from './selectTools';
 
 const make = (name: string, description = '', category = 'x'): SelectableTool => ({
   name,
@@ -74,5 +74,25 @@ describe('selectTools', () => {
     const names = selectTools(tools, 'quelle heure est-il', 14).map(t => t.name);
     expect(names).not.toContain('docker_ps');
     expect(names).not.toContain('browser_navigate');
+  });
+
+  it("latence : le noyau en tête, puis les outils retenus dans l'ordre d'enregistrement", () => {
+    // Deux formulations qui retiennent les mêmes outils doivent produire la
+    // MÊME liste, dans le même ordre : sinon Ollama relit tout le prompt.
+    const a = selectTools(tools, 'publie la revue de presse tech sur discord et un commit git', 10);
+    const b = selectTools(tools, 'git commit puis discord : revue de presse tech', 10);
+    expect(a.map(t => t.name)).toEqual(b.map(t => t.name));
+
+    const core = coreTools(tools, 10).map(t => t.name);
+    expect(a.slice(0, core.length).map(t => t.name)).toEqual(core);
+    const extras = a.slice(core.length).map(t => tools.indexOf(t));
+    expect(extras).toEqual([...extras].sort((x, y) => x - y));
+  });
+
+  it('les mots grammaticaux ne font remonter aucun outil (prompt minimal et stable)', () => {
+    const names = selectTools(tools, 'Quelle est la capitale de la France ? Une phrase.', 10).map(
+      t => t.name,
+    );
+    expect(names).toEqual(coreTools(tools, 10).map(t => t.name));
   });
 });

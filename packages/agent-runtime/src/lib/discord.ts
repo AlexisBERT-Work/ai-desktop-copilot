@@ -1,6 +1,8 @@
-// Transport Discord : forme d'un embed + envoi vers un webhook. Volontairement
-// ignorant du domaine presse — la construction des embeds vit dans
-// news/discordEmbeds.ts.
+// Transport Discord : forme d'un embed, validation et envoi vers un webhook.
+// Volontairement ignorant du domaine presse — la construction des embeds vit
+// dans news/discordEmbeds.ts.
+
+import { postJson } from './http';
 
 export interface DiscordEmbed {
   title: string;
@@ -11,39 +13,29 @@ export interface DiscordEmbed {
   timestamp?: string;
 }
 
-export async function postToDiscord(
+/**
+ * Vrai pour une URL de webhook entrant Discord (`https://discord.com/api/webhooks/…`,
+ * variantes ptb/canary et ancien domaine discordapp). Un outil qui poste sans
+ * confirmation ne doit pas pouvoir viser n'importe quel serveur : sinon une
+ * injection de prompt en fait un canal d'exfiltration.
+ */
+export function isDiscordWebhookUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  return (
+    url.protocol === 'https:' &&
+    /^(?:(?:ptb|canary)\.)?discord(?:app)?\.com$/i.test(url.hostname) &&
+    /^\/api\/webhooks\/\d+\/[\w-]+\/?$/.test(url.pathname)
+  );
+}
+
+export function postToDiscord(
   url: string,
   payload: unknown,
 ): Promise<{ status: number; text: string }> {
-  const { default: https } = await import('https');
-  const body = JSON.stringify(payload);
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = https.request(
-      {
-        method: 'POST',
-        hostname: u.hostname,
-        path: u.pathname + u.search,
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': String(Buffer.byteLength(body)),
-          'User-Agent': 'catdesk-agent/1.0',
-        },
-      },
-      res => {
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () =>
-          resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf-8') }),
-        );
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(10_000, () => {
-      req.destroy();
-      reject(new Error('Webhook timeout'));
-    });
-    req.write(body);
-    req.end();
-  });
+  return postJson(url, payload);
 }

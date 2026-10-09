@@ -75,3 +75,6 @@ audit-logs/
 # OS
 Desktop.ini
 ehthumbs.db
+
+# Tauri : schémas régénérés à chaque build (cf. gabarit Tauri 2)
+apps/desktop/src-tauri/gen/

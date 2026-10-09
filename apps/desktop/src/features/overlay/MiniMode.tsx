@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Cat, ArrowUp, Expand, Camera, Clipboard, Terminal, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useOverlayStore } from './overlayStore';
@@ -17,11 +17,18 @@ const VOICE_PLACEHOLDER: Record<string, string> = {
 export function MiniMode() {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { setMode } = useOverlayStore();
-  const { sendMessage, activeConversationId } = useChatStore();
+  const setMode = useOverlayStore(s => s.setMode);
+  const sendMessage = useChatStore(s => s.sendMessage);
+  const activeConversationId = useChatStore(s => s.activeConversationId);
+  const warmUp = useChatStore(s => s.warmUp);
   const voiceState = useVoiceStore(s => s.state);
   const voiceHint = useVoiceStore(s => s.hint);
-  const placeholder = VOICE_PLACEHOLDER[voiceState] ?? voiceHint ?? 'Ask anything...';
+  const placeholder = VOICE_PLACEHOLDER[voiceState] ?? voiceHint ?? 'Pose ta question…';
+
+  // La bulle s'ouvre (Ctrl+Espace) : on charge le modèle pendant la saisie ou la dictée.
+  useEffect(() => {
+    warmUp();
+  }, [warmUp]);
 
   const handleSubmit = async () => {
     const text = input.trim();
@@ -93,19 +100,29 @@ export function MiniMode() {
 }
 
 function QuickActions() {
-  const { setMode } = useOverlayStore();
+  const setMode = useOverlayStore(s => s.setMode);
 
   const actions = [
     {
-      label: 'Screenshot & analyze',
+      label: 'Capturer et analyser',
       Icon: Camera,
-      query: 'Capture my screen and tell me what you see',
+      query: 'Capture mon écran et décris ce que tu vois.',
     },
-    { label: 'Read clipboard', Icon: Clipboard, query: 'Read my clipboard and summarize it' },
-    { label: 'Run command', Icon: Terminal, query: 'Run a PowerShell command for me' },
+    {
+      label: 'Lire le presse-papier',
+      Icon: Clipboard,
+      query: 'Lis mon presse-papier et résume-le.',
+    },
+    {
+      label: 'Lancer une commande',
+      Icon: Terminal,
+      query: 'Exécute une commande PowerShell pour moi.',
+    },
   ];
 
-  const { sendMessage, activeConversationId } = useChatStore();
+  const sendMessage = useChatStore(s => s.sendMessage);
+
+  const activeConversationId = useChatStore(s => s.activeConversationId);
 
   return (
     <div className="border-t border-white/5 px-3 py-2 flex gap-1.5 flex-wrap">

@@ -3,7 +3,7 @@
 > **Ce document répond à une seule question : que reste-t-il à faire ?**
 > Il existe pour que les contradictions et les manques **cessent d'être
 > implicites**. Rien ici n'est un bug bloquant : ce sont des décisions que
-> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-10-06.
+> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-10-08.
 >
 > Où en est le projet : [SUIVI.md](SUIVI.md) · ce que l'agent sait faire :
 > [CAPACITES.md](CAPACITES.md) · ce qu'il ne sait pas faire :
@@ -13,17 +13,18 @@
 
 ## 0. Ce qui bloque sur toi
 
-Cinq choses restent ouvertes, et **aucune ne peut être faite sans toi** :
+Six choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
-| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe. |
-| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                |
-| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                      |
-| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
-| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
+| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | **Réactiver le projet Supabase** (`mpnpfbfjjkujiyeqrcwc`) depuis le tableau de bord Supabase — **urgent**.                                      | Constaté le 2026-10-08 : son domaine **n'existe plus en DNS** (même via 8.8.8.8). Dailys partagées, news et consoles admin sont muettes pour tous les postes. L'agent ne régénère plus la revue pour rien pendant ce temps (il attend que Supabase revienne). Seul le propriétaire du compte peut le restaurer. |
+| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe.                                      |
+| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                                                     |
+| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                                                           |
+| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                                                                 |
+| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                                                             |
 
-Ces cinq points forment le jalon **0.2.0** ci-dessous.
+Les points 1 à 5 forment le jalon **0.2.0** ci-dessous ; le point 0 passe avant tout.
 
 ---
 
@@ -41,14 +42,14 @@ les mises à jour légères (chaque update 0.2.x pèse ~800 Mo tant que les mod�
 voix ne sont pas semés), puis reporter le travail d'août mis de côté, puis la
 voix.
 
-| Version                                                                        | Objectif                         | Contenu (issues)                                                                                                                                                                                                                                                      | Sort quand                                                                                       |
-| ------------------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **[0.2.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/1)** | Première sortie de la ligne voix | Dépôt `catdesk-releases-voice` (#6) · essai au micro (#7) · rendu post-Tailwind (#8) · KV-cache `q4_0`, § 1.1 (#9, recommandé avant) · installeur + publication + tag (#10). **Rien à coder** : tout est sur `master`.                                                | L'installeur est publié et un poste neuf s'installe puis se met à jour                           |
-| **[0.2.1](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/2)** | Mises à jour légères, fiabilité  | Semer les modèles voix, § 4 (#11) · retry des dailys, `a7ffebb` (#12) · `vitest.config.ts`, § 2.2 (#13) · tests `RunCommandTool`/`ReadFileTool`/`ListDirTool`, § 2.1 (#14) · constantes modèle et URL Ollama, § 3 (#15) · dépendances vulnérables, `pnpm audit` (#25) | L'artefact de mise à jour **suivant** (0.2.2) ne contient plus `voice/` et `pnpm audit` est vert |
-| **[0.3.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/3)** | Apparence                        | Thème, palettes, réglages d'affichage — report de `515abec` (#16)                                                                                                                                                                                                     | Le rendu est validé à l'œil                                                                      |
-| **[0.4.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/4)** | Skills et veille                 | `load_skill`, 69ᵉ outil (#17) · coupe-circuit par source (#18) · extraction trafilatura (#19)                                                                                                                                                                         | `registerTools.test.ts` vert, `CAPACITES.md` et `LIMITES.md` à jour                              |
-| **[0.5.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/5)** | Voix phase 2 : « sonner Jarvis » | Mode oral côté agent (#20) · phrases de transition (#21) · barge-in (#22) — § 4                                                                                                                                                                                       | Une question orale obtient une réponse courte, sans Markdown, sans silence                       |
-| **[0.6.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/6)** | Mains libres                     | Wake word « Hey Jarvis », désactivé par défaut (#23) — § 4                                                                                                                                                                                                            | Détection fiable au calme, indicateur visible quand le micro écoute                              |
+| Version                                                                        | Objectif                         | Contenu (issues)                                                                                                                                                                                                                                                                                                                                                              | Sort quand                                                                                       |
+| ------------------------------------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **[0.2.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/1)** | Première sortie de la ligne voix | Dépôt `catdesk-releases-voice` (#6) · essai au micro (#7) · rendu post-Tailwind (#8) · KV-cache `q4_0`, § 1.1 (#9, recommandé avant) · installeur + publication + tag (#10). **Rien à coder** : tout est sur `master`.                                                                                                                                                        | L'installeur est publié et un poste neuf s'installe puis se met à jour                           |
+| **[0.2.1](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/2)** | Mises à jour légères, fiabilité  | Semer les modèles voix, § 4 (#11) · retry des dailys, `a7ffebb` (#12) · ✅ `vitest.config.ts`, § 2.2 (#13) · ✅ tests `RunCommandTool`/`ReadFileTool`/`ListDirTool`, § 2.1 (#14) · ✅ constantes modèle et URL Ollama, § 3 (#15) · dépendances vulnérables, `pnpm audit` (#25) · ✅ audit complet du 2026-10-07 (branche `refactor/audit-complet`, voir [SUIVI.md](SUIVI.md)) | L'artefact de mise à jour **suivant** (0.2.2) ne contient plus `voice/` et `pnpm audit` est vert |
+| **[0.3.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/3)** | Apparence                        | Thème, palettes, réglages d'affichage — report de `515abec` (#16)                                                                                                                                                                                                                                                                                                             | Le rendu est validé à l'œil                                                                      |
+| **[0.4.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/4)** | Skills et veille                 | `load_skill`, 69ᵉ outil (#17) · coupe-circuit par source (#18) · extraction trafilatura (#19)                                                                                                                                                                                                                                                                                 | `registerTools.test.ts` vert, `CAPACITES.md` et `LIMITES.md` à jour                              |
+| **[0.5.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/5)** | Voix phase 2 : « sonner Jarvis » | Mode oral côté agent (#20) · phrases de transition (#21) · barge-in (#22) — § 4                                                                                                                                                                                                                                                                                               | Une question orale obtient une réponse courte, sans Markdown, sans silence                       |
+| **[0.6.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/6)** | Mains libres                     | Wake word « Hey Jarvis », désactivé par défaut (#23) — § 4                                                                                                                                                                                                                                                                                                                    | Détection fiable au calme, indicateur visible quand le micro écoute                              |
 
 **Le travail d'août mis de côté.** Les PR #5 (apparence) et #3 (skills,
 veille) ont été écrites avant la refonte et le correctif Tailwind ; les fusionner
@@ -96,7 +97,7 @@ c'est la doc qui est périmée.
 `q4_0`, poser trois questions longues au chat et lire la sortie. Puis forcer
 `f16` et comparer la vitesse.
 
-- Sortie lisible → **le code a raison**, corriger `CLAUDE.md:38` et
+- Sortie lisible → **le code a raison**, corriger le paragraphe KV-cache de `CLAUDE.md` et
   `CAPACITES.md` §11 pour préciser « jamais en global, toujours avec flash
   attention ».
 - Texte illisible → **la doc a raison**, faire renvoyer `f16` en toutes
@@ -104,6 +105,12 @@ c'est la doc qui est périmée.
   `KvCacheCard`.
 
 **Statut : non tranché. Le code n'a volontairement pas été modifié.**
+
+**Indice partiel (2026-10-08, pas le test qui tranche)** : pendant les mesures de
+latence, Ollama a tourné avec les réglages de prod (`q4_0` + flash attention) sur
+une vingtaine de requêtes courtes ; toutes les réponses étaient lisibles
+(« Paris. », « La capitale de l'Espagne est Madrid. »). Ça penche du côté « le code
+a raison », sans remplacer les trois questions longues décrites ci-dessus.
 
 ### 1.2 Supabase appelé directement depuis le webview
 
@@ -140,70 +147,91 @@ couleurs littérales pour ne pas garder 132 classes qui ne résolvent rien.
 
 ## 2. Dettes assumées — tests
 
-Le socle est solide (640 tests agent sur 77 fichiers, 37 desktop, 23 Rust,
-7 Python) mais **la couverture est inégale**, et les trous sont concentrés là où
-ça compte.
+Le socle est solide (≈ 700 tests agent, 54 desktop, 34 Rust, 14 Python au
+2026-10-07) mais **la couverture reste inégale**.
 
 ### 2.1 Non testé et risqué
 
-| Module                                         | Pourquoi c'est gênant                                                                                                                                                      |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tools/system/RunCommandTool`                  | L'outil d'exécution de commandes. `security/commandPolicy` est testé, mais pas l'outil qui l'**applique** — ni sa liste blanche d'environnement, ni son plafond de sortie. |
-| `tools/filesystem/ReadFileTool`, `ListDirTool` | Aucun test de traversée de chemin côté lecture, alors que `WriteFileTool` en a.                                                                                            |
-| `llm/OllamaClient` (290 l.)                    | Le parseur de flux NDJSON, le code le plus « parsing » du runtime, n'a aucun test.                                                                                         |
-| `lib/ocrSidecar` (202 l.)                      | Cycle de vie d'un sous-processus + cadrage JSON à travers la frontière Python.                                                                                             |
-| `AuditLogger`                                  | Sécurité-pertinent, non testé.                                                                                                                                             |
-| Familles entières                              | `browser/` (6 outils), `automation/` (5), `market/` (5), `screen/` (3), `audio/` (1).                                                                                      |
+Fait le 2026-10-07 : `RunCommandTool` (politique appliquée, liste blanche
+d'environnement, délai), `ReadFileTool` / `ListDirTool` (plafond, cas d'erreur,
+chemin déclaré — la traversée est testée dans `PermissionEngine` à travers les
+outils réels), le parseur NDJSON d'`OllamaClient` (`parseChatLine`, pur), `AuditLogger`
+(expurgation, fichier du jour), `run_sqlite`, `semantic_search`. Reste :
 
-### 2.2 Configuration de test fragile
+| Module                    | Pourquoi c'est gênant                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| `lib/ocrSidecar` (202 l.) | Cycle de vie d'un sous-processus + cadrage JSON à travers la frontière Python.        |
+| Familles entières         | `browser/` (6 outils), `automation/` (5), `market/` (5), `screen/` (3), `audio/` (1). |
+| `ipc/bridge.rs`           | Le superviseur (relance, délais, run perdu) n'est vérifié qu'à la lecture.            |
 
-**Il n'existe aucun `vitest.config.ts` dans le dépôt.** Vitest tourne sur ses
-défauts, donc en environnement `node`. Les tests DOM ne passent que parce que
-**chaque fichier** porte un `// @vitest-environment jsdom` en tête. Un nouveau
-test qui l'oublie échoue sur un `document is not defined` incompréhensible.
+### 2.2 Configuration de test fragile — ✅ fait (2026-10-07)
 
-Corollaire : `@testing-library/jest-dom` est installé mais **jamais chargé**
-(pas de fichier de setup), d'où les `expect(...).toBeTruthy()` là où
-`toBeInTheDocument()` serait juste.
+`apps/desktop/vitest.config.ts` (jsdom, fusionné avec la config Vite) et
+`src/test/setup.ts` (`@testing-library/jest-dom` + nettoyage) ; les docblocks
+`@vitest-environment` sont retirés et les assertions passent à
+`toBeInTheDocument()`.
 
-À faire : un `vitest.config.ts` avec `environment: 'jsdom'`, un fichier de setup
-important `@testing-library/jest-dom`, et retirer les cinq docblocks.
+### 2.3 Python — `calendar_reader` couvert (2026-10-07)
 
-### 2.3 Python à ~5 %
-
-`test_main.py` et `test_csv_parser.py` couvrent 2 modules sur 11. Le plus
-rentable à couvrir est `files/calendar_reader.py` : ses helpers purs
-(`_parse_window_date`, `_to_iso`, `_is_all_day`, `_text`) et l'expansion RRULE
-sont testables trivialement et n'ont rien.
+`test_calendar_reader.py` couvre les helpers purs et l'expansion RRULE ;
+`test_main.py` vérifie que les logs restent du JSON valide. Trois modules sur
+onze ont des tests ; les parseurs PDF/DOCX et l'exporteur sont les suivants.
 
 ---
 
 ## 3. Incohérences mineures
 
-- **`"qwen3:14b"` est codé en dur en 6 endroits** (`tuning.rs`, `chatStore.ts` ×3,
-  `settingsStore.ts`, `stage-curated-models.ps1`) et **l'URL Ollama en 8**. Les
-  deux devraient descendre dans `@catdesk/shared-types`. Le tri des modèles de
-  0.1.3 a montré le coût : il a fallu les retrouver un par un.
+- ✅ **Modèle et URL Ollama codés en dur** (2026-10-07) : ils vivent dans
+  `shared-types/src/models.ts` ; Rust les recopie dans `core/ollama.rs` sous un
+  test miroir qui lit ce fichier. Restent en dur, faute de pouvoir importer du
+  TS : `scripts/setup.ps1`, `stage-curated-models.ps1` et `dev.ps1`.
 - **Le préfixe `nd-`** (nom du projet _avant_ CatDesk) traîne dans 4 chemins de
   `scripts/` : `nd-target`, `nd-tessdata`, `nd-agent-deploy`, `nd-empty-<guid>`.
-- **`tsconfig.node.json` n'étend pas `tsconfig.base.json`** : il recopie cinq
-  options à la main et perd au passage `exactOptionalPropertyTypes` et
-  `noUncheckedIndexedAccess`. `tailwind.config.ts` et `postcss.config.js` ne sont
-  type-checkés par rien.
+  Laissé tel quel volontairement : `nd-tessdata` et `nd-voice-models` sont des
+  caches dans `%LOCALAPPDATA%` (~800 Mo pour la voix, que l'app en dev lit
+  directement) — les renommer obligerait à tout re-télécharger, pour un gain
+  purement cosmétique.
+- ✅ **`tsconfig.node.json`** étend `tsconfig.base.json` (2026-10-07) et couvre
+  `vite.config.ts`, `vitest.config.ts` et `tailwind.config.ts`, type-checkés par
+  `pnpm type-check`.
 - **Les fichiers de config ne sont pas lintés** : `eslint.config.js` ignore
   `**/*.config.{js,mjs,ts}`, donc y compris lui-même.
 - **`scripts/*.ps1` n'est vérifié par rien** — ni PSScriptAnalyzer, ni la CI.
   Deux des cinq défauts corrigés fin août étaient dans ces scripts.
-- **Les stores Zustand divergent** : seul `dashboardStore` déclare un `version`
-  de persistance ; `dailiesStore` et `newsStore` persistent sans, donc sans
-  chemin de migration. `settingsStore` n'a pas de `partialize` et persiste ses
-  actions avec son état. `chatStore` est le seul à utiliser `immer`.
-- **Les sélecteurs Zustand sont mélangés** : la moitié des consommateurs
-  déstructurent le store entier (`const { x } = useStore()`), ce qui re-rend à
-  **chaque** changement, l'autre moitié utilise des sélecteurs atomiques.
+- **Les stores Zustand divergent encore** : `settingsStore` a désormais un
+  `version`, un `partialize` et une migration testée (2026-10-07), comme
+  `dashboardStore` ; `dailiesStore` et `newsStore` persistent toujours sans
+  `version`, et `newsStore.dismissedIds` grossit sans jamais être purgé.
+  `chatStore` est le seul à utiliser `immer`.
+- ✅ **Sélecteurs Zustand** (2026-10-07) : les 21 consommateurs qui
+  déstructuraient le store entier passent à des sélecteurs atomiques.
+- **Restes de l'audit du 2026-10-07**, notés pour plus tard :
+  - un **crash** de CatDesk (pas une fermeture) laisse encore l'agent et
+    l'Ollama géré orphelins — il faudrait un _Job Object_ Windows ;
+  - un run interrompu (Stop) n'interrompt pas les **sous-agents** déjà lancés :
+    `run_subagent` / `run_parallel_agents` ne reçoivent pas le signal ;
+  - plusieurs outils revérifient à la main ce que leur schéma zod garantit déjà
+    (code mort, sans danger).
 - **[`projects/dashboard.md`](projects/dashboard.md)** est une mémoire de
   décisions, **pas un état** : il fige le « pourquoi » de juin-juillet 2026 et
   n'est pas maintenu. `SUIVI.md` fait foi.
+
+### 3 bis. Latence — ce qui reste après le 2026-10-08
+
+Le premier token est passé de 19-47 s à 1-2,5 s (mesures dans
+[SUIVI.md](SUIVI.md)). Ce qui coûte encore, par ordre de poids :
+
+- **`qwen3:14b` déborde de la VRAM** : 8,7 Go sur la carte, ~1,2 Go en RAM, d'où
+  une lecture du prompt à ~130 tokens/s. Tout ce qui n'est pas en cache se paie
+  ~1 s par centaine de tokens — un outil ajouté à la liste en coûte ~2.
+- **Une question envoyée avant la fin du préchauffage** (~26 s à froid) attend
+  son reliquat. Il démarre au focus du champ ; une dictée immédiate après
+  `Ctrl+Espace` peut le rattraper.
+- **`scripts/dev.ps1` lance Ollama sans les réglages de prod** (ni `q4_0` ni
+  flash attention) : en dev, tout est ~2× plus lent qu'installé. L'aligner
+  dépend du § 1.1.
+- **Planificateur, sous-agents, vision** ont leur propre prompt : ils relisent
+  tout, et la question suivante aussi. Acceptable tant qu'ils restent opt-in.
 
 ---
 

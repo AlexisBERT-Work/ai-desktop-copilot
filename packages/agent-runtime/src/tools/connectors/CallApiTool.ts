@@ -2,8 +2,7 @@ import { z } from 'zod';
 import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
-
-type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+import { API_USER_AGENT, httpRequest, type HttpResponse } from '../../lib/http';
 
 const argsSchema = z.object({
   url: z
@@ -28,7 +27,8 @@ const argsSchema = z.object({
 });
 type Args = z.infer<typeof argsSchema>;
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+// `URL.hostname` garde les crochets d'une IPv6 : `[::1]`, pas `::1`.
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '0.0.0.0']);
 
 // Validate the URL: https anywhere; http only for local hosts (local MCP/API servers).
 export function validateApiUrl(raw: string): { ok: true; url: URL } | { ok: false; error: string } {
@@ -55,7 +55,7 @@ export function buildHeaders(
   hasBody: boolean,
 ): Record<string, string> {
   const headers: Record<string, string> = {
-    'User-Agent': 'catdesk-agent/1.0',
+    'User-Agent': API_USER_AGENT,
     Accept: 'application/json',
   };
   for (const [k, v] of Object.entries(base ?? {})) headers[k] = v;
@@ -66,50 +66,6 @@ export function buildHeaders(
     headers['Content-Type'] = 'application/json';
   }
   return headers;
-}
-
-async function request(
-  url: URL,
-  method: Method,
-  headers: Record<string, string>,
-  body: string | undefined,
-  timeoutMs: number,
-): Promise<{
-  status: number;
-  headers: Record<string, string | string[] | undefined>;
-  text: string;
-}> {
-  const isHttps = url.protocol === 'https:';
-  const { default: client } = await import(isHttps ? 'https' : 'http');
-  return new Promise((resolve, reject) => {
-    const req = client.request(
-      {
-        method,
-        hostname: url.hostname,
-        port: url.port || (isHttps ? 443 : 80),
-        path: url.pathname + url.search,
-        headers,
-      },
-      (res: import('http').IncomingMessage) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () =>
-          resolve({
-            status: res.statusCode ?? 0,
-            headers: res.headers,
-            text: Buffer.concat(chunks).toString('utf-8'),
-          }),
-        );
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(timeoutMs, () => {
-      req.destroy();
-      reject(new Error('Délai dépassé'));
-    });
-    if (body !== undefined) req.write(body);
-    req.end();
-  });
 }
 
 export class CallApiTool extends BaseTool<Args> {
@@ -137,18 +93,19 @@ export class CallApiTool extends BaseTool<Args> {
     const headers = buildHeaders(extraHeaders, token, hasBody);
     const timeout = Math.min(Math.max(1000, timeout_ms), 60000);
 
-    let res: {
-      status: number;
-      headers: Record<string, string | string[] | undefined>;
-      text: string;
-    };
+    let res: HttpResponse;
     try {
-      res = await request(v.url, method, headers, hasBody ? body : undefined, timeout);
+      res = await httpRequest(v.url.toString(), {
+        method,
+        headers,
+        ...(hasBody ? { body } : {}),
+        timeoutMs: timeout,
+      });
     } catch (err) {
       return this.fail(`Requête échouée: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    const contentType = String(res.headers['content-type'] ?? '');
+    const contentType = res.headers.get('content-type') ?? '';
     let json: unknown;
     let parseError = false;
     if (contentType.includes('json') || /^\s*[[{]/.test(res.text)) {

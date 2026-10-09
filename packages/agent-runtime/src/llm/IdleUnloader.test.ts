@@ -10,7 +10,7 @@ describe('IdleUnloader', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('décharge le modèle après la fenêtre d\'inactivité', () => {
+  it("décharge le modèle après la fenêtre d'inactivité", () => {
     const llm = fakeLlm();
     const u = new IdleUnloader(llm, { idleMs: 1000 });
 
@@ -22,7 +22,7 @@ describe('IdleUnloader', () => {
     expect(llm.unload).toHaveBeenCalledWith('devstral:24b');
   });
 
-  it('ne décharge pas tant qu\'un run est actif (relance reset le minuteur)', () => {
+  it("ne décharge pas tant qu'un run est actif (relance reset le minuteur)", () => {
     const llm = fakeLlm();
     const u = new IdleUnloader(llm, { idleMs: 1000 });
 
@@ -40,7 +40,7 @@ describe('IdleUnloader', () => {
     expect(llm.unload).toHaveBeenCalledTimes(1);
   });
 
-  it('ne décharge qu\'une fois le dernier run concurrent terminé', () => {
+  it("ne décharge qu'une fois le dernier run concurrent terminé", () => {
     const llm = fakeLlm();
     const u = new IdleUnloader(llm, { idleMs: 1000 });
 

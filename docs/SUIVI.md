@@ -8,11 +8,19 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-10-06.
+> Dernière mise à jour : 2026-10-08.
 
 ---
 
-## État actuel — 2026-10-06
+## État actuel — 2026-10-08
+
+**⚠ Le projet Supabase ne répond plus** (domaine inexistant en DNS, constaté le
+2026-10-08) : dailys partagées, news et consoles admin sont muettes partout.
+À réactiver depuis le tableau de bord Supabase — [AMELIORATIONS.md](AMELIORATIONS.md) § 0.
+
+**Branche `refactor/audit-complet`** (depuis `dev`) : audit complet du
+2026-10-07 puis latence du 2026-10-08 — [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)
+vers `dev`, ouverte le 2026-10-08.
 
 **`master` = 0.2.0, pas encore publiée** (refonte d'août, voix, deux lignes de
 distribution, cycle de version). **On travaille sur `dev`**, qui ne bouge
@@ -26,11 +34,72 @@ figée à 0.1.3 sur `catdesk-releases`, et rien n'est publié tant que
 La prochaine est la **0.2.0 elle-même** : rien à coder, tout bloque sur toi
 (§ 0).
 
-**Portes** : type-check 3/3, lint 0, 640 tests agent, 47 desktop, 32 Rust
-(+ 4 de fumée ignorés en CI), 7 Python, `clippy -D warnings`, `fmt --check`,
-prettier no-op — et **CI verte** sur la PR #24 (elle était rouge sur `master`
+**Portes** (branche) : type-check 3/3, lint 0, `format:check`, 738 tests agent,
+54 desktop, 35 Rust (+ 4 de fumée ignorés en CI), 14 Python, `clippy -D
+warnings`, `fmt --check`. Sur `master` : **CI verte** depuis la PR #24 (elle était rouge sur `master`
 depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
 antérieures, suivies dans #25 (jalon 0.2.1).
+
+## 2026-10-08 — Latence : premier token en 1-2 s
+
+Demande : « la latence et la vitesse seront toujours le plus gros problème,
+corrige-la ». Mesuré par le protocole réel de l'agent, derrière un proxy qui
+journalise chaque appel à Ollama, avec les réglages de prod (`q4_0` + flash
+attention) et les mêmes trois questions enchaînées :
+
+| Premier token | Avant  | Après                                                 |
+| ------------- | ------ | ----------------------------------------------------- |
+| Question 1    | 34,4 s | 1,2 s (chargement fait pendant la saisie)             |
+| Question 2    | 19,4 s | 1,4 s                                                 |
+| Question 3    | 47,1 s | 1,9 s                                                 |
+| Après pause   | —      | 2,3-2,5 s (travail de fond, puis cache re-préchauffé) |
+
+Cinq causes, toutes corrigées : modèle **rechargé deux fois par message**
+(num_ctx absent des appels de fond) ; **heure à la seconde** dans le prompt
+système (cache d'Ollama jamais réutilisable) ; **tâches de fond** lancées juste
+après la réponse (la question suivante attendait) ; **outils parasites**
+(« quelle est la capitale… » tirait describe_screen, read_email…) ; **aucun
+préchauffage**. Nouveaux : `llm/LlmScheduler` (le fond attend 90 s de calme et
+cède le GPU dès qu'un run démarre), commande `chat_warmup` (focus du champ,
+bulle), embeddings sur CPU.
+
+Trouvé au passage : le projet Supabase ne résout plus, et dans ce cas l'agent
+**regénérait toute la revue de presse à chaque lancement** (plusieurs minutes
+de GPU) pour échouer à la publier ; il attend désormais que Supabase revienne.
+Et un arrêt de CatDesk pendant une génération pouvait publier un lot dégradé
+(replis « extraits bruts ») : bloqué. Ce qui coûte encore :
+[AMELIORATIONS.md](AMELIORATIONS.md) § 3 bis.
+
+## 2026-10-07 — Audit complet et refonte (branche `refactor/audit-complet`)
+
+Demande : « refacto, analyser et corriger tout le code ». 15 commits sur
+`refactor/audit-complet` (depuis `dev`, non poussée). Portes : type-check
+3/3, lint 0, `format:check` (nouveau, en CI), **≈ 700 tests agent**,
+54 desktop, 34 Rust, 14 Python, clippy `-D warnings`.
+
+- **Bugs corrigés** : dailys partagées invisibles de l'agent sur un poste
+  installé ; contexte qui gardait les 40 PLUS ANCIENS messages ; délai de
+  permission qui faisait échouer le run ; erreur interne → UI bloquée en
+  « réfléchit… » ; réponse tronquée par Stop mise en cache ; Ollama géré
+  jamais arrêté (et pris pour « externe » ensuite) ; agent jamais relancé ;
+  safe mode perdu si l'agent démarrait lentement ; Réglages › Modèle sans
+  effet ; embeddings coupés à vie après un échec ; démons 6 h/24 h jamais
+  exécutés ; tâche cron annulée ressuscitée.
+- **Sécurité** : chemins déclarés par outil (`pathArgs` — `vault`/`paths`
+  lisaient tout le disque) ; audit expurgé (mots de passe, tokens) ;
+  dot-commands `sqlite3` refusées ; mathjs bridé ; webhook Discord borné ;
+  CSP et capacités réduites.
+- **Architecture** : un client HTTP (`lib/http`), une persistance atomique
+  (`lib/persistence`), `news/supabaseRest`, `memory/embedding`,
+  `lifecycle.ts`, orchestrateur à dépendances nommées, superviseur Rust.
+
+Docs à jour (CAPACITES, SECURITE, AMELIORATIONS, CHANGELOG `[Unreleased]`,
+CLAUDE.md, CONTRIBUTING) ; `@tauri-apps/plugin-notification` retiré du
+desktop. Ce qui n'a pas été fait est listé dans
+[AMELIORATIONS.md](AMELIORATIONS.md) § 3 (« Restes de l'audit »).
+
+**Reste à faire** : pousser la branche et ouvrir la PR vers `dev`, puis
+décider du numéro de version (le contenu correspond au jalon 0.2.1).
 
 ## 2026-10-06 — Nettoyage, branche `dev` et jalons de version
 

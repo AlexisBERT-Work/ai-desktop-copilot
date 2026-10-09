@@ -27,6 +27,10 @@ jobs:
 
       - run: pnpm lint
 
+      # `prettier --check .` (pas un glob) : sous Windows, l'ancien glob
+      # `**/*.{ts,tsx,json,md}` ratait des fichiers et la porte passait à tort.
+      - run: pnpm format:check
+
   # ─── Unit Tests ────────────────────────────────────────────
   test:
     name: Unit Tests
@@ -56,12 +60,28 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.96"
+          toolchain: '1.96'
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
+
+      # sherpa-onnx-sys télécharge ses bibliothèques natives (~1,2 Go extraites)
+      # dans target/sherpa-onnx-prebuilt, que rust-cache ne restaure pas en
+      # entier : le dossier revient, les .lib extraites non. La sortie de son
+      # build script, elle, survit — d'où « could not find native static
+      # library sherpa-onnx-c-api » au premier `cargo test` qui recompile la
+      # crate. Si la bibliothèque manque, on force le build script à se relancer
+      # (il réextrait l'archive, ou la retélécharge).
+      - name: Réparer le cache sherpa-onnx
+        shell: bash
+        run: |
+          t=apps/desktop/src-tauri/target
+          if ! ls "$t"/sherpa-onnx-prebuilt/*/lib/sherpa-onnx-c-api.lib >/dev/null 2>&1; then
+            echo "Bibliothèques sherpa-onnx absentes du cache : build script relancé"
+            rm -rf "$t"/debug/build/sherpa-onnx-sys-* "$t"/debug/.fingerprint/sherpa-onnx-sys-*
+          fi
 
       - run: cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
 
@@ -78,7 +98,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
           cache: pip
           cache-dependency-path: packages/ocr-vision/requirements.txt
 
@@ -109,7 +129,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.96"
+          toolchain: '1.96'
 
       - run: pnpm install --frozen-lockfile
 

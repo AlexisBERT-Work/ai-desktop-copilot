@@ -43,7 +43,9 @@ export class Compactor {
     const throughTs = toFold[toFold.length - 1]!.createdAt;
 
     const summary = await this.summarizer.summarize(toFold, prior?.summary);
-    if (!summary.trim()) return { compacted: false, folded: 0 };
+    // Pas de résumé = on ne touche à rien : avancer le marqueur sans résumé
+    // ferait disparaître ces messages du contexte.
+    if (summary === null || !summary.trim()) return { compacted: false, folded: 0 };
 
     this.store.setSummary(conversationId, summary, throughTs);
     log.info('Conversation compacted', { conversationId, folded: toFold.length, throughTs });

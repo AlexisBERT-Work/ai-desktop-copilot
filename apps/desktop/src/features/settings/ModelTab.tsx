@@ -2,37 +2,38 @@ import { useSettingsStore } from './settingsStore';
 import { useChatStore } from '../chat/store/chatStore';
 import { KvCacheCard } from './KvCacheCard';
 
-/** Onglet Modèle : choix du modèle Ollama, auto-tune GPU, température, itérations, streaming. */
-export function ModelTab() {
-  const { availableModels } = useChatStore();
-  const {
-    defaultModel,
-    temperature,
-    maxIterations,
-    streamingEnabled,
-    setDefaultModel,
-    setTemperature,
-    setMaxIterations,
-    setStreamingEnabled,
-  } = useSettingsStore();
+/** Valeur du <select> pour « laisser CatDesk choisir » (defaultModel = null). */
+const AUTO = '';
 
-  const models = availableModels.length > 0 ? availableModels : [defaultModel];
+/** Onglet Modèle : modèle Ollama, auto-tune GPU, température, itérations. */
+export function ModelTab() {
+  const availableModels = useChatStore(s => s.availableModels);
+  const recommendedModel = useChatStore(s => s.recommendedModel);
+  const chooseModel = useChatStore(s => s.chooseModel);
+  const defaultModel = useSettingsStore(s => s.defaultModel);
+  const temperature = useSettingsStore(s => s.temperature);
+  const maxIterations = useSettingsStore(s => s.maxIterations);
+  const setTemperature = useSettingsStore(s => s.setTemperature);
+  const setMaxIterations = useSettingsStore(s => s.setMaxIterations);
 
   return (
     <div className="space-y-6">
-      {/* Model selector */}
+      {/* Model selector — le même choix que le sélecteur du chat */}
       <div>
         <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-2">
           Modèle Ollama
         </label>
         <select
-          value={defaultModel}
-          onChange={e => setDefaultModel(e.target.value)}
+          value={defaultModel ?? AUTO}
+          onChange={e => chooseModel(e.target.value === AUTO ? null : e.target.value)}
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90
                      focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20
                      appearance-none cursor-pointer"
         >
-          {models.map(m => (
+          <option value={AUTO} className="bg-gray-900 text-white">
+            Automatique — {recommendedModel} (recommandé)
+          </option>
+          {availableModels.map(m => (
             <option key={m} value={m} className="bg-gray-900 text-white">
               {m}
             </option>
@@ -83,9 +84,7 @@ export function ModelTab() {
             min={1}
             max={25}
             value={maxIterations}
-            onChange={e =>
-              setMaxIterations(Math.max(1, Math.min(25, parseInt(e.target.value, 10) || 1)))
-            }
+            onChange={e => setMaxIterations(parseInt(e.target.value, 10) || 1)}
             className="w-20 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90
                        text-center focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20"
           />
@@ -93,28 +92,6 @@ export function ModelTab() {
             Nombre de tours agent max. avant abandon (1–25)
           </span>
         </div>
-      </div>
-
-      {/* Streaming toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-white/80">Streaming des tokens</p>
-          <p className="text-xs text-white/35 mt-0.5">
-            Affiche la réponse mot par mot en temps réel
-          </p>
-        </div>
-        <button
-          role="switch"
-          aria-checked={streamingEnabled}
-          onClick={() => setStreamingEnabled(!streamingEnabled)}
-          className={`relative w-10 h-5.5 rounded-full transition-colors focus:outline-none
-            ${streamingEnabled ? 'bg-brand-500' : 'bg-white/15'}`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-transform
-              ${streamingEnabled ? 'translate-x-4.5' : 'translate-x-0'}`}
-          />
-        </button>
       </div>
     </div>
   );

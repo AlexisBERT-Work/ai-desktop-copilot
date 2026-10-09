@@ -27,6 +27,7 @@ export class BrowserManager {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private launching: Promise<Page> | null = null;
 
   static get(): BrowserManager {
     if (!BrowserManager._instance) {
@@ -39,8 +40,22 @@ export class BrowserManager {
 
   // ─── Lifecycle ─────────────────────────────────────────────────
 
-  private async ensurePage(): Promise<Page> {
-    if (this.page && !this.page.isClosed()) return this.page;
+  /**
+   * Page prête à l'emploi, lancée au premier besoin. Deux défauts corrigés :
+   * deux outils simultanés lançaient chacun leur navigateur (le lancement est
+   * désormais partagé), et une page fermée relançait un navigateur sans fermer
+   * l'ancien, qui restait orphelin jusqu'à la fin de l'agent.
+   */
+  private ensurePage(): Promise<Page> {
+    if (this.page && !this.page.isClosed()) return Promise.resolve(this.page);
+    this.launching ??= this.launch().finally(() => {
+      this.launching = null;
+    });
+    return this.launching;
+  }
+
+  private async launch(): Promise<Page> {
+    await this.close(); // navigateur précédent (page fermée, crash) : ne pas le laisser orphelin
 
     const executablePath = findSystemBrowser();
     log.info('Launching browser', { executablePath: executablePath ?? 'playwright-bundled' });
@@ -63,21 +78,17 @@ export class BrowserManager {
   }
 
   async close(): Promise<void> {
+    if (this.browser === null) return;
     try {
-      await this.page?.close();
-      await this.context?.close();
-      await this.browser?.close();
+      // Fermer le navigateur ferme aussi ses contextes et ses pages.
+      await this.browser.close();
     } catch {
-      // Non-fatal
+      // Non-fatal : déjà fermé ou planté.
     }
     this.page = null;
     this.context = null;
     this.browser = null;
     log.info('Browser closed');
-  }
-
-  shutdown(): void {
-    void this.close();
   }
 
   // ─── Actions ───────────────────────────────────────────────────
@@ -112,7 +123,9 @@ export class BrowserManager {
 
     const b64 = buf.toString('base64');
     if (b64.length > MAX_SCREENSHOT_B64) {
-      throw new Error(`Screenshot trop grande (${Math.round(b64.length / 1024)}KB). Utilisez fullPage: false ou ciblez un élément.`);
+      throw new Error(
+        `Screenshot trop grande (${Math.round(b64.length / 1024)}KB). Utilisez fullPage: false ou ciblez un élément.`,
+      );
     }
     return b64;
   }
@@ -136,7 +149,11 @@ export class BrowserManager {
     await page.locator(selector).first().click({ timeout: timeoutMs });
   }
 
-  async fill(selector: string, text: string, opts: { clearFirst?: boolean; timeoutMs?: number } = {}): Promise<void> {
+  async fill(
+    selector: string,
+    text: string,
+    opts: { clearFirst?: boolean; timeoutMs?: number } = {},
+  ): Promise<void> {
     const page = await this.ensurePage();
     const locator = page.locator(selector).first();
 
