@@ -1,3 +1,6 @@
 # Généré par Tauri à chaque build : ne pas reformater.
 apps/desktop/src-tauri/gen/
 pnpm-lock.yaml
+# pnpm (v10+) réécrit ce fichier lui-même à l'installation (allowBuilds…) :
+# en CI, `pnpm install` le reformatait avant `format:check`.
+pnpm-workspace.yaml

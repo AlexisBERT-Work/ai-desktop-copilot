@@ -67,6 +67,19 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
+      # sherpa-onnx-sys télécharge ses bibliothèques natives dans
+      # target/sherpa-onnx-prebuilt, hors de ce que rust-cache conserve. Après
+      # une restauration partielle (Cargo.lock modifié), la sortie de son build
+      # script survivait sans elles : « could not find native static library
+      # sherpa-onnx-c-api ». On force alors le build script à se relancer.
+      - name: Réparer le cache sherpa-onnx
+        shell: bash
+        run: |
+          t=apps/desktop/src-tauri/target
+          if [ ! -d "$t/sherpa-onnx-prebuilt" ]; then
+            rm -rf "$t"/debug/build/sherpa-onnx-sys-* "$t"/debug/.fingerprint/sherpa-onnx-sys-*
+          fi
+
       - run: cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
 
       - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --tests -- -D warnings
