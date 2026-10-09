@@ -3,6 +3,7 @@ pub mod data_dir;
 pub mod error;
 pub mod hotkeys;
 pub mod ollama;
+pub mod process_tree;
 pub mod resources;
 pub mod sandbox;
 pub mod tray;

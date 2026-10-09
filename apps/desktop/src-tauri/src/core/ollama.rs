@@ -23,6 +23,7 @@
 //! In dev (no bundled binary) this is a no-op: the developer runs their own
 //! Ollama, exactly as before.
 
+use crate::core::process_tree::ProcessTree;
 use crate::core::resources::resource_subdir;
 use std::path::{Path, PathBuf};
 use std::process::Child;
@@ -47,8 +48,9 @@ pub fn http_client() -> reqwest::Client {
         .unwrap_or_default()
 }
 
-/// Le processus `ollama serve` lancé par CatDesk, gardé pour pouvoir l'arrêter.
-static MANAGED_CHILD: Mutex<Option<Child>> = Mutex::new(None);
+/// Le processus `ollama serve` lancé par CatDesk, gardé pour pouvoir l'arrêter,
+/// avec l'arbre qui emporte ses runners `llama-server` (voir process_tree).
+static MANAGED_CHILD: Mutex<Option<(Child, Option<ProcessTree>)>> = Mutex::new(None);
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -178,17 +180,26 @@ pub fn restart(app: &AppHandle) -> bool {
     true
 }
 
-/// Arrête l'Ollama lancé par CatDesk, par son handle. Avant : `taskkill /F /IM
-/// ollama.exe`, qui tuait TOUS les ollama.exe de la machine.
+/// Arrête l'Ollama lancé par CatDesk AVEC ses runners `llama-server` (sinon ils
+/// gardent la VRAM jusqu'au redémarrage). Jamais par nom d'image : l'ancien
+/// `taskkill /F /IM ollama.exe` tuait tous les ollama.exe de la machine.
 fn stop_managed_ollama() {
-    let child = MANAGED_CHILD
+    let managed = MANAGED_CHILD
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .take();
-    if let Some(mut child) = child {
-        let _ = child.kill();
+    if let Some((mut child, tree)) = managed {
+        match &tree {
+            Some(tree) => tree.kill(),
+            None => {
+                let _ = child.kill();
+            }
+        }
         let _ = child.wait();
-        info!("Managed Ollama stopped");
+        info!(
+            "Managed Ollama stopped (with its runners: {})",
+            tree.is_some()
+        );
     }
 }
 
@@ -284,9 +295,16 @@ fn spawn_serve(bin: &PathBuf, models: &Path, kv_cache: &str) {
 
     match cmd.spawn() {
         Ok(child) => {
+            // Rattaché à un arbre tué d'un bloc AVANT que le modèle ne charge :
+            // les runners llama-server lancés ensuite y entrent d'office, et
+            // un plantage de CatDesk les emporte aussi.
+            let tree = ProcessTree::adopt(&child);
+            if tree.is_none() {
+                warn!("Job Object refusé — un arrêt pourrait laisser des runners Ollama");
+            }
             // Gardé pour `shutdown()` / `restart()` : Windows ne tue pas les
             // enfants avec le parent, rien d'autre ne l'arrêterait.
-            *MANAGED_CHILD.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
+            *MANAGED_CHILD.lock().unwrap_or_else(|e| e.into_inner()) = Some((child, tree));
             info!("Ollama server spawned");
         }
         Err(e) => warn!("Failed to spawn bundled Ollama: {e}"),

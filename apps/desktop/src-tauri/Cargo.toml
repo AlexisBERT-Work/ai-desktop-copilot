@@ -39,6 +39,17 @@ reqwest = { version = "0.12", features = ["json"] }
 sherpa-onnx = "1.13"
 cpal = "0.15"
 
+# Job Object : arrêter Ollama AVEC ses runners llama-server (~9 Go de VRAM),
+# y compris si CatDesk plante — core/process_tree.rs. Version déjà présente
+# dans l'arbre de dépendances (tauri).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
 [profile.release]
 opt-level = 3
 lto = true
