@@ -96,20 +96,35 @@ fn is_valid_model_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '_' | '-' | '/'))
 }
 
+/// Identifiant de conversation tel que l'UI les crée (UUID) : il part lui aussi
+/// dans une requête JSON-RPC.
+fn is_valid_conversation_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 100
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+}
+
 /// Préchauffe le modèle quand l'utilisateur ouvre le chat ou commence à taper :
-/// l'agent le charge et lui fait lire le début fixe des requêtes pendant la
-/// saisie (~20 s retirées de la première réponse). Sans effet de bord durable,
-/// donc sans audit ; l'agent l'ignore s'il vient déjà de servir.
+/// l'agent le charge et lui fait lire le début des requêtes — prompt, outils
+/// et historique de la conversation ouverte — pendant la saisie. Sans effet de
+/// bord durable, donc sans audit ; l'agent l'ignore s'il vient déjà de servir.
 #[tauri::command]
-pub async fn chat_warmup(model: String) -> Result<(), String> {
+pub async fn chat_warmup(model: String, conversation_id: Option<String>) -> Result<(), String> {
     if !is_valid_model_name(&model) {
         return Err(CatdeskError::Refused("Nom de modèle invalide".into()).into());
     }
-    forward_to_agent(
-        protocol::RPC_AGENT_WARMUP,
-        serde_json::json!({ "model": model }),
-    )
-    .await
+    let mut params = serde_json::json!({ "model": model });
+    if let Some(id) = conversation_id {
+        if !is_valid_conversation_id(&id) {
+            return Err(
+                CatdeskError::Refused("Identifiant de conversation invalide".into()).into(),
+            );
+        }
+        params["conversationId"] = serde_json::json!(id);
+    }
+    forward_to_agent(protocol::RPC_AGENT_WARMUP, params).await
 }
 
 /// Interrupt the run currently in progress (Stop button).
@@ -181,5 +196,15 @@ mod tests {
         assert!(!is_valid_model_name("qwen3 14b"));
         assert!(!is_valid_model_name("x\"}\n{"));
         assert!(!is_valid_model_name(&"a".repeat(201)));
+    }
+
+    #[test]
+    fn prechauffage_n_accepte_que_des_identifiants_de_conversation_sages() {
+        assert!(is_valid_conversation_id(
+            "31430cdc-1d0e-465b-9191-a8e4e25df187"
+        ));
+        assert!(!is_valid_conversation_id(""));
+        assert!(!is_valid_conversation_id("../../etc"));
+        assert!(!is_valid_conversation_id("a\"}"));
     }
 }

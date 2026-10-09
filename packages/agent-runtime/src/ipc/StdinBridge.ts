@@ -49,7 +49,7 @@ export interface LocalPressControl {
 export interface StdinBridgeDeps {
   orchestrator: AgentOrchestrator;
   /** Préchauffage du modèle demandé par l'UI (ouverture du chat). Fire-and-forget. */
-  warmup?: (model: string) => void | Promise<void>;
+  warmup?: (model: string, conversationId?: string) => void | Promise<void>;
   /** Config bourse poussée par l'UI (symboles + formules des widgets `stocks`). */
   setMarketConfig?: (
     symbols: string[],
@@ -166,12 +166,18 @@ export class StdinBridge {
         // L'utilisateur ouvre le chat : préchauffe le modèle pendant la saisie.
         // Réponse immédiate — le chargement prend de 10 à 20 s.
         case RPC_METHODS.agentWarmup: {
-          const model = (request.params as { model?: unknown } | undefined)?.model;
+          const params = request.params as
+            | { model?: unknown; conversationId?: unknown }
+            | undefined;
+          const model = params?.model;
           if (typeof model !== 'string' || model.trim() === '') {
             this.sendError(request.id, -32602, 'agent.warmup: model requis');
             return;
           }
-          if (this.deps.warmup) void this.deps.warmup(model);
+          // Conversation ouverte dans l'UI : son historique est relu d'avance.
+          const conversationId =
+            typeof params?.conversationId === 'string' ? params.conversationId : undefined;
+          if (this.deps.warmup) void this.deps.warmup(model, conversationId);
           this.sendResponse(request.id, { ok: true });
           return;
         }

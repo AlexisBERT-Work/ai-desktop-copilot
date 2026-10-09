@@ -12,10 +12,11 @@ export function chatSend(payload: ChatSendPayload): Promise<void> {
 
 /**
  * Préchauffe le modèle (ouverture du chat, début de saisie) : l'agent le charge
- * et lit le début fixe des requêtes pendant que l'utilisateur tape.
+ * et lit le début des requêtes — dont l'historique de `conversationId` —
+ * pendant que l'utilisateur tape.
  */
-export function chatWarmup(model: string): Promise<void> {
-  return invoke('chat_warmup', { model });
+export function chatWarmup(model: string, conversationId?: string): Promise<void> {
+  return invoke('chat_warmup', { model, conversationId });
 }
 
 /** Interrompt le run en cours (bouton Stop). */

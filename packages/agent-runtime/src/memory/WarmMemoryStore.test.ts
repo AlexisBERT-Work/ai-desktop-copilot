@@ -51,6 +51,13 @@ describe('WarmMemoryStore', () => {
     expect(store.getActiveFacts()[0]?.confidence).toBe(0.9);
   });
 
+  it('getActiveFacts(minConfidence) écarte les faits incertains (« Brésilien », 0,1)', () => {
+    store.upsert({ kind: 'fact', subject: 'capitale_bresil', value: 'Brésilien', confidence: 0.1 });
+    store.upsert({ kind: 'preference', subject: 'editeur', value: 'VS Code', confidence: 0.9 });
+    expect(store.getActiveFacts(20, 0.5).map(f => f.value)).toEqual(['VS Code']);
+    expect(store.getActiveFacts()).toHaveLength(2); // rien n'est supprimé
+  });
+
   it('supersedes the old value on contradiction (same subject, new value)', () => {
     store.upsert({ kind: 'fact', subject: 'employeur', value: 'travaille chez X' });
     const changed = store.upsert({

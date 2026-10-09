@@ -128,7 +128,7 @@ export function InputArea({ conversationId }: Props) {
       </div>
 
       <p className="text-center text-xs text-white/15 mt-2">
-        CatDesk uses local AI — your data never leaves this machine.
+        CatDesk tourne en local : vos données ne quittent jamais cette machine.
       </p>
     </div>
   );

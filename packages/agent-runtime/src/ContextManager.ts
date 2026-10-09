@@ -3,12 +3,26 @@ import type { ConversationStore } from './memory/ConversationStore';
 import type { VectorStore } from './memory/VectorStore';
 import type { WarmMemoryStore } from './memory/WarmMemoryStore';
 import { createLogger } from './logger';
+import { looksGarbled } from './lib/readableText';
 
 const log = createLogger('agent:context');
 
 const MAX_CONTEXT_CHARS = 12_000; // ~3000 tokens rough estimate
 const RECENT_MESSAGES_LIMIT = 20;
 const WARM_FACTS_LIMIT = 20;
+/**
+ * Seuil de confiance d'un fait durable pour entrer dans le prompt. L'extracteur
+ * note lui-même ses faits ; « Brésilien » (confiance 0,1), tiré d'une question
+ * sur la capitale du Brésil, s'affichait sinon comme vérité à chaque message.
+ */
+const WARM_FACT_MIN_CONFIDENCE = 0.5;
+/**
+ * Souvenirs injectés au dernier message : jamais en cache chez Ollama, donc
+ * relus à CHAQUE tour. Bornés en nombre et en taille (un échange mémorisé
+ * pouvait dépasser 4 000 caractères, ~1 000 tokens, soit ~8 s de lecture).
+ */
+const MEMORY_LIMIT = 3;
+const MEMORY_SNIPPET_CHARS = 400;
 
 export interface AgentContext {
   messages: OllamaMessage[];
@@ -35,7 +49,11 @@ export class ContextManager {
    */
   getWarmFacts(): string[] {
     try {
-      return this.warmStore?.getActiveFacts(WARM_FACTS_LIMIT).map(f => `- ${f.value}`) ?? [];
+      return (
+        this.warmStore
+          ?.getActiveFacts(WARM_FACTS_LIMIT, WARM_FACT_MIN_CONFIDENCE)
+          .map(f => `- ${f.value}`) ?? []
+      );
     } catch (err) {
       log.warn('Warm facts read failed', {
         error: err instanceof Error ? err.message : String(err),
@@ -44,7 +62,12 @@ export class ContextManager {
     }
   }
 
-  async buildContext(conversationId: string, userInput: string): Promise<AgentContext> {
+  /**
+   * Historique d'une conversation tel que le modèle le reçoit : messages après
+   * le marqueur de compaction, bornés en taille, et résumé glissant. Sert au
+   * run ET au préchauffage — le même texte, pour qu'Ollama le garde en cache.
+   */
+  history(conversationId: string): { messages: OllamaMessage[]; summary?: string } {
     // If older turns were compacted, load only the messages after the marker
     // and surface the rolling summary instead of the dropped history. Store
     // reads are synchronous: wrapped so a failure degrades to an empty history
@@ -63,6 +86,14 @@ export class ContextManager {
     } catch (err) {
       log.warn('History read failed', { error: err instanceof Error ? err.message : String(err) });
     }
+    return {
+      messages: this.trimMessages(messages, MAX_CONTEXT_CHARS),
+      ...(summaryRow?.summary ? { summary: summaryRow.summary } : {}),
+    };
+  }
+
+  async buildContext(conversationId: string, userInput: string): Promise<AgentContext> {
+    const { messages: trimmed, summary } = this.history(conversationId);
 
     let memories: string[] = [];
     try {
@@ -77,16 +108,20 @@ export class ContextManager {
               r.metadata?.['kind'] === 'exchange' && r.metadata['conversationId'] === conversationId
             ),
         )
-        .slice(0, 5)
-        .map(r => r.content);
+        // Réponses corrompues de l'incident KV-cache de juin 2026, encore en
+        // mémoire : ne jamais les resservir au modèle.
+        .filter(r => !looksGarbled(r.content))
+        .slice(0, MEMORY_LIMIT)
+        .map(r =>
+          r.content.length > MEMORY_SNIPPET_CHARS
+            ? `${r.content.slice(0, MEMORY_SNIPPET_CHARS).trimEnd()}…`
+            : r.content,
+        );
     } catch (err) {
       log.debug('Semantic recall failed', { error: String(err) });
     }
 
     const warmFacts = this.getWarmFacts();
-
-    // Trim messages to fit context budget
-    const trimmed = this.trimMessages(messages, MAX_CONTEXT_CHARS);
 
     log.debug('Context built', {
       conversationId,
@@ -99,7 +134,7 @@ export class ContextManager {
       messages: trimmed,
       ...(memories.length > 0 ? { relevantMemories: memories } : {}),
       ...(warmFacts.length > 0 ? { warmFacts } : {}),
-      ...(summaryRow?.summary ? { conversationSummary: summaryRow.summary } : {}),
+      ...(summary ? { conversationSummary: summary } : {}),
     };
   }
 
@@ -127,6 +162,8 @@ export class ContextManager {
     userText: string,
     assistantText: string,
   ): Promise<void> {
+    // Une réponse corrompue ne doit pas devenir un souvenir resservi plus tard.
+    if (looksGarbled(assistantText)) return;
     const content = `Utilisateur : ${userText.trim()}\nAssistant : ${assistantText.trim()}`.trim();
     if (content.length < 16) return; // nothing worth indexing
     try {

@@ -260,7 +260,7 @@ async function main(): Promise<void> {
   const bridge = new StdinBridge({
     orchestrator,
     // L'UI ouvre le chat : charger le modèle et lire le prompt fixe pendant la saisie.
-    warmup: model => orchestrator.warmupForUser(model),
+    warmup: (model, conversationId) => orchestrator.warmupForUser(model, conversationId),
     setMarketConfig: async (symbols, formulas) => {
       market.setWatchlist(symbols);
       market.setFormulas(formulas);

@@ -67,6 +67,7 @@ interface ChatState {
  */
 const WARMUP_THROTTLE_MS = 60_000;
 let lastWarmupAt = 0;
+let lastWarmupConversation: string | null = null;
 
 const DEFAULT_CONVERSATION_ID = crypto.randomUUID();
 const NEW_CONVERSATION_TITLE = 'Nouvelle conversation';
@@ -204,12 +205,16 @@ export const useChatStore = create<ChatState>()(
     },
 
     warmUp: () => {
-      const { isStreaming, selectedModel } = get();
+      const { isStreaming, selectedModel, activeConversationId } = get();
       const now = Date.now();
-      if (isStreaming || now - lastWarmupAt < WARMUP_THROTTLE_MS) return;
+      // Une autre conversation ouverte : son historique est à relire, on passe
+      // outre la limite d'un appel par minute.
+      const sameConversation = activeConversationId === lastWarmupConversation;
+      if (isStreaming || (sameConversation && now - lastWarmupAt < WARMUP_THROTTLE_MS)) return;
       lastWarmupAt = now;
+      lastWarmupConversation = activeConversationId;
       // Best-effort : un agent pas encore prêt n'est pas une erreur à montrer.
-      chatWarmup(selectedModel).catch(() => undefined);
+      chatWarmup(selectedModel, activeConversationId).catch(() => undefined);
     },
 
     interrupt: async () => {
@@ -272,6 +277,8 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         s.activeConversationId = id;
       });
+      // Une question suit souvent : relire d'avance l'historique de celle-ci.
+      get().warmUp();
     },
 
     chooseModel: model => {

@@ -29,6 +29,7 @@ import type { PlaybookStore } from './playbook/PlaybookStore';
 import { approachSignature } from './playbook/PlaybookStore';
 import { classifyTask, type TaskType } from './playbook/classifyTask';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
+import { looksGarbled } from './lib/readableText';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
 import { buildSystemPrompt, buildTurnContext, withTurnContext } from './prompts/systemPrompt';
@@ -115,6 +116,8 @@ export class AgentOrchestrator {
   private lastForegroundUse = 0;
   /** Modèle du dernier run : celui que le re-préchauffage du cache doit servir. */
   private lastModel: string | undefined;
+  /** Conversation du dernier run ou préchauffage : celle que le re-préchauffage relit. */
+  private lastConversationId: string | undefined;
   /** Outils envoyés au dernier tour de chaque conversation (voir `toolsForTurn`). */
   private readonly turnTools = new Map<string, string[]>();
 
@@ -231,23 +234,30 @@ export class AgentOrchestrator {
 
   /**
    * Préchauffage demandé par l'UI (ouverture du chat, début de saisie) : charge
-   * le modèle et lui fait lire le début fixe de la prochaine requête pendant
-   * que l'utilisateur tape — mesuré : ~11 s de chargement + ~10 s de lecture du
-   * prompt système, retirés de la première réponse. Ignoré si un run tourne ou
-   * vient de finir (modèle chaud, cache déjà meilleur). Ne lève jamais.
+   * le modèle et lui fait lire le début de la prochaine requête — prompt
+   * système, outils et HISTORIQUE de la conversation ouverte — pendant que
+   * l'utilisateur tape. Mesuré : ~11 s de chargement + la lecture du prompt
+   * (jusqu'à ~60 s dans une conversation longue) retirés de la première
+   * réponse. Ignoré si un run tourne, ou si le modèle vient de servir à cette
+   * même conversation (cache déjà bon). Ne lève jamais.
    */
-  async warmupForUser(model: string): Promise<void> {
+  async warmupForUser(model: string, conversationId?: string): Promise<void> {
     if (this.activeRuns > 0) return;
-    if (Date.now() - this.lastForegroundUse < WARMUP_SKIP_IF_ACTIVE_WITHIN_MS) return;
+    const sameConversation =
+      conversationId === undefined || conversationId === this.lastConversationId;
+    if (sameConversation && Date.now() - this.lastForegroundUse < WARMUP_SKIP_IF_ACTIVE_WITHIN_MS) {
+      return;
+    }
     this.lastForegroundUse = Date.now();
     this.lastModel = model;
+    if (conversationId !== undefined) this.lastConversationId = conversationId;
     const { scheduler, idleUnloader } = this.deps;
     scheduler?.beginForeground();
     // Mode passif : un chat ouvert puis délaissé ne doit pas garder la VRAM.
     idleUnloader?.begin(model);
     const started = Date.now();
     try {
-      await this.primeCache(undefined, model);
+      await this.primeCache(undefined, model, conversationId);
       log.info('Model warmed up', { model, ms: Date.now() - started });
     } catch (err) {
       log.debug('Warmup failed (ignored)', { model, error: String(err) });
@@ -259,19 +269,30 @@ export class AgentOrchestrator {
   }
 
   /**
-   * Fait lire au modèle le début FIXE de toute requête de chat — prompt système
-   * puis noyau d'outils, dans l'ordre exact où `run` les envoie — pour qu'Ollama
-   * l'ait en cache. Sert au préchauffage et, via LlmScheduler, à réparer le
-   * cache après du travail de fond. Lève sur erreur ou interruption.
+   * Fait lire au modèle le début de la prochaine requête de chat, dans l'ordre
+   * exact où `run` l'envoie — prompt système, outils, puis l'historique de
+   * `conversationId` s'il y en a une — pour qu'Ollama l'ait en cache. Sert au
+   * préchauffage et, via LlmScheduler, à réparer le cache après du travail de
+   * fond (dernière conversation active). Lève sur erreur ou interruption.
    */
-  async primeCache(signal?: AbortSignal, model = this.lastModel): Promise<void> {
+  async primeCache(
+    signal?: AbortSignal,
+    model = this.lastModel,
+    conversationId = this.lastConversationId,
+  ): Promise<void> {
     if (model === undefined) return;
     const { llm, tools, context } = this.deps;
+    const enabled = tools.getEnabled();
+    const known = conversationId !== undefined ? this.turnTools.get(conversationId) : undefined;
+    const turnTools = known
+      ? known.flatMap(n => enabled.find(t => t.name === n) ?? [])
+      : coreTools(enabled, TOOL_LIMIT);
+    const history = conversationId !== undefined ? context.history(conversationId).messages : [];
     const stream = llm.streamChat({
       model,
       system: buildSystemPrompt(context.getWarmFacts()),
-      messages: [{ role: 'user', content: '.' }],
-      tools: coreTools(tools.getEnabled(), TOOL_LIMIT).map(t => t.toOllamaSchema()),
+      messages: [...history, { role: 'user', content: '.' }],
+      tools: turnTools.map(t => t.toOllamaSchema()),
       temperature: 0,
       numCtx: NUM_CTX,
       maxTokens: 1,
@@ -335,6 +356,7 @@ export class AgentOrchestrator {
     // Choix du modèle (auto/light/code) une fois par run.
     const model = this.pickModel(input, availableTools.length > 0, config);
     this.lastModel = model;
+    this.lastConversationId = conversationId;
 
     const interrupted = (iteration: number): boolean => {
       if (!signal?.aborted) return false;
@@ -675,7 +697,8 @@ export class AgentOrchestrator {
     // Semantic cache (§E): only cache tool-free answers to a standalone
     // query — a tool result reflects mutable world state, and a follow-up
     // answer depends on context that won't be present next time.
-    if (cache && opts.standalone && opts.usedTools.length === 0) {
+    // Jamais une réponse corrompue : le cache la resservirait telle quelle.
+    if (cache && opts.standalone && opts.usedTools.length === 0 && !looksGarbled(answer)) {
       void cache
         .put(input, answer)
         .catch(err => log.debug('Semantic cache put failed', { error: String(err) }));

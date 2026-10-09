@@ -104,6 +104,24 @@ describe('ContextManager semantic recall (rememberExchange)', () => {
     expect(c.relevantMemories ?? []).toHaveLength(0);
   });
 
+  it('ne mémorise ni ne resservit une réponse corrompue (incident KV-cache)', async () => {
+    const garbled =
+      'l d \\1\\0 14 2 31 23 1 9t 3 8e 2 6 1 7 1 21s 9 8 p 5 4 583 2 4 2 6 1 9 e 7 1 3e 8 5';
+    await ctx.rememberExchange('conv-A', 'quelle est la capitale de la france', garbled);
+    const c = await ctx.buildContext('conv-B', 'capitale de la france');
+    expect(c.relevantMemories ?? []).toHaveLength(0);
+  });
+
+  it('borne les souvenirs : trois au plus, 400 caractères chacun', async () => {
+    const long = 'Le port Postgres est 5544, et ' + 'la configuration détaillée suit. '.repeat(40);
+    for (const conv of ['A', 'B', 'C', 'D', 'E']) {
+      await ctx.rememberExchange(`conv-${conv}`, 'Quel est le port Postgres ?', long);
+    }
+    const memories = (await ctx.buildContext('conv-Z', 'port postgres')).relevantMemories ?? [];
+    expect(memories.length).toBeLessThanOrEqual(3);
+    for (const m of memories) expect(m.length).toBeLessThanOrEqual(401);
+  });
+
   it("ne resservit pas en « souvenirs » les échanges de la MÊME conversation (déjà dans l'historique)", async () => {
     await ctx.rememberExchange(
       'conv-A',

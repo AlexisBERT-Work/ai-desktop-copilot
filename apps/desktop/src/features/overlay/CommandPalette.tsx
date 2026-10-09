@@ -49,43 +49,43 @@ export function CommandPalette() {
     () => [
       {
         id: 'screenshot',
-        label: 'Capture & analyze screen',
-        description: "Take a screenshot and describe what's on screen",
+        label: "Capturer et analyser l'écran",
+        description: "Prend une capture et décrit ce qu'il y a à l'écran",
         icon: <Camera className="w-4 h-4" />,
         action: () => sendAndExpand('Capture mon écran et décris ce que tu vois en détail.'),
       },
       {
         id: 'clipboard',
-        label: 'Analyze clipboard',
-        description: 'Read and summarize clipboard content',
+        label: 'Analyser le presse-papier',
+        description: 'Lit et résume le contenu du presse-papier',
         icon: <Clipboard className="w-4 h-4" />,
         action: () => sendAndExpand('Lis mon presse-papier et résume ou améliore le contenu.'),
       },
       {
         id: 'run-cmd',
-        label: 'Run a command',
-        description: 'Execute PowerShell or CMD',
+        label: 'Lancer une commande',
+        description: 'Exécute une commande PowerShell ou CMD',
         icon: <Terminal className="w-4 h-4" />,
         action: () => sendAndExpand('Je veux exécuter une commande. Aide-moi.'),
       },
       {
         id: 'file',
-        label: 'Analyze a file',
-        description: 'Open and analyze a document',
+        label: 'Analyser un fichier',
+        description: 'Ouvre et analyse un document',
         icon: <FileText className="w-4 h-4" />,
         action: () => sendAndExpand('Analyse un fichier pour moi.'),
       },
       {
         id: 'dashboard',
         label: 'Marchés & News',
-        description: 'Open the markets & news dashboard (separate window)',
+        description: 'Ouvre le tableau de bord marchés et news (fenêtre séparée)',
         icon: <LayoutDashboard className="w-4 h-4" />,
         action: () => void openDashboardWindow(),
       },
       {
         id: 'settings',
-        label: 'Open settings',
-        description: 'Configure models, permissions, and hotkeys',
+        label: 'Ouvrir les réglages',
+        description: 'Modèles, permissions et raccourcis',
         icon: <Settings className="w-4 h-4" />,
         action: () => setMode('settings'),
       },
@@ -132,7 +132,7 @@ export function CommandPalette() {
             setSelected(0);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Search commands..."
+          placeholder="Chercher une commande…"
           className="flex-1 bg-transparent text-white placeholder-white/30 outline-none text-sm"
         />
         <button onClick={() => setMode('hidden')}>

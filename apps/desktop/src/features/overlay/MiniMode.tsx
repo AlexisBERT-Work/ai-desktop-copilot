@@ -104,12 +104,20 @@ function QuickActions() {
 
   const actions = [
     {
-      label: 'Screenshot & analyze',
+      label: 'Capturer et analyser',
       Icon: Camera,
-      query: 'Capture my screen and tell me what you see',
+      query: 'Capture mon écran et décris ce que tu vois.',
     },
-    { label: 'Read clipboard', Icon: Clipboard, query: 'Read my clipboard and summarize it' },
-    { label: 'Run command', Icon: Terminal, query: 'Run a PowerShell command for me' },
+    {
+      label: 'Lire le presse-papier',
+      Icon: Clipboard,
+      query: 'Lis mon presse-papier et résume-le.',
+    },
+    {
+      label: 'Lancer une commande',
+      Icon: Terminal,
+      query: 'Exécute une commande PowerShell pour moi.',
+    },
   ];
 
   const sendMessage = useChatStore(s => s.sendMessage);

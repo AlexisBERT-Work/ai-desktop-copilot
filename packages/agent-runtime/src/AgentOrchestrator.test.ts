@@ -110,6 +110,7 @@ function makeHarness(opts: HarnessOptions = {}) {
       ...(opts.relevantMemories ? { relevantMemories: opts.relevantMemories } : {}),
     }),
     getWarmFacts: () => opts.warmFacts ?? [],
+    history: () => ({ messages: opts.priorMessages ?? [] }),
     recordTurn,
     rememberExchange,
   } as unknown as ContextManager;
@@ -533,5 +534,24 @@ describe('AgentOrchestrator — latence', () => {
       (call?.tools as Array<{ function: { name: string } }> | undefined)?.map(t => t.function.name);
     expect(names(h.llmCalls[0])).toContain('post_tech_news_discord');
     expect(names(h.llmCalls[1])).toEqual(names(h.llmCalls[0]));
+  });
+});
+
+describe('AgentOrchestrator — préchauffage de la conversation ouverte', () => {
+  it("relit l'historique de la conversation : la question suivante n'a plus que son message à lire", async () => {
+    const priorMessages: OllamaMessage[] = [
+      { role: 'user', content: 'Quelle est la capitale du Japon ?' },
+      { role: 'assistant', content: 'Tokyo.' },
+    ];
+    const h = makeHarness({ turns: [[], [token('Ottawa.')]], priorMessages });
+    await h.orchestrator.warmupForUser('qwen3:14b', 'conv-1');
+    await collect(h.orchestrator.process('Et celle du Canada ?', 'conv-1', CONFIG));
+
+    const [warm, run] = h.llmCalls;
+    // Même début : système, outils, historique — seul le dernier message diffère.
+    expect(warm?.system).toBe(run?.system);
+    expect(warm?.tools).toEqual(run?.tools);
+    expect(warm?.messages.slice(0, -1)).toEqual(run?.messages.slice(0, -1));
+    expect(warm?.messages.slice(0, -1)).toEqual(priorMessages);
   });
 });

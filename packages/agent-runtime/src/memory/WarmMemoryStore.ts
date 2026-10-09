@@ -118,11 +118,12 @@ export class WarmMemoryStore {
   }
 
   /** Active facts, most recently updated first. */
-  getActiveFacts(limit = 50): WarmFact[] {
+  /** Faits actifs, les plus récents d'abord ; `minConfidence` écarte les faits incertains. */
+  getActiveFacts(limit = 50, minConfidence = 0): WarmFact[] {
     const stmt = this.db.prepare(
-      `SELECT * FROM warm_facts WHERE active=1 ORDER BY updated_at DESC LIMIT ?`,
+      `SELECT * FROM warm_facts WHERE active=1 AND confidence >= ? ORDER BY updated_at DESC LIMIT ?`,
     );
-    stmt.bind([limit]);
+    stmt.bind([minConfidence, limit]);
     const rows: WarmFact[] = [];
     while (stmt.step()) rows.push(this.rowToFact(stmt.getAsObject()));
     stmt.free();
