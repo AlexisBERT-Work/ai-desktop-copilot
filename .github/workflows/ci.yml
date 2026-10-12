@@ -73,14 +73,19 @@ jobs:
       # build script, elle, survit — d'où « could not find native static
       # library sherpa-onnx-c-api » au premier `cargo test` qui recompile la
       # crate. Si la bibliothèque manque, on force le build script à se relancer
-      # (il réextrait l'archive, ou la retélécharge).
+      # ET on retire le dossier extrait : le build script saute l'extraction dès
+      # que `<archive>/lib/` existe, même vide (vu en CI le 2026-10-09). Il
+      # réextrait alors l'archive restée dans le cache, ou la retélécharge.
       - name: Réparer le cache sherpa-onnx
         shell: bash
         run: |
           t=apps/desktop/src-tauri/target
           if ! ls "$t"/sherpa-onnx-prebuilt/*/lib/sherpa-onnx-c-api.lib >/dev/null 2>&1; then
-            echo "Bibliothèques sherpa-onnx absentes du cache : build script relancé"
+            echo "Bibliothèques sherpa-onnx absentes du cache : réextraction forcée"
             rm -rf "$t"/debug/build/sherpa-onnx-sys-* "$t"/debug/.fingerprint/sherpa-onnx-sys-*
+            if [ -d "$t"/sherpa-onnx-prebuilt ]; then
+              find "$t"/sherpa-onnx-prebuilt -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+            fi
           fi
 
       - run: cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
