@@ -14,6 +14,24 @@ cd ai-desktop-copilot
 Prerequisites and model setup are in the [README](README.md#quick-start). Node 22 and
 pnpm 11.3 are hard floors, not suggestions — CI builds with exactly those.
 
+### A second machine
+
+Git carries the code, not the local state. On another machine, after `setup.ps1`:
+
+| What                                                    | Where                                  | How                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Supabase URL + anon key for the webview (news, dailies) | `apps/desktop/.env`                    | Copy it from the first machine, or fill in `.env.example`. Without it the news panels stay empty.                        |
+| Discord webhooks, Supabase admin account (extras only)  | `packages/agent-runtime/.env`          | Copy it from the first machine. Without it the standard press digest still publishes.                                    |
+| Voice models (~800 MB)                                  | `%LOCALAPPDATA%\nd-voice-models`       | `powershell -File scripts\fetch-voice-models.ps1`                                                                        |
+| Ollama models                                           | Ollama's store                         | `setup.ps1` offers to pull them, or the three `ollama pull` in the README.                                               |
+| Rust build directory (optional)                         | `CARGO_TARGET_DIR` user variable       | e.g. `%LOCALAPPDATA%\nd-target`: keeps several GB of build output (sherpa-onnx alone extracts ~1.2 GB) out of the clone. |
+| Update signing key — only to run `publish-update.ps1`   | `%USERPROFILE%\.tauri\catdesk.key`     | Copy it by USB, never through git or a synced folder. Its password is stored nowhere: you type it.                       |
+| Agent memory and conversations                          | `%APPDATA%\com.catdesk.app\agent-data` | Starts empty. Copy it only to keep the history.                                                                          |
+
+The latency figures in `docs/SUIVI.md` were measured on an RX 6700 (10 GB of VRAM), which
+is about what `qwen3:14b` needs. With less VRAM, Ollama spills layers to the CPU and every
+answer gets slower: compare on the new machine with `node scripts/latency-bench.mjs`.
+
 ## Branches
 
 Two long-lived branches:

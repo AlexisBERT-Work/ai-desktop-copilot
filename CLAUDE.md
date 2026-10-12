@@ -85,7 +85,7 @@ Latence — **le problème n°1 du produit** (2026-10-08 : premier token passé 
 
 - **Ne jamais lire** : `pnpm-lock.yaml` (200 Ko), `node_modules/`,
   `packages/ocr-vision/.venv/`, `packages/ocr-vision/build-dist/` (bloqués via
-  `.claude/settings.local.json`).
+  `.claude/settings.json`, versionné : la règle suit le dépôt sur tout poste).
 - **Glob ne respecte pas `.gitignore`** (il ressort node_modules/.venv) → préférer
   Grep (ripgrep, qui le respecte) ou `git ls-files`.
 - Compter/inventorier les outils agent :

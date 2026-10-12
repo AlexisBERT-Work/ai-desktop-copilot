@@ -8,19 +8,23 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-10-08.
+> Dernière mise à jour : 2026-10-12.
 
 ---
 
-## État actuel — 2026-10-08
+## État actuel — 2026-10-12
 
-**⚠ Le projet Supabase ne répond plus** (domaine inexistant en DNS, constaté le
-2026-10-08) : dailys partagées, news et consoles admin sont muettes partout.
-À réactiver depuis le tableau de bord Supabase — [AMELIORATIONS.md](AMELIORATIONS.md) § 0.
+**Branche de travail : `refactor/audit-complet`** (depuis `dev`, tout est
+poussé) — audit complet du 2026-10-07, latence du 2026-10-08, tests dans l'app
+réelle du 2026-10-09. [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)
+vers `dev`, à relire et fusionner ([AMELIORATIONS.md](AMELIORATIONS.md) § 0).
+Pour reprendre sur un autre poste : `git switch refactor/audit-complet`, puis
+la liste de ce que git ne transporte pas dans
+[CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**Branche `refactor/audit-complet`** (depuis `dev`) : audit complet du
-2026-10-07 puis latence du 2026-10-08 — [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)
-vers `dev`, ouverte le 2026-10-08.
+**Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
+session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
+publiée avant la coupure : 2026-08-31 ; la revue reprend au prochain lancement.
 
 **`master` = 0.2.0, pas encore publiée** (refonte d'août, voix, deux lignes de
 distribution, cycle de version). **On travaille sur `dev`**, qui ne bouge
@@ -34,11 +38,39 @@ figée à 0.1.3 sur `catdesk-releases`, et rien n'est publié tant que
 La prochaine est la **0.2.0 elle-même** : rien à coder, tout bloque sur toi
 (§ 0).
 
-**Portes** (branche) : type-check 3/3, lint 0, `format:check`, 738 tests agent,
-54 desktop, 35 Rust (+ 4 de fumée ignorés en CI), 14 Python, `clippy -D
+**Portes** (branche) : type-check 3/3, lint 0, `format:check`, 752 tests agent,
+54 desktop, 38 Rust (+ 4 de fumée ignorés en CI), 14 Python, `clippy -D
 warnings`, `fmt --check`. Sur `master` : **CI verte** depuis la PR #24 (elle était rouge sur `master`
 depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
-antérieures, suivies dans #25 (jalon 0.2.1).
+antérieures, suivies dans #25 (jalon 0.2.1). Sur la PR #26, le job Rust
+échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
+
+Tests pilotés dans la vraie fenêtre (WebView2 en débogage distant), avec les
+données réelles : chat, palette, bulle, et dialogue de permission (« Refuser »
+→ l'outil n'est pas lancé). Les mesures du 2026-10-08 ne tenaient pas avec un
+vrai historique : la **première question d'une session** relisait 4 588 tokens
+(61-71 s).
+
+| Premier token, app réelle | Avant   | Après |
+| ------------------------- | ------- | ----- |
+| Première question         | 61-71 s | 3,5 s |
+| Questions suivantes       | ~10 s   | ~3 s  |
+
+Corrigé : le **préchauffage relit aussi la conversation ouverte** (l'UI passe
+son identifiant à `chat_warmup`) ; la mémoire resservait des **réponses
+corrompues** de l'incident KV-cache de juin (`lib/readableText.looksGarbled`
+les écarte) et des faits de confiance 0,1 comme des vérités (seuil 0,5) ;
+souvenirs bornés à 3 × 400 caractères. **Fuite de VRAM** : arrêter Ollama
+laissait ses runners `llama-server` tenir jusqu'à 9 Go jusqu'au redémarrage du
+PC — Ollama vit maintenant dans un _Job Object_ Windows. Dialogue de permission,
+bulle et palette en français.
+
+Qualité (12 questions enchaînées — capitales, calcul, auteurs, rappel d'une
+question passée — température 0,7) : 10/12 et 9/12. Les ratés sont surtout de
+forme : « Victor. » / « Émile. » quand on demande le nom de l'auteur. Pas de
+comparaison avec l'ancien code.
 
 ## 2026-10-08 — Latence : premier token en 1-2 s
 

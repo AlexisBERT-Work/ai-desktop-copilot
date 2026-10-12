@@ -3,7 +3,7 @@
 > **Ce document répond à une seule question : que reste-t-il à faire ?**
 > Il existe pour que les contradictions et les manques **cessent d'être
 > implicites**. Rien ici n'est un bug bloquant : ce sont des décisions que
-> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-10-08.
+> quelqu'un doit prendre, et des dettes assumées. À jour au 2026-10-12.
 >
 > Où en est le projet : [SUIVI.md](SUIVI.md) · ce que l'agent sait faire :
 > [CAPACITES.md](CAPACITES.md) · ce qu'il ne sait pas faire :
@@ -15,14 +15,14 @@
 
 Six choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
-| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                                                            |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0   | **Réactiver le projet Supabase** (`mpnpfbfjjkujiyeqrcwc`) depuis le tableau de bord Supabase — **urgent**.                                      | Constaté le 2026-10-08 : son domaine **n'existe plus en DNS** (même via 8.8.8.8). Dailys partagées, news et consoles admin sont muettes pour tous les postes. L'agent ne régénère plus la revue pour rien pendant ce temps (il attend que Supabase revienne). Seul le propriétaire du compte peut le restaurer. |
-| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe.                                      |
-| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                                                     |
-| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                                                           |
-| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                                                                 |
-| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                                                             |
+| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | **Relire et fusionner la [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)** (`refactor/audit-complet` → `dev`).          | Audit, latence et correctifs du 2026-10-07 au 2026-10-09 : ~30 commits. Tout est testé, mais c'est ta branche de travail qui change. Le Supabase coupé le 2026-10-08 est **rétabli** (vérifié le 2026-10-09 : session anonyme, tables, RPC de publication).                |
+| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe. |
+| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                |
+| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                      |
+| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
+| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
 
 Les points 1 à 5 forment le jalon **0.2.0** ci-dessous ; le point 0 passe avant tout.
 
@@ -206,8 +206,10 @@ onze ont des tests ; les parseurs PDF/DOCX et l'exporteur sont les suivants.
 - ✅ **Sélecteurs Zustand** (2026-10-07) : les 21 consommateurs qui
   déstructuraient le store entier passent à des sélecteurs atomiques.
 - **Restes de l'audit du 2026-10-07**, notés pour plus tard :
-  - un **crash** de CatDesk (pas une fermeture) laisse encore l'agent et
-    l'Ollama géré orphelins — il faudrait un _Job Object_ Windows ;
+  - ✅ un **crash** de CatDesk (pas une fermeture) laissait l'agent et
+    l'Ollama géré orphelins (2026-10-09) : Ollama et ses runners
+    `llama-server` sont dans un _Job Object_ Windows (`core/process_tree.rs`),
+    l'agent s'arrête seul quand son stdin se ferme (vérifié) ;
   - un run interrompu (Stop) n'interrompt pas les **sous-agents** déjà lancés :
     `run_subagent` / `run_parallel_agents` ne reçoivent pas le signal ;
   - plusieurs outils revérifient à la main ce que leur schéma zod garantit déjà

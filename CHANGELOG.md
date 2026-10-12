@@ -37,6 +37,9 @@ Full audit and refactor of the whole repository, then a latency pass (branch
     the model and read the fixed prompt prefix while the user types (`chat_warmup`).
 - Embeddings run on the CPU (~40 ms warm) and leave the whole GPU to the chat model; the
   current conversation's own exchanges no longer come back as "memories".
+- **The warm-up also reads the open conversation**, not just the fixed prompt: in the real
+  app, with a real history, the first question of a session went from 61-71 s to 3.5 s
+  and the following ones from ~10 s to ~3 s.
 
 ### Fixed
 
@@ -54,6 +57,14 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **Ollama outlived CatDesk**, and the next launch took the orphan for an external server,
   so the KV-cache tuning no longer applied. CatDesk now stops the Ollama it started (and
   the agent) on exit and before installing an update.
+- **Stopping Ollama leaked VRAM**: its `llama-server` runners survived and held up to 9 GB
+  until the PC restarted, after every exit and before every update. The managed Ollama now
+  lives in a Windows Job Object; stopping it, or a CatDesk crash, takes the whole tree.
+- **Corrupted answers from the June KV-cache incident were served back as memories**, and
+  facts with a confidence of 0.1 were stated as truths in the prompt. Unreadable text is
+  kept out of recall, memorization and the semantic cache; only facts with a confidence of
+  at least 0.5 reach the prompt; recalled memories are capped (3 × 400 characters).
+- Permission descriptions, the chat bubble and the command palette were still in English.
 - **The agent was never restarted after a crash.** Rust supervises it (exponential
   backoff, at most 5 restarts), replays the runtime settings after each spawn and reports
   a run lost mid-way (`AGENT_EXITED`) instead of leaving it hanging.
@@ -110,7 +121,7 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   everywhere, a versioned settings store with a tested migration, `tsconfig.node.json`
   extends the base config, remaining English UI strings translated.
 - Prettier now covers the whole repository and `pnpm format:check` runs in CI.
-- Tests: 738 agent (was 640), 54 desktop (was 47), 35 Rust (was 32), 14 Python (was 7).
+- Tests: 752 agent (was 640), 54 desktop (was 47), 38 Rust (was 32), 14 Python (was 7).
 
 ## [0.2.0] — 2026-09-12
 
