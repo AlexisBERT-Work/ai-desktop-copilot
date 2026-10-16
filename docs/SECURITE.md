@@ -318,3 +318,29 @@ trous réels, quatre durcissements.
   parle pas à Ollama — règle n°1) ; les capacités perdent
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+## Mise à jour 2026-10-16 — dailys envoyées par e-mail
+
+Nouveau **flux sortant** : SMTP authentifié (`lib/email.ts`, nodemailer), pour
+envoyer les dailys des journaux locaux qui ont un destinataire. Ce qui le borne :
+
+- **Pas un outil** : aucun appel du modèle ne déclenche d'envoi. Le
+  destinataire est saisi par l'utilisateur dans l'UI (« Mes journaux »), validé
+  côté UI et côté agent (`pressFeedRecord`), et le contenu se limite aux dailys
+  générées à partir de flux RSS publics. Une injection dans un article peut
+  altérer le texte d'un résumé, pas choisir le destinataire.
+- **Secret hors git et hors logs** : `SMTP_PASSWORD` vit dans le `.env` de
+  l'agent (gitignoré) ou dans `smtp.env` du dossier de données ; les logs ne
+  portent que l'adresse masquée (`a***@domaine.fr`), et les messages d'erreur
+  SMTP ne recopient pas les identifiants.
+- **`smtp.env` ne règle que SMTP** : le fichier est dans un dossier écrivable par
+  l'utilisateur, donc seules les clés `SMTP_*` en sont lues (`pickSmtpKeys`,
+  testé) — il ne peut pas basculer `CATDESK_TOOL_PROFILE` ni injecter
+  `NODE_OPTIONS` dans les enfants de l'agent.
+- **TLS obligatoire** : port 465 en TLS direct, sinon `requireTLS` (STARTTLS
+  exigé) ; délais bornés (connexion 15 s, socket 30 s).
+- **Les journaux partagés n'envoient jamais** : `press_feeds` (Supabase) n'a pas
+  de colonne destinataire, et la lecture `snake_case` force `emailTo: null`.
+- **`pnpm audit`** : la dépendance directe `nodemailer@10.1.1` est à jour ; les 7
+  alertes nodemailer restantes visent la copie 9.0.1 tirée par `imapflow` et
+  `mailparser` (déjà là avant, suivies dans #25).

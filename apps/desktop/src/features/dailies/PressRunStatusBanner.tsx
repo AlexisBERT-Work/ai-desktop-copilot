@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, MailWarning } from 'lucide-react';
 import { useLocalPressStore } from './localPress';
 
 const PHASE_LABEL: Record<string, string> = {
@@ -65,7 +65,28 @@ export function PressRunStatusBanner({ showDone = true }: Props) {
     );
   }
 
+  // Envoi par e-mail raté : signalé même sur l'accueil — sans ce bandeau,
+  // l'utilisateur attend un mail qui ne viendra pas sans savoir pourquoi.
+  if (status.emailError !== undefined) {
+    return (
+      <div
+        className="flex items-center gap-2 border-b border-amber-400/20 bg-amber-500/10 px-5 py-2
+                   text-xs text-amber-200"
+        role="status"
+      >
+        <MailWarning className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Dailys générées{time ? ` à ${time}` : ''}, mais l'envoi par e-mail a échoué —{' '}
+        {status.emailError}
+      </div>
+    );
+  }
+
   if (!showDone) return null;
+
+  const emailed =
+    (status.emailed ?? 0) > 0
+      ? ` Envoi par e-mail : ${status.emailed} message${(status.emailed ?? 0) > 1 ? 's' : ''}.`
+      : '';
 
   return (
     <div
@@ -76,7 +97,7 @@ export function PressRunStatusBanner({ showDone = true }: Props) {
       <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden />
       {status.produced === 0
         ? `Dernière génération${time ? ` à ${time}` : ''} : rien à publier (aucun article retenu).`
-        : `Dernière génération${time ? ` à ${time}` : ''} : ${status.produced ?? 0} daily${(status.produced ?? 0) > 1 ? 's' : ''} produite${(status.produced ?? 0) > 1 ? 's' : ''}.`}
+        : `Dernière génération${time ? ` à ${time}` : ''} : ${status.produced ?? 0} daily${(status.produced ?? 0) > 1 ? 's' : ''} produite${(status.produced ?? 0) > 1 ? 's' : ''}.${emailed}`}
     </div>
   );
 }

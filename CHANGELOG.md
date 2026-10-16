@@ -17,6 +17,19 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 `refactor/audit-complet`). Details and the remaining items: `docs/SUIVI.md` (2026-10-07 and
 2026-10-08) and `docs/AMELIORATIONS.md`.
 
+### Added
+
+- **Daily press review by e-mail** (branch `feat/recap-ia-email`). A local journal
+  (« Mes journaux ») can now carry a recipient address: after each generation its new
+  dailies are sent as one HTML + plain-text e-mail per recipient, through the user's own
+  SMTP account (`SMTP_*` in the agent `.env`, or `smtp.env` in the data directory for the
+  installed app). A restart sends nothing twice; « Générer maintenant » re-sends the
+  regenerated version; a failed send keeps the dailies and shows the error in the status
+  banner. Shared (Supabase) journals never send e-mail.
+- **« IA » source group**: 12 AI feeds checked live on 2026-10-16 (ActuIA, JDN IA, The
+  Verge AI, TechCrunch AI, Ars Technica AI, MIT Technology Review AI, The Decoder, OpenAI,
+  Google DeepMind, Google AI, Hugging Face, Simon Willison).
+
 ### Performance
 
 - **First token in ~1-2 s instead of 19-47 s** (same three chained questions, production

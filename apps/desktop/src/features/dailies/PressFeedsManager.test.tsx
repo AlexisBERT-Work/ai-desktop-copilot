@@ -72,6 +72,33 @@ describe('PressFeedsManager', () => {
     await waitFor(() => expect(backend.list).toHaveBeenCalledTimes(2));
   });
 
+  it('section e-mail : absente pour les journaux partagés', () => {
+    render(<PressFeedsManager backend={makeBackend()} />);
+    expect(screen.queryByText('Envoi par e-mail')).not.toBeInTheDocument();
+  });
+
+  it('section e-mail (backend local) : adresse transmise, adresse invalide refusée', async () => {
+    const backend = { ...makeBackend(), supportsEmail: true };
+    const first = PRESS_SOURCE_CATALOG[0]!;
+    render(<PressFeedsManager backend={backend} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Veille IA, Revue crypto…'), {
+      target: { value: 'Actu IA' },
+    });
+    fireEvent.click(screen.getByText(first.label));
+    const address = screen.getByPlaceholderText('prenom.nom@entreprise.fr');
+
+    fireEvent.change(address, { target: { value: 'moi@boulot' } });
+    fireEvent.click(screen.getByText('Créer'));
+    expect(await screen.findByText('Adresse e-mail invalide : moi@boulot')).toBeInTheDocument();
+    expect(backend.create).not.toHaveBeenCalled();
+
+    fireEvent.change(address, { target: { value: 'moi@boulot.fr' } });
+    fireEvent.click(screen.getByText('Créer'));
+    await waitFor(() => expect(backend.create).toHaveBeenCalledTimes(1));
+    expect((backend.create.mock.calls[0]![0] as PressFeedInput).emailTo).toBe('moi@boulot.fr');
+  });
+
   it('le bouton de run lance le backend et affiche le message', async () => {
     const backend = makeBackend();
     render(<PressFeedsManager backend={backend} />);

@@ -38,6 +38,8 @@ function rowToPressFeed(r: PressFeedRow): PressFeed {
     sinceHours: r.since_hours,
     articleLimit: r.article_limit,
     enabled: r.enabled,
+    // Pas de colonne : un journal partagé ne s'envoie pas par e-mail.
+    emailTo: null,
   };
 }
 

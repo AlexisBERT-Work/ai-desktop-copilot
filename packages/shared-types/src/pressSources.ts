@@ -5,7 +5,7 @@
  * id/label entre les deux.
  */
 
-export type PressSourceGroup = 'tech' | 'markets' | 'macro' | 'general-fr' | 'international';
+export type PressSourceGroup = 'tech' | 'ai' | 'markets' | 'macro' | 'general-fr' | 'international';
 
 export interface PressSourceInfo {
   id: string;
@@ -16,6 +16,7 @@ export interface PressSourceInfo {
 
 export const PRESS_SOURCE_GROUP_LABEL: Record<PressSourceGroup, string> = {
   tech: 'Tech',
+  ai: 'IA',
   markets: 'Finance & marchés',
   macro: 'Macro / économie',
   'general-fr': 'Généraliste FR',
@@ -33,6 +34,19 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'numerama', label: 'Numerama', lang: 'fr', group: 'tech' },
   { id: 'nextinpact', label: 'Next', lang: 'fr', group: 'tech' },
   { id: 'lesnumeriques', label: 'Les Numériques', lang: 'fr', group: 'tech' },
+  // ─── IA (flux vérifiés en direct le 2026-10-16) ──────────────
+  { id: 'actuia', label: 'ActuIA', lang: 'fr', group: 'ai' },
+  { id: 'jdn_ia', label: 'JDN — IA', lang: 'fr', group: 'ai' },
+  { id: 'theverge_ai', label: 'The Verge — IA', lang: 'en', group: 'ai' },
+  { id: 'techcrunch_ai', label: 'TechCrunch — IA', lang: 'en', group: 'ai' },
+  { id: 'arstechnica_ai', label: 'Ars Technica — IA', lang: 'en', group: 'ai' },
+  { id: 'mittr_ai', label: 'MIT Technology Review — IA', lang: 'en', group: 'ai' },
+  { id: 'thedecoder', label: 'The Decoder', lang: 'en', group: 'ai' },
+  { id: 'openai', label: 'OpenAI', lang: 'en', group: 'ai' },
+  { id: 'deepmind', label: 'Google DeepMind', lang: 'en', group: 'ai' },
+  { id: 'googleai', label: 'Google — IA', lang: 'en', group: 'ai' },
+  { id: 'huggingface', label: 'Hugging Face', lang: 'en', group: 'ai' },
+  { id: 'simonwillison', label: 'Simon Willison', lang: 'en', group: 'ai' },
   // ─── Finance / marchés ───────────────────────────────────────
   { id: 'latribune', label: 'La Tribune', lang: 'fr', group: 'markets' },
   { id: 'yahoofinance', label: 'Yahoo Finance', lang: 'en', group: 'markets' },

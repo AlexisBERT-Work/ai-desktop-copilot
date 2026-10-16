@@ -8,7 +8,7 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-10-12.
+> Dernière mise à jour : 2026-10-16.
 
 ---
 
@@ -44,6 +44,27 @@ warnings`, `fmt --check`. Sur `master` : **CI verte** depuis la PR #24 (elle ét
 depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
 antérieures, suivies dans #25 (jalon 0.2.1). Sur la PR #26, le job Rust
 échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-10-16 — Récap « Actu IA » par e-mail (branche `feat/recap-ia-email`)
+
+Besoin : recevoir chaque matin, sur une adresse pro, un récap de l'actualité de
+l'IA (rôle de référent IA). Branche coupée de `refactor/audit-complet`, à
+proposer vers `dev` après la PR #26.
+
+- **Groupe de sources « IA »** : 12 flux vérifiés en direct (ActuIA, JDN IA,
+  The Verge / TechCrunch / Ars Technica / MIT Tech Review rubriques IA, The
+  Decoder, OpenAI, Google DeepMind, Google IA, Hugging Face, Simon Willison) —
+  ~70 articles sur 48 h. Écartés : Le Big Data et L'Usine Digitale (403),
+  VentureBeat (429), Anthropic (pas de flux).
+- **Envoi par e-mail** d'un journal local : champ « Envoi par e-mail » dans
+  Journaux → Ce poste ; après chaque génération, les dailys neuves partent par
+  SMTP (un message HTML + texte par destinataire). Compte expéditeur :
+  `SMTP_*` (`.env.example`). Un échec d'envoi garde les dailys et s'affiche
+  dans le bandeau de statut, accueil compris.
+- Portes : type-check 3/3, lint 0, 784 tests agent (+32), 58 desktop (+4).
+  **Pas encore vérifié de bout en bout** : il faut le mot de passe
+  d'application Gmail de l'utilisateur. L'exe installé (0.1.3) n'a pas la
+  fonctionnalité : `pnpm dev` d'ici la prochaine version.
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 

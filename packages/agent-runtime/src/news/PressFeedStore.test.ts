@@ -29,6 +29,8 @@ describe('rowToPressFeed', () => {
       sinceHours: 48,
       articleLimit: 20,
       enabled: true,
+      // Journal partagé : jamais envoyé par e-mail (pas de colonne en base).
+      emailTo: null,
     });
   });
 

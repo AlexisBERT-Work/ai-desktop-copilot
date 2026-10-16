@@ -91,6 +91,107 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
     category: 'tech',
   },
 
+  // ─── IA ──────────────────────────────────────────────────────
+  // Flux vérifiés en direct le 2026-10-16 (journal « Actu IA » du référent IA).
+  // Écartés ce jour-là : Le Big Data et L'Usine Digitale (403), VentureBeat
+  // (429), Anthropic (pas de flux public).
+  actuia: {
+    id: 'actuia',
+    label: 'ActuIA',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.actuia.com/feed/',
+    category: 'tech',
+  },
+  jdn_ia: {
+    id: 'jdn_ia',
+    label: 'JDN — IA',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.journaldunet.com/intelligence-artificielle/rss/',
+    category: 'tech',
+  },
+  theverge_ai: {
+    id: 'theverge_ai',
+    label: 'The Verge — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml',
+    category: 'tech',
+  },
+  techcrunch_ai: {
+    id: 'techcrunch_ai',
+    label: 'TechCrunch — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://techcrunch.com/category/artificial-intelligence/feed/',
+    category: 'tech',
+  },
+  arstechnica_ai: {
+    id: 'arstechnica_ai',
+    label: 'Ars Technica — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://arstechnica.com/ai/feed/',
+    category: 'tech',
+  },
+  mittr_ai: {
+    id: 'mittr_ai',
+    label: 'MIT Technology Review — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.technologyreview.com/topic/artificial-intelligence/feed',
+    category: 'tech',
+  },
+  thedecoder: {
+    id: 'thedecoder',
+    label: 'The Decoder',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://the-decoder.com/feed/',
+    category: 'tech',
+  },
+  openai: {
+    id: 'openai',
+    label: 'OpenAI',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://openai.com/news/rss.xml',
+    category: 'tech',
+  },
+  deepmind: {
+    id: 'deepmind',
+    label: 'Google DeepMind',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://deepmind.google/blog/rss.xml',
+    category: 'tech',
+  },
+  googleai: {
+    id: 'googleai',
+    label: 'Google — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://blog.google/innovation-and-ai/technology/ai/rss/',
+    category: 'tech',
+  },
+  huggingface: {
+    id: 'huggingface',
+    label: 'Hugging Face',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://huggingface.co/blog/feed.xml',
+    category: 'tech',
+  },
+  simonwillison: {
+    id: 'simonwillison',
+    label: 'Simon Willison',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://simonwillison.net/atom/everything/',
+    category: 'tech',
+  },
+
   // ─── Finance / marchés ───────────────────────────────────────
   // (Les Échos retiré : flux en 403 systématique. La Tribune + Yahoo Finance OK.)
   latribune: {

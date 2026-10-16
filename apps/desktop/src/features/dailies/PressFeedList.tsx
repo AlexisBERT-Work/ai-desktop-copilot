@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Mail, Pencil, Trash2 } from 'lucide-react';
 import { DAILY_CATEGORY_LABEL, type PressFeed } from '@catdesk/shared-types';
 import { sourceSummary } from './pressFeedsModel';
 
@@ -49,6 +49,15 @@ export function PressFeedList({
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/85">
                     {f.name}
                   </span>
+                  {f.emailTo !== null && (
+                    <span
+                      className="flex shrink-0 items-center gap-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/55"
+                      title={`Envoyé par e-mail à ${f.emailTo}`}
+                    >
+                      <Mail className="h-3 w-3" aria-hidden />
+                      e-mail
+                    </span>
+                  )}
                   {!f.enabled && (
                     <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/40">
                       inactif

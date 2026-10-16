@@ -22,6 +22,7 @@ const LOCAL_BACKEND: PressFeedsBackend = {
   runLabel: 'Générer maintenant',
   runStartedMsg: 'Génération lancée — tes dailys apparaîtront dans une minute environ.',
   subscribe: cb => useLocalPressStore.subscribe(s => cb(s.feeds)),
+  supportsEmail: true,
 };
 
 type FeedScope = 'local' | 'shared';

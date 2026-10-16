@@ -4,6 +4,7 @@ import {
   csv,
   lines,
   draftToInput,
+  emailError,
   feedToDraft,
   fold,
   regexError,
@@ -37,6 +38,17 @@ describe('regexError', () => {
   });
 });
 
+describe('emailError', () => {
+  it("null pour une adresse vide (pas d'envoi) ou plausible", () => {
+    expect(emailError('')).toBeNull();
+    expect(emailError('  moi@boulot.fr ')).toBeNull();
+  });
+
+  it('message pour une adresse invalide', () => {
+    expect(emailError('moi@boulot')).toBe('Adresse e-mail invalide : moi@boulot');
+  });
+});
+
 describe('brouillon ↔ modèle', () => {
   const feed: PressFeed = {
     ...EMPTY_PRESS_FEED,
@@ -49,6 +61,7 @@ describe('brouillon ↔ modèle', () => {
     includeRegex: 'gpu',
     excludeRegex: null,
     enabled: true,
+    emailTo: 'moi@boulot.fr',
   };
 
   it('feedToDraft → draftToInput est un aller-retour fidèle', () => {
@@ -62,12 +75,19 @@ describe('brouillon ↔ modèle', () => {
     expect(input.includeKeywords).toEqual(feed.includeKeywords);
     expect(input.includeRegex).toBe('gpu');
     expect(input.excludeRegex).toBeNull();
+    expect(input.emailTo).toBe('moi@boulot.fr');
   });
 
-  it('draftToInput normalise : trim du nom, regex vide → null', () => {
-    const input = draftToInput({ ...EMPTY_DRAFT, name: '  X  ', includeRegex: '   ' });
+  it('draftToInput normalise : trim du nom, regex et adresse vides → null', () => {
+    const input = draftToInput({
+      ...EMPTY_DRAFT,
+      name: '  X  ',
+      includeRegex: '   ',
+      emailTo: '  ',
+    });
     expect(input.name).toBe('X');
     expect(input.includeRegex).toBeNull();
+    expect(input.emailTo).toBeNull();
   });
 });
 

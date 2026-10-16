@@ -136,6 +136,12 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   [dashboard.md](projects/dashboard.md) §5.
 - **Local-first nuancé** : bourse et news ajoutent des **flux réseau sortants en
   lecture seule** (allow-listés). L'inférence, elle, reste 100 % locale.
+- **Dailys par e-mail** : envoyées par le poste lui-même, donc **seulement si
+  CatDesk tourne** ce jour-là (rattrapage dès le démarrage suivant, comme la
+  génération). Un compte Gmail personnel suffit, avec ses quotas (~500 envois/jour,
+  très au-delà du besoin) ; une messagerie pro peut classer le premier envoi en
+  indésirable ou en quarantaine. Les résumés viennent de qwen3:14b sur les
+  extraits RSS : à vérifier dans l'article d'origine avant de citer.
 - **Pas de partage de tableau de bord** : la disposition (canvas libre, tailles,
   styles, affichages enregistrés) vit dans le `localStorage` du poste. Rien ne
   l'exporte ni ne la synchronise entre machines.
