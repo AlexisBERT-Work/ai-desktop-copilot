@@ -68,7 +68,7 @@ proposer vers `dev` après la PR #26.
 - **Récap sans PC allumé** (contrainte : pas de PC qui tourne la nuit) :
   workflow GitHub Actions `ai-recap.yml`, chaque matin vers 6 h 23 (été) /
   5 h 23 (hiver). Même pipeline en ligne de commande (`pnpm recap:email`),
-  `qwen3:4b` sur le processeur du serveur (0 €, dépôt public), fenêtre « depuis
+  `qwen3:4b-instruct-2507` sur le processeur du serveur (0 €, dépôt public), fenêtre « depuis
   le dernier envoi planifié réussi ». **À activer** : le fichier doit être sur
   `master` (GitHub ne planifie que depuis la branche par défaut), le code lancé
   vient de `dev` (variable `RECAP_CODE_REF`), et les secrets `SMTP_USER`,

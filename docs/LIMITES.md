@@ -142,7 +142,7 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   très au-delà du besoin) ; une messagerie pro peut classer le premier envoi en
   indésirable ou en quarantaine. Les résumés viennent de qwen3:14b sur les
   extraits RSS : à vérifier dans l'article d'origine avant de citer.
-- **Récap dans le cloud** (GitHub Actions) : rédigé par `qwen3:4b` sur processeur,
+- **Récap dans le cloud** (GitHub Actions) : rédigé par `qwen3:4b-instruct-2507` sur processeur,
   un cran en dessous du 14b local (variable `RECAP_MODEL` pour essayer
   `qwen3:8b`, deux fois plus lent). GitHub peut retarder un déclenchement planifié
   (souvent 10-30 min), et **désactive** les planifications d'un dépôt public sans

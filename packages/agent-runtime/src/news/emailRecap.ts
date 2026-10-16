@@ -15,6 +15,14 @@ export const AI_SOURCE_IDS: readonly string[] = PRESS_SOURCE_CATALOG.filter(
   s => s.group === 'ai',
 ).map(s => s.id);
 
+/**
+ * Modèle du récap dans le cloud (processeur seul). Surtout PAS `qwen3:4b` :
+ * depuis la mise à jour 2507, ce tag désigne la variante qui raisonne
+ * toujours et ignore `think: false` — 2 754 tokens de réflexion pour une
+ * phrase, chaque appel du pipeline au délai de 10 min (essai du 2026-10-16).
+ */
+export const RECAP_DEFAULT_MODEL = 'qwen3:4b-instruct-2507-q4_K_M';
+
 /** Fenêtre par défaut quand aucun envoi précédent n'est connu (premier run). */
 const DEFAULT_WINDOW_HOURS = 24;
 /** Au-delà (plusieurs matins ratés), le mail deviendrait indigeste. */
@@ -87,7 +95,7 @@ export function readRecapConfig(
       sourceIds,
       articleLimit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 40) : 12,
       sinceHours: recapWindowHours(env['RECAP_SINCE'], now),
-      model: env['RECAP_MODEL']?.trim() || 'qwen3:4b',
+      model: env['RECAP_MODEL']?.trim() || RECAP_DEFAULT_MODEL,
       dryRun,
       out: env['RECAP_OUT']?.trim() || 'recap-preview.html',
     },

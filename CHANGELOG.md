@@ -32,7 +32,7 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **Morning AI recap without the PC** (`.github/workflows/ai-recap.yml`). A scheduled
   GitHub Actions job runs the same pipeline headless (`pnpm recap:email`,
   `src/cli/emailRecap.ts`): the « IA » sources since the last successful scheduled send
-  (24 h on the first run, 72 h at most), written by `qwen3:4b` on the runner's CPU, sent
+  (24 h on the first run, 72 h at most), written by `qwen3:4b-instruct-2507` on the runner's CPU, sent
   through SMTP. Free on a public repository; secrets `SMTP_USER`, `SMTP_PASSWORD`,
   `RECAP_TO`. A manual run defaults to a dry run that uploads the HTML preview.
 

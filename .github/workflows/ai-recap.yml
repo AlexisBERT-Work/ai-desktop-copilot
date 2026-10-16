@@ -2,14 +2,15 @@
 #
 # Le pipeline des journaux personnalisés (collecte RSS du groupe « IA »,
 # rédaction LLM, mise en forme) tourne ici sur le processeur du serveur
-# GitHub, avec un petit modèle ouvert (qwen3:4b) : aucune clé d'API, 0 €
+# GitHub, avec un petit modèle ouvert (qwen3 4b instruct) : aucune clé d'API, 0 €
 # (minutes gratuites d'un dépôt public). Script : packages/agent-runtime/src/cli/emailRecap.ts.
 #
 # Réglages (Settings → Secrets and variables → Actions) :
 #   secrets   SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
 #             RECAP_TO (adresse qui reçoit le récap)
 #   variables (optionnelles) SMTP_HOST (défaut smtp.gmail.com), SMTP_PORT (465),
-#             RECAP_MODEL (qwen3:4b), RECAP_SOURCES (groupe IA), RECAP_LIMIT (12),
+#             RECAP_MODEL (qwen3:4b-instruct-2507-q4_K_M — pas qwen3:4b, qui raisonne
+#             toujours), RECAP_SOURCES (groupe IA), RECAP_LIMIT (12),
 #             RECAP_CODE_REF (branche du code lancée le matin, défaut dev)
 #
 # GitHub ne déclenche un `schedule` que depuis la branche par défaut (master) :
@@ -46,7 +47,8 @@ jobs:
     # Jamais sur un fork (ni secrets ni raison d'envoyer quoi que ce soit).
     if: github.repository == 'AlexisBERT-Work/ai-desktop-copilot'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Mesuré le 2026-10-16 : ~7 tokens/s en génération sur ce processeur.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,7 +68,7 @@ jobs:
 
       - name: Ollama et modèle
         env:
-          MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b' }}
+          MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b-instruct-2507-q4_K_M' }}
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
           # Pas de systemd sur le runner : le service installé ne démarre pas
@@ -75,10 +77,6 @@ jobs:
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version > /dev/null && break; sleep 2; done
           curl -sf http://127.0.0.1:11434/api/version || { cat "$RUNNER_TEMP/ollama.log"; exit 1; }
           ollama pull "$MODEL"
-          # Diagnostic : capacités du modèle (« thinking » ?) et vitesse sur une
-          # phrase, raisonnement coupé comme dans le pipeline.
-          ollama show "$MODEL" | sed -n '1,25p'
-          time ollama run "$MODEL" --think=false --verbose "Réponds en une phrase : qu'est-ce qu'un LLM ?"
 
       # « Depuis le dernier envoi » : début du dernier run PLANIFIÉ réussi. Les
       # essais lancés à la main ne décalent pas la fenêtre.
@@ -99,7 +97,9 @@ jobs:
           RECAP_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
           RECAP_SINCE: ${{ steps.last.outputs.since }}
           RECAP_TO: ${{ secrets.RECAP_TO }}
-          RECAP_MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b' }}
+          RECAP_MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b-instruct-2507-q4_K_M' }}
+          # Processeur lent : 30 min par appel au lieu de 10 (défaut du poste).
+          CATDESK_DIGEST_TIMEOUT_MS: '1800000'
           RECAP_SOURCES: ${{ vars.RECAP_SOURCES }}
           RECAP_LIMIT: ${{ inputs.limit || vars.RECAP_LIMIT }}
           RECAP_OUT: ${{ runner.temp }}/recap-preview.html
@@ -111,10 +111,10 @@ jobs:
         # pas dans les logs (publics). Les étapes restent visibles sur stderr.
         run: pnpm recap:email > /dev/null
 
-      # Vitesse réelle de chaque appel (lignes print_timing de llama-server).
-      - name: Journal Ollama (vitesse)
+      # Durée de chaque appel au modèle (lignes [GIN] du serveur Ollama).
+      - name: Journal Ollama (durées)
         if: always()
-        run: grep -E "print_timing|n_tokens|eval time|took" "$RUNNER_TEMP/ollama.log" | tail -60 || true
+        run: grep -E '\[GIN\].*(/api/chat|/api/generate)' "$RUNNER_TEMP/ollama.log" | tail -40 || true
 
       - name: Aperçu (essai à blanc)
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run

@@ -36,7 +36,7 @@ describe('recapWindowHours', () => {
 });
 
 describe('readRecapConfig', () => {
-  it('défauts : groupe IA, 12 articles, qwen3:4b, fenêtre depuis RECAP_SINCE', () => {
+  it('défauts : groupe IA, 12 articles, qwen3 4b instruct, fenêtre depuis RECAP_SINCE', () => {
     const r = readRecapConfig(
       { RECAP_TO: 'moi@boulot.fr', RECAP_SINCE: '2026-10-16T05:30:00Z' },
       NOW,
@@ -49,7 +49,7 @@ describe('readRecapConfig', () => {
         sourceIds: [...AI_SOURCE_IDS],
         articleLimit: 12,
         sinceHours: 24,
-        model: 'qwen3:4b',
+        model: 'qwen3:4b-instruct-2507-q4_K_M',
         dryRun: false,
         out: 'recap-preview.html',
       },
@@ -88,7 +88,7 @@ describe('runEmailRecap', () => {
     sourceIds: ['actuia'],
     articleLimit: 12,
     sinceHours: 26,
-    model: 'qwen3:4b',
+    model: 'qwen3:4b-instruct-2507-q4_K_M',
     dryRun: false,
     out: 'x.html',
   };
