@@ -28,6 +28,10 @@ on:
         description: 'Essai à blanc : rien n’est envoyé, aperçu HTML en artefact'
         type: boolean
         default: true
+      limit:
+        description: 'Articles max (vide = RECAP_LIMIT, sinon 12) — petit pour un essai rapide'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -71,6 +75,10 @@ jobs:
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version > /dev/null && break; sleep 2; done
           curl -sf http://127.0.0.1:11434/api/version || { cat "$RUNNER_TEMP/ollama.log"; exit 1; }
           ollama pull "$MODEL"
+          # Diagnostic : capacités du modèle (« thinking » ?) et vitesse sur une
+          # phrase, raisonnement coupé comme dans le pipeline.
+          ollama show "$MODEL" | sed -n '1,25p'
+          time ollama run "$MODEL" --think=false --verbose "Réponds en une phrase : qu'est-ce qu'un LLM ?"
 
       # « Depuis le dernier envoi » : début du dernier run PLANIFIÉ réussi. Les
       # essais lancés à la main ne décalent pas la fenêtre.
@@ -93,7 +101,7 @@ jobs:
           RECAP_TO: ${{ secrets.RECAP_TO }}
           RECAP_MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b' }}
           RECAP_SOURCES: ${{ vars.RECAP_SOURCES }}
-          RECAP_LIMIT: ${{ vars.RECAP_LIMIT }}
+          RECAP_LIMIT: ${{ inputs.limit || vars.RECAP_LIMIT }}
           RECAP_OUT: ${{ runner.temp }}/recap-preview.html
           SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
           SMTP_PORT: ${{ vars.SMTP_PORT || '465' }}
@@ -102,6 +110,11 @@ jobs:
         # stdout = le texte du récap en essai à blanc : il va dans l'artefact,
         # pas dans les logs (publics). Les étapes restent visibles sur stderr.
         run: pnpm recap:email > /dev/null
+
+      # Vitesse réelle de chaque appel (lignes print_timing de llama-server).
+      - name: Journal Ollama (vitesse)
+        if: always()
+        run: grep -E "print_timing|n_tokens|eval time|took" "$RUNNER_TEMP/ollama.log" | tail -60 || true
 
       - name: Aperçu (essai à blanc)
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run
