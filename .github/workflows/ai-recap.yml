@@ -47,7 +47,8 @@ jobs:
     # Jamais sur un fork (ni secrets ni raison d'envoyer quoi que ce soit).
     if: github.repository == 'AlexisBERT-Work/ai-desktop-copilot'
     runs-on: ubuntu-latest
-    # Mesuré le 2026-10-16 : ~7 tokens/s en génération sur ce processeur.
+    # Mesuré le 2026-10-16 : ~7 tokens/s en génération sur ce processeur,
+    # job complet en 14 min pour 12 articles.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -110,11 +111,6 @@ jobs:
         # stdout = le texte du récap en essai à blanc : il va dans l'artefact,
         # pas dans les logs (publics). Les étapes restent visibles sur stderr.
         run: pnpm recap:email > /dev/null
-
-      # Durée de chaque appel au modèle (lignes [GIN] du serveur Ollama).
-      - name: Journal Ollama (durées)
-        if: always()
-        run: grep -E '\[GIN\].*(/api/chat|/api/generate)' "$RUNNER_TEMP/ollama.log" | tail -40 || true
 
       - name: Aperçu (essai à blanc)
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run

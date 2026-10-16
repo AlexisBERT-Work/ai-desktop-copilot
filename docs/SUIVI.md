@@ -73,6 +73,10 @@ proposer vers `dev` après la PR #26.
   `master` (GitHub ne planifie que depuis la branche par défaut), le code lancé
   vient de `dev` (variable `RECAP_CODE_REF`), et les secrets `SMTP_USER`,
   `SMTP_PASSWORD`, `RECAP_TO` sont à créer.
+  Essais à blanc sur le runner : `qwen3:4b` raisonne toujours depuis la mise à
+  jour 2507 (chaque appel au délai, job tué à 60 min) → variante **instruct
+  2507** ; le runner génère ~7 tokens/s ; récap de 12 articles en 11 min 47 s
+  (job complet 13 min 41 s), en français, vérification des détails active.
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 
