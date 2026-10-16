@@ -65,7 +65,11 @@ jobs:
           MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b' }}
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
-          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
+          # Pas de systemd sur le runner : le service installé ne démarre pas
+          # (vu au premier essai, 2026-10-16). On lance le serveur nous-mêmes.
+          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version > /dev/null && break; sleep 2; done
+          curl -sf http://127.0.0.1:11434/api/version || { cat "$RUNNER_TEMP/ollama.log"; exit 1; }
           ollama pull "$MODEL"
 
       # « Depuis le dernier envoi » : début du dernier run PLANIFIÉ réussi. Les
