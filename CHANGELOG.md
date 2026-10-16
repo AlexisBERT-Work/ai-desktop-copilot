@@ -29,6 +29,12 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **« IA » source group**: 12 AI feeds checked live on 2026-10-16 (ActuIA, JDN IA, The
   Verge AI, TechCrunch AI, Ars Technica AI, MIT Technology Review AI, The Decoder, OpenAI,
   Google DeepMind, Google AI, Hugging Face, Simon Willison).
+- **Morning AI recap without the PC** (`.github/workflows/ai-recap.yml`). A scheduled
+  GitHub Actions job runs the same pipeline headless (`pnpm recap:email`,
+  `src/cli/emailRecap.ts`): the « IA » sources since the last successful scheduled send
+  (24 h on the first run, 72 h at most), written by `qwen3:4b` on the runner's CPU, sent
+  through SMTP. Free on a public repository; secrets `SMTP_USER`, `SMTP_PASSWORD`,
+  `RECAP_TO`. A manual run defaults to a dry run that uploads the HTML preview.
 
 ### Performance
 

@@ -344,3 +344,13 @@ envoyer les dailys des journaux locaux qui ont un destinataire. Ce qui le borne 
 - **`pnpm audit`** : la dépendance directe `nodemailer@10.1.1` est à jour ; les 7
   alertes nodemailer restantes visent la copie 9.0.1 tirée par `imapflow` et
   `mailparser` (déjà là avant, suivies dans #25).
+
+**Le récap dans le cloud** (`.github/workflows/ai-recap.yml`, même date) : le
+dépôt est **public**, donc ses logs aussi. Les identifiants SMTP et l'adresse de
+destination sont des **secrets GitHub** (masqués dans les logs, jamais transmis
+à un fork : le job ne tourne que sur `AlexisBERT-Work/ai-desktop-copilot`) ; le
+texte du récap ne va pas dans les logs (stdout jeté), seulement dans l'artefact
+d'un essai à blanc. Jeton du job réduit à `contents: read` + `actions: read`
+(lecture de la date du dernier envoi). Le LLM tourne sur le serveur GitHub
+(Ollama + modèle ouvert) : aucune clé d'API tierce, et le contenu traité n'est
+que de l'actualité publique.

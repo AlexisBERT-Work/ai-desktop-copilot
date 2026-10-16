@@ -1,0 +1,107 @@
+# Récap « Actu IA » par e-mail, chaque matin, PC éteint.
+#
+# Le pipeline des journaux personnalisés (collecte RSS du groupe « IA »,
+# rédaction LLM, mise en forme) tourne ici sur le processeur du serveur
+# GitHub, avec un petit modèle ouvert (qwen3:4b) : aucune clé d'API, 0 €
+# (minutes gratuites d'un dépôt public). Script : packages/agent-runtime/src/cli/emailRecap.ts.
+#
+# Réglages (Settings → Secrets and variables → Actions) :
+#   secrets   SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
+#             RECAP_TO (adresse qui reçoit le récap)
+#   variables (optionnelles) SMTP_HOST (défaut smtp.gmail.com), SMTP_PORT (465),
+#             RECAP_MODEL (qwen3:4b), RECAP_SOURCES (groupe IA), RECAP_LIMIT (12),
+#             RECAP_CODE_REF (branche du code lancée le matin, défaut dev)
+#
+# GitHub ne déclenche un `schedule` que depuis la branche par défaut (master) :
+# ce fichier doit y être. Le code exécuté, lui, vient de RECAP_CODE_REF.
+
+name: Récap Actu IA
+
+on:
+  schedule:
+    # 4 h 23 UTC = 6 h 23 à Paris en été, 5 h 23 en hiver. Minute impaire : les
+    # créneaux pile à l'heure sont les plus retardés par GitHub.
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Essai à blanc : rien n’est envoyé, aperçu HTML en artefact'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read # date du dernier envoi réussi (gh run list)
+
+concurrency:
+  group: ai-recap
+  cancel-in-progress: false
+
+jobs:
+  recap:
+    # Jamais sur un fork (ni secrets ni raison d'envoyer quoi que ce soit).
+    if: github.repository == 'AlexisBERT-Work/ai-desktop-copilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Le matin : le code de RECAP_CODE_REF (master ne bouge qu'aux
+          # sorties). À la main : la branche choisie dans « Run workflow ».
+          ref: ${{ github.event_name == 'schedule' && (vars.RECAP_CODE_REF || 'dev') || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @catdesk/agent-runtime...
+
+      - name: Ollama et modèle
+        env:
+          MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b' }}
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
+          ollama pull "$MODEL"
+
+      # « Depuis le dernier envoi » : début du dernier run PLANIFIÉ réussi. Les
+      # essais lancés à la main ne décalent pas la fenêtre.
+      - name: Date du dernier envoi
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          since=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ai-recap.yml \
+            --event schedule --status success --limit 1 \
+            --json createdAt --jq '.[0].createdAt // ""')
+          echo "Dernier envoi : ${since:-aucun (fenêtre de 24 h)}"
+          echo "since=$since" >> "$GITHUB_OUTPUT"
+
+      - name: Récap
+        working-directory: packages/agent-runtime
+        env:
+          RECAP_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          RECAP_SINCE: ${{ steps.last.outputs.since }}
+          RECAP_TO: ${{ secrets.RECAP_TO }}
+          RECAP_MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b' }}
+          RECAP_SOURCES: ${{ vars.RECAP_SOURCES }}
+          RECAP_LIMIT: ${{ vars.RECAP_LIMIT }}
+          RECAP_OUT: ${{ runner.temp }}/recap-preview.html
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '465' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        # stdout = le texte du récap en essai à blanc : il va dans l'artefact,
+        # pas dans les logs (publics). Les étapes restent visibles sur stderr.
+        run: pnpm recap:email > /dev/null
+
+      - name: Aperçu (essai à blanc)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: recap-preview
+          path: ${{ runner.temp }}/recap-preview.html
+          retention-days: 3

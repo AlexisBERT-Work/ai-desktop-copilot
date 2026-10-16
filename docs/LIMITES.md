@@ -142,6 +142,12 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   très au-delà du besoin) ; une messagerie pro peut classer le premier envoi en
   indésirable ou en quarantaine. Les résumés viennent de qwen3:14b sur les
   extraits RSS : à vérifier dans l'article d'origine avant de citer.
+- **Récap dans le cloud** (GitHub Actions) : rédigé par `qwen3:4b` sur processeur,
+  un cran en dessous du 14b local (variable `RECAP_MODEL` pour essayer
+  `qwen3:8b`, deux fois plus lent). GitHub peut retarder un déclenchement planifié
+  (souvent 10-30 min), et **désactive** les planifications d'un dépôt public sans
+  activité pendant 60 jours (un clic pour les réactiver). La planification ne
+  part que de `master`.
 - **Pas de partage de tableau de bord** : la disposition (canvas libre, tailles,
   styles, affichages enregistrés) vit dans le `localStorage` du poste. Rien ne
   l'exporte ni ne la synchronise entre machines.
