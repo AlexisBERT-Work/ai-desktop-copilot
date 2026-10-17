@@ -29,12 +29,18 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **« IA » source group**: 12 AI feeds checked live on 2026-10-16 (ActuIA, JDN IA, The
   Verge AI, TechCrunch AI, Ars Technica AI, MIT Technology Review AI, The Decoder, OpenAI,
   Google DeepMind, Google AI, Hugging Face, Simon Willison).
-- **Morning AI recap without the PC** (`.github/workflows/ai-recap.yml`). A scheduled
-  GitHub Actions job runs the same pipeline headless (`pnpm recap:email`,
-  `src/cli/emailRecap.ts`): the « IA » sources since the last successful scheduled send
-  (24 h on the first run, 72 h at most), written by `qwen3:4b-instruct-2507` on the runner's CPU, sent
-  through SMTP. Free on a public repository; secrets `SMTP_USER`, `SMTP_PASSWORD`,
-  `RECAP_TO`. A manual run defaults to a dry run that uploads the HTML preview.
+- **Daily « Veille IA » brief, PC off** (`.github/workflows/ai-recap.yml`). Each morning a
+  GitHub Actions job collects the candidate articles since the last successful scheduled
+  send (`pnpm recap:collect`, no LLM), has **Claude Code** write the brief headless on the
+  user's Claude subscription (`claude -p` with a `CLAUDE_CODE_OAUTH_TOKEN` from
+  `claude setup-token`; read-only tools plus web fetch/search; output constrained to a JSON
+  schema derived from the zod `BriefSchema`), then lays it out and sends it
+  (`pnpm recap:send`): headline, « L'essentiel », 2-3 lead stories with « ce que ça
+  change », section briefs, actions « Pour le référent IA », article images and Mermaid
+  diagrams attached inline. A manual run defaults to a dry run that uploads the HTML
+  preview. 8 more sources (Import AI, Interconnects, Latent Space, EU AI Act Newsletter,
+  Ben's Bites, Le Monde Informatique IA, Le Monde Pixels, CNIL); feed items now carry
+  their image.
 
 ### Performance
 

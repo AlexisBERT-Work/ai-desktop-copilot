@@ -65,18 +65,19 @@ proposer vers `dev` après la PR #26.
   **Pas encore vérifié de bout en bout** : il faut le mot de passe
   d'application Gmail de l'utilisateur. L'exe installé (0.1.3) n'a pas la
   fonctionnalité : `pnpm dev` d'ici la prochaine version.
-- **Récap sans PC allumé** (contrainte : pas de PC qui tourne la nuit) :
+- **Brief sans PC allumé** (contrainte : pas de PC qui tourne la nuit) :
   workflow GitHub Actions `ai-recap.yml`, chaque matin vers 6 h 23 (été) /
-  5 h 23 (hiver). Même pipeline en ligne de commande (`pnpm recap:email`),
-  `qwen3:4b-instruct-2507` sur le processeur du serveur (0 €, dépôt public), fenêtre « depuis
-  le dernier envoi planifié réussi ». **À activer** : le fichier doit être sur
-  `master` (GitHub ne planifie que depuis la branche par défaut), le code lancé
-  vient de `dev` (variable `RECAP_CODE_REF`), et les secrets `SMTP_USER`,
-  `SMTP_PASSWORD`, `RECAP_TO` sont à créer.
-  Essais à blanc sur le runner : `qwen3:4b` raisonne toujours depuis la mise à
-  jour 2507 (chaque appel au délai, job tué à 60 min) → variante **instruct
-  2507** ; le runner génère ~7 tokens/s ; récap de 12 articles en 11 min 47 s
-  (job complet 13 min 41 s), en français, vérification des détails active.
+  5 h 23 (hiver), fenêtre « depuis le dernier envoi planifié réussi ».
+  Premier essai avec un petit modèle sur le processeur du serveur
+  (`qwen3:4b-instruct-2507`, ~7 tokens/s, 14 min) : lisible mais **pas au
+  niveau d'une veille de référent** (erreurs d'attribution, aucun jugement
+  éditorial). Remplacé le 2026-10-17 par **Claude Code sur l'abonnement**
+  (`claude setup-token`) : collecte sans IA (`recap:collect`), rédaction
+  `claude -p` en sortie JSON contrainte par `BriefSchema`, mise en page
+  avec images et schémas joints (`recap:send`). **À activer** : secrets
+  `CLAUDE_CODE_OAUTH_TOKEN`, `SMTP_USER`, `SMTP_PASSWORD`, `RECAP_TO` ; le
+  workflow est sur `master` (seule branche planifiable), le code vient de
+  `RECAP_CODE_REF`.
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 

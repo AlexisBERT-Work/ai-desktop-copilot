@@ -1,7 +1,7 @@
 // La plomberie générique (complete, extraction JSON) vit dans llm/completion ;
 // `complete` est réexporté ici parce que tout le pipeline presse l'appelle avec
 // DIGEST_LLM_OPTS et importe déjà ce module.
-import { CONFIG, envNumber } from '../config';
+import { CONFIG } from '../config';
 
 export { complete, extractJsonArray, extractJsonObject } from '../llm/completion';
 
@@ -32,10 +32,8 @@ export const DIGEST_NUM_CTX = CONFIG.numCtx;
  * Délai des appels de digest : chargement du modèle + éval de ~4 k tokens +
  * longue réponse JSON dépassent facilement les 120 s par défaut sur ce GPU —
  * c'est une tâche de fond quotidienne, on lui laisse le temps de finir.
- * `CATDESK_DIGEST_TIMEOUT_MS` l'allonge là où il n'y a qu'un processeur (le
- * récap planifié sur GitHub Actions : ~7 tokens/s).
  */
-export const DIGEST_TIMEOUT_MS = envNumber('CATDESK_DIGEST_TIMEOUT_MS', 600_000);
+export const DIGEST_TIMEOUT_MS = 600_000;
 
 /**
  * Options partagées des complétions de digest (journaux, sujets, synthèse).

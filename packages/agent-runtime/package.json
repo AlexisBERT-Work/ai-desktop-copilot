@@ -10,7 +10,8 @@
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
-    "recap:email": "tsx src/cli/emailRecap.ts"
+    "recap:collect": "tsx src/cli/recapCollect.ts",
+    "recap:send": "tsx src/cli/recapSend.ts"
   },
   "dependencies": {
     "@catdesk/shared-types": "workspace:*",

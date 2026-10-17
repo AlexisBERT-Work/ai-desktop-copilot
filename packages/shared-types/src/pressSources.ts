@@ -34,6 +34,7 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'numerama', label: 'Numerama', lang: 'fr', group: 'tech' },
   { id: 'nextinpact', label: 'Next', lang: 'fr', group: 'tech' },
   { id: 'lesnumeriques', label: 'Les Numériques', lang: 'fr', group: 'tech' },
+  { id: 'lemonde_pixels', label: 'Le Monde — Pixels', lang: 'fr', group: 'tech' },
   // ─── IA (flux vérifiés en direct le 2026-10-16) ──────────────
   { id: 'actuia', label: 'ActuIA', lang: 'fr', group: 'ai' },
   { id: 'jdn_ia', label: 'JDN — IA', lang: 'fr', group: 'ai' },
@@ -47,6 +48,12 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'googleai', label: 'Google — IA', lang: 'en', group: 'ai' },
   { id: 'huggingface', label: 'Hugging Face', lang: 'en', group: 'ai' },
   { id: 'simonwillison', label: 'Simon Willison', lang: 'en', group: 'ai' },
+  { id: 'importai', label: 'Import AI', lang: 'en', group: 'ai' },
+  { id: 'interconnects', label: 'Interconnects', lang: 'en', group: 'ai' },
+  { id: 'latentspace', label: 'Latent Space', lang: 'en', group: 'ai' },
+  { id: 'euaiact', label: 'EU AI Act Newsletter', lang: 'en', group: 'ai' },
+  { id: 'bensbites', label: "Ben's Bites", lang: 'en', group: 'ai' },
+  { id: 'lmi_ia', label: 'Le Monde Informatique — IA', lang: 'fr', group: 'ai' },
   // ─── Finance / marchés ───────────────────────────────────────
   { id: 'latribune', label: 'La Tribune', lang: 'fr', group: 'markets' },
   { id: 'yahoofinance', label: 'Yahoo Finance', lang: 'en', group: 'markets' },
@@ -61,6 +68,7 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'lefigaro', label: 'Le Figaro', lang: 'fr', group: 'general-fr' },
   { id: 'liberation', label: 'Libération', lang: 'fr', group: 'general-fr' },
   { id: 'france24', label: 'France 24', lang: 'fr', group: 'general-fr' },
+  { id: 'cnil', label: 'CNIL', lang: 'fr', group: 'general-fr' },
   // ─── International (EN) ──────────────────────────────────────
   { id: 'bbc', label: 'BBC News', lang: 'en', group: 'international' },
   { id: 'guardian', label: 'The Guardian', lang: 'en', group: 'international' },

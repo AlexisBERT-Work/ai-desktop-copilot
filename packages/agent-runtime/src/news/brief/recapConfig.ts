@@ -1,0 +1,114 @@
+import { PRESS_SOURCE_CATALOG, isEmailAddress } from '@catdesk/shared-types';
+import { NEWS_SOURCES } from '../sources';
+import { DEFAULT_AUDIENCE } from './briefPrompt';
+
+// Configuration du brief « Actu IA » quotidien, en deux temps autour de la
+// rédaction par Claude Code (.github/workflows/ai-recap.yml) :
+//   collecte  (cli/recapCollect.ts) : variables RECAP_SINCE, RECAP_SOURCES, RECAP_LIMIT, RECAP_AUDIENCE
+//   envoi     (cli/recapSend.ts)    : variables RECAP_TO, RECAP_DRY_RUN, RECAP_OUT + SMTP_*
+// Les deux partagent RECAP_WORKDIR, le dossier d'échange avec Claude.
+
+type EnvLike = Record<string, string | undefined>;
+
+/**
+ * Sources par défaut : le groupe « IA » du catalogue, plus deux sources
+ * généralistes que Claude filtre (Le Monde Pixels, CNIL).
+ */
+export const BRIEF_DEFAULT_SOURCES: readonly string[] = [
+  ...PRESS_SOURCE_CATALOG.filter(s => s.group === 'ai').map(s => s.id),
+  'lemonde_pixels',
+  'cnil',
+];
+
+/** Fenêtre par défaut quand aucun envoi précédent n'est connu (premier run). */
+const DEFAULT_WINDOW_HOURS = 24;
+/** Au-delà (plusieurs matins ratés), le brief deviendrait indigeste. */
+const MAX_WINDOW_HOURS = 72;
+
+/**
+ * Fenêtre de collecte « depuis le dernier envoi », en heures entières : du
+ * début du dernier run réussi à maintenant, bornée à [1, 72]. Sans date (ou
+ * date illisible) : 24 h. Pur, exporté pour tests.
+ */
+export function recapWindowHours(lastSentIso: string | undefined, now = new Date()): number {
+  const last = lastSentIso?.trim() ? Date.parse(lastSentIso) : Number.NaN;
+  if (Number.isNaN(last)) return DEFAULT_WINDOW_HOURS;
+  const hours = Math.ceil((now.getTime() - last) / 3_600_000);
+  return Math.min(MAX_WINDOW_HOURS, Math.max(1, hours));
+}
+
+function csv(v: string | undefined): string[] {
+  return (v ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
+function workdir(env: EnvLike): string {
+  return env['RECAP_WORKDIR']?.trim() || 'recap-work';
+}
+
+export interface CollectConfig {
+  workdir: string;
+  sourceIds: string[];
+  sinceHours: number;
+  /** Nombre max de candidats soumis à Claude. */
+  limit: number;
+  audience: string;
+}
+
+/** Configuration de la collecte ; refuse une source inconnue. Pur, exporté pour tests. */
+export function readCollectConfig(
+  env: EnvLike,
+  now = new Date(),
+): { ok: true; config: CollectConfig } | { ok: false; error: string } {
+  const requested = csv(env['RECAP_SOURCES']);
+  const sourceIds = requested.length > 0 ? requested : [...BRIEF_DEFAULT_SOURCES];
+  const unknown = sourceIds.filter(id => !(id in NEWS_SOURCES));
+  if (unknown.length > 0) {
+    return { ok: false, error: `RECAP_SOURCES : source(s) inconnue(s) — ${unknown.join(', ')}` };
+  }
+  const limit = Number(env['RECAP_LIMIT'] ?? '');
+  return {
+    ok: true,
+    config: {
+      workdir: workdir(env),
+      sourceIds,
+      sinceHours: recapWindowHours(env['RECAP_SINCE'], now),
+      limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : 120,
+      audience: env['RECAP_AUDIENCE']?.trim() || DEFAULT_AUDIENCE,
+    },
+  };
+}
+
+export interface SendConfig {
+  workdir: string;
+  /** Destinataire ; null seulement en essai à blanc. */
+  to: string | null;
+  /** Essai à blanc : rien n'est envoyé, l'aperçu HTML est écrit dans `out`. */
+  dryRun: boolean;
+  out: string;
+}
+
+/** Configuration de l'envoi ; exige un destinataire valide hors essai à blanc. Pur. */
+export function readSendConfig(
+  env: EnvLike,
+): { ok: true; config: SendConfig } | { ok: false; error: string } {
+  const dryRun = env['RECAP_DRY_RUN'] === '1' || env['RECAP_DRY_RUN'] === 'true';
+  const to = env['RECAP_TO']?.trim() || null;
+  if (to === null && !dryRun) {
+    return { ok: false, error: 'RECAP_TO manquant (adresse qui reçoit le récap).' };
+  }
+  if (to !== null && !isEmailAddress(to)) {
+    return { ok: false, error: 'RECAP_TO invalide : ce n’est pas une adresse e-mail.' };
+  }
+  return {
+    ok: true,
+    config: {
+      workdir: workdir(env),
+      to,
+      dryRun,
+      out: env['RECAP_OUT']?.trim() || 'recap-preview.html',
+    },
+  };
+}

@@ -150,3 +150,10 @@ describe('emailChangedDailies', () => {
     expect(out).toEqual({ emailed: 0 });
   });
 });
+
+describe('inlineHtml — code', () => {
+  it('rend le code entre accents graves', () => {
+    expect(inlineHtml('cibler `@chrome`')).toContain('<code style=');
+    expect(inlineHtml('cibler `@chrome`')).toContain('>@chrome</code>');
+  });
+});

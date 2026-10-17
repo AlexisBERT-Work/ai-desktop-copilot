@@ -11,7 +11,7 @@ const log = createLogger('news:daily-email');
 // gras/italique. Pas de bibliothèque Markdown : le format d'entrée est connu,
 // et tout le texte (issu de flux RSS tiers et du LLM) est échappé.
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -20,9 +20,13 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Gras `**x**` et italique `*x*` sur un texte DÉJÀ échappé. */
+const CODE_STYLE =
+  'font-family:Consolas,Menlo,monospace;font-size:.92em;background:#f4f4f5;padding:0 3px;border-radius:3px';
+
+/** Code `x`, gras `**x**` et italique `*x*` sur un texte DÉJÀ échappé. */
 function emphasis(escaped: string): string {
   return escaped
+    .replace(/`([^`]+)`/g, `<code style="${CODE_STYLE}">$1</code>`)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\s][^*]*)\*(?!\*)/g, '$1<em>$2</em>');
 }
