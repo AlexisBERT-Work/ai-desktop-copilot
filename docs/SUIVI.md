@@ -42,8 +42,10 @@ La prochaine est la **0.2.0 elle-même** : rien à coder, tout bloque sur toi
 54 desktop, 38 Rust (+ 4 de fumée ignorés en CI), 14 Python, `clippy -D
 warnings`, `fmt --check`. Sur `master` : **CI verte** depuis la PR #24 (elle était rouge sur `master`
 depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
-antérieures, suivies dans #25 (jalon 0.2.1). Sur la PR #26, le job Rust
-échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+antérieures (#25). Sur la PR #26, le job Rust échouait sur un cache
+sherpa-onnx incomplet : corrigé le 2026-10-12 ; et `pnpm audit` y passe de 68
+alertes à 2 modérées le 2026-10-17 (lockfile rafraîchi, vitest 2 → 4,
+lint-staged 15 → 16).
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 

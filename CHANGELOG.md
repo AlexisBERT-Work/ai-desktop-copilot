@@ -93,6 +93,10 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Security
 
+- **Vulnerable dependencies: 68 → 2 moderate** (`pnpm audit`, #25). The lockfile is
+  refreshed within the declared ranges; vitest 2 → 4 (its `tinypool` was critical) and
+  lint-staged 15 → 16 (its `braces` has no fixed release). Left: esbuild's dev server and
+  PrismJS (code highlighting), both moderate.
 - **Path arguments are declared per tool** (`BaseTool.pathArgs`) and all of them are
   checked against the whitelist. `obsidian_notes` (`vault`) and `semantic_search`
   (`paths`), both auto-approved, could read any folder on the disk.

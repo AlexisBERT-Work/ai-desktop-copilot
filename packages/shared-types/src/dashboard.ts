@@ -4,14 +4,7 @@
 // (Record<string, unknown>) et sera spécifié widget par widget.
 
 export type WidgetType =
-  | 'kpi'
-  | 'stat'
-  | 'chart'
-  | 'table'
-  | 'stocks'
-  | 'quick_action'
-  | 'news'
-  | 'dailies';
+  'kpi' | 'stat' | 'chart' | 'table' | 'stocks' | 'quick_action' | 'news' | 'dailies';
 
 /**
  * Position/taille sur le canvas libre du dashboard, en px (v2). Les anciennes

@@ -167,8 +167,7 @@ export class StdinBridge {
         // Réponse immédiate — le chargement prend de 10 à 20 s.
         case RPC_METHODS.agentWarmup: {
           const params = request.params as
-            | { model?: unknown; conversationId?: unknown }
-            | undefined;
+            { model?: unknown; conversationId?: unknown } | undefined;
           const model = params?.model;
           if (typeof model !== 'string' || model.trim() === '') {
             this.sendError(request.id, -32602, 'agent.warmup: model requis');
