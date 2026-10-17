@@ -1,17 +1,21 @@
-# Récap « Actu IA » par e-mail, chaque matin, PC éteint.
+# Brief « Veille IA » quotidien par e-mail, PC éteint.
 #
-# Le pipeline des journaux personnalisés (collecte RSS du groupe « IA »,
-# rédaction LLM, mise en forme) tourne ici sur le processeur du serveur
-# GitHub, avec un petit modèle ouvert (qwen3 4b instruct) : aucune clé d'API, 0 €
-# (minutes gratuites d'un dépôt public). Script : packages/agent-runtime/src/cli/emailRecap.ts.
+# 1. Collecte (notre code, sans IA) : articles des sources IA depuis le dernier
+#    envoi → candidates.json + consigne + schéma (src/cli/recapCollect.ts).
+# 2. Rédaction par Claude Code en mode non interactif, sur l'ABONNEMENT Claude
+#    (jeton `claude setup-token`, pas de facturation API) : tri, lecture des
+#    articles, vérifications web, brief en JSON conforme au schéma.
+# 3. Mise en page et envoi (notre code) : HTML, images et schémas joints, SMTP
+#    (src/cli/recapSend.ts).
 #
 # Réglages (Settings → Secrets and variables → Actions) :
-#   secrets   SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
-#             RECAP_TO (adresse qui reçoit le récap)
-#   variables (optionnelles) SMTP_HOST (défaut smtp.gmail.com), SMTP_PORT (465),
-#             RECAP_MODEL (qwen3:4b-instruct-2507-q4_K_M — pas qwen3:4b, qui raisonne
-#             toujours), RECAP_SOURCES (groupe IA), RECAP_LIMIT (12),
-#             RECAP_CODE_REF (branche du code lancée le matin, défaut dev)
+#   secrets   CLAUDE_CODE_OAUTH_TOKEN (sortie de `claude setup-token`),
+#             SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
+#             RECAP_TO (adresse qui reçoit le brief)
+#   variables (optionnelles) RECAP_CLAUDE_MODEL (claude-opus-5-5), RECAP_AUDIENCE
+#             (lectorat visé), RECAP_SOURCES, RECAP_LIMIT (120 candidats),
+#             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465),
+#             RECAP_CODE_REF (branche du code lancée depuis master, défaut dev)
 #
 # GitHub ne déclenche un `schedule` que depuis la branche par défaut (master) :
 # ce fichier doit y être. Le code exécuté, lui, vient de RECAP_CODE_REF.
@@ -29,10 +33,6 @@ on:
         description: 'Essai à blanc : rien n’est envoyé, aperçu HTML en artefact'
         type: boolean
         default: true
-      limit:
-        description: 'Articles max (vide = RECAP_LIMIT, sinon 12) — petit pour un essai rapide'
-        type: string
-        default: ''
 
 permissions:
   contents: read
@@ -47,9 +47,7 @@ jobs:
     # Jamais sur un fork (ni secrets ni raison d'envoyer quoi que ce soit).
     if: github.repository == 'AlexisBERT-Work/ai-desktop-copilot'
     runs-on: ubuntu-latest
-    # Mesuré le 2026-10-16 : ~7 tokens/s en génération sur ce processeur,
-    # job complet en 14 min pour 12 articles.
-    timeout-minutes: 90
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,18 +65,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --filter @catdesk/agent-runtime...
 
-      - name: Ollama et modèle
-        env:
-          MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b-instruct-2507-q4_K_M' }}
-        run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          # Pas de systemd sur le runner : le service installé ne démarre pas
-          # (vu au premier essai, 2026-10-16). On lance le serveur nous-mêmes.
-          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
-          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version > /dev/null && break; sleep 2; done
-          curl -sf http://127.0.0.1:11434/api/version || { cat "$RUNNER_TEMP/ollama.log"; exit 1; }
-          ollama pull "$MODEL"
-
       # « Depuis le dernier envoi » : début du dernier run PLANIFIÉ réussi. Les
       # essais lancés à la main ne décalent pas la fenêtre.
       - name: Date du dernier envoi
@@ -92,30 +78,69 @@ jobs:
           echo "Dernier envoi : ${since:-aucun (fenêtre de 24 h)}"
           echo "since=$since" >> "$GITHUB_OUTPUT"
 
-      - name: Récap
+      - name: Collecte
         working-directory: packages/agent-runtime
         env:
-          RECAP_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          RECAP_WORKDIR: ${{ runner.temp }}/recap
           RECAP_SINCE: ${{ steps.last.outputs.since }}
-          RECAP_TO: ${{ secrets.RECAP_TO }}
-          RECAP_MODEL: ${{ vars.RECAP_MODEL || 'qwen3:4b-instruct-2507-q4_K_M' }}
-          # Processeur lent : 30 min par appel au lieu de 10 (défaut du poste).
-          CATDESK_DIGEST_TIMEOUT_MS: '1800000'
           RECAP_SOURCES: ${{ vars.RECAP_SOURCES }}
-          RECAP_LIMIT: ${{ inputs.limit || vars.RECAP_LIMIT }}
+          RECAP_LIMIT: ${{ vars.RECAP_LIMIT }}
+          RECAP_AUDIENCE: ${{ vars.RECAP_AUDIENCE }}
+        run: pnpm recap:collect
+
+      - name: Installer Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Claude ne reçoit que lecture de fichiers + web : ni shell, ni écriture,
+      # ni jeton GitHub. Le contenu des articles ne peut donc agir que sur le
+      # texte du brief, que l'étape suivante valide contre le schéma.
+      - name: Rédaction (Claude)
+        id: claude
+        timeout-minutes: 30
+        working-directory: ${{ runner.temp }}/recap
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MODEL: ${{ vars.RECAP_CLAUDE_MODEL || 'claude-opus-5-5' }}
+        run: |
+          if [ "$(jq length candidates.json)" -eq 0 ]; then
+            echo "Aucun article dans la fenêtre : pas de brief aujourd'hui."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          claude -p --model "$MODEL" \
+            --permission-mode dontAsk \
+            --allowedTools "Read,WebFetch,WebSearch" \
+            --max-turns 60 \
+            --output-format json \
+            --json-schema "$(cat brief.schema.json)" \
+            < prompt.md > claude-result.json
+          jq '{subtype, is_error, num_turns, duration_ms}' claude-result.json
+          jq -e '.structured_output' claude-result.json > brief.json
+
+      - name: Mise en page et envoi
+        if: steps.claude.outputs.skip != '1'
+        working-directory: packages/agent-runtime
+        env:
+          RECAP_WORKDIR: ${{ runner.temp }}/recap
+          RECAP_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          RECAP_TO: ${{ secrets.RECAP_TO }}
           RECAP_OUT: ${{ runner.temp }}/recap-preview.html
           SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
           SMTP_PORT: ${{ vars.SMTP_PORT || '465' }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-        # stdout = le texte du récap en essai à blanc : il va dans l'artefact,
+        # stdout = le texte du brief en essai à blanc : il va dans l'artefact,
         # pas dans les logs (publics). Les étapes restent visibles sur stderr.
-        run: pnpm recap:email > /dev/null
+        run: pnpm recap:send > /dev/null
 
       - name: Aperçu (essai à blanc)
-        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run && steps.claude.outputs.skip != '1'
         uses: actions/upload-artifact@v4
         with:
           name: recap-preview
-          path: ${{ runner.temp }}/recap-preview.html
+          path: |
+            ${{ runner.temp }}/recap-preview.html
+            ${{ runner.temp }}/recap/brief.json
           retention-days: 3
