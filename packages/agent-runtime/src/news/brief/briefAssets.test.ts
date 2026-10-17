@@ -4,6 +4,7 @@ import {
   diagramUrl,
   layoutDiagram,
   pageImage,
+  pngSize,
   type AssetDeps,
 } from './briefAssets';
 import type { Candidate } from './collectCandidates';
@@ -106,5 +107,50 @@ describe('layoutDiagram', () => {
     });
     expect(layoutDiagram('graph TD\n A --> B').vertical).toBe(true);
     expect(layoutDiagram('timeline\n 2026 : AI Act').vertical).toBe(false);
+  });
+});
+
+/** En-tête PNG minimal (signature + IHDR) aux dimensions données. */
+function pngHeader(width: number, height: number): Buffer {
+  const buf = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buf, 0);
+  buf.writeUInt32BE(13, 8);
+  buf.write('IHDR', 12, 'ascii');
+  buf.writeUInt32BE(width, 16);
+  buf.writeUInt32BE(height, 20);
+  return buf;
+}
+
+describe('pngSize', () => {
+  it('lit largeur et hauteur, refuse ce qui n’est pas un PNG', () => {
+    expect(pngSize(pngHeader(1200, 843))).toEqual({ width: 1200, height: 843 });
+    expect(pngSize(Buffer.from('<html>'))).toBeNull();
+  });
+});
+
+describe('buildBriefAssets — largeur du schéma', () => {
+  it('schéma vertical mais plus large que haut : affiché pleine largeur', async () => {
+    const d = deps({
+      fetchBinary: vi
+        .fn<AssetDeps['fetchBinary']>()
+        .mockResolvedValue({ body: pngHeader(1200, 843), contentType: 'image/png' }),
+    });
+    const brief = {
+      ...BRIEF,
+      leads: [{ ...BRIEF.leads[0]!, diagram: { mermaid: 'flowchart TD\n A --> B', caption: 'c' } }],
+    };
+    const res = await buildBriefAssets(brief, [], d);
+    expect(res.visuals[0]?.diagram).toBe('lead1-diagram');
+    expect(res.visuals[0]?.diagramVertical).toBeUndefined();
+  });
+
+  it('schéma plus haut que large : affiché étroit', async () => {
+    const d = deps({
+      fetchBinary: vi
+        .fn<AssetDeps['fetchBinary']>()
+        .mockResolvedValue({ body: pngHeader(1200, 2291), contentType: 'image/png' }),
+    });
+    const res = await buildBriefAssets(BRIEF, [], d);
+    expect(res.visuals[0]?.diagramVertical).toBe(true);
   });
 });

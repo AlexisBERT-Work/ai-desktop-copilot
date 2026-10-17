@@ -58,6 +58,14 @@ export function layoutDiagram(mermaid: string): { code: string; vertical: boolea
     : { code, vertical: false };
 }
 
+/** Dimensions d'un PNG lues dans son en-tête IHDR, ou null si ce n'est pas un PNG. Pur. */
+export function pngSize(png: Buffer): { width: number; height: number } | null {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (png.length < 24 || !png.subarray(0, 8).equals(signature)) return null;
+  if (png.toString('ascii', 12, 16) !== 'IHDR') return null;
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
 /** URL de rendu PNG d'un schéma Mermaid (mermaid.ink, thème sobre). Pur, exporté pour tests. */
 export function diagramUrl(mermaid: string): string {
   const code = Buffer.from(mermaid.trim(), 'utf-8').toString('base64url');
@@ -128,7 +136,12 @@ export async function buildBriefAssets(
           ? fetchImage(diagramUrl(layout.code), `lead${i + 1}-diagram`, deps)
           : Promise.resolve(null),
       ]);
-      return { image, diagram, vertical: layout?.vertical === true };
+      // Largeur d'affichage selon la FORME réelle de l'image, pas la direction
+      // du schéma : un `flowchart TD` qui se ramifie sort plus large que haut
+      // (essai du 2026-10-17), et rétréci, ses libellés devenaient illisibles.
+      const size = diagram !== null ? pngSize(diagram.body) : null;
+      const tall = size !== null ? size.height > size.width : layout?.vertical === true;
+      return { image, diagram, vertical: tall };
     }),
   );
 
