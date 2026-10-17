@@ -45,10 +45,20 @@ describe('readCollectConfig', () => {
   it('refuse une source inconnue, borne le nombre de candidats', () => {
     expect(readCollectConfig({ RECAP_SOURCES: 'actuia,nimporte' }, NOW)).toEqual({
       ok: false,
-      error: 'RECAP_SOURCES : source(s) inconnue(s) — nimporte',
+      error: 'Source(s) inconnue(s) — nimporte',
     });
     const r = readCollectConfig({ RECAP_SOURCES: 'actuia, openai', RECAP_LIMIT: '900' }, NOW);
     expect(r.ok && r.config).toMatchObject({ sourceIds: ['actuia', 'openai'], limit: 200 });
+  });
+
+  it('RECAP_EXTRA_SOURCES s’ajoute aux sources par défaut, sans doublon', () => {
+    const r = readCollectConfig({ RECAP_EXTRA_SOURCES: 'stat_healthtech, ema, actuia' }, NOW);
+    expect(r.ok && r.config.sourceIds).toEqual([
+      ...BRIEF_DEFAULT_SOURCES,
+      'stat_healthtech',
+      'ema',
+    ]);
+    expect(readCollectConfig({ RECAP_EXTRA_SOURCES: 'pharma_inconnue' }, NOW).ok).toBe(false);
   });
 });
 

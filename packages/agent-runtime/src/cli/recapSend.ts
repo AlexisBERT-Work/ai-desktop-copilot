@@ -6,7 +6,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { maskEmail, readSmtpConfig, sendEmail } from '../lib/email';
+import { readSmtpConfig, sendEmail } from '../lib/email';
 import { buildBriefAssets } from '../news/brief/briefAssets';
 import { BriefSchema } from '../news/brief/briefSchema';
 import { BRIEF_FILE, CANDIDATES_FILE, type Candidate } from '../news/brief/collectCandidates';
@@ -97,7 +97,9 @@ async function main(): Promise<number> {
     log.error('Brief non envoyé', { error: res.error });
     return 1;
   }
-  log.info('Brief envoyé', { to: maskEmail(cfg.to), subject, images: assets.images.length });
+  // Ni adresse ni domaine : les logs d'un dépôt public sont publics, et le
+  // domaine d'une adresse pro révèle l'employeur (vu le 2026-10-17).
+  log.info('Brief envoyé', { subject, images: assets.images.length });
   return 0;
 }
 

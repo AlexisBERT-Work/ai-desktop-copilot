@@ -197,7 +197,9 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
     label: 'Import AI',
     lang: 'en',
     kind: 'feed',
-    url: 'https://importai.substack.com/feed',
+    // Miroir WordPress : le flux Substack répond 403 aux serveurs de GitHub
+    // Actions (vu le 2026-10-17), où tourne le brief quotidien.
+    url: 'https://jack-clark.net/feed/',
     category: 'tech',
   },
   interconnects: {
@@ -254,6 +256,40 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
     lang: 'fr',
     kind: 'feed',
     url: 'https://www.cnil.fr/fr/rss.xml',
+    category: 'misc',
+  },
+
+  // ─── Santé & pharma (vérifiés le 2026-10-17, part d'IA mesurée) ──────
+  stat_healthtech: {
+    id: 'stat_healthtech',
+    label: 'STAT — Health Tech',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.statnews.com/category/health-tech/feed/',
+    category: 'tech',
+  },
+  endpoints: {
+    id: 'endpoints',
+    label: 'Endpoints News',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://endpoints.news/feed/',
+    category: 'misc',
+  },
+  mindhealth: {
+    id: 'mindhealth',
+    label: 'Mind Health',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.mind.eu.com/health/feed/',
+    category: 'tech',
+  },
+  ema: {
+    id: 'ema',
+    label: 'EMA — actualités',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.ema.europa.eu/en/news.xml',
     category: 'misc',
   },
 

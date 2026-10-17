@@ -13,7 +13,9 @@
 #             SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
 #             RECAP_TO (adresse qui reçoit le brief)
 #   variables (optionnelles) RECAP_CLAUDE_MODEL (claude-opus-5-5), RECAP_AUDIENCE
-#             (lectorat visé), RECAP_SOURCES, RECAP_LIMIT (120 candidats),
+#             (lectorat visé), RECAP_EXTRA_SOURCES (sources ajoutées aux défauts,
+#             ex. stat_healthtech,endpoints,mindhealth,ema), RECAP_SOURCES
+#             (remplace les défauts), RECAP_LIMIT (120 candidats),
 #             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465),
 #             RECAP_CODE_REF (branche du code lancée depuis master, défaut dev)
 #
@@ -33,6 +35,16 @@ on:
         description: 'Essai à blanc : rien n’est envoyé, aperçu HTML en artefact'
         type: boolean
         default: true
+      # Pour essayer un réglage sur UN run, sans toucher aux variables. Les
+      # entrées apparaissent dans les logs (publics) : rien de confidentiel.
+      audience:
+        description: 'Lectorat visé, pour ce run seulement (vide = variable RECAP_AUDIENCE)'
+        type: string
+        default: ''
+      extra_sources:
+        description: 'Sources ajoutées, pour ce run seulement (ex. stat_healthtech,ema)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -84,8 +96,9 @@ jobs:
           RECAP_WORKDIR: ${{ runner.temp }}/recap
           RECAP_SINCE: ${{ steps.last.outputs.since }}
           RECAP_SOURCES: ${{ vars.RECAP_SOURCES }}
+          RECAP_EXTRA_SOURCES: ${{ inputs.extra_sources || vars.RECAP_EXTRA_SOURCES }}
           RECAP_LIMIT: ${{ vars.RECAP_LIMIT }}
-          RECAP_AUDIENCE: ${{ vars.RECAP_AUDIENCE }}
+          RECAP_AUDIENCE: ${{ inputs.audience || vars.RECAP_AUDIENCE }}
         run: pnpm recap:collect
 
       - name: Installer Claude Code

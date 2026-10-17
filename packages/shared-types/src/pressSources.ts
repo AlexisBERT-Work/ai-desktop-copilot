@@ -5,7 +5,14 @@
  * id/label entre les deux.
  */
 
-export type PressSourceGroup = 'tech' | 'ai' | 'markets' | 'macro' | 'general-fr' | 'international';
+export type PressSourceGroup =
+  | 'tech'
+  | 'ai'
+  | 'health'
+  | 'markets'
+  | 'macro'
+  | 'general-fr'
+  | 'international';
 
 export interface PressSourceInfo {
   id: string;
@@ -17,6 +24,7 @@ export interface PressSourceInfo {
 export const PRESS_SOURCE_GROUP_LABEL: Record<PressSourceGroup, string> = {
   tech: 'Tech',
   ai: 'IA',
+  health: 'Santé & pharma',
   markets: 'Finance & marchés',
   macro: 'Macro / économie',
   'general-fr': 'Généraliste FR',
@@ -54,6 +62,11 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'euaiact', label: 'EU AI Act Newsletter', lang: 'en', group: 'ai' },
   { id: 'bensbites', label: "Ben's Bites", lang: 'en', group: 'ai' },
   { id: 'lmi_ia', label: 'Le Monde Informatique — IA', lang: 'fr', group: 'ai' },
+  // ─── Santé & pharma ──────────────────────────────────────────
+  { id: 'stat_healthtech', label: 'STAT — Health Tech', lang: 'en', group: 'health' },
+  { id: 'endpoints', label: 'Endpoints News', lang: 'en', group: 'health' },
+  { id: 'mindhealth', label: 'Mind Health', lang: 'fr', group: 'health' },
+  { id: 'ema', label: 'EMA — actualités', lang: 'en', group: 'health' },
   // ─── Finance / marchés ───────────────────────────────────────
   { id: 'latribune', label: 'La Tribune', lang: 'fr', group: 'markets' },
   { id: 'yahoofinance', label: 'Yahoo Finance', lang: 'en', group: 'markets' },

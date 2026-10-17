@@ -57,16 +57,21 @@ export interface CollectConfig {
   audience: string;
 }
 
-/** Configuration de la collecte ; refuse une source inconnue. Pur, exporté pour tests. */
+/**
+ * Configuration de la collecte ; refuse une source inconnue. RECAP_SOURCES
+ * REMPLACE la liste par défaut ; RECAP_EXTRA_SOURCES s'y AJOUTE (sources d'un
+ * secteur, ex. santé). Pur, exporté pour tests.
+ */
 export function readCollectConfig(
   env: EnvLike,
   now = new Date(),
 ): { ok: true; config: CollectConfig } | { ok: false; error: string } {
   const requested = csv(env['RECAP_SOURCES']);
-  const sourceIds = requested.length > 0 ? requested : [...BRIEF_DEFAULT_SOURCES];
+  const base = requested.length > 0 ? requested : [...BRIEF_DEFAULT_SOURCES];
+  const sourceIds = [...new Set([...base, ...csv(env['RECAP_EXTRA_SOURCES'])])];
   const unknown = sourceIds.filter(id => !(id in NEWS_SOURCES));
   if (unknown.length > 0) {
-    return { ok: false, error: `RECAP_SOURCES : source(s) inconnue(s) — ${unknown.join(', ')}` };
+    return { ok: false, error: `Source(s) inconnue(s) — ${unknown.join(', ')}` };
   }
   const limit = Number(env['RECAP_LIMIT'] ?? '');
   return {
