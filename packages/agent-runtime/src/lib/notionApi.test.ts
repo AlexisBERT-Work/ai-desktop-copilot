@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { notionTitle, blockToText, resolveNotionToken } from './notionApi';
 
 describe('notionTitle', () => {
-  it('lit le titre d\'une base (title array)', () => {
+  it("lit le titre d'une base (title array)", () => {
     expect(notionTitle({ title: [{ plain_text: 'My ' }, { plain_text: 'DB' }] })).toBe('My DB');
   });
 
-  it('lit le titre d\'une page (properties.*.title)', () => {
+  it("lit le titre d'une page (properties.*.title)", () => {
     const page = {
       properties: {
         Name: { type: 'title', title: [{ plain_text: 'Page Title' }] },
@@ -23,7 +23,10 @@ describe('notionTitle', () => {
 
 describe('blockToText', () => {
   it('aplati le rich_text selon le type', () => {
-    const block = { type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Hello ' }, { plain_text: 'world' }] } };
+    const block = {
+      type: 'paragraph',
+      paragraph: { rich_text: [{ plain_text: 'Hello ' }, { plain_text: 'world' }] },
+    };
     expect(blockToText(block)).toBe('Hello world');
   });
 
@@ -33,7 +36,7 @@ describe('blockToText', () => {
 });
 
 describe('resolveNotionToken', () => {
-  it('préfère l\'argument', () => {
+  it("préfère l'argument", () => {
     expect(resolveNotionToken('arg-token')).toBe('arg-token');
   });
 });

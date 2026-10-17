@@ -5,9 +5,9 @@ import { jsonSchemaFrom } from '../base/zodSchema';
 import { aggregateNews } from '../../news/aggregate';
 import { enrichExcerpts } from '../../news/enrich';
 import { buildDiscordEmbeds, MAX_CONTENT, MAX_EMBEDS, truncate } from '../../news/discordEmbeds';
-import { postToDiscord } from '../../lib/discord';
+import { isDiscordWebhookUrl, postToDiscord } from '../../lib/discord';
 import type { OllamaClient } from '../../llm/OllamaClient';
-import { summarizeDigest } from '../../llm/NewsSummarizer';
+import { summarizeDigest } from '../../news/NewsSummarizer';
 import { createLogger } from '../../logger';
 
 const log = createLogger('tool:tech-news-discord');
@@ -86,8 +86,12 @@ export class PostTechNewsDiscordTool extends BaseTool<Args> {
         'URL de webhook Discord manquante. Passe webhook_url ou définis DISCORD_WEBHOOK_URL.',
       );
     }
-    if (!/^https:\/\//i.test(webhookUrl)) {
-      return this.fail('webhook_url doit être une URL https valide.');
+    // Outil sans confirmation : la cible est bornée aux webhooks Discord, sinon
+    // une injection de prompt en ferait un canal d'exfiltration (intro libre).
+    if (!isDiscordWebhookUrl(webhookUrl)) {
+      return this.fail(
+        'webhook_url doit être un webhook Discord (https://discord.com/api/webhooks/…).',
+      );
     }
 
     let result;

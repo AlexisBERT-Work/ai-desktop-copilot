@@ -47,7 +47,10 @@ export class OcrSidecarClient {
     const { root } = parse(dir);
     for (;;) {
       if (existsSync(join(dir, 'packages', 'ocr-vision', 'main.py'))) break;
-      if (dir === root) { dir = process.cwd(); break; }
+      if (dir === root) {
+        dir = process.cwd();
+        break;
+      }
       dir = dirname(dir);
     }
     this._repoRoot = dir;
@@ -62,10 +65,7 @@ export class OcrSidecarClient {
   }
 
   private scriptPath(): string {
-    return (
-      process.env['OCR_SCRIPT'] ??
-      join(this.repoRoot(), 'packages/ocr-vision/main.py')
-    );
+    return process.env['OCR_SCRIPT'] ?? join(this.repoRoot(), 'packages/ocr-vision/main.py');
   }
 
   private isRunning(): boolean {
@@ -94,8 +94,7 @@ export class OcrSidecarClient {
     // un dossier utilisateur (eng+fra+osd) car Program Files n'est pas accessible
     // en écriture sans admin. Surchargeable via l'env système.
     const tessdata =
-      process.env['TESSDATA_PREFIX'] ??
-      join(process.env['LOCALAPPDATA'] ?? '', 'nd-tessdata');
+      process.env['TESSDATA_PREFIX'] ?? join(process.env['LOCALAPPDATA'] ?? '', 'nd-tessdata');
 
     log.info('Starting OCR sidecar', { command, args, tessdata });
 
@@ -183,8 +182,14 @@ export class OcrSidecarClient {
       }, timeoutMs);
 
       this.pending.set(id, {
-        resolve: v => { clearTimeout(timer); resolve(v); },
-        reject: e => { clearTimeout(timer); reject(e); },
+        resolve: v => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        reject: e => {
+          clearTimeout(timer);
+          reject(e);
+        },
       });
 
       proc.stdin.write(payload);

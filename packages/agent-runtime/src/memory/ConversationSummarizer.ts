@@ -1,5 +1,6 @@
 import type { OllamaClient } from '../llm/OllamaClient';
 import { createLogger } from '../logger';
+import { complete } from '../llm/completion';
 
 const log = createLogger('memory:summarizer');
 
@@ -24,7 +25,10 @@ export interface SummarizableMessage {
  * summary so long sessions keep their context without blowing the token budget.
  */
 export class ConversationSummarizer {
-  constructor(private llm: OllamaClient, private model: string) {}
+  constructor(
+    private llm: OllamaClient,
+    private model: string,
+  ) {}
 
   static toTranscript(messages: SummarizableMessage[], maxChars = MAX_TRANSCRIPT_CHARS): string {
     const lines: string[] = [];
@@ -39,29 +43,37 @@ export class ConversationSummarizer {
     return t;
   }
 
-  /** Produce an updated summary from a prior summary + a batch of messages. */
-  async summarize(messages: SummarizableMessage[], prior?: string): Promise<string> {
+  /**
+   * Produce an updated summary from a prior summary + a batch of messages.
+   * `null` = pas de résumé exploitable (appel en échec, réponse vide) : l'appelant
+   * ne doit RIEN enregistrer. Rendre l'ancien résumé à la place faisait avancer
+   * le marqueur de compaction — les messages repliés disparaissaient du contexte
+   * sans avoir été résumés.
+   */
+  async summarize(messages: SummarizableMessage[], prior?: string): Promise<string | null> {
     const transcript = ConversationSummarizer.toTranscript(messages);
     if (!transcript) return prior ?? '';
 
-    const userContent = (prior ? `Résumé précédent :\n${prior}\n\n` : '')
-      + `Nouveaux échanges à intégrer :\n${transcript}`;
+    const userContent =
+      (prior ? `Résumé précédent :\n${prior}\n\n` : '') +
+      `Nouveaux échanges à intégrer :\n${transcript}`;
 
-    let text = '';
+    let text: string;
     try {
-      const stream = this.llm.streamChat({
-        model: this.model,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: userContent }],
+      // think:false — tâche de fond : le raisonnement caché de qwen3 ne ferait
+      // qu'occuper le GPU plus longtemps, sans meilleur résumé. background :
+      // cède le GPU à l'utilisateur (LlmScheduler).
+      text = await complete(this.llm, this.model, SYSTEM, userContent, {
         temperature: 0.2,
+        think: false,
+        background: true,
       });
-      for await (const chunk of stream) {
-        if (chunk.type === 'token') text += chunk.content;
-      }
     } catch (err) {
-      log.warn('Summarize call failed', { error: err instanceof Error ? err.message : String(err) });
-      return prior ?? '';
+      log.warn('Summarize call failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
-    return text.trim() || (prior ?? '');
+    return text.trim() || null;
   }
 }

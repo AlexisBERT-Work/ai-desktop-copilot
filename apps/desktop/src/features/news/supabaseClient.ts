@@ -17,3 +17,26 @@ export const supabase: SupabaseClient | null =
         auth: { persistSession: true, autoRefreshToken: true },
       })
     : null;
+
+let sessionReady: Promise<void> | null = null;
+
+/**
+ * Garantit une session (anonyme par défaut : identité d'installation stable).
+ * Partagée : la news et les dailys la demandaient chacune au montage, en
+ * parallèle — deux connexions anonymes concurrentes, donc deux utilisateurs
+ * anonymes créés et une session qui écrasait l'autre. Un échec est oublié
+ * pour que l'appel suivant réessaie. Nécessite « Anonymous sign-ins » activé.
+ */
+export function ensureSession(client: SupabaseClient): Promise<void> {
+  sessionReady ??= (async () => {
+    const { data } = await client.auth.getSession();
+    if (data.session === null) {
+      const { error } = await client.auth.signInAnonymously();
+      if (error) throw error;
+    }
+  })().catch(err => {
+    sessionReady = null;
+    throw err;
+  });
+  return sessionReady;
+}

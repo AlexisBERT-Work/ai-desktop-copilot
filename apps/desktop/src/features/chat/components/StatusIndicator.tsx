@@ -11,9 +11,11 @@ export function StatusIndicator() {
   const animated = status === 'thinking' || status === 'responding' || status === 'tool';
   const label = statusLabel(status, activeTool);
   const color =
-    status === 'error' ? 'text-red-400'
-    : status === 'interrupted' ? 'text-amber-400/80'
-    : 'text-white/40';
+    status === 'error'
+      ? 'text-red-400'
+      : status === 'interrupted'
+        ? 'text-amber-400/80'
+        : 'text-white/40';
 
   return (
     <AnimatePresence>
@@ -45,12 +47,18 @@ export function StatusIndicator() {
 
 function statusLabel(status: AgentStatus, activeTool: string | null): string {
   switch (status) {
-    case 'thinking': return 'CatDesk réfléchit';
-    case 'responding': return 'CatDesk écrit';
-    case 'tool': return `Utilise ${prettyTool(activeTool)}`;
-    case 'interrupted': return 'Interrompu';
-    case 'error': return "Une erreur s'est produite";
-    default: return '';
+    case 'thinking':
+      return 'CatDesk réfléchit';
+    case 'responding':
+      return 'CatDesk écrit';
+    case 'tool':
+      return `Utilise ${prettyTool(activeTool)}`;
+    case 'interrupted':
+      return 'Interrompu';
+    case 'error':
+      return "Une erreur s'est produite";
+    default:
+      return '';
   }
 }
 

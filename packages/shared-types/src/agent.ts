@@ -7,9 +7,6 @@ export interface AgentConfig {
   temperature?: number;
   maxIterations?: number;
   enabledTools?: string[];
-  useScreenContext?: boolean;
-  useMemory?: boolean;
-  safeMode?: boolean;
   /**
    * Active une phase de planification avant l'exécution : l'agent établit
    * d'abord un plan d'étapes, injecté comme guidage. Utile pour les tâches
@@ -81,15 +78,6 @@ export interface ToolCall {
   id: string;
   name: string;
   args: Record<string, unknown>;
-}
-
-export interface ActiveToolCall extends ToolCall {
-  status: 'pending' | 'awaiting_permission' | 'executing' | 'complete' | 'failed' | 'blocked';
-  startedAt: number;
-  result?: ToolResult;
-  approve?: () => void;
-  approveAlways?: () => void;
-  reject?: () => void;
 }
 
 // ─── Ollama Schema ────────────────────────────────────────────

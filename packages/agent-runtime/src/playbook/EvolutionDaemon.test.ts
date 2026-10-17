@@ -29,8 +29,12 @@ describe('EvolutionDaemon', () => {
     const report = daemon.runOnce(1234);
 
     expect(report.generatedAt).toBe(1234);
-    expect(report.proposals.some(p => p.kind === 'prefer' && p.approach === 'generate_unit_tests')).toBe(true);
-    expect(report.proposals.some(p => p.kind === 'avoid' && p.approach === 'run_command>guess')).toBe(true);
+    expect(
+      report.proposals.some(p => p.kind === 'prefer' && p.approach === 'generate_unit_tests'),
+    ).toBe(true);
+    expect(
+      report.proposals.some(p => p.kind === 'avoid' && p.approach === 'run_command>guess'),
+    ).toBe(true);
 
     const reportPath = join(dir, 'evolution-proposals.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -63,6 +67,11 @@ describe('EvolutionDaemon', () => {
 
   it('start()/stop() are idempotent and do not throw', () => {
     const daemon = new EvolutionDaemon(store, { dataDir: dir, intervalMs: 60_000 });
-    expect(() => { daemon.start(); daemon.start(); daemon.stop(); daemon.stop(); }).not.toThrow();
+    expect(() => {
+      daemon.start();
+      daemon.start();
+      daemon.stop();
+      daemon.stop();
+    }).not.toThrow();
   });
 });

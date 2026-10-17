@@ -1,5 +1,6 @@
 import type { OllamaClient } from './OllamaClient';
 import { createLogger } from '../logger';
+import { complete } from './completion';
 
 const log = createLogger('agent:planner');
 
@@ -36,30 +37,24 @@ export function parsePlan(text: string): string[] {
 }
 
 /**
- * Génère un plan d'étapes pour une tâche, via un appel LLM non-outillé.
- * Réutilise `streamChat` (pas de nouvel endpoint) en accumulant les tokens.
+ * Génère un plan d'étapes pour une tâche, via une complétion non outillée.
+ * `think:false` : le raisonnement caché de qwen3 doublerait la latence d'une
+ * phase qui n'est déjà qu'un préambule. Un échec (Ollama absent, Stop) rend un
+ * plan vide : la planification est un bonus, jamais un point de rupture.
  */
 export class Planner {
   constructor(private llm: OllamaClient) {}
 
-  async plan(input: string, model: string): Promise<string[]> {
-    let text = '';
+  async plan(input: string, model: string, signal?: AbortSignal): Promise<string[]> {
+    let text: string;
     try {
-      const stream = this.llm.streamChat({
-        model,
-        system: PLAN_SYSTEM,
-        messages: [{ role: 'user', content: input }],
+      text = await complete(this.llm, model, PLAN_SYSTEM, input, {
         temperature: 0.3,
+        think: false,
+        signal,
       });
-      for await (const chunk of stream) {
-        if (chunk.type === 'token') text += chunk.content;
-        else if (chunk.type === 'error') {
-          log.warn('Planning failed', { error: chunk.error });
-          return [];
-        }
-      }
     } catch (err) {
-      log.warn('Planning threw', { error: String(err) });
+      log.warn('Planning failed', { error: String(err) });
       return [];
     }
 

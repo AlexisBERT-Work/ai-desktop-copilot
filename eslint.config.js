@@ -26,7 +26,10 @@ export default tseslint.config(
     },
     rules: {
       // Allow intentionally-unused args prefixed with _.
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
   // Front-end React (Vite + React 19).
@@ -44,12 +47,17 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       // Tout invoke() passe par la couche API (shared/api/) — pas d'appel
       // Tauri direct depuis les composants/stores.
-      'no-restricted-imports': ['error', {
-        paths: [{
-          name: '@tauri-apps/api/core',
-          message: 'Utilise la couche API (src/shared/api/) au lieu d\'invoke() direct.',
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tauri-apps/api/core',
+              message: "Utilise la couche API (src/shared/api/) au lieu d'invoke() direct.",
+            },
+          ],
+        },
+      ],
     },
   },
   // La couche API est le seul endroit autorisé à parler à Tauri core.

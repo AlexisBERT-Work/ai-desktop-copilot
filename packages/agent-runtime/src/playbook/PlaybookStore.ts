@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createLogger } from '../logger';
-import { loadSqlJs, type Database } from '../lib/sqljs';
+import type { Database } from '../lib/sqljs';
+import { SqliteFile } from '../lib/persistence';
 import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('playbook:store');
@@ -28,9 +28,20 @@ export interface StrategyRow {
   updatedAt: number;
 }
 
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS strategies (
+    task_type  TEXT NOT NULL,
+    approach   TEXT NOT NULL,
+    successes  INTEGER NOT NULL DEFAULT 0,
+    failures   INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (task_type, approach)
+  );
+`;
+
 export class PlaybookStore {
   // Affectée dans initialize() — tout accès avant est un bug d'ordre de démarrage.
-  private db!: Database;
+  private file!: SqliteFile;
   private readonly dbPath: string;
 
   constructor(dataDir?: string) {
@@ -38,21 +49,12 @@ export class PlaybookStore {
   }
 
   async initialize(): Promise<void> {
-    const SqlJs = await loadSqlJs();
-    this.db = existsSync(this.dbPath)
-      ? new SqlJs.Database(readFileSync(this.dbPath))
-      : new SqlJs.Database();
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS strategies (
-        task_type  TEXT NOT NULL,
-        approach   TEXT NOT NULL,
-        successes  INTEGER NOT NULL DEFAULT 0,
-        failures   INTEGER NOT NULL DEFAULT 0,
-        updated_at INTEGER NOT NULL,
-        PRIMARY KEY (task_type, approach)
-      );
-    `);
+    this.file = await SqliteFile.open(this.dbPath, SCHEMA, log);
     log.info('PlaybookStore initialized', { path: this.dbPath });
+  }
+
+  private get db(): Database {
+    return this.file.db;
   }
 
   /** Record the outcome of one run for a (task type, approach). */
@@ -118,15 +120,11 @@ export class PlaybookStore {
   }
 
   private persist(): void {
-    try {
-      writeFileSync(this.dbPath, Buffer.from(this.db.export()));
-    } catch (err) {
-      log.warn('Persist failed', { error: err instanceof Error ? err.message : String(err) });
-    }
+    this.file.persist();
   }
 
   close(): void {
-    this.db?.close();
+    this.file?.close();
   }
 }
 

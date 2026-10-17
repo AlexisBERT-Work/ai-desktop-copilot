@@ -6,12 +6,22 @@ import type { RpcMethodName } from './ipc-contract';
 
 // ─── Tauri Commands (React → Rust via invoke) ──────────────────
 
+/**
+ * Arguments de la commande `chat_send` (miroir de `ChatSendArgs`, chat.rs).
+ * Les réglages absents prennent les défauts de l'agent.
+ */
 export interface ChatSendPayload {
   conversationId: string;
   message: string;
-  attachments?: Attachment[];
+  /** Id du message assistant à remplir : corrèle les tokens streamés. */
+  messageId: string;
   modelId: string;
-  useTools: boolean;
+  temperature?: number | undefined;
+  maxIterations?: number | undefined;
+  modelMode?: 'auto' | 'light' | 'code' | undefined;
+  lightModel?: string | undefined;
+  codeModel?: string | undefined;
+  usePlanning?: boolean | undefined;
 }
 
 export interface Attachment {
@@ -43,15 +53,6 @@ export interface ErrorEvent {
   messageId?: string;
   code: string;
   message: string;
-}
-
-export interface ToolCallEvent {
-  runId: string;
-  toolCallId: string;
-  toolName: string;
-  args: Record<string, unknown>;
-  requiresConfirmation: boolean;
-  confirmationMessage?: string;
 }
 
 export interface PermissionRequestEvent {

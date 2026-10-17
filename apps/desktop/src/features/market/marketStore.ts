@@ -14,14 +14,14 @@ interface MarketState {
 }
 
 /** Alimenté par l'event Tauri `market:update` (voir useTauriEvents). */
-export const useMarketStore = create<MarketState>((set) => ({
+export const useMarketStore = create<MarketState>(set => ({
   quotes: {},
   computed: [],
   history: {},
   updatedAt: null,
-  apply: (snapshot) =>
+  apply: snapshot =>
     set({
-      quotes: Object.fromEntries(snapshot.quotes.map((q) => [q.symbol.toUpperCase(), q])),
+      quotes: Object.fromEntries(snapshot.quotes.map(q => [q.symbol.toUpperCase(), q])),
       computed: snapshot.computed,
       history: Object.fromEntries(
         Object.entries(snapshot.history).map(([sym, values]) => [sym.toUpperCase(), values]),

@@ -14,6 +14,24 @@ cd ai-desktop-copilot
 Prerequisites and model setup are in the [README](README.md#quick-start). Node 22 and
 pnpm 11.3 are hard floors, not suggestions — CI builds with exactly those.
 
+### A second machine
+
+Git carries the code, not the local state. On another machine, after `setup.ps1`:
+
+| What                                                    | Where                                  | How                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Supabase URL + anon key for the webview (news, dailies) | `apps/desktop/.env`                    | Copy it from the first machine, or fill in `.env.example`. Without it the news panels stay empty.                        |
+| Discord webhooks, Supabase admin account (extras only)  | `packages/agent-runtime/.env`          | Copy it from the first machine. Without it the standard press digest still publishes.                                    |
+| Voice models (~800 MB)                                  | `%LOCALAPPDATA%\nd-voice-models`       | `powershell -File scripts\fetch-voice-models.ps1`                                                                        |
+| Ollama models                                           | Ollama's store                         | `setup.ps1` offers to pull them, or the three `ollama pull` in the README.                                               |
+| Rust build directory (optional)                         | `CARGO_TARGET_DIR` user variable       | e.g. `%LOCALAPPDATA%\nd-target`: keeps several GB of build output (sherpa-onnx alone extracts ~1.2 GB) out of the clone. |
+| Update signing key — only to run `publish-update.ps1`   | `%USERPROFILE%\.tauri\catdesk.key`     | Copy it by USB, never through git or a synced folder. Its password is stored nowhere: you type it.                       |
+| Agent memory and conversations                          | `%APPDATA%\com.catdesk.app\agent-data` | Starts empty. Copy it only to keep the history.                                                                          |
+
+The latency figures in `docs/SUIVI.md` were measured on an RX 6700 (10 GB of VRAM), which
+is about what `qwen3:14b` needs. With less VRAM, Ollama spills layers to the CPU and every
+answer gets slower: compare on the new machine with `node scripts/latency-bench.mjs`.
+
 ## Branches
 
 Two long-lived branches:
@@ -62,7 +80,10 @@ what you changed.
 - **Named exports only** (React components excepted)
 - **Co-locate tests**: `MyModule.test.ts` beside `MyModule.ts`
 - Prefer the shared helpers over re-rolling one: `lib/runProcess` (never
-  `promisify(execFile)` again), `lib/httpGet`, `lib/dataDir`, `llm/completion`
+  `promisify(execFile)` again), `lib/http` (never a bare `fetch`: it has no timeout
+  and no size cap), `lib/persistence` (atomic writes, `SqliteFile`), `lib/dataDir`,
+  `llm/completion`, `memory/embedding`, `news/supabaseRest`, `lifecycle.ts`. The full
+  list is in [CLAUDE.md](CLAUDE.md).
 
 Run `pnpm format` before pushing; a pre-commit hook runs ESLint and Prettier on staged
 files.
@@ -75,7 +96,7 @@ files.
    pnpm type-check
    pnpm lint
    pnpm test
-   pnpm format                                   # must be a no-op
+   pnpm format:check                             # also run in CI
    cargo test   --manifest-path apps/desktop/src-tauri/Cargo.toml
    cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --tests -- -D warnings
    cargo fmt --check --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -92,6 +113,8 @@ files.
 2. Declare a zod `argsSchema` and derive the JSON Schema from it:
    `schema = jsonSchemaFrom(argsSchema)`. This is mandatory — `argsSchema` is abstract on
    `BaseTool`, and it is the single source for validation and for the model's schema.
+   List every filesystem-path argument in `override readonly pathArgs = [...] as const`:
+   the permission engine checks only declared paths against the whitelist.
 3. Add the matching entry to `DEFAULT_PERMISSION_CONFIG` in
    `packages/shared-types/src/permissions.ts`, with a risk level.
 4. Register it in `packages/agent-runtime/src/tools/registerTools.ts` (**not**
@@ -102,7 +125,8 @@ files.
 6. Document it in `docs/CAPACITES.md` — the tool catalogue's single source of truth.
 
 `registerTools.test.ts` asserts that registrations and permission entries match exactly,
-so steps 3 and 4 fail loudly if you skip one.
+so steps 3 and 4 fail loudly if you skip one — and it fails on a path-like argument
+(`path`, `dir`, `file`, `vault`…) missing from `pathArgs`.
 
 ## Keeping the layers honest
 

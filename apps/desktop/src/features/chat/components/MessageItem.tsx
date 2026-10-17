@@ -37,9 +37,7 @@ export function MessageItem({ message, isStreaming }: Props) {
         ) : (
           /* Assistant markdown */
           <div className="space-y-1">
-            {message.plan && message.plan.length > 0 && (
-              <PlanBlock steps={message.plan} />
-            )}
+            {message.plan && message.plan.length > 0 && <PlanBlock steps={message.plan} />}
             <MarkdownContent content={message.content} />
             {isStreaming && (
               <span className="inline-block w-1.5 h-4 bg-brand-400 animate-pulse ml-0.5 rounded-full" />
@@ -75,7 +73,8 @@ function PlanBlock({ steps }: { steps: string[] }) {
 
 function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="prose prose-invert prose-sm max-w-none
+    <div
+      className="prose prose-invert prose-sm max-w-none
                     prose-p:leading-relaxed prose-p:my-1
                     prose-pre:p-0 prose-pre:bg-transparent
                     prose-code:text-brand-300 prose-code:bg-white/5
@@ -83,7 +82,8 @@ function MarkdownContent({ content }: { content: string }) {
                     prose-code:text-xs prose-code:font-mono
                     prose-headings:text-white/90 prose-headings:font-semibold
                     prose-a:text-brand-400 prose-a:no-underline hover:prose-a:underline
-                    prose-blockquote:border-brand-600 prose-blockquote:text-white/60">
+                    prose-blockquote:border-brand-600 prose-blockquote:text-white/60"
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -91,7 +91,7 @@ function MarkdownContent({ content }: { content: string }) {
             return (
               <a
                 href={href}
-                onClick={(e) => {
+                onClick={e => {
                   e.preventDefault();
                   openExternal(href);
                 }}

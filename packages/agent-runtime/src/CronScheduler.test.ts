@@ -42,8 +42,12 @@ function makeScheduler() {
   const saved: ScheduledJob[] = [];
   const deleted: string[] = [];
   const store = {
-    saveScheduledTask: (job: ScheduledJob) => { saved.push(job); },
-    deleteScheduledTask: (id: string) => { deleted.push(id); },
+    saveScheduledTask: (job: ScheduledJob) => {
+      saved.push(job);
+    },
+    deleteScheduledTask: (id: string) => {
+      deleted.push(id);
+    },
     getScheduledTasks: () => [],
   } as unknown as ConversationStore;
   const runner = { run: vi.fn() } as unknown as SubAgentRunner;

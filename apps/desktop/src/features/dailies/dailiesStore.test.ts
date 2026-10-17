@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import type { Daily } from '@catdesk/shared-types';
 import { filterByOrigin, isDailyOriginFilter } from './dailiesStore';
