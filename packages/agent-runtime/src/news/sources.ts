@@ -191,6 +191,40 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
     url: 'https://simonwillison.net/atom/everything/',
     category: 'tech',
   },
+  // Analyse et source primaire, vérifiés le 2026-10-21 (part d'articles IA :
+  // 20/20, 19/20, 20/20, 8/10).
+  oneusefulthing: {
+    id: 'oneusefulthing',
+    label: 'One Useful Thing (Ethan Mollick)',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.oneusefulthing.org/feed',
+    category: 'tech',
+  },
+  understandingai: {
+    id: 'understandingai',
+    label: 'Understanding AI',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.understandingai.org/feed',
+    category: 'tech',
+  },
+  normaltech: {
+    id: 'normaltech',
+    label: 'Normal Tech (ex-AI Snake Oil)',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.normaltech.ai/feed',
+    category: 'tech',
+  },
+  eu_digital: {
+    id: 'eu_digital',
+    label: 'Commission européenne — numérique',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://digital-strategy.ec.europa.eu/en/rss.xml',
+    category: 'tech',
+  },
   // Ajoutés le 2026-10-17 pour le récap « haut niveau » (analyses, régulation).
   importai: {
     id: 'importai',
@@ -290,6 +324,22 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
     lang: 'en',
     kind: 'feed',
     url: 'https://www.ema.europa.eu/en/news.xml',
+    category: 'misc',
+  },
+  ddtrends: {
+    id: 'ddtrends',
+    label: 'Drug Discovery & Development',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.drugdiscoverytrends.com/feed/',
+    category: 'misc',
+  },
+  gen: {
+    id: 'gen',
+    label: 'GEN — Genetic Engineering News',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.genengnews.com/feed/',
     category: 'misc',
   },
 

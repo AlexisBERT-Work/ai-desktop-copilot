@@ -360,7 +360,8 @@ seule étape). Claude n'a que `Read`, `WebFetch` et `WebSearch`, en mode
 dossier temporaire hors du dépôt (aucun `CLAUDE.md`, réglage ou serveur MCP du
 projet chargé). Le contenu des articles — non fiable, potentiellement piégé —
 ne peut donc agir que sur le texte du brief, que `recap:send` valide contre le
-schéma, échappe, et dont il ne garde que les liens http(s). Les **images** ne
-sont jamais prises sur une URL donnée par le modèle : seulement celles qu'un
-flux collecté annonçait, ou l'`og:image` de la page source ; téléchargées
-bornées (2,5 Mo, 20 s, types image uniquement) puis jointes au mail.
+schéma, échappe, et dont il ne garde que les liens http(s). Depuis la v2
+(2026-10-21), le mail est **texte seul** : plus aucune image téléchargée ni
+jointe, donc plus d'URL d'image à filtrer. Les entrées `audience`, `focus` et
+`extra_sources` d'un lancement manuel apparaissent dans les logs publics :
+n'y mettre rien de confidentiel (pas de nom d'entreprise).

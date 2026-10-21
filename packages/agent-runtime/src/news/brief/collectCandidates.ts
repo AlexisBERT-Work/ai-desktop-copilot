@@ -21,8 +21,6 @@ export interface Candidate {
   lang: 'fr' | 'en' | null;
   publishedAt: string | null;
   excerpt: string;
-  /** Illustration annoncée par le flux, seule source d'images admise au rendu. */
-  image: string | null;
 }
 
 const LANG_BY_LABEL = new Map(Object.values(NEWS_SOURCES).map(s => [s.label, s.lang]));
@@ -37,7 +35,6 @@ export function toCandidates(items: NewsItem[]): Candidate[] {
     lang: LANG_BY_LABEL.get(it.source) ?? null,
     publishedAt: it.publishedAt ?? null,
     excerpt: it.excerpt ? cutAtSentence(it.excerpt, 600) : '',
-    image: it.image ?? null,
   }));
 }
 

@@ -30,7 +30,6 @@ async function main(): Promise<number> {
     sinceHours: cfg.sinceHours,
     totalFetched,
     candidates: candidates.length,
-    withImage: candidates.filter(c => c.image !== null).length,
     ...(failed.length > 0 ? { failed } : {}),
   });
 
@@ -47,6 +46,7 @@ async function main(): Promise<number> {
       since,
       now,
       audience: cfg.audience,
+      focus: cfg.focus,
     }),
   );
   write('meta.json', JSON.stringify({ since, now: now.toISOString(), sinceHours: cfg.sinceHours }));

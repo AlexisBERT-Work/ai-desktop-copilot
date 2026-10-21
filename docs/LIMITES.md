@@ -149,8 +149,9 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   **expire au bout d'un an**. GitHub peut retarder un déclenchement planifié
   (souvent 10-30 min), et **désactive** les planifications d'un dépôt public
   sans activité pendant 60 jours (un clic pour les réactiver). La planification
-  ne part que de `master`. Schémas rendus par le service public mermaid.ink :
-  s'il ne répond pas, le brief part sans schéma.
+  ne part que de `master`. Certains flux refusent les serveurs de GitHub
+  (403 : Substack en `*.substack.com`, Fierce, Healthcare IT News) : une
+  source se teste depuis le runner, pas seulement depuis un poste.
 - **Pas de partage de tableau de bord** : la disposition (canvas libre, tailles,
   styles, affichages enregistrés) vit dans le `localStorage` du poste. Rien ne
   l'exporte ni ne la synchronise entre machines.

@@ -5,7 +5,7 @@ import {
   readSendConfig,
   recapWindowHours,
 } from './recapConfig';
-import { DEFAULT_AUDIENCE } from './briefPrompt';
+import { DEFAULT_AUDIENCE, DEFAULT_FOCUS } from './briefPrompt';
 
 const NOW = new Date('2026-10-17T05:30:00Z');
 
@@ -27,7 +27,7 @@ describe('recapWindowHours', () => {
 });
 
 describe('readCollectConfig', () => {
-  it('défauts : sources IA + Pixels + CNIL, 120 candidats, lectorat référent IA', () => {
+  it('défauts : sources du brief, 120 candidats, lectorat et priorités génériques', () => {
     const r = readCollectConfig({ RECAP_SINCE: '2026-10-16T05:30:00Z' }, NOW);
     expect(r).toEqual({
       ok: true,
@@ -37,9 +37,29 @@ describe('readCollectConfig', () => {
         sinceHours: 24,
         limit: 120,
         audience: DEFAULT_AUDIENCE,
+        focus: DEFAULT_FOCUS,
       },
     });
-    expect(BRIEF_DEFAULT_SOURCES).toEqual(expect.arrayContaining(['actuia', 'cnil', 'euaiact']));
+  });
+
+  it('sources par défaut : analyse et sources primaires dedans, agrégats et tutoriels dehors', () => {
+    expect(BRIEF_DEFAULT_SOURCES).toEqual(
+      expect.arrayContaining([
+        'oneusefulthing',
+        'normaltech',
+        'eu_digital',
+        'nextinpact',
+        'cnil',
+        'euaiact',
+      ]),
+    );
+    expect(BRIEF_DEFAULT_SOURCES).not.toContain('bensbites');
+    expect(BRIEF_DEFAULT_SOURCES).not.toContain('huggingface');
+  });
+
+  it('RECAP_FOCUS remplace les priorités par défaut', () => {
+    const r = readCollectConfig({ RECAP_FOCUS: '1. Annexe 22\n2. EMA' }, NOW);
+    expect(r.ok && r.config.focus).toBe('1. Annexe 22\n2. EMA');
   });
 
   it('refuse une source inconnue, borne le nombre de candidats', () => {

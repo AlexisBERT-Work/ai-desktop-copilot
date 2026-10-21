@@ -1,23 +1,32 @@
 import { PRESS_SOURCE_CATALOG, isEmailAddress } from '@catdesk/shared-types';
 import { NEWS_SOURCES } from '../sources';
-import { DEFAULT_AUDIENCE } from './briefPrompt';
+import { DEFAULT_AUDIENCE, DEFAULT_FOCUS } from './briefPrompt';
 
-// Configuration du brief « Actu IA » quotidien, en deux temps autour de la
+// Configuration du brief « Veille IA » quotidien, en deux temps autour de la
 // rédaction par Claude Code (.github/workflows/ai-recap.yml) :
-//   collecte  (cli/recapCollect.ts) : variables RECAP_SINCE, RECAP_SOURCES, RECAP_LIMIT, RECAP_AUDIENCE
-//   envoi     (cli/recapSend.ts)    : variables RECAP_TO, RECAP_DRY_RUN, RECAP_OUT + SMTP_*
+//   collecte  (cli/recapCollect.ts) : RECAP_SINCE, RECAP_SOURCES, RECAP_EXTRA_SOURCES,
+//                                     RECAP_LIMIT, RECAP_AUDIENCE, RECAP_FOCUS
+//   envoi     (cli/recapSend.ts)    : RECAP_TO, RECAP_DRY_RUN, RECAP_OUT + SMTP_*
 // Les deux partagent RECAP_WORKDIR, le dossier d'échange avec Claude.
 
 type EnvLike = Record<string, string | undefined>;
 
 /**
- * Sources par défaut : le groupe « IA » du catalogue, plus deux sources
- * généralistes que Claude filtre (Le Monde Pixels, CNIL).
+ * Groupe « IA » écarté du brief : agrégats promotionnels et tutoriels
+ * techniques, qui noient le tri sans apporter de fait (revue du 2026-10-21).
+ * Ces sources restent au catalogue pour les journaux de CatDesk.
+ */
+const BRIEF_EXCLUDED = new Set(['bensbites', 'huggingface']);
+
+/**
+ * Sources par défaut : le groupe « IA » du catalogue (moins les exclus), plus
+ * trois sources généralistes que Claude filtre (Le Monde Pixels, CNIL, Next).
  */
 export const BRIEF_DEFAULT_SOURCES: readonly string[] = [
-  ...PRESS_SOURCE_CATALOG.filter(s => s.group === 'ai').map(s => s.id),
+  ...PRESS_SOURCE_CATALOG.filter(s => s.group === 'ai' && !BRIEF_EXCLUDED.has(s.id)).map(s => s.id),
   'lemonde_pixels',
   'cnil',
+  'nextinpact',
 ];
 
 /** Fenêtre par défaut quand aucun envoi précédent n'est connu (premier run). */
@@ -55,6 +64,8 @@ export interface CollectConfig {
   /** Nombre max de candidats soumis à Claude. */
   limit: number;
   audience: string;
+  /** Thèmes prioritaires du lecteur (RECAP_FOCUS, une ligne par thème). */
+  focus: string;
 }
 
 /**
@@ -82,6 +93,7 @@ export function readCollectConfig(
       sinceHours: recapWindowHours(env['RECAP_SINCE'], now),
       limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : 120,
       audience: env['RECAP_AUDIENCE']?.trim() || DEFAULT_AUDIENCE,
+      focus: env['RECAP_FOCUS']?.trim() || DEFAULT_FOCUS,
     },
   };
 }

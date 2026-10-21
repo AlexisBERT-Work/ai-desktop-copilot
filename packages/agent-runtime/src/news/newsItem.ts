@@ -8,5 +8,4 @@ export interface NewsItem {
   publishedAt?: string; // ISO 8601
   excerpt?: string; // short plain-text teaser, used as input for summarization
   fullText?: string; // article body fetched from the page (enrichArticleTexts), capped
-  image?: string; // illustration annoncée par le flux (media:content, enclosure, 1re <img>), http(s)
 }

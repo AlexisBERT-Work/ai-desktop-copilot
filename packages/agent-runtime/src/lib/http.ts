@@ -48,29 +48,12 @@ export async function httpRequest(url: string, req: HttpRequest = {}): Promise<H
     ...(req.body !== undefined ? { body: req.body } : {}),
     signal: AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
   });
-  const text = (await readBounded(res, req.maxBytes ?? DEFAULT_MAX_BYTES)).toString('utf-8');
+  const text = await readBounded(res, req.maxBytes ?? DEFAULT_MAX_BYTES);
   return { status: res.status, ok: res.ok, headers: res.headers, text };
 }
 
-/**
- * GET d'une ressource binaire (image…), bornée comme les autres. Lève sur un
- * statut ≥ 400, une erreur réseau, un délai dépassé ou un corps trop gros.
- */
-export async function httpGetBinary(
-  url: string,
-  opts: { timeoutMs?: number; maxBytes?: number } = {},
-): Promise<{ body: Buffer; contentType: string }> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'image/*,*/*;q=0.5' },
-    signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-  });
-  if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
-  const body = await readBounded(res, opts.maxBytes ?? DEFAULT_MAX_BYTES);
-  return { body, contentType: res.headers.get('content-type') ?? '' };
-}
-
-async function readBounded(res: Response, maxBytes: number): Promise<Buffer> {
-  if (res.body === null) return Buffer.alloc(0);
+async function readBounded(res: Response, maxBytes: number): Promise<string> {
+  if (res.body === null) return '';
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -84,7 +67,7 @@ async function readBounded(res: Response, maxBytes: number): Promise<Buffer> {
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks);
+  return Buffer.concat(chunks).toString('utf-8');
 }
 
 /**

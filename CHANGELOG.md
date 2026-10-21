@@ -35,12 +35,18 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   user's Claude subscription (`claude -p` with a `CLAUDE_CODE_OAUTH_TOKEN` from
   `claude setup-token`; read-only tools plus web fetch/search; output constrained to a JSON
   schema derived from the zod `BriefSchema`), then lays it out and sends it
-  (`pnpm recap:send`): headline, « L'essentiel », 2-3 lead stories with « ce que ça
-  change », section briefs, actions « Pour le référent IA », article images and Mermaid
-  diagrams attached inline. A manual run defaults to a dry run that uploads the HTML
-  preview. 8 more sources (Import AI, Interconnects, Latent Space, EU AI Act Newsletter,
-  Ben's Bites, Le Monde Informatique IA, Le Monde Pixels, CNIL); feed items now carry
-  their image.
+  (`pnpm recap:send`), text only: a clickable table of contents, 1-3 lead stories
+  (facts, « Pour nous », optional action and « À confirmer », sources tagged primary),
+  section briefs limited to facts not already covered, and a dated agenda — each fact
+  appears once (v2, 2026-10-21, after the first briefs repeated a story up to six
+  times). Claude goes back to the primary source an article cites and checks
+  regulatory statuses itself; the reader's priorities come from `RECAP_FOCUS`. A manual
+  run defaults to a dry run that uploads the HTML preview, and can override audience,
+  focus and extra sources for that run only. New sources: analysis (One Useful Thing,
+  Understanding AI, Normal Tech, Import AI, Interconnects, Latent Space), primary
+  (European Commission digital, EU AI Act Newsletter, CNIL, EMA), health and pharma
+  (STAT Health Tech, Endpoints News, Mind Health, Drug Discovery & Development, GEN),
+  French press (Next, Le Monde Pixels, Le Monde Informatique IA).
 
 ### Performance
 

@@ -4,16 +4,18 @@
 #    envoi → candidates.json + consigne + schéma (src/cli/recapCollect.ts).
 # 2. Rédaction par Claude Code en mode non interactif, sur l'ABONNEMENT Claude
 #    (jeton `claude setup-token`, pas de facturation API) : tri, lecture des
-#    articles, vérifications web, brief en JSON conforme au schéma.
-# 3. Mise en page et envoi (notre code) : HTML, images et schémas joints, SMTP
-#    (src/cli/recapSend.ts).
+#    articles et de leurs sources primaires, vérifications web, brief en JSON
+#    conforme au schéma.
+# 3. Mise en page et envoi (notre code) : HTML texte seul avec sommaire
+#    cliquable, SMTP (src/cli/recapSend.ts).
 #
 # Réglages (Settings → Secrets and variables → Actions) :
 #   secrets   CLAUDE_CODE_OAUTH_TOKEN (sortie de `claude setup-token`),
 #             SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
 #             RECAP_TO (adresse qui reçoit le brief)
 #   variables (optionnelles) RECAP_CLAUDE_MODEL (claude-opus-5-5), RECAP_AUDIENCE
-#             (lectorat visé), RECAP_EXTRA_SOURCES (sources ajoutées aux défauts,
+#             (lectorat visé), RECAP_FOCUS (thèmes prioritaires, un par ligne),
+#             RECAP_EXTRA_SOURCES (sources ajoutées aux défauts,
 #             ex. stat_healthtech,endpoints,mindhealth,ema), RECAP_SOURCES
 #             (remplace les défauts), RECAP_LIMIT (120 candidats),
 #             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465),
@@ -43,6 +45,10 @@ on:
         default: ''
       extra_sources:
         description: 'Sources ajoutées, pour ce run seulement (ex. stat_healthtech,ema)'
+        type: string
+        default: ''
+      focus:
+        description: 'Thèmes prioritaires, pour ce run seulement (vide = variable RECAP_FOCUS)'
         type: string
         default: ''
 
@@ -99,6 +105,7 @@ jobs:
           RECAP_EXTRA_SOURCES: ${{ inputs.extra_sources || vars.RECAP_EXTRA_SOURCES }}
           RECAP_LIMIT: ${{ vars.RECAP_LIMIT }}
           RECAP_AUDIENCE: ${{ inputs.audience || vars.RECAP_AUDIENCE }}
+          RECAP_FOCUS: ${{ inputs.focus || vars.RECAP_FOCUS }}
         run: pnpm recap:collect
 
       - name: Installer Claude Code

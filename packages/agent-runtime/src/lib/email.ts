@@ -118,21 +118,11 @@ export function describeSmtpError(err: unknown, cfg: Pick<SmtpConfig, 'host' | '
   }
 }
 
-/** Image jointe au message, affichée dans le HTML par `<img src="cid:{cid}">`. */
-export interface InlineImage {
-  cid: string;
-  filename: string;
-  content: Buffer;
-  contentType: string;
-}
-
 export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
   html: string;
-  /** Images jointes en ligne : affichées même quand la messagerie bloque les images distantes. */
-  inlineImages?: InlineImage[];
 }
 
 export type SendEmailResult = { ok: true } | { ok: false; error: string };
@@ -166,17 +156,6 @@ export async function sendEmail(
       subject: msg.subject,
       text: msg.text,
       html: msg.html,
-      ...(msg.inlineImages !== undefined && msg.inlineImages.length > 0
-        ? {
-            attachments: msg.inlineImages.map(img => ({
-              cid: img.cid,
-              filename: img.filename,
-              content: img.content,
-              contentType: img.contentType,
-              contentDisposition: 'inline' as const,
-            })),
-          }
-        : {}),
     });
     return { ok: true };
   } catch (err) {

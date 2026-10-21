@@ -73,11 +73,19 @@ proposer vers `dev` après la PR #26.
   niveau d'une veille de référent** (erreurs d'attribution, aucun jugement
   éditorial). Remplacé le 2026-10-17 par **Claude Code sur l'abonnement**
   (`claude setup-token`) : collecte sans IA (`recap:collect`), rédaction
-  `claude -p` en sortie JSON contrainte par `BriefSchema`, mise en page
-  avec images et schémas joints (`recap:send`). **À activer** : secrets
-  `CLAUDE_CODE_OAUTH_TOKEN`, `SMTP_USER`, `SMTP_PASSWORD`, `RECAP_TO` ; le
-  workflow est sur `master` (seule branche planifiable), le code vient de
-  `RECAP_CODE_REF`.
+  `claude -p` en sortie JSON contrainte par `BriefSchema`, mise en page et
+  envoi (`recap:send`). En production depuis le 18/10 (secrets en place,
+  workflow sur `master`, code via `RECAP_CODE_REF`, profil pharma par
+  `RECAP_AUDIENCE` et `RECAP_EXTRA_SOURCES`).
+- **Brief v2 (2026-10-21)**, retour du lecteur : plus aucun visuel (les
+  illustrations, souvent générées par IA, n'apportaient rien), et **« un fait,
+  une place »** — le 17/10, un même sujet revenait six fois (objet,
+  essentiel, à la une, brèves, actions, à surveiller). Nouveau format :
+  sommaire cliquable, 1 à 3 sujets (faits, « pour nous », action, « à
+  confirmer », sources typées primaire / presse / analyse), brèves sans
+  redite, agenda daté. Consigne : remonter à la source primaire, vérifier
+  les statuts réglementaires du jour, priorités du lecteur par
+  `RECAP_FOCUS`. Sources revues en direct (analyse, primaires, pharma).
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 
