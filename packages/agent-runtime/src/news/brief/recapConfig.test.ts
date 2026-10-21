@@ -42,19 +42,13 @@ describe('readCollectConfig', () => {
     });
   });
 
-  it('sources par défaut : analyse et sources primaires dedans, agrégats et tutoriels dehors', () => {
+  it('sources par défaut : analyse et presse dedans ; agrégats, tutoriels et flux bloqués dehors', () => {
     expect(BRIEF_DEFAULT_SOURCES).toEqual(
-      expect.arrayContaining([
-        'oneusefulthing',
-        'normaltech',
-        'eu_digital',
-        'nextinpact',
-        'cnil',
-        'euaiact',
-      ]),
+      expect.arrayContaining(['oneusefulthing', 'normaltech', 'nextinpact', 'cnil', 'importai']),
     );
-    expect(BRIEF_DEFAULT_SOURCES).not.toContain('bensbites');
-    expect(BRIEF_DEFAULT_SOURCES).not.toContain('huggingface');
+    for (const id of ['bensbites', 'huggingface', 'eu_digital', 'euaiact']) {
+      expect(BRIEF_DEFAULT_SOURCES).not.toContain(id);
+    }
   });
 
   it('RECAP_FOCUS remplace les priorités par défaut', () => {

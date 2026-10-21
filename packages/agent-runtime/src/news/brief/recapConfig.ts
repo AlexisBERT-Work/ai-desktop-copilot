@@ -12,11 +12,15 @@ import { DEFAULT_AUDIENCE, DEFAULT_FOCUS } from './briefPrompt';
 type EnvLike = Record<string, string | undefined>;
 
 /**
- * Groupe « IA » écarté du brief : agrégats promotionnels et tutoriels
- * techniques, qui noient le tri sans apporter de fait (revue du 2026-10-21).
- * Ces sources restent au catalogue pour les journaux de CatDesk.
+ * Groupe « IA » écarté du brief (revue du 2026-10-21), sources qui restent au
+ * catalogue pour les journaux de CatDesk :
+ * - agrégats promotionnels et tutoriels techniques, qui noient le tri sans
+ *   apporter de fait : Ben's Bites, Hugging Face ;
+ * - flux qui refusent les serveurs de GitHub Actions (403), où tourne le
+ *   brief : Commission européenne, EU AI Act Newsletter. La recherche web de
+ *   Claude couvre l'AI Act.
  */
-const BRIEF_EXCLUDED = new Set(['bensbites', 'huggingface']);
+const BRIEF_EXCLUDED = new Set(['bensbites', 'huggingface', 'eu_digital', 'euaiact']);
 
 /**
  * Sources par défaut : le groupe « IA » du catalogue (moins les exclus), plus
