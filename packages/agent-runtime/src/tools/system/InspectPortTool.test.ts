@@ -15,7 +15,7 @@ Active Connections
 describe('parseNetstat', () => {
   it('garde uniquement les TCP LISTENING et déduplique', () => {
     const rows = parseNetstat(NETSTAT);
-    const ports = rows.map((r) => r.port).sort((a, b) => a - b);
+    const ports = rows.map(r => r.port).sort((a, b) => a - b);
     // 3000 (dedup ipv4+ipv6 same pid) and 5432; ESTABLISHED excluded
     expect(ports).toEqual([3000, 5432]);
   });

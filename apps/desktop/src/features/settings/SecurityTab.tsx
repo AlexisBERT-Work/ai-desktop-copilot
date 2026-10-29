@@ -19,7 +19,8 @@ const RISK_DOT: Record<RiskLevel, string> = {
 
 /** Onglet Sécurité : mode sans danger + catalogue des outils groupés par risque. */
 export function SecurityTab() {
-  const { safeMode, setSafeMode } = useSettingsStore();
+  const safeMode = useSettingsStore(s => s.safeMode);
+  const setSafeMode = useSettingsStore(s => s.setSafeMode);
   const tools = Object.values(DEFAULT_PERMISSION_CONFIG.tools);
 
   const byRisk: Record<RiskLevel, typeof tools> = {

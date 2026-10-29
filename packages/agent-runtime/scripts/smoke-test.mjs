@@ -22,7 +22,10 @@ let done = false;
 proc.stderr.on('data', d => process.stderr.write(d));
 
 proc.stdout.on('data', d => {
-const lines = d.toString().split('\n').filter(l => l.trim());
+  const lines = d
+    .toString()
+    .split('\n')
+    .filter(l => l.trim());
   for (const line of lines) {
     try {
       const msg = JSON.parse(line);
@@ -42,35 +45,47 @@ const lines = d.toString().split('\n').filter(l => l.trim());
       }
       if (msg.id === 1 && msg.result?.status === 'ok') {
         // Health check passed, send agent request
-        proc.stdin.write(JSON.stringify({
-          jsonrpc: '2.0', id: 2, method: 'agent.process',
-          params: {
-            input: 'Réponds en une phrase courte : quel est ton rôle ?',
-            conversationId: 'smoke-test-' + Date.now(),
-            config: { model: 'qwen2.5:7b', maxIterations: 2, maxTokens: 25 },
-          },
-        }) + '\n');
+        proc.stdin.write(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'agent.process',
+            params: {
+              input: 'Réponds en une phrase courte : quel est ton rôle ?',
+              conversationId: 'smoke-test-' + Date.now(),
+              config: { model: 'qwen2.5:7b', maxIterations: 2, maxTokens: 25 },
+            },
+          }) + '\n',
+        );
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 });
 
 function finish() {
   const tokens = stepsSeen.filter(t => t === 'token').length;
   const hasDone = stepsSeen.includes('done');
-  console.error(`\n✅ SMOKE TEST ${tokens > 0 && hasDone ? 'PASSED' : 'PARTIAL'} — steps: ${[...new Set(stepsSeen)].join(', ')}, token chunks: ${tokens}`);
+  console.error(
+    `\n✅ SMOKE TEST ${tokens > 0 && hasDone ? 'PASSED' : 'PARTIAL'} — steps: ${[...new Set(stepsSeen)].join(', ')}, token chunks: ${tokens}`,
+  );
   proc.kill();
   process.exit(tokens > 0 ? 0 : 1);
 }
 
 // Send health check immediately
-proc.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'health.check', params: {} }) + '\n');
+proc.stdin.write(
+  JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'health.check', params: {} }) + '\n',
+);
 
 // Timeout
 setTimeout(() => {
   if (!done) {
     const tokens = stepsSeen.filter(t => t === 'token').length;
-    console.error(`\n⚠️  TIMEOUT — steps seen: ${[...new Set(stepsSeen)].join(', ')}, token chunks: ${tokens}`);
+    console.error(
+      `\n⚠️  TIMEOUT — steps seen: ${[...new Set(stepsSeen)].join(', ')}, token chunks: ${tokens}`,
+    );
     proc.kill();
     process.exit(tokens > 0 ? 0 : 1);
   }

@@ -86,6 +86,27 @@ describe('cohérence outils ↔ permissions', () => {
       .map(t => t.name);
     expect(empty).toEqual([]);
   });
+
+  /**
+   * Garde-fou de la liste blanche des chemins : un argument qui NOMME un
+   * chemin doit être déclaré dans `pathArgs`, sinon le moteur de permissions
+   * ne le voit pas (c'était le cas de `vault` et `paths`). Seules exceptions :
+   * les pathspecs git, relatives au dépôt `workdir` — pas des cibles disque.
+   */
+  it('tout argument-chemin est déclaré dans pathArgs (sauf pathspec git)', () => {
+    const PATH_LIKE = /^(path|paths|db_path|vault|file|file_path|dir|directory|output)$/;
+    const GIT_PATHSPEC = new Set(['bisect_guided', 'resolve_conflicts', 'summarize_git_log']);
+    const undeclared: string[] = [];
+    for (const tool of registered) {
+      const declared = new Set((tool as unknown as { pathArgs: readonly string[] }).pathArgs);
+      for (const key of Object.keys(tool.schema.properties ?? {})) {
+        if (!PATH_LIKE.test(key) || declared.has(key)) continue;
+        if (key === 'path' && GIT_PATHSPEC.has(tool.name)) continue;
+        undeclared.push(`${tool.name}.${key}`);
+      }
+    }
+    expect(undeclared).toEqual([]);
+  });
 });
 
 describe("profil 'research' (bot articles + recherche)", () => {

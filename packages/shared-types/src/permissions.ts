@@ -2,9 +2,17 @@ import type { RiskLevel } from './ipc';
 
 // ─── Permission System ─────────────────────────────────────────
 
+/**
+ * Délai de réponse à une demande de confirmation. Au-delà, l'agent la traite
+ * comme un refus et l'UI ferme le dialogue — une seule valeur pour les deux.
+ */
+export const PERMISSION_TIMEOUT_MS = 60_000;
+
 export interface PermissionRequest {
   tool: string;
   args: Record<string, unknown>;
+  /** Chemins du disque visés, à vérifier contre la liste blanche (BaseTool.pathArgs). */
+  paths?: string[];
   context?: {
     conversationId?: string;
     activeWindow?: string;
@@ -53,84 +61,84 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
   tools: {
     read_file: {
       name: 'read_file',
-      description: 'Read file content',
+      description: "Lire le contenu d'un fichier",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     list_directory: {
       name: 'list_directory',
-      description: 'List directory',
+      description: 'Lister un dossier',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     capture_screen: {
       name: 'capture_screen',
-      description: 'Capture screen',
+      description: "Capturer l'écran",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     ocr_region: {
       name: 'ocr_region',
-      description: 'OCR screen region',
+      description: "Lire le texte d'une zone de l'écran (OCR)",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     describe_screen: {
       name: 'describe_screen',
-      description: 'Describe the screen via a vision model',
+      description: "Décrire l'écran avec un modèle de vision",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     read_clipboard: {
       name: 'read_clipboard',
-      description: 'Read clipboard',
+      description: 'Lire le presse-papier',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     search_memory: {
       name: 'search_memory',
-      description: 'Search memory',
+      description: 'Chercher dans la mémoire',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     write_file: {
       name: 'write_file',
-      description: 'Write file',
+      description: 'Écrire un fichier',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: true,
     },
     write_clipboard: {
       name: 'write_clipboard',
-      description: 'Write clipboard',
+      description: 'Écrire dans le presse-papier',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: true,
     },
     open_app: {
       name: 'open_app',
-      description: 'Open application',
+      description: 'Ouvrir une application',
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
     },
     store_memory: {
       name: 'store_memory',
-      description: 'Store in memory',
+      description: 'Enregistrer en mémoire',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: false,
     },
     analyze_stacktrace: {
       name: 'analyze_stacktrace',
-      description: 'Analyze stacktrace and extract error info',
+      description: "Analyser une trace d'erreur (stacktrace) et en extraire la cause",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -145,21 +153,21 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     },
     generate_commit_message: {
       name: 'generate_commit_message',
-      description: 'Read git diff and generate a commit message',
+      description: 'Lire le diff git et rédiger un message de commit',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     generate_pr_description: {
       name: 'generate_pr_description',
-      description: 'Read git log/diff and generate a PR description',
+      description: "Lire l'historique et le diff git, rédiger une description de PR",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     generate_unit_tests: {
       name: 'generate_unit_tests',
-      description: 'Detect test framework and scaffold unit tests for a source file',
+      description: 'Détecter le framework de test et générer des tests unitaires pour un fichier',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -167,7 +175,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     suggest_refactor: {
       name: 'suggest_refactor',
       description:
-        'Detect refactoring opportunities (long functions, duplication, complexity) in a source file',
+        'Repérer des refactorisations possibles (fonctions longues, duplication, complexité) dans un fichier',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -175,7 +183,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     review_diff: {
       name: 'review_diff',
       description:
-        'Review a git diff and surface likely issues (secrets, debug code, risky patterns)',
+        'Relire un diff git et signaler les problèmes probables (secrets, code de débogage, motifs risqués)',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -183,14 +191,14 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     analyze_dependencies: {
       name: 'analyze_dependencies',
       description:
-        'Parse package.json/Cargo.toml/requirements.txt and flag outdated or risky dependencies',
+        'Analyser package.json / Cargo.toml / requirements.txt et signaler les dépendances obsolètes ou risquées',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     watch_ci: {
       name: 'watch_ci',
-      description: 'Poll GitHub Actions workflow runs and surface build errors',
+      description: 'Surveiller les exécutions GitHub Actions et remonter les erreurs de build',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -198,7 +206,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     bisect_guided: {
       name: 'bisect_guided',
       description:
-        'Plan a git bisect: count suspect commits, pick the next to test, and emit manual/automated commands',
+        'Piloter un git bisect : compter les commits suspects, choisir le prochain à tester, donner les commandes',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -206,28 +214,31 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     detect_spiral: {
       name: 'detect_spiral',
       description:
-        'Detect when the user is stuck looping on the same problem and suggest a break/new approach',
+        "Détecter quand l'utilisateur tourne en rond sur un problème et proposer une pause ou une autre approche",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     generate_standup: {
       name: 'generate_standup',
-      description: 'Draft a daily standup (yesterday/today/blockers) from recent git activity',
+      description:
+        "Rédiger un standup quotidien (hier, aujourd'hui, blocages) à partir de l'activité git",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     summarize_git_log: {
       name: 'summarize_git_log',
-      description: 'Summarize git history grouped by type/author/area over a time window or path',
+      description:
+        "Résumer l'historique git par type, auteur ou zone, sur une période ou un chemin",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     resolve_conflicts: {
       name: 'resolve_conflicts',
-      description: 'Parse merge-conflicted files into ours/theirs blocks to propose a resolution',
+      description:
+        'Découper les fichiers en conflit de fusion (ours/theirs) pour proposer une résolution',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -235,7 +246,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     load_project_context: {
       name: 'load_project_context',
       description:
-        'Profile a project on open: stack, scripts, structure, entry points, README summary',
+        "Profiler un projet à l'ouverture : pile technique, scripts, structure, points d'entrée, résumé du README",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -243,29 +254,28 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     analyze_code_style: {
       name: 'analyze_code_style',
       description:
-        'Infer code-style conventions (indentation, quotes, semicolons, naming) from sampled files',
+        "Déduire les conventions de style (indentation, guillemets, points-virgules, nommage) d'un échantillon de fichiers",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     semantic_search: {
       name: 'semantic_search',
-      description: 'Search local files by keyword/semantic content similarity',
+      description: 'Chercher dans les fichiers locaux par mots-clés ou par sens',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     read_webpage: {
       name: 'read_webpage',
-      description: 'Fetch a URL and extract readable text content',
+      description: 'Lire une page web et en extraire le texte',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     fetch_tech_news: {
       name: 'fetch_tech_news',
-      description:
-        'Aggregate daily tech headlines from Hacker News, The Verge, TechCrunch, DEV.to and more',
+      description: "Rassembler l'actu tech du jour (Hacker News, The Verge, TechCrunch, DEV.to…)",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
@@ -273,36 +283,35 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     search_dailies: {
       name: 'search_dailies',
       description:
-        'Search and read the generated press-review dailies (local + shared) to answer questions about articles',
+        'Chercher et lire les dailys de la revue de presse (locales et partagées) pour répondre sur les articles',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     post_tech_news_discord: {
       name: 'post_tech_news_discord',
-      description:
-        'Fetch the daily tech news and post them as rich embeds to a pre-configured Discord webhook',
+      description: "Récupérer l'actu tech du jour et la publier sur le webhook Discord configuré",
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: false,
     },
     obsidian_notes: {
       name: 'obsidian_notes',
-      description: 'Search and read notes in a local Obsidian vault',
+      description: 'Chercher et lire des notes dans un coffre Obsidian local',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     notion_search: {
       name: 'notion_search',
-      description: 'Search Notion pages/databases and read page content via the Notion API',
+      description: "Chercher et lire des pages ou bases Notion via l'API Notion",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     send_webhook_message: {
       name: 'send_webhook_message',
-      description: 'Post a message to a Discord/Slack incoming webhook (outward-facing)',
+      description: "Publier un message sur un webhook Discord ou Slack (envoi vers l'extérieur)",
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
@@ -310,7 +319,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     call_api: {
       name: 'call_api',
       description:
-        'Make an HTTP/JSON request to a REST API (GET auto; write methods need confirmation)',
+        'Appeler une API REST en HTTP/JSON (lecture automatique, écriture sur confirmation)',
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
@@ -318,21 +327,21 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     read_email: {
       name: 'read_email',
       description:
-        'Read a mailbox over IMAP (read-only): list recent messages or fetch one by UID. Outward network connector with credentials',
+        'Lire une boîte mail en IMAP (lecture seule) : messages récents ou un message par UID. Connexion réseau avec identifiants',
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
     },
     run_subagent: {
       name: 'run_subagent',
-      description: 'Spawn an independent sub-agent to complete a task autonomously',
+      description: 'Lancer un sous-agent indépendant pour mener une tâche en autonomie',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: false,
     },
     run_parallel_agents: {
       name: 'run_parallel_agents',
-      description: 'Spawn multiple sub-agents running in parallel on independent tasks',
+      description: 'Lancer plusieurs sous-agents en parallèle sur des tâches indépendantes',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: false,
@@ -415,35 +424,36 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     },
     github_list_issues: {
       name: 'github_list_issues',
-      description: 'List or search GitHub issues for a repository',
+      description: "Lister ou chercher les issues GitHub d'un dépôt",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     github_get_pr: {
       name: 'github_get_pr',
-      description: 'Get pull request details, files changed, and optionally the diff',
+      description:
+        "Lire le détail d'une pull request, ses fichiers modifiés et, au besoin, le diff",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     docker_ps: {
       name: 'docker_ps',
-      description: "List Docker containers and optionally tail a container's logs",
+      description: "Lister les conteneurs Docker et, au besoin, les derniers logs d'un conteneur",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     docker_control: {
       name: 'docker_control',
-      description: 'Start/stop/restart a container or compose up/down a project',
+      description: 'Démarrer, arrêter ou relancer un conteneur, ou un projet compose (up/down)',
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
     },
     run_sqlite: {
       name: 'run_sqlite',
-      description: 'Run SQL against a local SQLite database (read-only by default)',
+      description: 'Exécuter du SQL sur une base SQLite locale (lecture seule par défaut)',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: false,
@@ -451,36 +461,35 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     query_database: {
       name: 'query_database',
       description:
-        'Run SQL against a Postgres or MySQL/MariaDB database (read-only by default, DB-level READ ONLY transaction)',
+        'Exécuter du SQL sur une base Postgres ou MySQL/MariaDB (lecture seule par défaut, transaction READ ONLY)',
       riskLevel: 'medium',
       enabled: true,
       requiresConfirmation: false,
     },
     audit_env: {
       name: 'audit_env',
-      description:
-        'Compare .env against .env.example and flag missing keys, secrets and empty values',
+      description: 'Comparer .env à .env.example : clés manquantes, secrets et valeurs vides',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     inspect_port: {
       name: 'inspect_port',
-      description: 'List listening TCP ports and the processes bound to them',
+      description: 'Lister les ports TCP en écoute et les processus qui les tiennent',
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,
     },
     kill_process: {
       name: 'kill_process',
-      description: 'Terminate a process by PID',
+      description: 'Arrêter un processus par son PID',
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
     },
     run_command: {
       name: 'run_command',
-      description: 'Run system command',
+      description: 'Exécuter une commande système',
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,

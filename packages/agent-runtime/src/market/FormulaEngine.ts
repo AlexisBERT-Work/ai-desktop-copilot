@@ -1,5 +1,34 @@
-import { evaluate } from 'mathjs';
+import { all, create } from 'mathjs';
 import type { Quote } from '@catdesk/shared-types';
+
+/**
+ * Instance mathjs bridée. Les formules viennent de l'UI mais aussi du LLM
+ * (set_formula) : on retire les fonctions qui modifient l'interpréteur ou
+ * réévaluent du texte (import, createUnit, evaluate, parse…), comme le
+ * recommande la doc sécurité de mathjs pour des expressions non fiables.
+ */
+// Les types de mathjs déclarent `all` optionnel ; il est toujours fourni.
+if (all === undefined) throw new Error('mathjs : fabriques indisponibles');
+const math = create(all);
+const evaluate = math.evaluate.bind(math);
+const disabled = (name: string) => () => {
+  throw new Error(`Fonction « ${name} » désactivée dans les formules`);
+};
+math.import(
+  Object.fromEntries(
+    [
+      'import',
+      'createUnit',
+      'evaluate',
+      'parse',
+      'simplify',
+      'derivative',
+      'resolve',
+      'compile',
+    ].map(name => [name, disabled(name)]),
+  ),
+  { override: true },
+);
 
 export interface EvalResult {
   value: number | null;

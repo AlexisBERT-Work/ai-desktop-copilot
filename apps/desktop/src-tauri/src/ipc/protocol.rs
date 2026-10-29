@@ -24,6 +24,7 @@ pub const EVENT_VOICE_LEVEL: &str = "voice:level";
 // ─── Méthodes JSON-RPC hôte → agent ────────────────────────────
 pub const RPC_AGENT_PROCESS: &str = "agent.process";
 pub const RPC_AGENT_CANCEL: &str = "agent.cancel";
+pub const RPC_AGENT_WARMUP: &str = "agent.warmup";
 pub const RPC_PERMISSION_RESPONSE: &str = "permission.response";
 pub const RPC_MARKET_SET_WATCHLIST: &str = "market.set_watchlist";
 pub const RPC_PRESS_RUN_NOW: &str = "press.run_now";
@@ -86,6 +87,7 @@ mod tests {
         EVENT_VOICE_LEVEL,
         RPC_AGENT_PROCESS,
         RPC_AGENT_CANCEL,
+        RPC_AGENT_WARMUP,
         RPC_PERMISSION_RESPONSE,
         RPC_MARKET_SET_WATCHLIST,
         RPC_PRESS_RUN_NOW,

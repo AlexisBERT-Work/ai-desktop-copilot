@@ -12,7 +12,7 @@ import type {
 const HISTORY_CAP = 120; // ~1 h à 30 s/tick
 
 function uniqueUpper(symbols: string[]): string[] {
-  return [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter((s) => s.length > 0))];
+  return [...new Set(symbols.map(s => s.trim().toUpperCase()).filter(s => s.length > 0))];
 }
 
 /**
@@ -45,7 +45,7 @@ export class MarketService {
   }
 
   getWatchlist(): WatchlistItem[] {
-    return this.symbols.map((symbol) => ({ symbol }));
+    return this.symbols.map(symbol => ({ symbol }));
   }
 
   getFormulas(): FormulaCell[] {
@@ -62,7 +62,7 @@ export class MarketService {
 
   removeSymbol(symbol: string): void {
     const up = symbol.trim().toUpperCase();
-    this.symbols = this.symbols.filter((s) => s !== up);
+    this.symbols = this.symbols.filter(s => s !== up);
     this.quotes.delete(up);
     this.history.delete(up);
     this.historyStore?.deleteSymbol(up);
@@ -84,21 +84,25 @@ export class MarketService {
 
   setFormula(name: string, expression: string, id?: string): FormulaCell {
     const cell: FormulaCell = { id: id ?? crypto.randomUUID(), name, expression };
-    const idx = this.formulas.findIndex((f) => f.id === cell.id);
+    const idx = this.formulas.findIndex(f => f.id === cell.id);
     if (idx >= 0) this.formulas[idx] = cell;
     else this.formulas.push(cell);
     return cell;
   }
 
   removeFormula(id: string): void {
-    this.formulas = this.formulas.filter((f) => f.id !== id);
+    this.formulas = this.formulas.filter(f => f.id !== id);
   }
 
   /** Remplace toutes les formules (source de vérité = widgets de l'UI). */
   setFormulas(defs: { name: string; expression: string }[]): void {
     this.formulas = defs
-      .filter((d) => d.name.trim().length > 0 && d.expression.trim().length > 0)
-      .map((d) => ({ id: crypto.randomUUID(), name: d.name.trim(), expression: d.expression.trim() }));
+      .filter(d => d.name.trim().length > 0 && d.expression.trim().length > 0)
+      .map(d => ({
+        id: crypto.randomUUID(),
+        name: d.name.trim(),
+        expression: d.expression.trim(),
+      }));
   }
 
   /** Récupère les cotations, met à jour cache + historique, renvoie l'instantané. */
@@ -127,11 +131,11 @@ export class MarketService {
 
   snapshot(): MarketSnapshot {
     const quotes = this.symbols
-      .map((s) => this.quotes.get(s))
+      .map(s => this.quotes.get(s))
       .filter((q): q is Quote => q !== undefined);
 
     const scope = buildScope(quotes, this.history);
-    const computed: ComputedValue[] = this.formulas.map((f) => {
+    const computed: ComputedValue[] = this.formulas.map(f => {
       const r = evaluateFormula(f.expression, scope);
       return r.error !== undefined
         ? { id: f.id, name: f.name, value: r.value, error: r.error }

@@ -34,7 +34,9 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ onOpenGuide, onOpenAdmin, onOpenMyFeeds }: DashboardPageProps) {
-  const { config, editMode, setEditMode } = useDashboardStore();
+  const config = useDashboardStore(s => s.config);
+  const editMode = useDashboardStore(s => s.editMode);
+  const setEditMode = useDashboardStore(s => s.setEditMode);
   const [addOpen, setAddOpen] = useState(false);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);

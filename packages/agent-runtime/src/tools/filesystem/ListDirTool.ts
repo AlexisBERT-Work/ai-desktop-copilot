@@ -28,6 +28,7 @@ export class ListDirTool extends BaseTool<Args> {
   riskLevel = 'low' as const;
   requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
+  override readonly pathArgs = ['path'] as const;
   schema = jsonSchemaFrom(argsSchema);
 
   async execute(args: Args): Promise<ToolResult> {

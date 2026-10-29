@@ -9,6 +9,8 @@ export interface RegisteredTool extends ToolDefinition {
   /** Valide (zod, si l'outil en a un) puis exécute — le chemin du LLM. */
   run(rawArgs: unknown): Promise<ToolResult>;
   toOllamaSchema(): OllamaToolSchema;
+  /** Chemins du disque visés par ces arguments (voir BaseTool.pathArgs). */
+  filesystemTargets(args: Record<string, unknown>): string[];
 }
 
 export class ToolRegistry {
@@ -31,6 +33,11 @@ export class ToolRegistry {
 
   has(name: string): boolean {
     return this.tools.has(name);
+  }
+
+  /** Chemins à vérifier contre la liste blanche avant d'exécuter `name`. */
+  filesystemTargets(name: string, args: Record<string, unknown>): string[] {
+    return this.tools.get(name)?.filesystemTargets(args) ?? [];
   }
 
   async execute(name: string, args: unknown): Promise<ToolResult> {

@@ -8,7 +8,8 @@ import { SettingsWindow } from '../settings/SettingsWindow';
 const SPRING = { type: 'spring', stiffness: 320, damping: 32 } as const;
 
 export function FloatingOverlay() {
-  const { isVisible, mode } = useOverlayStore();
+  const isVisible = useOverlayStore(s => s.isVisible);
+  const mode = useOverlayStore(s => s.mode);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-2 pointer-events-none z-50">

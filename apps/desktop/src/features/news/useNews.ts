@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { isNewsConfigured, supabase } from './supabaseClient';
+import { ensureSession, isNewsConfigured, supabase } from './supabaseClient';
 import { useNewsStore } from './newsStore';
 import { rowToNews, type NewsRow } from './model';
 
@@ -36,11 +36,8 @@ export function useNews(): void {
 
     void (async () => {
       setStatus('loading');
-      const { data: sessionData } = await client.auth.getSession();
-      if (sessionData.session === null) {
-        // Anonyme : nécessite « Anonymous sign-ins » activé côté Supabase.
-        await client.auth.signInAnonymously();
-      }
+      // Sans session, la RLS renverrait une liste vide : on la garantit d'abord.
+      await ensureSession(client).catch(() => {});
       await load();
     })();
 

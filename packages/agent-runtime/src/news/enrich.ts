@@ -1,5 +1,5 @@
 import type { NewsItem } from './newsItem';
-import { httpGet } from '../lib/httpGet';
+import { httpGet } from '../lib/http';
 import { extractReadableText, looksLikeProse, startsMidSentence } from '../lib/readableText';
 import { cutAtSentence, toExcerpt } from './newsText';
 

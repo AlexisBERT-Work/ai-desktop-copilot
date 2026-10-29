@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import type { PermissionRequestEvent } from '@catdesk/shared-types';
-import { TAURI_EVENTS } from '@catdesk/shared-types';
+import { PERMISSION_TIMEOUT_MS, TAURI_EVENTS } from '@catdesk/shared-types';
 import { respondToPermission } from '../../shared/api/permissions';
 
 const RISK_CONFIG = {
@@ -33,22 +33,45 @@ const RISK_CONFIG = {
   },
 } as const;
 
+/**
+ * Dialogue de confirmation des outils à risque. Les demandes sont mises en
+ * FILE : avant, une seconde demande (sous-agents parallèles) écrasait la
+ * première, qui expirait côté agent sans que l'utilisateur l'ait jamais vue.
+ * Une demande disparaît d'elle-même au délai de l'agent (il l'a alors déjà
+ * traitée comme un refus).
+ */
 export function PermissionPrompt() {
-  const [request, setRequest] = useState<PermissionRequestEvent | null>(null);
+  const [queue, setQueue] = useState<PermissionRequestEvent[]>([]);
+  const request = queue[0] ?? null;
 
   useEffect(() => {
     const unlisten = listen<PermissionRequestEvent>(TAURI_EVENTS.permissionRequest, e => {
-      setRequest(e.payload);
+      setQueue(q => [...q, e.payload]);
     });
     return () => {
-      unlisten.then(fn => fn());
+      void unlisten.then(fn => fn());
     };
   }, []);
 
+  const dismiss = (requestId: string) => setQueue(q => q.filter(r => r.requestId !== requestId));
+
+  // Expiration alignée sur l'agent : passé ce délai, la demande ne sert plus.
+  useEffect(() => {
+    if (!request) return;
+    const timer = setTimeout(() => dismiss(request.requestId), PERMISSION_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [request]);
+
   const respond = async (granted: boolean, remember = false) => {
     if (!request) return;
-    await respondToPermission(request.requestId, granted, remember);
-    setRequest(null);
+    try {
+      await respondToPermission(request.requestId, granted, remember);
+    } catch {
+      // Agent injoignable : la demande expirera côté agent (refus). Le
+      // dialogue, lui, ne doit pas rester bloqué à l'écran.
+    } finally {
+      dismiss(request.requestId);
+    }
   };
 
   return (
@@ -80,7 +103,14 @@ export function PermissionPrompt() {
 
               {/* Body */}
               <div className="px-5 py-4 space-y-3">
-                <p className="text-sm text-white/70">{request.description}</p>
+                {request.description && (
+                  <p className="text-sm text-white/70">{request.description}</p>
+                )}
+                {queue.length > 1 && (
+                  <p className="text-xs text-white/40">
+                    {queue.length - 1} autre(s) demande(s) en attente
+                  </p>
+                )}
 
                 {/* Args preview */}
                 {Object.keys(request.args).length > 0 && (

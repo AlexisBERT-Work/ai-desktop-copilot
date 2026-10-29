@@ -1,12 +1,4 @@
-import {
-  Camera,
-  Clipboard,
-  Terminal,
-  FileText,
-  Search,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react';
+import { Camera, Clipboard, Terminal, FileText, Search, Zap, type LucideIcon } from 'lucide-react';
 
 /** Icônes disponibles pour les widgets « action rapide » (par nom). */
 export const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {

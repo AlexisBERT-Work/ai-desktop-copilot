@@ -20,7 +20,13 @@ async function gen(
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'catdesk-tests-'));
-  // No package.json => JS/TS defaults to vitest.
+  // Le détecteur remonte les parents jusqu'à un package.json : sans celui-ci, un
+  // package.json quelconque au-dessus de tmpdir (hors dépôt) déciderait du framework.
+  await writeFile(
+    join(dir, 'package.json'),
+    JSON.stringify({ devDependencies: { vitest: '^2.0.0' } }),
+    'utf-8',
+  );
 });
 
 afterAll(async () => {

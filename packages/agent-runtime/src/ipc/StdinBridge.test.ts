@@ -18,7 +18,9 @@ function dispatch(bridge: StdinBridge, request: JsonRpcRequest): Promise<void> {
 describe('handleRequest — routage des méthodes du contrat', () => {
   it('permission.response débloque la demande en attente', async () => {
     const resolvePermission = vi.fn();
-    const bridge = new StdinBridge({ resolvePermission } as unknown as AgentOrchestrator);
+    const bridge = new StdinBridge({
+      orchestrator: { resolvePermission } as unknown as AgentOrchestrator,
+    });
 
     // Rust l'émet en NOTIFICATION : pas d'`id`.
     await dispatch(bridge, {
@@ -32,7 +34,9 @@ describe('handleRequest — routage des méthodes du contrat', () => {
 
   it('permission.response mal formée est ignorée, pas propagée', async () => {
     const resolvePermission = vi.fn();
-    const bridge = new StdinBridge({ resolvePermission } as unknown as AgentOrchestrator);
+    const bridge = new StdinBridge({
+      orchestrator: { resolvePermission } as unknown as AgentOrchestrator,
+    });
 
     await dispatch(bridge, {
       jsonrpc: '2.0',
@@ -46,7 +50,7 @@ describe('handleRequest — routage des méthodes du contrat', () => {
   it('une notification inconnue ne reçoit aucune réponse sur stdout', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     try {
-      const bridge = new StdinBridge({} as unknown as AgentOrchestrator);
+      const bridge = new StdinBridge({ orchestrator: {} as unknown as AgentOrchestrator });
       await dispatch(bridge, {
         jsonrpc: '2.0',
         method: 'methode.inexistante' as never,
@@ -65,7 +69,7 @@ describe('handleRequest — routage des méthodes du contrat', () => {
       return true;
     });
     try {
-      const bridge = new StdinBridge({} as unknown as AgentOrchestrator);
+      const bridge = new StdinBridge({ orchestrator: {} as unknown as AgentOrchestrator });
       await dispatch(bridge, {
         jsonrpc: '2.0',
         id: 7,

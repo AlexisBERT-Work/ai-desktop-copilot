@@ -48,3 +48,17 @@ def test_require_signale_le_paquet_a_installer():
         assert "pip install" in str(exc)
     else:
         raise AssertionError("require aurait du lever RuntimeError")
+
+
+def test_les_logs_restent_du_json_valide_meme_avec_guillemets():
+    import json
+    import logging
+
+    record = logging.LogRecord(
+        "x", logging.ERROR, __file__, 1, 'Erreur "fichier" C:\\chemin\nligne 2 → fin', None, None
+    )
+    line = main.JsonLogFormatter().format(record)
+    parsed = json.loads(line)
+    assert parsed["level"] == "ERROR"
+    assert parsed["msg"].startswith('Erreur "fichier"')
+    assert line.isascii()
