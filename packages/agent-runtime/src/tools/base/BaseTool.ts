@@ -28,7 +28,7 @@ export abstract class BaseTool<A = unknown> implements RegisteredTool {
    * Args ni d'entrée TOOL_SCHEMAS à part). Obligatoire : la migration est
    * terminée, les 68 outils enregistrés en déclarent un.
    */
-  abstract readonly argsSchema: z.ZodType<A, z.ZodTypeDef, unknown>;
+  abstract readonly argsSchema: z.ZodType<A, unknown>;
 
   abstract execute(args: A): Promise<ToolResult>;
 
