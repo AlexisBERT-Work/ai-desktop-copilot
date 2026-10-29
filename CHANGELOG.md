@@ -13,7 +13,16 @@ from the release commits and the shipped installers.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **Anyone could publish a fake daily.** `publish_daily_if_missing`, the open RPC every
+  CatDesk install uses to publish the standard batch, only checked the start of the
+  title. With the public anon key, anyone could publish any title behind a valid prefix
+  (« Le Monde — revue du <anything> ») or fill the 60-a-day cap alone. The title's date
+  must now be today, give or take a day for the poster's time zone, which leaves the 14
+  standard titles per date; a session is required and one session publishes at most
+  20 dailies a day (migration `20261029143431_publish_daily_harden.sql`). Whoever
+  publishes a title of the day first still wins: only the admin can remove a fake one.
 
 ## [0.2.0] — 2026-09-12
 
