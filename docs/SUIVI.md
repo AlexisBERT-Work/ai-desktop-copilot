@@ -86,6 +86,21 @@ proposer vers `dev` après la PR #26.
   redite, agenda daté. Consigne : remonter à la source primaire, vérifier
   les statuts réglementaires du jour, priorités du lecteur par
   `RECAP_FOCUS`. Sources revues en direct (analyse, primaires, pharma).
+- **Brief v3 (2026-10-28)**, retour après une semaine : trop maigre (2
+  sujets et 2 à 6 brèves par jour d'après les logs), « Pour nous » et
+  « Action » jamais utiles. Nouveau format : rubrique **« Tendances du
+  secteur »** en tête (rivalités, course, benchmarks avec qui a mesuré,
+  cherchés activement sur le web), puis **4 à 6 sujets développés**
+  (paragraphes courts, chiffres clés en gras, contexte factuel, « à
+  confirmer », jusqu'à 4 sources), **10 à 20 brèves**, aucune
+  recommandation au lecteur ; sommaire détaillé (chaque tendance, chaque
+  sujet, chaque rubrique de brèves avec son nombre). Sources
+  « pouls du secteur » ajoutées et vérifiées : Hacker News IA (≥ 100
+  points), Techmeme, TLDR AI, Zvi Mowshowitz (miroir WordPress), Guardian
+  IA, Wired IA, METR, L'Usine Digitale ; 160 candidats par défaut (148 sur
+  24 h). Essai local du 2026-10-29 (Opus, réglages pharma) : 6 tendances
+  (2 par nature), 6 sujets de 195 à 260 mots en 4-5 paragraphes, 20
+  brèves, 4 échéances ; 41 tours (< 60 de `--max-turns`), ~12 min.
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 

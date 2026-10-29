@@ -35,18 +35,25 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   user's Claude subscription (`claude -p` with a `CLAUDE_CODE_OAUTH_TOKEN` from
   `claude setup-token`; read-only tools plus web fetch/search; output constrained to a JSON
   schema derived from the zod `BriefSchema`), then lays it out and sends it
-  (`pnpm recap:send`), text only: a clickable table of contents, 1-3 lead stories
-  (facts, « Pour nous », optional action and « À confirmer », sources tagged primary),
-  section briefs limited to facts not already covered, and a dated agenda — each fact
-  appears once (v2, 2026-10-21, after the first briefs repeated a story up to six
-  times). Claude goes back to the primary source an article cites and checks
+  (`pnpm recap:send`), text only: a detailed clickable table of contents (every trend,
+  story and brief section with its count), a « Tendances du secteur » section first on
+  the industry's competition (rivalries, the race, benchmarks with who measured them,
+  actively searched on the web), 4-6 developed lead stories (short paragraphs with key
+  figures in bold, factual context, optional « À confirmer », sources tagged primary —
+  no recommendations to the reader, v3), 10-20 section briefs limited to facts not
+  already covered, and a dated agenda — each
+  fact appears once (v2, 2026-10-21, after the first briefs repeated a story up to six
+  times; v3, 2026-10-28, after two-story briefs proved too thin). Claude goes back to
+  the primary source an article cites and checks
   regulatory statuses itself; the reader's priorities come from `RECAP_FOCUS`. A manual
   run defaults to a dry run that uploads the HTML preview, and can override audience,
   focus and extra sources for that run only. New sources: analysis (One Useful Thing,
   Understanding AI, Normal Tech, Import AI, Interconnects, Latent Space), primary
   (European Commission digital, EU AI Act Newsletter, CNIL, EMA), health and pharma
   (STAT Health Tech, Endpoints News, Mind Health, Drug Discovery & Development, GEN),
-  French press (Next, Le Monde Pixels, Le Monde Informatique IA).
+  French press (Next, Le Monde Pixels, Le Monde Informatique IA, L’Usine Digitale), and
+  the industry's pulse (Hacker News AI at 100+ points, Techmeme, TLDR AI, Zvi
+  Mowshowitz, The Guardian AI, Wired AI, METR).
 
 ### Performance
 

@@ -12,6 +12,11 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 // vivent DANS la fiche du sujet, les brèves et l'agenda ne portent que ce qui
 // n'est pas déjà développé.
 //
+// v3 (2026-10-28) : le lecteur trouvait la v2 trop maigre (2 sujets par jour)
+// et n'utilisait pas « Pour nous » / « Action » : 4 à 6 sujets développés, un
+// contexte factuel à la place de la recommandation, et une rubrique
+// « Tendances » sur la compétition du secteur (rivalités, course, benchmarks).
+//
 // Pas de bornes de longueur dans le schéma (une sortie structurée trop
 // contrainte échoue plutôt que de s'adapter) : les tailles sont demandées dans
 // les descriptions et rabotées au rendu.
@@ -38,23 +43,19 @@ const SourceRef = z.object({
     ),
 });
 
+export const TREND_KINDS = ['Rivalités', 'Course', 'Benchmarks'] as const;
+
 const Lead = z.object({
   title: z.string().describe('Titre informatif en français, 110 caractères au plus'),
   facts: z
     .string()
     .describe(
-      'Les faits : qui, quoi, quand, combien, et ce qui est NOUVEAU par rapport à ce qui était connu. 80 à 120 mots, chaque phrase vérifiable',
+      'Les faits, développés : qui, quoi, quand, combien, comment ça marche, et ce qui est NOUVEAU par rapport à ce qui était connu. 150 à 250 mots en paragraphes courts de deux ou trois phrases, séparés par une ligne vide ; deux à quatre chiffres clés en **gras** ; chaque phrase vérifiable',
     ),
-  forUs: z
+  context: z
     .string()
     .describe(
-      'Ce que ça change pour l’organisation du lecteur, sans répéter les faits. 40 à 70 mots',
-    ),
-  action: z
-    .string()
-    .nullable()
-    .describe(
-      'Une action concrète et réaliste pour le lecteur, 30 mots au plus ; null s’il n’y en a pas',
+      'Le contexte, sans répéter les faits : ce qui précède (annonces antérieures, chiffres de comparaison, concurrents), les réactions d’acteurs ou d’experts citées par les sources, le débat s’il y en a un. 60 à 120 mots. Jamais de recommandation au lecteur',
     ),
   uncertain: z
     .string()
@@ -65,12 +66,30 @@ const Lead = z.object({
   sources: z
     .array(SourceRef)
     .min(1)
+    .describe('1 à 4 sources, la source primaire en premier si elle existe'),
+});
+
+const Trend = z.object({
+  kind: z
+    .enum(TREND_KINDS)
+    .describe(
+      'Rivalités = procès, débauchages, piques publiques, alliances qui se font ou se défont ; Course = sorties concurrentes, levées et valorisations, puces et centres de calcul, parts de marché ; Benchmarks = records, classements, évaluations indépendantes, contestations de mesure',
+    ),
+  title: z.string().describe('Titre informatif en français, 110 caractères au plus'),
+  body: z
+    .string()
+    .describe(
+      'Qui contre qui, les faits et les chiffres. Pour un benchmark : nom du test, score, écart avec le précédent record, qui a mesuré (le labo lui-même ou un évaluateur indépendant). 80 à 150 mots, chiffres clés en **gras**',
+    ),
+  sources: z
+    .array(SourceRef)
+    .min(1)
     .describe('1 à 3 sources, la source primaire en premier si elle existe'),
 });
 
 const Item = z.object({
   title: z.string().describe('Titre court en français'),
-  summary: z.string().describe('Le fait précis et sa portée, 35 mots au plus'),
+  summary: z.string().describe('Le fait précis, ses chiffres et sa portée, 30 à 50 mots'),
   url: z.string().describe('URL de la source'),
   source: z.string().describe('Nom de la source'),
 });
@@ -80,7 +99,7 @@ const Section = z.object({
   items: z
     .array(Item)
     .describe(
-      'Brèves sur des faits ABSENTS des sujets « À la une », les plus importantes d’abord ; 4 au plus',
+      'Brèves sur des faits ABSENTS des sujets « À la une » et des tendances, les plus importantes d’abord ; 6 au plus',
     ),
 });
 
@@ -96,10 +115,19 @@ export const BriefSchema = z.object({
   leads: z
     .array(Lead)
     .min(1)
-    .describe('« À la une » : les 1 à 3 sujets les plus importants pour le lecteur, développés'),
+    .describe(
+      '« À la une » : les 4 à 6 sujets les plus importants de la période, chacun développé ; moins seulement si la période est vraiment creuse',
+    ),
+  trends: z
+    .array(Trend)
+    .describe(
+      '« Tendances » : 4 à 6 faits de la compétition du secteur pendant la période, absents des sujets « À la une » ; rendus en tête du brief',
+    ),
   sections: z
     .array(Section)
-    .describe('« En bref » par rubrique ; omettre une rubrique sans matière plutôt que la remplir'),
+    .describe(
+      '« En bref » par rubrique : 10 à 20 brèves au total ; omettre une rubrique sans matière plutôt que la remplir',
+    ),
   agenda: z
     .array(AgendaEntry)
     .describe(
@@ -109,6 +137,7 @@ export const BriefSchema = z.object({
 
 export type Brief = z.infer<typeof BriefSchema>;
 export type BriefLead = z.infer<typeof Lead>;
+export type BriefTrend = z.infer<typeof Trend>;
 
 /** JSON Schema à passer à `claude --json-schema`. Pur. */
 export function briefJsonSchema(): Record<string, unknown> {

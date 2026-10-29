@@ -276,6 +276,75 @@ export const NEWS_SOURCES: Record<string, SourceDef> = {
     url: 'https://www.lemondeinformatique.fr/flux-rss/thematique/intelligence-artificielle/rss.xml',
     category: 'tech',
   },
+  // Pouls du secteur — rivalités, course aux modèles, benchmarks — pour la
+  // rubrique « Tendances » du brief. Vérifiés le 2026-10-28 (part d'articles
+  // IA : 20/20, 19/20, 17/20, 10/10 ; Techmeme et L'Usine Digitale plus larges).
+  hn_ai: {
+    id: 'hn_ai',
+    label: 'Hacker News — IA',
+    lang: 'en',
+    kind: 'feed',
+    // Ce qui fait réagir la communauté : sujets IA à 100 points ou plus.
+    url: 'https://hnrss.org/newest?q=AI+OR+LLM+OR+OpenAI+OR+Anthropic+OR+Gemini&points=100',
+    category: 'tech',
+  },
+  tldr_ai: {
+    id: 'tldr_ai',
+    label: 'TLDR AI',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://tldr.tech/api/rss/ai',
+    category: 'tech',
+  },
+  zvi: {
+    id: 'zvi',
+    label: 'Don’t Worry About the Vase (Zvi Mowshowitz)',
+    lang: 'en',
+    kind: 'feed',
+    // Miroir WordPress : Substack refuse les serveurs de GitHub Actions.
+    url: 'https://thezvi.wordpress.com/feed/',
+    category: 'tech',
+  },
+  guardian_ai: {
+    id: 'guardian_ai',
+    label: 'The Guardian — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.theguardian.com/technology/artificialintelligenceai/rss',
+    category: 'tech',
+  },
+  wired_ai: {
+    id: 'wired_ai',
+    label: 'Wired — IA',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.wired.com/feed/tag/ai/latest/rss',
+    category: 'tech',
+  },
+  metr: {
+    id: 'metr',
+    label: 'METR (évaluations de modèles)',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://metr.org/feed.xml',
+    category: 'tech',
+  },
+  techmeme: {
+    id: 'techmeme',
+    label: 'Techmeme',
+    lang: 'en',
+    kind: 'feed',
+    url: 'https://www.techmeme.com/feed.xml',
+    category: 'tech',
+  },
+  usine_digitale: {
+    id: 'usine_digitale',
+    label: 'L’Usine Digitale',
+    lang: 'fr',
+    kind: 'feed',
+    url: 'https://www.usine-digitale.fr/rss',
+    category: 'tech',
+  },
   lemonde_pixels: {
     id: 'lemonde_pixels',
     label: 'Le Monde — Pixels',

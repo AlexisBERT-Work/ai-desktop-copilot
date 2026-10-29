@@ -24,14 +24,24 @@ const BRIEF_EXCLUDED = new Set(['bensbites', 'huggingface', 'eu_digital', 'euaia
 
 /**
  * Sources par défaut : le groupe « IA » du catalogue (moins les exclus), plus
- * trois sources généralistes que Claude filtre (Le Monde Pixels, CNIL, Next).
+ * des sources généralistes que Claude filtre (Le Monde Pixels, CNIL, Next,
+ * L'Usine Digitale) et Techmeme, qui fait remonter les rivalités et la course
+ * entre labos pour la rubrique « Tendances ».
  */
 export const BRIEF_DEFAULT_SOURCES: readonly string[] = [
   ...PRESS_SOURCE_CATALOG.filter(s => s.group === 'ai' && !BRIEF_EXCLUDED.has(s.id)).map(s => s.id),
   'lemonde_pixels',
   'cnil',
   'nextinpact',
+  'usine_digitale',
+  'techmeme',
 ];
+
+/**
+ * Candidats soumis à Claude par défaut : un jour de semaine en produit environ
+ * 150 depuis l'ajout des sources « Tendances » (148 le 2026-10-28).
+ */
+const DEFAULT_LIMIT = 160;
 
 /** Fenêtre par défaut quand aucun envoi précédent n'est connu (premier run). */
 const DEFAULT_WINDOW_HOURS = 24;
@@ -95,7 +105,7 @@ export function readCollectConfig(
       workdir: workdir(env),
       sourceIds,
       sinceHours: recapWindowHours(env['RECAP_SINCE'], now),
-      limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : 120,
+      limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : DEFAULT_LIMIT,
       audience: env['RECAP_AUDIENCE']?.trim() || DEFAULT_AUDIENCE,
       focus: env['RECAP_FOCUS']?.trim() || DEFAULT_FOCUS,
     },

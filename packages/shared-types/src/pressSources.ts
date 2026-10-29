@@ -43,6 +43,8 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'nextinpact', label: 'Next', lang: 'fr', group: 'tech' },
   { id: 'lesnumeriques', label: 'Les Numériques', lang: 'fr', group: 'tech' },
   { id: 'lemonde_pixels', label: 'Le Monde — Pixels', lang: 'fr', group: 'tech' },
+  { id: 'techmeme', label: 'Techmeme', lang: 'en', group: 'tech' },
+  { id: 'usine_digitale', label: 'L’Usine Digitale', lang: 'fr', group: 'tech' },
   // ─── IA (flux vérifiés en direct le 2026-10-16) ──────────────
   { id: 'actuia', label: 'ActuIA', lang: 'fr', group: 'ai' },
   { id: 'jdn_ia', label: 'JDN — IA', lang: 'fr', group: 'ai' },
@@ -66,6 +68,13 @@ export const PRESS_SOURCE_CATALOG: readonly PressSourceInfo[] = [
   { id: 'euaiact', label: 'EU AI Act Newsletter', lang: 'en', group: 'ai' },
   { id: 'bensbites', label: "Ben's Bites", lang: 'en', group: 'ai' },
   { id: 'lmi_ia', label: 'Le Monde Informatique — IA', lang: 'fr', group: 'ai' },
+  // Pouls du secteur : rivalités, course aux modèles, benchmarks (2026-10-28)
+  { id: 'hn_ai', label: 'Hacker News — IA', lang: 'en', group: 'ai' },
+  { id: 'tldr_ai', label: 'TLDR AI', lang: 'en', group: 'ai' },
+  { id: 'zvi', label: 'Don’t Worry About the Vase (Zvi Mowshowitz)', lang: 'en', group: 'ai' },
+  { id: 'guardian_ai', label: 'The Guardian — IA', lang: 'en', group: 'ai' },
+  { id: 'wired_ai', label: 'Wired — IA', lang: 'en', group: 'ai' },
+  { id: 'metr', label: 'METR (évaluations de modèles)', lang: 'en', group: 'ai' },
   // ─── Santé & pharma ──────────────────────────────────────────
   { id: 'stat_healthtech', label: 'STAT — Health Tech', lang: 'en', group: 'health' },
   { id: 'endpoints', label: 'Endpoints News', lang: 'en', group: 'health' },

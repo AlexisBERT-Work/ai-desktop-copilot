@@ -1,16 +1,14 @@
 import type { Brief } from './briefSchema';
 
-/** Brief d'exemple (format v2) partagé par les tests du rendu. */
+/** Brief d'exemple (format v3) partagé par les tests du rendu. */
 export const BRIEF_FIXTURE: Brief = {
   headline: 'Pékin <veut> contrôler l’export des poids de modèles',
   leads: [
     {
       title: 'La Chine prépare un contrôle à l’export des grands modèles',
       facts:
-        'Le ministère du Commerce vise 23 technologies, dont les poids au-delà de 10^26 FLOPs & plus.',
-      forUs:
-        'Les modèles ouverts chinois hébergés en interne deviennent un **risque** de continuité.',
-      action: 'Recenser les modèles chinois hébergés et désigner un modèle de repli.',
+        'Le ministère du Commerce vise 23 technologies, dont les poids au-delà de 10^26 FLOPs & plus.\n\nLa liste couvre aussi les **puces** d’inférence.',
+      context: 'Washington restreint déjà l’export des puces Nvidia vers la Chine depuis 2022.',
       uncertain: 'Date d’entrée en vigueur non publiée.',
       sources: [
         { name: 'MOFCOM', url: 'https://mofcom.gov.cn/a', kind: 'primaire' },
@@ -22,10 +20,23 @@ export const BRIEF_FIXTURE: Brief = {
       title: 'Agents IA : le CERT-In signale des intrusions',
       facts:
         'Des agents de plusieurs fournisseurs ont lu des données via des identifiants exposés.',
-      forUs: 'L’hygiène des secrets devient prioritaire pour les données cliniques.',
-      action: null,
+      context: 'Troisième alerte d’une autorité nationale sur les agents depuis l’été.',
       uncertain: null,
       sources: [{ name: 'TechCrunch', url: 'https://tc.com/b', kind: 'presse' }],
+    },
+  ],
+  trends: [
+    {
+      kind: 'Benchmarks',
+      title: 'Gemini 4 Carbon en tête de LMArena',
+      body: '1 512 points Elo, 9 de plus que le précédent record.',
+      sources: [{ name: 'LMArena', url: 'https://lmarena.ai/leaderboard', kind: 'primaire' }],
+    },
+    {
+      kind: 'Rivalités',
+      title: 'xAI attaque OpenAI pour débauchage',
+      body: 'La plainte vise le recrutement de 12 ingénieurs.',
+      sources: [{ name: 'The Guardian', url: 'https://theguardian.com/x', kind: 'presse' }],
     },
   ],
   sections: [

@@ -27,7 +27,7 @@ describe('recapWindowHours', () => {
 });
 
 describe('readCollectConfig', () => {
-  it('défauts : sources du brief, 120 candidats, lectorat et priorités génériques', () => {
+  it('défauts : sources du brief, 160 candidats, lectorat et priorités génériques', () => {
     const r = readCollectConfig({ RECAP_SINCE: '2026-10-16T05:30:00Z' }, NOW);
     expect(r).toEqual({
       ok: true,
@@ -35,7 +35,7 @@ describe('readCollectConfig', () => {
         workdir: 'recap-work',
         sourceIds: [...BRIEF_DEFAULT_SOURCES],
         sinceHours: 24,
-        limit: 120,
+        limit: 160,
         audience: DEFAULT_AUDIENCE,
         focus: DEFAULT_FOCUS,
       },
@@ -44,7 +44,15 @@ describe('readCollectConfig', () => {
 
   it('sources par défaut : analyse et presse dedans ; agrégats, tutoriels et flux bloqués dehors', () => {
     expect(BRIEF_DEFAULT_SOURCES).toEqual(
-      expect.arrayContaining(['oneusefulthing', 'normaltech', 'nextinpact', 'cnil', 'importai']),
+      expect.arrayContaining([
+        'oneusefulthing',
+        'normaltech',
+        'nextinpact',
+        'cnil',
+        'importai',
+        'hn_ai',
+        'techmeme',
+      ]),
     );
     for (const id of ['bensbites', 'huggingface', 'eu_digital', 'euaiact']) {
       expect(BRIEF_DEFAULT_SOURCES).not.toContain(id);

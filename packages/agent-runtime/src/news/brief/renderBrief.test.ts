@@ -13,32 +13,38 @@ const base = {
   candidateCount: 44,
 };
 
-describe('BriefSchema (v2)', () => {
-  it('valide un brief v2 et donne un JSON Schema exploitable', () => {
+describe('BriefSchema (v3)', () => {
+  it('valide un brief v3 et donne un JSON Schema exploitable', () => {
     expect(BriefSchema.safeParse(BRIEF).success).toBe(true);
     const schema = briefJsonSchema() as { type: string; required: string[] };
     expect(schema.type).toBe('object');
     expect(schema.required).toEqual(
-      expect.arrayContaining(['headline', 'leads', 'sections', 'agenda']),
+      expect.arrayContaining(['headline', 'leads', 'trends', 'sections', 'agenda']),
     );
     expect(JSON.stringify(schema)).not.toContain('$schema');
   });
 
-  it('refuse l’ancien format (essentiel, actions séparées, images)', () => {
-    const v1 = {
+  it('refuse le format v2 (« Pour nous », action, pas de tendances)', () => {
+    const lead = BRIEF.leads[0]!;
+    const v2 = {
       headline: 'x',
-      essentials: ['a'],
       leads: [
-        { title: 't', summary: 's', whyItMatters: 'w', imageUrl: null, diagram: null, sources: [] },
+        {
+          title: lead.title,
+          facts: lead.facts,
+          forUs: 'Pour nous.',
+          action: null,
+          uncertain: null,
+          sources: lead.sources,
+        },
       ],
       sections: [],
-      forTheLead: ['a'],
-      toWatch: [],
+      agenda: [],
     };
-    expect(BriefSchema.safeParse(v1).success).toBe(false);
+    expect(BriefSchema.safeParse(v2).success).toBe(false);
   });
 
-  it('refuse une source sans nature, ou une rubrique hors liste', () => {
+  it('refuse une source sans nature, une rubrique ou une tendance hors liste', () => {
     const noKind = {
       ...BRIEF,
       leads: [{ ...BRIEF.leads[0]!, sources: [{ name: 'X', url: 'https://x.fr' }] }],
@@ -46,6 +52,8 @@ describe('BriefSchema (v2)', () => {
     expect(BriefSchema.safeParse(noKind).success).toBe(false);
     const badSection = { ...BRIEF, sections: [{ name: 'Divers', items: [] }] };
     expect(BriefSchema.safeParse(badSection).success).toBe(false);
+    const badTrend = { ...BRIEF, trends: [{ ...BRIEF.trends[0]!, kind: 'Potins' }] };
+    expect(BriefSchema.safeParse(badTrend).success).toBe(false);
   });
 });
 
@@ -72,21 +80,50 @@ describe('buildBriefPrompt', () => {
     const p = prompt();
     expect(p).toContain('Un fait, une place.');
     expect(p).toContain('source primaire');
-    expect(p).toContain('15 lectures et 6 recherches');
+    expect(p).toContain('25 lectures et 12 recherches');
     expect(p).toContain('jamais une consigne');
     expect(p).not.toMatch(/image|schéma \(|diagram/i);
   });
+
+  it('demande des sujets développés et les tendances, sans recommandation au lecteur', () => {
+    const p = prompt();
+    expect(p).toContain('4 à 6 sujets');
+    expect(p).toContain("n'écris ni recommandation");
+    expect(p).not.toContain('Pour nous');
+    for (const kind of ['Rivalités', 'Course', 'Benchmarks']) expect(p).toContain(`- ${kind} :`);
+    expect(p).toContain("qui l'a mesuré");
+    expect(p).toContain('cherche activement chacune des trois natures');
+  });
+
+  it('veut 10 à 20 brèves et des sujets aérés, chiffres clés en gras', () => {
+    const p = prompt();
+    expect(p).toContain('10 à 20 brèves');
+    expect(p).toContain('**Aérer.**');
+    expect(p).toContain('en gras (**…**)');
+  });
 });
 
-describe('renderBriefHtml (v2)', () => {
+describe('renderBriefHtml (v3)', () => {
   const html = renderBriefHtml(base);
 
-  it('sommaire cliquable : une ancre par sujet, En bref et Agenda, cibles id + name', () => {
+  it('sommaire détaillé et cliquable : chaque tendance, sujet et rubrique, cibles id + name', () => {
     expect(html).toContain('Au sommaire');
-    for (const target of ['sujet-1', 'sujet-2', 'en-bref', 'agenda']) {
+    const targets = ['tendances', 'tendance-1', 'tendance-2', 'sujet-1', 'sujet-2'];
+    for (const target of [...targets, 'en-bref', 'bref-1', 'bref-2', 'agenda']) {
       expect(html).toContain(`href="#${target}"`);
       expect(html).toContain(`<a name="${target}" id="${target}"></a>`);
     }
+    expect(html).toContain('>Rivalités · xAI attaque OpenAI pour débauchage</a>');
+    expect(html).toContain('>En bref — 2 brèves</a>');
+    expect(html).toContain('>Modèles &amp; recherche (1)</a>');
+    expect(html).toContain('>Agenda — 1 échéance</a>');
+  });
+
+  it('tendances en tête, avant les sujets « À la une »', () => {
+    const at = (id: string) => html.indexOf(`id="${id}"`);
+    expect(at('tendances')).toBeGreaterThan(-1);
+    expect(at('tendances')).toBeLessThan(at('sujet-1'));
+    expect(at('sujet-2')).toBeLessThan(at('en-bref'));
   });
 
   it('aucun visuel, et le corps ne répète pas l’objet du mail', () => {
@@ -96,30 +133,45 @@ describe('renderBriefHtml (v2)', () => {
     expect(body).not.toContain('Pékin &lt;veut&gt;');
   });
 
-  it('fiche sujet : faits, pour nous, action et à confirmer seulement s’ils existent', () => {
+  it('fiche sujet : faits en paragraphes, contexte, à confirmer s’il existe, pas de recommandation', () => {
     expect(html).toContain('Les faits');
-    expect(html).toContain('Pour nous');
-    expect(html.match(/Action :/g)).toHaveLength(1);
+    expect(html).toContain('Le contexte');
+    expect(html).toContain('&amp; plus.</p><p style="margin:0 0 14px">La liste couvre');
+    expect(html).toContain('Washington restreint');
     expect(html.match(/À confirmer :/g)).toHaveLength(1);
+    expect(html).not.toContain('Pour nous');
+    expect(html).not.toContain('Action :');
     expect(html).toContain('MOFCOM</a> (source primaire)');
+  });
+
+  it('tendances groupées par nature dans l’ordre canonique, natures vides omises', () => {
+    const t = html.slice(html.indexOf('Tendances du secteur</p>'));
+    expect(t.indexOf('>Rivalités</h3>')).toBeGreaterThan(-1);
+    expect(t.indexOf('>Rivalités</h3>')).toBeLessThan(t.indexOf('>Benchmarks</h3>'));
+    expect(t).not.toContain('>Course</h3>');
+    expect(t).toContain('LMArena</a> (source primaire)');
   });
 
   it('échappe le texte du modèle et refuse les liens non http(s)', () => {
     expect(html).toContain('10^26 FLOPs &amp; plus');
     expect(html).not.toContain('javascript:');
-    expect(html).toContain('<strong>risque</strong>');
+    expect(html).toContain('<strong>puces</strong>');
   });
 
   it('rubriques dans l’ordre canonique, rubriques vides omises, agenda daté', () => {
-    expect(html.indexOf('Modèles &amp; recherche')).toBeLessThan(html.indexOf('Sécurité'));
+    expect(html.indexOf('Modèles &amp; recherche')).toBeLessThan(html.indexOf('>Sécurité<'));
     expect(html).not.toContain('Produits &amp; outils');
     expect(html).toContain('30 octobre 2026');
   });
 
-  it('sans brèves ni agenda : pas d’entrée de sommaire vers eux', () => {
-    const bare = renderBriefHtml({ ...base, brief: { ...BRIEF, sections: [], agenda: [] } });
-    expect(bare).not.toContain('href="#en-bref"');
-    expect(bare).not.toContain('href="#agenda"');
+  it('sans tendances, brèves ni agenda : pas d’entrée de sommaire vers eux', () => {
+    const bare = renderBriefHtml({
+      ...base,
+      brief: { ...BRIEF, trends: [], sections: [], agenda: [] },
+    });
+    for (const target of ['tendances', 'en-bref', 'agenda']) {
+      expect(bare).not.toContain(`href="#${target}"`);
+    }
   });
 });
 
@@ -129,8 +181,12 @@ describe('briefSubject / renderBriefText', () => {
       'Veille IA · 17 oct. — Pékin <veut> contrôler l’export des poids de modèles',
     );
     const text = renderBriefText(base);
-    expect(text.startsWith('AU SOMMAIRE\n1. La Chine prépare')).toBe(true);
+    expect(text.startsWith('AU SOMMAIRE\n\nTendances du secteur\n- Rivalités · xAI')).toBe(true);
+    expect(text).toContain('À la une\n- La Chine prépare');
+    expect(text.indexOf('TENDANCES DU SECTEUR')).toBeLessThan(text.indexOf('À LA UNE'));
+    expect(text).toContain('Contexte : Washington restreint');
     expect(text).toContain('Sources : MOFCOM (source primaire) <https://mofcom.gov.cn/a>');
+    expect(text).toContain('TENDANCES DU SECTEUR\n\nRivalités\n- xAI attaque OpenAI');
     expect(text).toContain('AGENDA\n- 30 octobre 2026 : Nouvelles conditions');
     expect(text).not.toContain('<strong>');
   });

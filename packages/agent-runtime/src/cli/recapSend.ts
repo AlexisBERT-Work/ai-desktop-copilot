@@ -55,6 +55,7 @@ async function main(): Promise<number> {
   const html = renderBriefHtml(input);
   log.info('Brief mis en page', {
     leads: brief.data.leads.length,
+    trends: brief.data.trends.length,
     briefs: brief.data.sections.reduce((n, s) => n + s.items.length, 0),
     agenda: brief.data.agenda.length,
     primarySources: brief.data.leads.filter(l => l.sources.some(s => s.kind === 'primaire')).length,
