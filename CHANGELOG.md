@@ -32,6 +32,17 @@ from the release commits and the shipped installers.
   since it needs no client change. The admin path (`publishDailies`, custom journals) only
   looks for today's copy of a title, and treats a 409 duplicate as skipped.
 
+### Security
+
+- `pnpm audit --audit-level=high` passes again (36 high/critical advisories published
+  since 2026-10-17, none left). Runtime dependencies first: `mailparser` 3.12 (pulls
+  patched `nodemailer`, `linkify-it`, `deepmerge-ts`), `imapflow` 1.7 (no longer depends
+  on `nodemailer`), `zod` 4. Tooling: `vitest` 4 (drops `tinypool`), `vite` 6.4,
+  `postcss` 8.5.32. Transitive fixes are targeted `overrides` in `pnpm-workspace.yaml`.
+- `zod` 4: tool schemas now come from the native `z.toJSONSchema` (`zod-to-json-schema`
+  removed). The JSON Schemas sent to the model are unchanged for all 68 tools, except
+  an extra `propertyNames: {type: string}` on `call_api.headers`.
+
 ## [0.2.0] — 2026-09-12
 
 > **Two release lines from here on.** 0.2.x is the voice line and self-updates from the
