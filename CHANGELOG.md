@@ -43,6 +43,22 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Fixed
 
+- **Anyone could publish a fake daily.** `publish_daily_if_missing`, the open RPC every
+  CatDesk install uses to publish the standard batch, only checked the start of the
+  title. With the public anon key, anyone could publish any title behind a valid prefix
+  (« Le Monde — revue du <anything> ») or fill the 60-a-day cap alone. The title's date
+  must now be today, give or take a day for the poster's time zone, which leaves the 14
+  standard titles per date; a session is required and one session publishes at most
+  20 dailies a day (migration `20261029143431_publish_daily_harden.sql`). Whoever
+  publishes a title of the day first still wins: only the admin can remove a fake one.
+- **From summer 2027, the shared dailies would have stopped, silently.** Titles carry no
+  year (« Le Monde — revue du 29 octobre ») and nothing purges `dailies`, yet titles were
+  unique forever: a year after the first publication, every standard daily would have hit
+  last year's row, been counted as "already published" and dropped, with no error.
+  Uniqueness is now per title **and Paris calendar day** (migration
+  `20261029170000_dailies_unique_per_day.sql`), which fixes the frozen 0.1.x installs too
+  since it needs no client change. The admin path (`publishDailies`, custom journals) only
+  looks for today's copy of a title, and treats a 409 duplicate as skipped.
 - **The agent could not see the shared dailies on an installed machine.** The Supabase URL
   and anon key were only read from `.env`, which an installer does not ship; the public
   defaults now live in `config.ts` and an empty variable counts as absent.
@@ -93,10 +109,15 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Security
 
-- **Vulnerable dependencies: 68 → 2 moderate** (`pnpm audit`, #25). The lockfile is
-  refreshed within the declared ranges; vitest 2 → 4 (its `tinypool` was critical) and
-  lint-staged 15 → 16 (its `braces` has no fixed release). Left: esbuild's dev server and
-  PrismJS (code highlighting), both moderate.
+- `pnpm audit --audit-level=high` passes again (36 high/critical advisories published
+  since 2026-10-17, none left). Runtime dependencies first: `mailparser` 3.12 (pulls
+  patched `nodemailer`, `linkify-it`, `deepmerge-ts`), `imapflow` 1.7 (no longer depends
+  on `nodemailer`), `zod` 4. Tooling: `vitest` 4 (drops `tinypool`), `vite` 6.4,
+  `postcss` 8.5.32, `lint-staged` 16 (drops `braces`, which has no fixed release).
+  Transitive fixes are targeted `overrides` in `pnpm-workspace.yaml`.
+- `zod` 4: tool schemas now come from the native `z.toJSONSchema` (`zod-to-json-schema`
+  removed). The JSON Schemas sent to the model are unchanged for all 68 tools, except
+  an extra `propertyNames: {type: string}` on `call_api.headers`.
 - **Path arguments are declared per tool** (`BaseTool.pathArgs`) and all of them are
   checked against the whitelist. `obsidian_notes` (`vault`) and `semantic_search`
   (`paths`), both auto-approved, could read any folder on the disk.
@@ -125,7 +146,7 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   everywhere, a versioned settings store with a tested migration, `tsconfig.node.json`
   extends the base config, remaining English UI strings translated.
 - Prettier now covers the whole repository and `pnpm format:check` runs in CI.
-- Tests: 752 agent (was 640), 54 desktop (was 47), 38 Rust (was 32), 14 Python (was 7).
+- Tests: 756 agent (was 640), 54 desktop (was 47), 38 Rust (was 32), 14 Python (was 7).
 
 ## [0.2.0] — 2026-09-12
 

@@ -6,7 +6,14 @@
  * Returns 'general' when nothing matches. First match wins, so order = priority.
  */
 export type TaskType =
-  'debug' | 'tests' | 'refactor' | 'git' | 'search' | 'explain' | 'write' | 'general';
+  | 'debug'
+  | 'tests'
+  | 'refactor'
+  | 'git'
+  | 'search'
+  | 'explain'
+  | 'write'
+  | 'general';
 
 const RULES: ReadonlyArray<{ type: TaskType; re: RegExp }> = [
   {

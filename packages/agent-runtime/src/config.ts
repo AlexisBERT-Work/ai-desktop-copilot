@@ -93,7 +93,8 @@ export const CONFIG = {
    * CATDESK_TOOL_PROFILE=full pour réexposer tout le catalogue.
    */
   toolProfile: (process.env['CATDESK_TOOL_PROFILE'] === 'full' ? 'full' : 'research') as
-    'research' | 'full',
+    | 'research'
+    | 'full',
 
   // ─── Données ─────────────────────────────────────────────────
   dataDir: envString('CATDESK_DATA_DIR', join(process.cwd(), 'data')),

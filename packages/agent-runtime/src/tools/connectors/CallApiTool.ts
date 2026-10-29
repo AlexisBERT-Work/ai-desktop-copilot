@@ -13,7 +13,7 @@ const argsSchema = z.object({
     ),
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).default('GET').describe('HTTP method'),
   headers: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .optional()
     .describe('Extra request headers as a string map (optional)'),
   body: z

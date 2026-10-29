@@ -1,12 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  sharedDigestState,
+  publishDailies,
   publishDailiesOpen,
+  sharedDigestState,
+  type SupabaseAdminConfig,
   type SupabaseOpenConfig,
 } from './SupabasePublisher';
 import type { JournalDraft } from './pressDigest';
 
 const cfg: SupabaseOpenConfig = { url: 'https://proj.supabase.co', anonKey: 'anon-key' };
+const adminCfg: SupabaseAdminConfig = { ...cfg, email: 'admin@example.com', password: 'pw' };
+
+/** Borne `published_at=gte.…` d'une requête REST, ou null si absente. */
+function sinceParam(url: string): Date | null {
+  const m = /published_at=gte\.([^&]+)/.exec(url);
+  return m?.[1] === undefined ? null : new Date(decodeURIComponent(m[1]));
+}
+
+function isStartOfToday(d: Date | null): boolean {
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  return d !== null && d.getTime() === midnight.getTime();
+}
 
 function draft(over: Partial<JournalDraft> = {}): JournalDraft {
   return {
@@ -122,6 +137,64 @@ describe('publishDailiesOpen', () => {
   });
 });
 
+describe('publishDailies (admin)', () => {
+  /**
+   * Faux Supabase : la table contient déjà le même titre, publié l'AN DERNIER
+   * (les titres ne portent pas l'année). Une lecture bornée au jour ne le voit
+   * pas ; une lecture par titre seul, si.
+   */
+  function stubLastYearRow(insertStatus = 201) {
+    const calls: { url: string; method: string }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const method = init?.method ?? 'GET';
+        calls.push({ url, method });
+        if (url.includes('/auth/v1/token')) return jsonResponse({ access_token: 'jwt-admin' });
+        if (method === 'GET') {
+          return jsonResponse(isStartOfToday(sinceParam(url)) ? [] : [{ id: 'an-dernier' }]);
+        }
+        return jsonResponse(null, insertStatus < 300, insertStatus);
+      }),
+    );
+    return calls;
+  }
+
+  it("le même titre publié l'an dernier ne bloque pas la daily du jour", async () => {
+    const calls = stubLastYearRow();
+
+    const res = await publishDailies(adminCfg, [draft()]);
+
+    expect(res.published).toBe(1);
+    expect(res.skipped).toBe(0);
+    expect(res.errors).toEqual([]);
+    const lookup = calls.find(c => c.method === 'GET' && c.url.includes('/rest/v1/dailies'));
+    expect(lookup?.url).toContain(`title=eq.${encodeURIComponent(draft().title)}`);
+    expect(calls.some(c => c.method === 'POST' && c.url.endsWith('/rest/v1/dailies'))).toBe(true);
+  });
+
+  it('insert refusé en doublon (409, publié entretemps) → skipped, pas une erreur', async () => {
+    stubLastYearRow(409);
+
+    const res = await publishDailies(adminCfg, [draft()]);
+
+    expect(res.published).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(res.errors).toEqual([]);
+    expect(res.publishedDrafts).toEqual([]);
+  });
+
+  it("autre échec HTTP à l'insert → erreur pour CE draft", async () => {
+    stubLastYearRow(500);
+
+    const res = await publishDailies(adminCfg, [draft()]);
+
+    expect(res.published).toBe(0);
+    expect(res.skipped).toBe(0);
+    expect(res.errors).toHaveLength(1);
+  });
+});
+
 describe('sharedDigestState', () => {
   it('published si la lecture renvoie au moins une ligne', async () => {
     vi.stubGlobal(
@@ -132,6 +205,21 @@ describe('sharedDigestState', () => {
       }),
     );
     expect(await sharedDigestState(cfg)).toBe('published');
+  });
+
+  it('ne lit que les dailys publiées depuis minuit (heure locale du poste)', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        if (url.includes('/auth/v1/signup')) return jsonResponse({ access_token: 'jwt-anon' });
+        return jsonResponse([]);
+      }),
+    );
+    await sharedDigestState(cfg);
+    const read = urls.find(u => u.includes('/rest/v1/dailies'));
+    expect(isStartOfToday(sinceParam(read ?? ''))).toBe(true);
   });
 
   it('missing si la lecture renvoie une liste vide', async () => {

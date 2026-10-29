@@ -111,7 +111,8 @@ export class GitHubIssuesTool extends BaseTool<Args> {
       let data: RawIssue[] | RawListResult;
       try {
         data = (await ghFetch(`/repos/${repo}/issues?${params.toString()}`, token)) as
-          RawIssue[] | RawListResult;
+          | RawIssue[]
+          | RawListResult;
       } catch (err) {
         return this.fail(`Impossible de contacter GitHub API: ${String(err)}`);
       }

@@ -8,11 +8,11 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-10-12.
+> Dernière mise à jour : 2026-10-30.
 
 ---
 
-## État actuel — 2026-10-12
+## État actuel — 2026-10-30
 
 **Branche de travail : `refactor/audit-complet`** (depuis `dev`, tout est
 poussé) — audit complet du 2026-10-07, latence du 2026-10-08, tests dans l'app
@@ -38,14 +38,13 @@ figée à 0.1.3 sur `catdesk-releases`, et rien n'est publié tant que
 La prochaine est la **0.2.0 elle-même** : rien à coder, tout bloque sur toi
 (§ 0).
 
-**Portes** (branche) : type-check 3/3, lint 0, `format:check`, 752 tests agent,
+**Portes** (branche) : type-check 3/3, lint 0, `format:check`, 756 tests agent,
 54 desktop, 38 Rust (+ 4 de fumée ignorés en CI), 14 Python, `clippy -D
 warnings`, `fmt --check`. Sur `master` : **CI verte** depuis la PR #24 (elle était rouge sur `master`
-depuis juillet), sauf **Security Audit** : 68 alertes `pnpm audit`
-antérieures (#25). Sur la PR #26, le job Rust échouait sur un cache
-sherpa-onnx incomplet : corrigé le 2026-10-12 ; et `pnpm audit` y passe de 68
-alertes à 2 modérées le 2026-10-17 (lockfile rafraîchi, vitest 2 → 4,
-lint-staged 15 → 16).
+depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
+(zod 4, vitest 4, overrides ciblés), fusionnée dans cette branche le
+2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
+job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
 
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 

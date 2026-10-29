@@ -313,8 +313,10 @@ allumé. **La fonction Postgres `publish_daily_if_missing` (`SECURITY DEFINER`),
 pas la policy RLS, autorise l'écriture** — et valide elle-même ce qu'elle
 accepte : titre conforme à l'un des **3 gabarits**, catégorie parmi les 6, corps
 ≤ 20 000 caractères, **≤ 60 lignes/jour**. Idempotente en base (contrainte unique
-sur `title`, `on conflict do nothing`) : deux postes qui publient en même temps →
-un seul insert passe.
+sur le titre **et le jour de Paris**, `on conflict do nothing`) : deux postes qui
+publient le même jour → un seul insert passe. Pas d'unicité sur le titre seul :
+les titres n'ont pas d'année et la table n'est jamais purgée, le titre de l'an
+dernier bloquerait celui du jour (migration `20261029170000`).
 
 Restent **admin uniquement** : les journaux personnalisés (`press_feeds`, lecture
 **et** écriture) et les dailys manuelles (`dailies_admin_write`).
