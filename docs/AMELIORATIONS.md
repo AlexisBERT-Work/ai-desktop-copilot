@@ -13,7 +13,7 @@
 
 ## 0. Ce qui bloque sur toi
 
-Cinq choses restent ouvertes, et **aucune ne peut être faite sans toi** :
+Six choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
 | #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,8 +22,9 @@ Cinq choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 | 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                      |
 | 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
 | 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
+| 6   | **Appliquer les migrations Supabase** — `pnpm exec supabase db push`, après fusion de #29 (#27 est déjà dans `dev`).                            | Le Supabase de prod est partagé par tous les postes : aucune session n'y a touché. Sans `20261029170000`, le titre de l'an dernier bloquera en silence chaque daily du jour dès l'été 2027.                                                                                |
 
-Ces cinq points forment le jalon **0.2.0** ci-dessous.
+Les points 1 à 5 forment le jalon **0.2.0** ci-dessous ; le 6 ne dépend d'aucune version.
 
 ---
 

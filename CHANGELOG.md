@@ -23,6 +23,14 @@ from the release commits and the shipped installers.
   standard titles per date; a session is required and one session publishes at most
   20 dailies a day (migration `20261029143431_publish_daily_harden.sql`). Whoever
   publishes a title of the day first still wins: only the admin can remove a fake one.
+- **From summer 2027, the shared dailies would have stopped, silently.** Titles carry no
+  year (« Le Monde — revue du 29 octobre ») and nothing purges `dailies`, yet titles were
+  unique forever: a year after the first publication, every standard daily would have hit
+  last year's row, been counted as "already published" and dropped, with no error.
+  Uniqueness is now per title **and Paris calendar day** (migration
+  `20261029170000_dailies_unique_per_day.sql`), which fixes the frozen 0.1.x installs too
+  since it needs no client change. The admin path (`publishDailies`, custom journals) only
+  looks for today's copy of a title, and treats a 409 duplicate as skipped.
 
 ### Security
 

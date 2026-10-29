@@ -23,6 +23,13 @@ function base(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
+/** Début du jour local de CE poste, en ISO — borne « publié aujourd'hui ». */
+function startOfTodayIso(now = new Date()): string {
+  const since = new Date(now);
+  since.setHours(0, 0, 0, 0);
+  return since.toISOString();
+}
+
 /** Connexion admin (mot de passe) → renvoie un JWT porteur du claim role=admin. */
 export async function signIn(cfg: SupabaseAdminConfig): Promise<string> {
   const res = await fetch(`${base(cfg.url)}/auth/v1/token?grant_type=password`, {
@@ -48,9 +55,14 @@ export async function signIn(cfg: SupabaseAdminConfig): Promise<string> {
   return token;
 }
 
-/** Vrai si une daily de même titre existe déjà (idempotence du cron quotidien). */
+/**
+ * Vrai si une daily de même titre a déjà été publiée AUJOURD'HUI (idempotence
+ * du cron quotidien). Borné au jour : les titres ne portent pas l'année, celui
+ * de l'an dernier ne doit pas bloquer celui du jour.
+ */
 async function dailyExists(cfg: SupabaseAdminConfig, jwt: string, title: string): Promise<boolean> {
-  const q = `title=eq.${encodeURIComponent(title)}&select=id&limit=1`;
+  const since = encodeURIComponent(startOfTodayIso());
+  const q = `title=eq.${encodeURIComponent(title)}&published_at=gte.${since}&select=id&limit=1`;
   const res = await fetch(`${base(cfg.url)}/rest/v1/dailies?${q}`, {
     headers: { apikey: cfg.anonKey, Authorization: `Bearer ${jwt}` },
   });
@@ -59,11 +71,12 @@ async function dailyExists(cfg: SupabaseAdminConfig, jwt: string, title: string)
   return Array.isArray(rows) && rows.length > 0;
 }
 
+/** @returns faux si la base a refusé un doublon du jour (409, `dailies_title_day_key`). */
 async function insertDaily(
   cfg: SupabaseAdminConfig,
   jwt: string,
   draft: JournalDraft,
-): Promise<void> {
+): Promise<boolean> {
   const res = await fetch(`${base(cfg.url)}/rest/v1/dailies`, {
     method: 'POST',
     headers: {
@@ -74,16 +87,19 @@ async function insertDaily(
     },
     body: JSON.stringify({ title: draft.title, body: draft.body, category: draft.category }),
   });
+  // Publiée entre la vérification et l'insert (autre poste) : doublon, pas une erreur.
+  if (res.status === 409) return false;
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`insert ${res.status}: ${text.slice(0, 200)}`);
   }
+  return true;
 }
 
 /**
  * Publie les dailys dans Supabase avec le compte admin. Idempotent : une daily
- * dont le titre existe déjà est ignorée (cron quotidien sûr à rejouer). Une
- * erreur sur une daily n'interrompt pas les autres.
+ * dont le titre a déjà été publié aujourd'hui est ignorée (cron quotidien sûr
+ * à rejouer). Une erreur sur une daily n'interrompt pas les autres.
  */
 export async function publishDailies(
   cfg: SupabaseAdminConfig,
@@ -106,9 +122,12 @@ export async function publishDailies(
         result.skipped += 1;
         continue;
       }
-      await insertDaily(cfg, jwt, draft);
-      result.published += 1;
-      result.publishedDrafts.push(draft);
+      if (await insertDaily(cfg, jwt, draft)) {
+        result.published += 1;
+        result.publishedDrafts.push(draft);
+      } else {
+        result.skipped += 1;
+      }
     } catch (err) {
       result.errors.push(`${draft.journal}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -165,9 +184,7 @@ async function anonSignIn(cfg: SupabaseOpenConfig): Promise<string> {
 export async function hasTodaysSharedDigest(cfg: SupabaseOpenConfig): Promise<boolean> {
   try {
     const jwt = await anonSignIn(cfg);
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    const q = `select=id&published_at=gte.${encodeURIComponent(since.toISOString())}&limit=1`;
+    const q = `select=id&published_at=gte.${encodeURIComponent(startOfTodayIso())}&limit=1`;
     const res = await fetch(`${base(cfg.url)}/rest/v1/dailies?${q}`, {
       headers: { apikey: cfg.anonKey, Authorization: `Bearer ${jwt}` },
     });
@@ -203,9 +220,10 @@ async function publishOneOpen(
 
 /**
  * Publie le lot standard sans identifiants admin, via une session anonyme +
- * la RPC `publish_daily_if_missing`. Idempotent (contrainte unique sur
- * `title`) : si un autre poste a déjà publié le même titre entretemps, cet
- * appel devient un no-op silencieux (`skipped`), jamais une erreur.
+ * la RPC `publish_daily_if_missing`. Idempotent (contrainte unique sur le
+ * titre ET le jour, migration 20261029000000) : si un autre poste a déjà publié
+ * le même titre aujourd'hui, cet appel devient un no-op silencieux
+ * (`skipped`), jamais une erreur.
  */
 export async function publishDailiesOpen(
   cfg: SupabaseOpenConfig,
