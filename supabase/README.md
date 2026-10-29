@@ -39,11 +39,11 @@ elle **valide elle-même** ce qu'elle accepte avant d'insérer :
 - le **corps** est plafonné à 20 000 caractères ;
 - au plus **60 lignes/jour** au total (le lot réel en compte ~14).
 - **idempotente** : contrainte unique sur le **titre et le jour de Paris**
-  (`dailies_title_day_key`, migration `20261029170000`), `on conflict do
-nothing` — si deux postes publient la même daily le même jour, un seul insert
-  passe. L'unicité n'est plus sur `title` seul : les titres ne portent pas
-  l'année, et rien ne purge la table, donc le titre de l'an dernier aurait
-  bloqué en silence celui du jour.
+  (`dailies_title_day_key`, migration `20261029170000`) et
+  `on conflict do nothing` — si deux postes publient la même daily le même
+  jour, un seul insert passe. L'unicité n'est plus sur `title` seul : les
+  titres ne portent pas l'année, et rien ne purge la table, donc le titre de
+  l'an dernier aurait bloqué en silence celui du jour.
 
 Risque restant, assumé : le premier qui publie un titre du jour l'emporte. Un
 appel direct avec la clé anon peut donc devancer le vrai pipeline avec un faux
