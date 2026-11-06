@@ -1,7 +1,15 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isEmailAddress } from '@catdesk/shared-types';
-import { EMPTY_STATE, VeilleStateSchema, type VeilleState } from './collectRepos';
+import { writeFileAtomic } from '../../lib/persistence';
+import {
+  EMPTY_STATE,
+  VeilleStateSchema,
+  markSeen,
+  type RepoCandidate,
+  type VeilleState,
+  type WatchedRelease,
+} from './collectRepos';
 
 // Configuration de la veille GitHub, en deux temps autour de la rédaction par
 // Claude Code (.github/workflows/ai-veille.yml) :
@@ -106,4 +114,23 @@ export function loadVeilleState(dir: string): VeilleState {
   const path = join(dir, STATE_FILE);
   if (!existsSync(path)) return EMPTY_STATE;
   return VeilleStateSchema.parse(JSON.parse(readFileSync(path, 'utf-8')));
+}
+
+/**
+ * Range un rapport envoyé et ce qu'il a montré. À n'appeler qu'après l'envoi :
+ * un échec remet ainsi les mêmes dépôts au lendemain.
+ */
+export function archiveReport(
+  dir: string,
+  report: {
+    day: string;
+    markdown: string;
+    candidates: readonly Pick<RepoCandidate, 'repo' | 'stars'>[];
+    releases: readonly Pick<WatchedRelease, 'repo' | 'version'>[];
+  },
+): void {
+  mkdirSync(join(dir, REPORTS_DIR), { recursive: true });
+  writeFileAtomic(join(dir, REPORTS_DIR, `${report.day}.md`), report.markdown);
+  const state = markSeen(loadVeilleState(dir), report.candidates, report.releases, report.day);
+  writeFileAtomic(join(dir, STATE_FILE), JSON.stringify(state));
 }

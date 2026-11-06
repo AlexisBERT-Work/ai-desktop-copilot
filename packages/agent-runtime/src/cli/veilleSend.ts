@@ -4,25 +4,18 @@
 // écrit dans VEILLE_OUT. À la main :
 //   VEILLE_WORKDIR=veille-work VEILLE_DRY_RUN=1 pnpm --filter @catdesk/agent-runtime veille:send
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readSmtpConfig, sendEmail } from '../lib/email';
-import { writeFileAtomic } from '../lib/persistence';
 import {
   CANDIDATES_FILE,
   RELEASES_FILE,
   REPORT_FILE,
-  markSeen,
   type RepoCandidate,
   type WatchedRelease,
 } from '../news/veille/collectRepos';
 import { renderVeilleHtml, renderVeilleMarkdown, veilleSubject } from '../news/veille/renderVeille';
-import {
-  REPORTS_DIR,
-  STATE_FILE,
-  loadVeilleState,
-  readVeilleSendConfig,
-} from '../news/veille/veilleConfig';
+import { archiveReport, readVeilleSendConfig } from '../news/veille/veilleConfig';
 import { VeilleReportSchema, keepCollected } from '../news/veille/veilleSchema';
 import { createLogger } from '../logger';
 
@@ -93,12 +86,7 @@ async function main(): Promise<number> {
   // Ni adresse ni contenu : les logs d'un dépôt public sont publics.
   log.info('Rapport envoyé');
 
-  // Seulement après l'envoi : un échec remet les mêmes dépôts au lendemain.
-  const day = meta.now.slice(0, 10);
-  mkdirSync(join(cfg.archiveDir, REPORTS_DIR), { recursive: true });
-  writeFileAtomic(join(cfg.archiveDir, REPORTS_DIR, `${day}.md`), markdown);
-  const state = markSeen(loadVeilleState(cfg.archiveDir), candidates, releases, day);
-  writeFileAtomic(join(cfg.archiveDir, STATE_FILE), JSON.stringify(state));
+  archiveReport(cfg.archiveDir, { day: meta.now.slice(0, 10), markdown, candidates, releases });
   return 0;
 }
 

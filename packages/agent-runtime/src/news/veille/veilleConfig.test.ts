@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  REPORTS_DIR,
   STATE_FILE,
+  archiveReport,
   loadVeilleState,
   readVeilleCollectConfig,
   readVeilleSendConfig,
@@ -81,6 +83,29 @@ describe('loadVeilleState', () => {
     const state = { repos: { 'a/b': { firstSeen: '2026-11-06', stars: 3 } }, releases: {} };
     writeFileSync(join(dir, STATE_FILE), JSON.stringify(state));
     expect(loadVeilleState(dir)).toEqual(state);
+  });
+
+  it('archiveReport : le rapport est rangé, et le run suivant sait ce qui a été vu', () => {
+    const archive = join(dir, 'archive');
+    archiveReport(archive, {
+      day: '2026-11-06',
+      markdown: '# Lundi',
+      candidates: [{ repo: 'a/b', stars: 10 }],
+      releases: [{ repo: 'ollama/ollama', version: 'v1' }],
+    });
+    archiveReport(archive, {
+      day: '2026-11-07',
+      markdown: '# Mardi',
+      candidates: [{ repo: 'c/d', stars: 20 }],
+      releases: [],
+    });
+
+    const state = loadVeilleState(archive);
+    expect(state.repos['a/b']).toEqual({ firstSeen: '2026-11-06', stars: 10 });
+    expect(state.repos['c/d']).toEqual({ firstSeen: '2026-11-07', stars: 20 });
+    expect(state.releases['ollama/ollama']).toBe('v1');
+    const report = join(archive, REPORTS_DIR, '2026-11-06.md');
+    expect(readFileSync(report, 'utf-8')).toBe('# Lundi');
   });
 
   it('un fichier abîmé échoue : repartir à vide écraserait l’archive', () => {
