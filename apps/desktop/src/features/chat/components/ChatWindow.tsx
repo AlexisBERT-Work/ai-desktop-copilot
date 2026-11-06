@@ -8,8 +8,11 @@ import { InputArea } from './InputArea';
 import { ModelSelector } from './ModelSelector';
 
 export function ChatWindow() {
-  const { hide, setMode } = useOverlayStore();
-  const { activeConversationId, newConversation, conversations } = useChatStore();
+  const hide = useOverlayStore(s => s.hide);
+  const setMode = useOverlayStore(s => s.setMode);
+  const activeConversationId = useChatStore(s => s.activeConversationId);
+  const newConversation = useChatStore(s => s.newConversation);
+  const conversations = useChatStore(s => s.conversations);
   const activeConv = conversations.find(c => c.id === activeConversationId);
 
   return (
@@ -33,21 +36,21 @@ export function ChatWindow() {
           <button
             onClick={newConversation}
             className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-            title="New conversation"
+            title="Nouvelle conversation"
           >
             <Plus className="w-4 h-4" />
           </button>
           <button
             onClick={() => setMode('mini')}
             className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-            title="Minimize"
+            title="Réduire"
           >
             <Minimize2 className="w-4 h-4" />
           </button>
           <button
             onClick={hide}
             className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
-            title="Close"
+            title="Fermer"
           >
             <X className="w-4 h-4" />
           </button>

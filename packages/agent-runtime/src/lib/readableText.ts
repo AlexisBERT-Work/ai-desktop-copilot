@@ -64,6 +64,36 @@ export function looksLikeProse(text: string, minLen = 80): boolean {
 }
 
 /**
+ * Sortie de modèle CORROMPUE : l'incident KV-cache de juin 2026 a laissé en
+ * mémoire des réponses comme « l d \1\0 14 2 31 23 1 9t 3 8e … » ou « Je suis dés
+ * che que v' st( is e faie c6 ilf e8e … », resservies ensuite en « souvenirs ».
+ *
+ * Heuristique : parmi les mots qui ne sont ni des nombres (dates, prix, %), ni
+ * de la ponctuation, ni des liens, moins de 60 % ont l'air de vrais mots
+ * (lettres, apostrophes, traits d'union ; une lettre seule seulement si c'est
+ * « à », « a », « y », « ô », « I »). Mise en forme Markdown ignorée. Trop court
+ * pour juger (moins de 8 mots) → faux. Pur, exporté pour tests.
+ */
+export function looksGarbled(text: string): boolean {
+  const tokens = text
+    .replace(/[*#`>|_~]+/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 0);
+  const neutral = (t: string): boolean =>
+    /^https?:\/\//.test(t) ||
+    /^[-–—•.,;:!?…()$€£%+=/]+$/u.test(t) ||
+    /^[([«"+−-]*\d[\d\s.,:/h%€$-]*[)\]»".,;:!?%]*$/u.test(t);
+  const words = tokens.filter(t => !neutral(t));
+  if (words.length < 8) return false;
+  const real = words.filter(t => {
+    const core = t.replace(/^[«(“"'[]+|[.,;:!?…»)”"'\]]+$/gu, '');
+    if (core.length <= 1) return /^[aàyôAÀYI]$/u.test(core);
+    return /^\p{L}[\p{L}'’.-]*$/u.test(core);
+  }).length;
+  return real / words.length < 0.6;
+}
+
+/**
  * Un texte qui démarre par une minuscule a été pris EN COURS de phrase (flux
  * RSS tronqué, fragment recollé) : à écarter quand on cite ou résume — un
  * extrait qui commence au milieu d'une phrase est illisible. Pur, exporté.

@@ -1,15 +1,18 @@
 import type { JournalDraft } from './pressDigest';
+import {
+  anonSignIn,
+  authHeaders,
+  signIn,
+  supabaseUrl,
+  SUPABASE_TIMEOUT_MS,
+  type SupabaseAdminConfig,
+  type SupabaseOpenConfig,
+} from './supabaseRest';
 import { createLogger } from '../logger';
 
-const log = createLogger('news:supabase-publish');
+export type { SupabaseAdminConfig, SupabaseOpenConfig } from './supabaseRest';
 
-/** Config d'accès admin au backend Supabase (poste de référence uniquement). */
-export interface SupabaseAdminConfig {
-  url: string; // https://<ref>.supabase.co
-  anonKey: string;
-  email: string;
-  password: string;
-}
+const log = createLogger('news:supabase-publish');
 
 export interface PublishResult {
   published: number;
@@ -19,8 +22,12 @@ export interface PublishResult {
   publishedDrafts: JournalDraft[];
 }
 
-function base(url: string): string {
-  return url.replace(/\/+$/, '');
+function emptyResult(): PublishResult {
+  return { published: 0, skipped: 0, errors: [], publishedDrafts: [] };
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 /** Début du jour local de CE poste, en ISO — borne « publié aujourd'hui ». */
@@ -28,31 +35,6 @@ function startOfTodayIso(now = new Date()): string {
   const since = new Date(now);
   since.setHours(0, 0, 0, 0);
   return since.toISOString();
-}
-
-/** Connexion admin (mot de passe) → renvoie un JWT porteur du claim role=admin. */
-export async function signIn(cfg: SupabaseAdminConfig): Promise<string> {
-  const res = await fetch(`${base(cfg.url)}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: { apikey: cfg.anonKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: cfg.email, password: cfg.password }),
-  });
-  const data: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg =
-      data !== null && typeof data === 'object' && 'error_description' in data
-        ? String((data as Record<string, unknown>)['error_description'])
-        : `HTTP ${res.status}`;
-    throw new Error(`Connexion admin échouée: ${msg}`);
-  }
-  const token =
-    data !== null && typeof data === 'object'
-      ? (data as Record<string, unknown>)['access_token']
-      : null;
-  if (typeof token !== 'string' || token.length === 0) {
-    throw new Error('Connexion admin: access_token absent');
-  }
-  return token;
 }
 
 /**
@@ -63,8 +45,9 @@ export async function signIn(cfg: SupabaseAdminConfig): Promise<string> {
 async function dailyExists(cfg: SupabaseAdminConfig, jwt: string, title: string): Promise<boolean> {
   const since = encodeURIComponent(startOfTodayIso());
   const q = `title=eq.${encodeURIComponent(title)}&published_at=gte.${since}&select=id&limit=1`;
-  const res = await fetch(`${base(cfg.url)}/rest/v1/dailies?${q}`, {
-    headers: { apikey: cfg.anonKey, Authorization: `Bearer ${jwt}` },
+  const res = await fetch(supabaseUrl(cfg, `/rest/v1/dailies?${q}`), {
+    headers: authHeaders(cfg, jwt),
+    signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
   });
   if (!res.ok) return false; // en cas de doute, on tente l'insertion
   const rows: unknown = await res.json().catch(() => null);
@@ -77,15 +60,15 @@ async function insertDaily(
   jwt: string,
   draft: JournalDraft,
 ): Promise<boolean> {
-  const res = await fetch(`${base(cfg.url)}/rest/v1/dailies`, {
+  const res = await fetch(supabaseUrl(cfg, '/rest/v1/dailies'), {
     method: 'POST',
     headers: {
-      apikey: cfg.anonKey,
-      Authorization: `Bearer ${jwt}`,
+      ...authHeaders(cfg, jwt),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
     body: JSON.stringify({ title: draft.title, body: draft.body, category: draft.category }),
+    signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
   });
   // Publiée entre la vérification et l'insert (autre poste) : doublon, pas une erreur.
   if (res.status === 409) return false;
@@ -105,14 +88,14 @@ export async function publishDailies(
   cfg: SupabaseAdminConfig,
   drafts: JournalDraft[],
 ): Promise<PublishResult> {
-  const result: PublishResult = { published: 0, skipped: 0, errors: [], publishedDrafts: [] };
+  const result = emptyResult();
   if (drafts.length === 0) return result;
 
   let jwt: string;
   try {
     jwt = await signIn(cfg);
   } catch (err) {
-    result.errors.push(err instanceof Error ? err.message : String(err));
+    result.errors.push(errorText(err));
     return result;
   }
 
@@ -129,7 +112,7 @@ export async function publishDailies(
         result.skipped += 1;
       }
     } catch (err) {
-      result.errors.push(`${draft.journal}: ${err instanceof Error ? err.message : String(err)}`);
+      result.errors.push(`${draft.journal}: ${errorText(err)}`);
     }
   }
 
@@ -150,49 +133,39 @@ export async function publishDailies(
 // journaux personnalisés (press_feeds) et les dailys manuelles restent
 // publiés via `publishDailies` ci-dessus (identifiants admin, RLS directe).
 
-export interface SupabaseOpenConfig {
-  url: string;
-  anonKey: string;
-}
-
-/** Session anonyme (POST /auth/v1/signup sans identifiants) — même flux que SharedDailyReader. */
-async function anonSignIn(cfg: SupabaseOpenConfig): Promise<string> {
-  const res = await fetch(`${base(cfg.url)}/auth/v1/signup`, {
-    method: 'POST',
-    headers: { apikey: cfg.anonKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  });
-  const data: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(`connexion anonyme refusée (HTTP ${res.status})`);
-  const token =
-    data !== null && typeof data === 'object'
-      ? (data as Record<string, unknown>)['access_token']
-      : null;
-  if (typeof token !== 'string' || token.length === 0) {
-    throw new Error('connexion anonyme: access_token absent');
-  }
-  return token;
-}
+/** Le lot standard du jour : déjà publié, manquant, ou impossible à savoir (Supabase injoignable). */
+export type SharedDigestState = 'published' | 'missing' | 'unreachable';
 
 /**
- * Vrai si au moins une daily a déjà été publiée aujourd'hui (comparaison sur
- * le début du jour local de CE poste). Utilisé pour éviter de regénérer
- * localement (coût LLM réel) un lot déjà couvert par un autre poste. En cas de
- * doute (réseau indisponible), renvoie faux : on préfère une génération
- * redondante — rattrapée par l'idempotence de la RPC — à un jour sans daily.
+ * Le lot standard du jour est-il déjà publié (début du jour local de CE
+ * poste) ? Évite de regénérer localement (coût LLM réel : plusieurs minutes de
+ * GPU) un lot déjà couvert par un autre poste.
+ *
+ * - Lecture refusée (HTTP en erreur) → 'missing' : dans le doute on génère,
+ *   la RPC idempotente rattrape un doublon — mieux qu'un jour sans daily.
+ * - Supabase INJOIGNABLE (réseau, DNS, projet en pause, session anonyme
+ *   refusée) → 'unreachable' : la publication échouerait de la même façon.
+ *   Générer quand même, c'était plusieurs minutes de GPU à CHAQUE lancement de
+ *   CatDesk pour un lot jeté — pendant que l'utilisateur attendait sa réponse.
  */
-export async function hasTodaysSharedDigest(cfg: SupabaseOpenConfig): Promise<boolean> {
+export async function sharedDigestState(cfg: SupabaseOpenConfig): Promise<SharedDigestState> {
+  let jwt: string;
   try {
-    const jwt = await anonSignIn(cfg);
-    const q = `select=id&published_at=gte.${encodeURIComponent(startOfTodayIso())}&limit=1`;
-    const res = await fetch(`${base(cfg.url)}/rest/v1/dailies?${q}`, {
-      headers: { apikey: cfg.anonKey, Authorization: `Bearer ${jwt}` },
-    });
-    if (!res.ok) return false;
-    const rows: unknown = await res.json().catch(() => null);
-    return Array.isArray(rows) && rows.length > 0;
+    jwt = await anonSignIn(cfg);
   } catch {
-    return false;
+    return 'unreachable';
+  }
+  try {
+    const q = `select=id&published_at=gte.${encodeURIComponent(startOfTodayIso())}&limit=1`;
+    const res = await fetch(supabaseUrl(cfg, `/rest/v1/dailies?${q}`), {
+      headers: authHeaders(cfg, jwt),
+      signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
+    });
+    if (!res.ok) return 'missing';
+    const rows: unknown = await res.json().catch(() => null);
+    return Array.isArray(rows) && rows.length > 0 ? 'published' : 'missing';
+  } catch {
+    return 'unreachable';
   }
 }
 
@@ -201,14 +174,11 @@ async function publishOneOpen(
   jwt: string,
   draft: JournalDraft,
 ): Promise<boolean> {
-  const res = await fetch(`${base(cfg.url)}/rest/v1/rpc/publish_daily_if_missing`, {
+  const res = await fetch(supabaseUrl(cfg, '/rest/v1/rpc/publish_daily_if_missing'), {
     method: 'POST',
-    headers: {
-      apikey: cfg.anonKey,
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { ...authHeaders(cfg, jwt), 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_title: draft.title, p_body: draft.body, p_category: draft.category }),
+    signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -221,7 +191,7 @@ async function publishOneOpen(
 /**
  * Publie le lot standard sans identifiants admin, via une session anonyme +
  * la RPC `publish_daily_if_missing`. Idempotent (contrainte unique sur le
- * titre ET le jour, migration 20261029000000) : si un autre poste a déjà publié
+ * titre ET le jour, migration 20261029170000) : si un autre poste a déjà publié
  * le même titre aujourd'hui, cet appel devient un no-op silencieux
  * (`skipped`), jamais une erreur.
  */
@@ -229,14 +199,14 @@ export async function publishDailiesOpen(
   cfg: SupabaseOpenConfig,
   drafts: JournalDraft[],
 ): Promise<PublishResult> {
-  const result: PublishResult = { published: 0, skipped: 0, errors: [], publishedDrafts: [] };
+  const result = emptyResult();
   if (drafts.length === 0) return result;
 
   let jwt: string;
   try {
     jwt = await anonSignIn(cfg);
   } catch (err) {
-    result.errors.push(err instanceof Error ? err.message : String(err));
+    result.errors.push(errorText(err));
     return result;
   }
 
@@ -249,7 +219,7 @@ export async function publishDailiesOpen(
         result.skipped += 1;
       }
     } catch (err) {
-      result.errors.push(`${draft.journal}: ${err instanceof Error ? err.message : String(err)}`);
+      result.errors.push(`${draft.journal}: ${errorText(err)}`);
     }
   }
 

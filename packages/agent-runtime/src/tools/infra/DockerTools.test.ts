@@ -6,13 +6,32 @@ import { isReadOnlyQuery } from './RunSqliteTool';
 describe('parseDockerPs', () => {
   it('parse les lignes JSON de docker ps', () => {
     const out = [
-      JSON.stringify({ ID: 'abc123456789xyz', Names: 'web', Image: 'nginx', Status: 'Up 2 hours', State: 'running', Ports: '0.0.0.0:80->80/tcp' }),
-      JSON.stringify({ ID: 'def987654321', Names: 'db', Image: 'postgres:16', Status: 'Exited (0)', State: 'exited', Ports: '' }),
+      JSON.stringify({
+        ID: 'abc123456789xyz',
+        Names: 'web',
+        Image: 'nginx',
+        Status: 'Up 2 hours',
+        State: 'running',
+        Ports: '0.0.0.0:80->80/tcp',
+      }),
+      JSON.stringify({
+        ID: 'def987654321',
+        Names: 'db',
+        Image: 'postgres:16',
+        Status: 'Exited (0)',
+        State: 'exited',
+        Ports: '',
+      }),
       'garbage line',
     ].join('\n');
     const c = parseDockerPs(out);
     expect(c).toHaveLength(2);
-    expect(c[0]).toMatchObject({ id: 'abc123456789', name: 'web', image: 'nginx', state: 'running' });
+    expect(c[0]).toMatchObject({
+      id: 'abc123456789',
+      name: 'web',
+      image: 'nginx',
+      state: 'running',
+    });
     expect(c[1]?.name).toBe('db');
   });
 });
@@ -28,8 +47,14 @@ describe('buildDockerArgs', () => {
   });
 
   it('compose up/down avec fichier par défaut', () => {
-    expect(buildDockerArgs('up', undefined)).toEqual({ ok: true, args: ['compose', '-f', 'docker-compose.yml', 'up', '-d'] });
-    expect(buildDockerArgs('down', 'custom.yml')).toEqual({ ok: true, args: ['compose', '-f', 'custom.yml', 'down'] });
+    expect(buildDockerArgs('up', undefined)).toEqual({
+      ok: true,
+      args: ['compose', '-f', 'docker-compose.yml', 'up', '-d'],
+    });
+    expect(buildDockerArgs('down', 'custom.yml')).toEqual({
+      ok: true,
+      args: ['compose', '-f', 'custom.yml', 'down'],
+    });
   });
 });
 

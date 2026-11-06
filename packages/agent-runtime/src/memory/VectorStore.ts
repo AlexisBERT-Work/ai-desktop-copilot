@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { bm25Scores } from './bm25';
+import { cosineSimilarity, TolerantEmbedder, type Embedder } from './embedding';
 import { createLogger } from '../logger';
 import { dataPath } from '../lib/dataDir';
+import { readJsonFile, writeJsonFile } from '../lib/persistence';
 
 const log = createLogger('memory:vector');
 
@@ -18,10 +19,15 @@ export interface SearchOptions {
   filter?: Record<string, unknown>;
 }
 
-/** Tout objet capable de produire un embedding (ex. OllamaClient). */
-export interface Embedder {
-  embed(text: string): Promise<number[]>;
-}
+export type { Embedder } from './embedding';
+
+/**
+ * Plafond des échanges indexés automatiquement (`kind: 'exchange'`, un par
+ * réponse). Chaque entrée porte un vecteur de ~768 flottants, et le fichier
+ * entier est relu et réécrit : sans plafond il grossissait sans fin. Les
+ * souvenirs posés explicitement (store_memory) ne sont jamais évincés.
+ */
+const MAX_EXCHANGES = 2_000;
 
 interface StoredVector {
   id: string;
@@ -43,31 +49,21 @@ export class VectorStore {
   private initialized = false;
   private vectors: StoredVector[] = [];
   private readonly filePath: string;
-  private embeddingsDisabled = false;
+  private readonly embedder: TolerantEmbedder;
 
-  constructor(
-    private embedder?: Embedder,
-    dataDir?: string,
-  ) {
+  constructor(embedder?: Embedder, dataDir?: string) {
     this.filePath = dataPath('vectors.json', dataDir);
+    this.embedder = new TolerantEmbedder(embedder, log);
   }
 
   async initialize(): Promise<void> {
-    if (existsSync(this.filePath)) {
-      try {
-        const raw = readFileSync(this.filePath, 'utf-8');
-        const parsed = JSON.parse(raw) as StoredVector[];
-        if (Array.isArray(parsed)) this.vectors = parsed;
-      } catch (err) {
-        log.warn('Could not load vectors file — starting empty', { error: String(err) });
-        this.vectors = [];
-      }
-    }
+    const parsed = readJsonFile(this.filePath, log);
+    if (Array.isArray(parsed)) this.vectors = parsed as StoredVector[];
     this.initialized = true;
     log.info('VectorStore initialized', {
       path: this.filePath,
       count: this.vectors.length,
-      embedder: !!this.embedder,
+      embedder: this.embedder.configured,
     });
   }
 
@@ -82,7 +78,7 @@ export class VectorStore {
       : this.vectors;
     if (candidates.length === 0) return [];
 
-    const queryEmbedding = await this.tryEmbed(query);
+    const queryEmbedding = await this.embedder.tryEmbed(query);
     const denseOk =
       !!queryEmbedding && candidates.some(v => v.embedding.length === queryEmbedding.length);
 
@@ -119,7 +115,7 @@ export class VectorStore {
 
   async store(content: string, metadata?: Record<string, unknown>): Promise<string> {
     const id = crypto.randomUUID();
-    const embedding = (await this.tryEmbed(content)) ?? [];
+    const embedding = (await this.embedder.tryEmbed(content)) ?? [];
 
     this.vectors.push({
       id,
@@ -128,6 +124,7 @@ export class VectorStore {
       ...(metadata ? { metadata } : {}),
       createdAt: Date.now(),
     });
+    this.evictOldExchanges();
     this.persist();
     log.debug('Stored vector', { id, embedded: embedding.length > 0, total: this.vectors.length });
     return id;
@@ -139,47 +136,26 @@ export class VectorStore {
     if (this.vectors.length !== before) this.persist();
   }
 
-  /** Embedding tolérant : null si pas d'embedder ou si Ollama échoue. */
-  private async tryEmbed(text: string): Promise<number[] | null> {
-    if (!this.embedder || this.embeddingsDisabled) return null;
-    try {
-      const vec = await this.embedder.embed(text);
-      return Array.isArray(vec) && vec.length > 0 ? vec : null;
-    } catch (err) {
-      // Une seule alerte, puis repli silencieux sur les mots-clés.
-      if (!this.embeddingsDisabled) {
-        log.warn('Embeddings indisponibles — repli mots-clés', { error: String(err) });
-        this.embeddingsDisabled = true;
-      }
-      return null;
-    }
+  /** Évince les échanges automatiques les plus anciens au-delà de MAX_EXCHANGES. */
+  private evictOldExchanges(): void {
+    const exchanges = this.vectors.filter(v => v.metadata?.['kind'] === 'exchange');
+    const excess = exchanges.length - MAX_EXCHANGES;
+    if (excess <= 0) return;
+    const evicted = new Set(
+      [...exchanges]
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .slice(0, excess)
+        .map(v => v.id),
+    );
+    this.vectors = this.vectors.filter(v => !evicted.has(v.id));
   }
 
   private persist(): void {
-    try {
-      writeFileSync(this.filePath, JSON.stringify(this.vectors), 'utf-8');
-    } catch (err) {
-      log.warn('Could not persist vectors', { error: String(err) });
-    }
+    writeJsonFile(this.filePath, this.vectors, log);
   }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i] ?? 0;
-    const bi = b[i] ?? 0;
-    dot += ai * bi;
-    normA += ai * ai;
-    normB += bi * bi;
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
 
 function matchesFilter(
   metadata: Record<string, unknown> | undefined,

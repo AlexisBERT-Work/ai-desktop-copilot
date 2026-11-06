@@ -1,6 +1,5 @@
-// @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import {
   EMPTY_PRESS_FEED,
   PRESS_SOURCE_CATALOG,
@@ -8,8 +7,6 @@ import {
   type PressFeedInput,
 } from '@catdesk/shared-types';
 import { PressFeedsManager, type PressFeedsBackend } from './PressFeedsManager';
-
-afterEach(cleanup);
 
 function makeBackend(items: PressFeed[] = []) {
   return {
@@ -34,14 +31,14 @@ const saved = (over: Partial<PressFeed> = {}): PressFeed => ({
 describe('PressFeedsManager', () => {
   it('charge et affiche les journaux du backend', async () => {
     render(<PressFeedsManager backend={makeBackend([saved()])} />);
-    expect(await screen.findByText('Veille IA')).toBeTruthy();
+    expect(await screen.findByText('Veille IA')).toBeInTheDocument();
   });
 
   it('refuse de créer sans nom', async () => {
     const backend = makeBackend();
     render(<PressFeedsManager backend={backend} />);
     fireEvent.click(screen.getByText('Créer'));
-    expect(await screen.findByText('Le nom du journal est requis.')).toBeTruthy();
+    expect(await screen.findByText('Le nom du journal est requis.')).toBeInTheDocument();
     expect(backend.create).not.toHaveBeenCalled();
   });
 
@@ -52,7 +49,7 @@ describe('PressFeedsManager', () => {
       target: { value: 'Mon journal' },
     });
     fireEvent.click(screen.getByText('Créer'));
-    expect(await screen.findByText(/au moins une source intégrée/)).toBeTruthy();
+    expect(await screen.findByText(/au moins une source intégrée/)).toBeInTheDocument();
     expect(backend.create).not.toHaveBeenCalled();
   });
 
@@ -79,7 +76,7 @@ describe('PressFeedsManager', () => {
     const backend = makeBackend();
     render(<PressFeedsManager backend={backend} />);
     fireEvent.click(screen.getByText('Générer maintenant'));
-    expect(await screen.findByText('Génération lancée.')).toBeTruthy();
+    expect(await screen.findByText('Génération lancée.')).toBeInTheDocument();
     expect(backend.runNow).toHaveBeenCalledTimes(1);
   });
 });

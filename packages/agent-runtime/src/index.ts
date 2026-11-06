@@ -1,20 +1,32 @@
 /**
  * CatDesk — Agent Runtime Sidecar
  * Communicates with Tauri Rust core via JSON-RPC 2.0 over stdin/stdout.
+ *
+ * Ce fichier ne fait qu'ASSEMBLER : chaque section crée ses services, inscrit
+ * leur arrêt dans le `Lifecycle`, et passe aux suivantes ce dont elles ont
+ * besoin. La logique vit dans les modules.
  */
 
+// Premier import : charge le .env local puis fige la config du runtime.
+import { CONFIG } from './config';
+import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
+import { createLogger } from './logger';
+import { Lifecycle } from './lifecycle';
 import { StdinBridge } from './ipc/StdinBridge';
+import { stdoutNotifier } from './ipc/Notifier';
 import { AgentOrchestrator } from './AgentOrchestrator';
 import { ToolRegistry } from './ToolRegistry';
 import { PermissionEngine } from './permissions/PermissionEngine';
 import { ContextManager } from './ContextManager';
 import { AuditLogger } from './AuditLogger';
-import { OllamaClient } from './llm/OllamaClient';
-import { IdleUnloader } from './llm/IdleUnloader';
-import { Planner } from './llm/Planner';
 import { ActivityTracker } from './ActivityTracker';
 import { SpiralMonitor } from './SpiralMonitor';
-import { stdoutNotifier } from './ipc/Notifier';
+import { SubAgentRunner } from './SubAgentRunner';
+import { CronScheduler } from './CronScheduler';
+import { OllamaClient } from './llm/OllamaClient';
+import { IdleUnloader } from './llm/IdleUnloader';
+import { LlmScheduler } from './llm/LlmScheduler';
+import { Planner } from './llm/Planner';
 import { ConversationStore } from './memory/ConversationStore';
 import { VectorStore } from './memory/VectorStore';
 import { WarmMemoryStore } from './memory/WarmMemoryStore';
@@ -25,24 +37,12 @@ import { Compactor } from './memory/Compactor';
 import { SemanticCache } from './memory/SemanticCache';
 import { PlaybookStore } from './playbook/PlaybookStore';
 import { EvolutionDaemon } from './playbook/EvolutionDaemon';
-import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
-// Premier import : charge le .env local puis fige la config du runtime.
-import { CONFIG, envNumber } from './config';
-import { createLogger } from './logger';
-
-// ─── Tools ────────────────────────────────────────────────────
-// Enregistrement centralisé (et testé) dans tools/registerTools.ts.
 import { registerCoreTools, registerAutomationTools } from './tools/registerTools';
 import { MarketService } from './market/MarketService';
 import { MarketPoller } from './market/MarketPoller';
 import { MarketHistoryStore } from './market/MarketHistoryStore';
-import { SubAgentRunner } from './SubAgentRunner';
-import { CronScheduler } from './CronScheduler';
-import {
-  PressDigestScheduler,
-  type PressDigestConfig,
-  type PressMode,
-} from './news/PressDigestScheduler';
+import { PressDigestScheduler } from './news/PressDigestScheduler';
+import { readPressDigestConfig } from './news/pressConfig';
 import { LocalPressFeedStore } from './news/LocalPressFeedStore';
 import { LocalDailyStore } from './news/LocalDailyStore';
 import { SharedDailyReader } from './news/SharedDailyReader';
@@ -52,146 +52,83 @@ import { OcrSidecarClient } from './lib/ocrSidecar';
 
 const log = createLogger('runtime:main');
 
-// Sélection de journaux par défaut pour la revue de presse quotidienne
-// (finance + généraliste FR + international). Surchargeable via CATDESK_PRESS_SOURCES.
-const DEFAULT_PRESS_SOURCES = [
-  'latribune',
-  'cnbc',
-  'lemonde',
-  'lefigaro',
-  'france24',
-  'bbc',
-  'guardian',
-];
+/** Plafond absolu de l'arrêt : au-delà, on sort quoi qu'il reste. */
+const SHUTDOWN_HARD_LIMIT_MS = 10_000;
 
-// Projet Supabase de la revue de presse (catdesk-news). URL + clé ANON : ces
-// valeurs sont PUBLIQUES par construction (c'est l'usage prévu de la clé anon
-// Supabase, bornée par RLS côté serveur — jamais la clé service_role) et déjà
-// embarquées telles quelles dans le build desktop (VITE_SUPABASE_ANON_KEY).
-// Les avoir aussi ici en défaut permet à TOUT poste ayant lancé CatDesk de
-// publier le lot standard sans configuration (tri modèles 2026-07-20) —
-// overridable via SUPABASE_URL/SUPABASE_ANON_KEY pour pointer sur un autre
-// projet (dev/test).
-const DEFAULT_SUPABASE_URL = 'https://mpnpfbfjjkujiyeqrcwc.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbnBmYmZqamt1aml5ZXFyY3djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NjMxMDksImV4cCI6MjA5ODMzOTEwOX0.mzve54klYVm97r9WFOfQht35eb2mkth5O8eNMDUfPHE';
-
-/**
- * Config de la revue de presse (dailys). Active par défaut sur TOUT poste
- * ayant lancé CatDesk (tri modèles 2026-07-20 — CATDESK_PRESS_DIGEST=0 pour
- * désactiver) : le lot standard (7 journaux + sujets + synthèse) se publie
- * via une session anonyme + la RPC `publish_daily_if_missing`
- * (SECURITY DEFINER, voir supabase/migrations/20260720000000_*.sql), sans
- * identifiants admin. Idempotent entre postes : le premier arrivé publie, les
- * suivants no-opent (contrainte unique sur `title`).
- *
- * Les identifiants admin (SUPABASE_ADMIN_EMAIL/PASSWORD), s'ils sont
- * configurés sur CE poste, activent en plus les extras réservés à l'admin
- * (journaux personnalisés `press_feeds`, miroir Discord) — voir
- * PressDigestScheduler. Absents : le lot standard se publie quand même.
- */
-function readPressMode(v: string | undefined): PressMode {
-  return v === 'journal' || v === 'topic' || v === 'both' ? v : 'both';
-}
-
-function readPressDigestConfig(): PressDigestConfig | null {
-  if (process.env['CATDESK_PRESS_DIGEST'] === '0') return null;
-  const url = process.env['SUPABASE_URL'] ?? DEFAULT_SUPABASE_URL;
-  const anonKey = process.env['SUPABASE_ANON_KEY'] ?? DEFAULT_SUPABASE_ANON_KEY;
-  const email = process.env['SUPABASE_ADMIN_EMAIL'];
-  const password = process.env['SUPABASE_ADMIN_PASSWORD'];
-  const admin = email && password ? { url, anonKey, email, password } : undefined;
-
-  const csv = (v: string | undefined, fallback: string[]): string[] =>
-    v
-      ? v
-          .split(',')
-          .map(s => s.trim())
-          .filter(s => s.length > 0)
-      : fallback;
-  return {
-    sourceIds: csv(process.env['CATDESK_PRESS_SOURCES'], DEFAULT_PRESS_SOURCES),
-    topics: csv(process.env['CATDESK_PRESS_TOPICS'], []),
-    sinceHours: envNumber('CATDESK_PRESS_SINCE_HOURS', 24),
-    perJournalLimit: envNumber('CATDESK_PRESS_LIMIT', 10),
-    mode: readPressMode(process.env['CATDESK_PRESS_MODE']),
-    topicLimit: envNumber('CATDESK_PRESS_TOPIC_LIMIT', 40),
-    synthesis: process.env['CATDESK_PRESS_SYNTHESIS'] !== '0',
-    hour: CONFIG.pressHour,
-    runOnStart: process.env['CATDESK_PRESS_RUN_ON_START'] === '1',
-    supabase: { url, anonKey },
-    ...(admin ? { admin } : {}),
-    // Miroir Discord optionnel (extra admin) : réutilise DISCORD_WEBHOOK_URL par
-    // défaut, ou une cible dédiée aux dailys via CATDESK_PRESS_DISCORD_WEBHOOK.
-    ...(() => {
-      const hook = (
-        process.env['CATDESK_PRESS_DISCORD_WEBHOOK'] ??
-        process.env['DISCORD_WEBHOOK_URL'] ??
-        ''
-      ).trim();
-      return hook.length > 0 ? { discordWebhook: hook } : {};
-    })(),
-  };
-}
-
-async function main() {
-  // Le .env local (secrets de connecteurs) est chargé par l'import de
-  // ./config, avant toute lecture d'environnement.
+async function main(): Promise<void> {
   log.info('CatDesk Agent Runtime starting', { pid: process.pid, node: process.version });
+  const lifecycle = new Lifecycle();
 
-  // ─── Services ──────────────────────────────────────────────
-  const db = new ConversationStore();
-  await db.initialize();
+  // Processus enfants lancés à la demande par les outils (navigateur
+  // headless, sidecar OCR) : inscrits en premier, donc fermés en dernier.
+  lifecycle.onShutdown('ocr-sidecar', () => OcrSidecarClient.get().shutdown());
+  lifecycle.onShutdown('browser', () => BrowserManager.get().close());
 
+  // ─── LLM ───────────────────────────────────────────────────
+  // Priorité GPU : les questions de l'utilisateur passent devant le travail de
+  // fond (faits, compaction, digests), qui attend le calme et cède la place.
+  const scheduler = new LlmScheduler({ quietMs: CONFIG.backgroundQuietMs });
   const llm = new OllamaClient({
     baseUrl: CONFIG.ollamaBaseUrl,
     keepAlive: CONFIG.ollamaKeepAlive,
+    // Une seule fenêtre de contexte pour tous les appels : en changer recharge le modèle.
+    numCtx: CONFIG.numCtx,
+    scheduler,
   });
-  const ollamaOk = await llm.isAvailable();
-  log.info('Ollama status', { available: ollamaOk });
+  log.info('Ollama status', { available: await llm.isAvailable() });
 
-  // VectorStore uses Ollama (nomic-embed-text) for embeddings when available.
+  // ─── Mémoire ───────────────────────────────────────────────
+  const db = new ConversationStore();
+  await db.initialize();
+  lifecycle.onShutdown('conversations', () => db.close());
+
+  // Embeddings via Ollama (nomic-embed-text) quand disponible, repli mots-clés sinon.
   const vectorStore = new VectorStore(llm);
   await vectorStore.initialize();
 
-  // Warm memory : faits/préférences structurés sur l'utilisateur, instantanés
-  // à interroger, alimentés en tâche de fond par le petit modèle. Désactivable
-  // via CATDESK_WARM_MEMORY=0.
-  const warmEnabled = CONFIG.warmMemory;
-  const warmStore = new WarmMemoryStore();
-  if (warmEnabled) await warmStore.initialize();
+  // Warm memory : faits/préférences structurés sur l'utilisateur, alimentés en
+  // tâche de fond. Désactivable via CATDESK_WARM_MEMORY=0.
+  const warmStore = CONFIG.warmMemory ? new WarmMemoryStore() : undefined;
+  if (warmStore) {
+    await warmStore.initialize();
+    lifecycle.onShutdown('warm-memory', () => warmStore.close());
+  }
 
-  const audit = new AuditLogger();
-  const permissions = new PermissionEngine();
-  const context = new ContextManager(db, vectorStore, warmEnabled ? warmStore : undefined);
+  // Playbook : mémoire de stratégie par type de tâche (CATDESK_PLAYBOOK=0).
+  const playbook = CONFIG.playbook ? new PlaybookStore() : undefined;
+  if (playbook) {
+    await playbook.initialize();
+    lifecycle.onShutdown('playbook', () => playbook.close());
+  }
 
-  // ─── Market (bourse, P3) ───────────────────────────────────
-  // Provider de cotations Yahoo + moteur de formules. Le poller pousse
-  // périodiquement `market.update` (stdout → bras Rust → event UI). Watchlist
-  // de départ via CATDESK_WATCHLIST, cadence via CATDESK_MARKET_INTERVAL_MS.
-  // Créé avant le registre : les outils bourse en dépendent.
+  // Cache sémantique des réponses (CATDESK_SEMANTIC_CACHE=0) ; seuil/TTL via
+  // CATDESK_CACHE_THRESHOLD / CATDESK_CACHE_TTL_MS.
+  const cache = CONFIG.semanticCache
+    ? new SemanticCache(llm, { threshold: CONFIG.cacheThreshold, ttlMs: CONFIG.cacheTtlMs })
+    : undefined;
+  cache?.initialize();
+
+  // ─── Bourse ────────────────────────────────────────────────
+  // Créée avant le registre : les outils bourse en dépendent. Historique en
+  // SQLite (B6) ; un échec n'est pas fatal, le marché reste en mémoire.
   const market = new MarketService([...CONFIG.watchlistSeed]);
-  // B6 : historique persisté en SQLite (survit aux redémarrages, base des
-  // futures formules glissantes). Échec non-fatal : le marché reste en mémoire.
   try {
     const marketHistory = new MarketHistoryStore();
     await marketHistory.initialize();
     market.attachHistoryStore(marketHistory);
+    lifecycle.onShutdown('market-history', () => marketHistory.close());
   } catch (err) {
     log.warn('MarketHistoryStore indisponible (historique en mémoire seulement)', {
       error: String(err),
     });
   }
 
-  // ─── Journaux personnalisés LOCAUX + dailys ────────────────
-  // Créés AVANT le registre d'outils : search_dailies lit les dailys locales
-  // (« Mes journaux ») et les dailys partagées (lecture Supabase anonyme).
+  // ─── Dailys (lues par search_dailies) ──────────────────────
   const localFeeds = new LocalPressFeedStore(CONFIG.dataDir);
   const localDailies = new LocalDailyStore(CONFIG.dataDir);
-  const sharedDailies = new SharedDailyReader();
+  const sharedDailies = new SharedDailyReader(CONFIG.supabase);
 
-  // ─── Tool Registry ─────────────────────────────────────────
-  const defaultModel = CONFIG.model;
+  // ─── Outils ────────────────────────────────────────────────
   const tools = new ToolRegistry();
   registerCoreTools(
     tools,
@@ -201,118 +138,101 @@ async function main() {
       market,
       localDailies,
       sharedDailies,
-      defaultModel,
-      // Vision : minicpm-v — PAS llava ni l'arch 'mllama' (voir SUIVI.md, choix
-      // validé sur RX 6700). Override via CATDESK_VISION_MODEL.
+      defaultModel: CONFIG.model,
       visionModel: CONFIG.visionModel,
     },
-    // Profil 'research' (défaut) : bot recentré articles + recherche, sans
-    // outils dev/infra. CATDESK_TOOL_PROFILE=full pour tout réexposer.
+    // 'research' (défaut) : bot recentré articles + recherche, sans outils
+    // dev/infra. CATDESK_TOOL_PROFILE=full pour tout réexposer.
     CONFIG.toolProfile,
   );
 
-  const marketPoller = new MarketPoller(market, CONFIG.marketIntervalMs);
-  marketPoller.start();
-
   // ─── Agent ─────────────────────────────────────────────────
-  // CATDESK_MODEL_SMALL (optionnel) : modèle léger vers lequel rétrograder
-  // pour les tâches triviales (gain ressources). Absent => pas de routage.
-  const smallModel = CONFIG.modelSmall;
-  // Planificateur opt-in (utilisé seulement si la requête a usePlanning=true).
-  const planner = new Planner(llm);
-  // Suivi d'activité → alimente la détection de spirale en arrière-plan.
-  const activity = new ActivityTracker();
-  // Mode passif : décharge le modèle de la VRAM après une période d'inactivité
-  // pour rendre le GPU aux autres applis (jeux, etc.). Désactivable via
-  // CATDESK_PASSIVE_MODE=0 ; fenêtre réglable via CATDESK_IDLE_UNLOAD_MS.
+  // Mode passif : décharge le modèle de la VRAM après inactivité, pour rendre
+  // le GPU aux autres applis (CATDESK_PASSIVE_MODE=0, CATDESK_IDLE_UNLOAD_MS).
   const idleUnloader = new IdleUnloader(llm, {
     enabled: CONFIG.passiveMode,
     idleMs: CONFIG.idleUnloadMs,
   });
-  // Extraction des faits warm — modèle capable requis (cf. config.extractModel).
-  const factExtractor = warmEnabled
-    ? new FactExtractor(llm, CONFIG.extractModel, warmStore)
-    : undefined;
-  // Compaction : replie l'historique ancien en résumé glissant (long sessions).
-  // Utilise le modèle d'extraction (capable) ; désactivable via CATDESK_COMPACTION=0.
-  const compactor = CONFIG.compaction
-    ? new Compactor(db, new ConversationSummarizer(llm, CONFIG.extractModel))
-    : undefined;
-  // Playbook : mémoire de stratégie (quelle approche marche par type de tâche).
-  // Désactivable via CATDESK_PLAYBOOK=0.
-  const playbook = CONFIG.playbook ? new PlaybookStore() : undefined;
-  if (playbook) await playbook.initialize();
-  // Cache sémantique : sert sans LLM une réponse déjà calculée pour une question
-  // équivalente (gros gain de latence). Désactivable via CATDESK_SEMANTIC_CACHE=0.
-  // Seuil/TTL réglables via CATDESK_CACHE_THRESHOLD / CATDESK_CACHE_TTL_MS.
-  const cache = CONFIG.semanticCache
-    ? new SemanticCache(llm, {
-        threshold: CONFIG.cacheThreshold,
-        ttlMs: CONFIG.cacheTtlMs,
-      })
-    : undefined;
-  if (cache) cache.initialize();
-  const orchestrator = new AgentOrchestrator(
+  lifecycle.onShutdown('unload-model', () => idleUnloader.unloadNow());
+
+  const activity = new ActivityTracker();
+  const orchestrator = new AgentOrchestrator({
     llm,
     tools,
-    permissions,
-    context,
-    audit,
-    smallModel,
-    planner,
+    permissions: new PermissionEngine(),
+    context: new ContextManager(db, vectorStore, warmStore),
+    audit: new AuditLogger(),
+    // Palier léger optionnel (CATDESK_MODEL_SMALL) : rétrogradation des tâches triviales.
+    smallModel: CONFIG.modelSmall,
+    planner: new Planner(llm),
     activity,
     idleUnloader,
-    factExtractor,
-    compactor,
+    // Extraction de faits et compaction : modèle capable requis (config.extractModel).
+    factExtractor: warmStore ? new FactExtractor(llm, CONFIG.extractModel, warmStore) : undefined,
+    compactor: CONFIG.compaction
+      ? new Compactor(db, new ConversationSummarizer(llm, CONFIG.extractModel))
+      : undefined,
     playbook,
     cache,
-  );
+    scheduler,
+  });
+  // Après du travail de fond, le cache d'Ollama contient SON prompt : on y
+  // remet le début fixe des requêtes de chat avant la prochaine question.
+  scheduler.setPrimer(signal => orchestrator.primeCache(signal));
 
-  // Daemon de consolidation : nettoie périodiquement la mémoire warm (fusion des
-  // doublons inter-clés, purge des faits périmés et peu fiables). Déterministe,
-  // sans LLM — tourne en fond sans déranger.
-  const consolidator = warmEnabled ? new MemoryConsolidator(warmStore) : undefined;
-  consolidator?.start();
+  // Sous-agents et cron référencent l'orchestrateur : outils enregistrés après lui.
+  const subAgentRunner = new SubAgentRunner(orchestrator, tools, CONFIG.model);
+  const cron = new CronScheduler(db, subAgentRunner);
+  await cron.initialize();
+  lifecycle.onShutdown('cron', () => cron.shutdown());
+  registerAutomationTools(tools, subAgentRunner, cron);
+  log.info('Tools registered', { profile: CONFIG.toolProfile, tools: tools.listNames() });
 
-  // Daemon d'évolution (§8) : analyse périodiquement les traces du playbook,
-  // repère les échecs récurrents et les approches gagnantes, et écrit un rapport
-  // de PROPOSITIONS (evolution-proposals.json) — jamais appliquées d'office :
-  // l'humain reste dans la boucle. Désactivable via CATDESK_EVOLUTION=0.
-  const evolution = playbook && CONFIG.evolution ? new EvolutionDaemon(playbook) : undefined;
-  evolution?.start();
+  // ─── Démons de fond ────────────────────────────────────────
+  const marketPoller = new MarketPoller(market, CONFIG.marketIntervalMs);
+  marketPoller.start();
+  lifecycle.onShutdown('market-poller', () => marketPoller.stop());
 
-  // ─── Spiral monitor (proactive nudge) ──────────────────────
-  // Émet une notification `proactive.suggestion` sur stdout quand l'utilisateur
-  // boucle sur le même problème. Le bridge Rust la transforme en event Tauri.
+  // Consolidation déterministe de la mémoire warm (doublons, faits périmés).
+  if (warmStore) {
+    const consolidator = new MemoryConsolidator(warmStore);
+    consolidator.start();
+    lifecycle.onShutdown('memory-consolidator', () => consolidator.stop());
+  }
+
+  // Évolution (§8) : rapport de PROPOSITIONS tiré du playbook, jamais appliqué
+  // d'office (CATDESK_EVOLUTION=0).
+  if (playbook && CONFIG.evolution) {
+    const evolution = new EvolutionDaemon(playbook);
+    evolution.start();
+    lifecycle.onShutdown('evolution', () => evolution.stop());
+  }
+
+  // Suggestion proactive quand l'utilisateur boucle sur le même problème.
   const spiralMonitor = new SpiralMonitor(activity, stdoutNotifier, {
     thresholdMinutes: CONFIG.spiralThresholdMin,
   });
   spiralMonitor.start();
+  lifecycle.onShutdown('spiral-monitor', () => spiralMonitor.stop());
 
-  // ─── Sub-agent + cron tools (need orchestrator reference) ──
-  const subAgentRunner = new SubAgentRunner(orchestrator, tools, defaultModel);
-  const cron = new CronScheduler(db, subAgentRunner);
-  await cron.initialize();
-  registerAutomationTools(tools, subAgentRunner, cron);
+  // Inscrit AVANT les planificateurs de presse, donc arrêté APRÈS eux : ils
+  // sont déjà marqués arrêtés quand leurs appels LLM sont annulés, et ne
+  // publient pas les replis dégradés qui en résultent.
+  lifecycle.onShutdown('llm-scheduler', () => scheduler.dispose());
 
-  // ─── Revue de presse → dailys (tout poste ayant lancé CatDesk) ──
-  // Agrège plusieurs journaux, analyse intra-journal (LLM local) et publie une
-  // daily par journal dans Supabase — publication ouverte (anon), sans
-  // identifiants admin requis (cf. ci-dessus). CATDESK_PRESS_DIGEST=0 pour
-  // désactiver sur ce poste.
-  const pressCfg = readPressDigestConfig();
+  // ─── Revue de presse partagée (tout poste, sauf CATDESK_PRESS_DIGEST=0) ──
+  const pressCfg = readPressDigestConfig(process.env, CONFIG.supabase, CONFIG.pressHour);
   const pressScheduler =
-    pressCfg !== null ? new PressDigestScheduler(llm, defaultModel, pressCfg) : null;
-  pressScheduler?.start();
+    pressCfg !== null ? new PressDigestScheduler(llm, CONFIG.model, pressCfg) : null;
+  if (pressScheduler) {
+    pressScheduler.start();
+    lifecycle.onShutdown('press-digest', () => pressScheduler.stop());
+  }
 
   // ─── Journaux personnalisés LOCAUX (tout utilisateur) ──────
-  // Chaque poste peut définir ses propres journaux (panneau « Mes journaux »),
-  // générés quotidiennement par SON agent et stockés localement — ils viennent
-  // s'ajouter aux dailys partagées dans le widget. Aucun rôle admin requis.
-  // (Stores localFeeds/localDailies créés plus haut, avant le registre d'outils.)
   const localPress = new LocalPressScheduler(
     llm,
-    defaultModel,
+    CONFIG.model,
     localFeeds,
     localDailies,
     CONFIG.pressHour,
@@ -320,26 +240,42 @@ async function main() {
     status => stdoutNotifier(RPC_NOTIFICATIONS.pressLocalProgress, { status }),
   );
   localPress.start();
+  lifecycle.onShutdown('local-press', () => localPress.stop());
 
-  log.info('Tools registered', { profile: CONFIG.toolProfile, tools: tools.listNames() });
+  // ─── Arrêt ─────────────────────────────────────────────────
+  const shutdown = (reason: string): void => {
+    setTimeout(() => process.exit(0), SHUTDOWN_HARD_LIMIT_MS).unref();
+    void lifecycle.shutdown(reason).finally(() => process.exit(0));
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('uncaughtException', err => {
+    log.error('Uncaught exception', { message: err.message, stack: err.stack });
+  });
+  process.on('unhandledRejection', reason => {
+    log.error('Unhandled rejection', { reason: String(reason) });
+  });
 
-  // ─── IPC Bridge ────────────────────────────────────────────
-  const bridge = new StdinBridge(
+  // ─── IPC ───────────────────────────────────────────────────
+  const bridge = new StdinBridge({
     orchestrator,
-    async (symbols, formulas) => {
+    // L'UI ouvre le chat : charger le modèle et lire le prompt fixe pendant la saisie.
+    warmup: (model, conversationId) => orchestrator.warmupForUser(model, conversationId),
+    setMarketConfig: async (symbols, formulas) => {
       market.setWatchlist(symbols);
       market.setFormulas(formulas);
       await marketPoller.refreshNow();
     },
-    // « Publier maintenant » : lance un run immédiat de la revue de presse
-    // (actif sur tout poste, sauf CATDESK_PRESS_DIGEST=0). Absent (undefined)
-    // seulement si désactivé → le bridge répond « inactif » sans rien publier.
-    pressScheduler !== null
-      ? async () => {
-          await pressScheduler.runOnce();
+    // Absent seulement si la revue de presse est désactivée → le bridge
+    // répond « inactif » sans rien publier.
+    ...(pressScheduler
+      ? {
+          runPressDigest: async () => {
+            await pressScheduler.runOnce();
+          },
         }
-      : undefined,
-    {
+      : {}),
+    localPress: {
       listFeeds: () => localFeeds.list(),
       saveFeed: input => localFeeds.save(input),
       deleteFeed: id => localFeeds.delete(id),
@@ -348,7 +284,9 @@ async function main() {
       runNow: () => localPress.runOnce(true),
       getStatus: () => localPress.status,
     },
-  );
+    // stdin fermé = CatDesk quitte : seul signal fiable sous Windows.
+    onClose: () => shutdown('stdin closed'),
+  });
   bridge.start();
 
   // État initial des journaux/dailys locaux — l'UI peut aussi le redemander via
@@ -358,29 +296,6 @@ async function main() {
   stdoutNotifier(RPC_NOTIFICATIONS.dailiesLocal, { dailies: localDailies.list() });
 
   log.info('Agent Runtime ready and listening on stdin');
-
-  // ─── Graceful shutdown ─────────────────────────────────────
-  process.on('SIGTERM', () => {
-    log.info('SIGTERM received — shutting down');
-    consolidator?.stop();
-    cron.shutdown();
-    pressScheduler?.stop();
-    marketPoller.stop();
-    BrowserManager.get().shutdown();
-    OcrSidecarClient.get().shutdown();
-    db.close();
-    // Mode passif : libère la VRAM en quittant (best-effort, ne bloque pas l'arrêt).
-    void idleUnloader.unloadNow().finally(() => process.exit(0));
-    setTimeout(() => process.exit(0), 5500).unref();
-  });
-
-  process.on('uncaughtException', err => {
-    log.error('Uncaught exception', { message: err.message, stack: err.stack });
-  });
-
-  process.on('unhandledRejection', reason => {
-    log.error('Unhandled rejection', { reason: String(reason) });
-  });
 }
 
 main().catch(err => {

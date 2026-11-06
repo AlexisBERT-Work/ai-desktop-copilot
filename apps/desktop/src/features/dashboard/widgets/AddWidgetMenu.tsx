@@ -7,7 +7,7 @@ interface Props {
 
 /** Sélecteur de type de widget à ajouter au tableau de bord, trié par famille. */
 export function AddWidgetMenu({ onClose }: Props) {
-  const addWidget = useDashboardStore((s) => s.addWidget);
+  const addWidget = useDashboardStore(s => s.addWidget);
 
   return (
     <div
@@ -15,13 +15,13 @@ export function AddWidgetMenu({ onClose }: Props) {
       role="menu"
       aria-label="Ajouter un widget"
     >
-      {WIDGET_CATEGORIES.map((cat) => (
+      {WIDGET_CATEGORIES.map(cat => (
         <div key={cat}>
           <p className="mb-1 px-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
             {WIDGET_CATEGORY_LABEL[cat]}
           </p>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {WIDGET_META.filter((m) => m.category === cat).map((m) => (
+            {WIDGET_META.filter(m => m.category === cat).map(m => (
               <button
                 key={m.label}
                 role="menuitem"

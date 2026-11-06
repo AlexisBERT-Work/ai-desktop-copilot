@@ -11,12 +11,31 @@ import traceback
 import logging
 from typing import Any
 
+class JsonLogFormatter(logging.Formatter):
+    """Une ligne JSON par entree, comme les logs de l'agent Node.
+
+    L'ancien format etait un gabarit de chaine : un message contenant un
+    guillemet ou un saut de ligne (une trace d'exception, un chemin Windows
+    echappe) produisait du JSON invalide. `ensure_ascii` (defaut de json.dumps)
+    garde la sortie en ASCII : stderr redirige vers Node est en cp1252 sous
+    Windows, un caractere non encodable y ferait echouer l'ecriture.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {
+                "ts": self.formatTime(record),
+                "level": record.levelname,
+                "ns": "ocr:main",
+                "msg": record.getMessage(),
+            }
+        )
+
+
 # Configure logging to stderr to keep stdout clean for JSON-RPC
-logging.basicConfig(
-    stream=sys.stderr,
-    level=logging.INFO,
-    format='{"ts":"%(asctime)s","level":"%(levelname)s","ns":"ocr:main","msg":"%(message)s"}'
-)
+_handler = logging.StreamHandler(sys.stderr)
+_handler.setFormatter(JsonLogFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 log = logging.getLogger(__name__)
 
 # Lazy imports (loaded only when first used)
