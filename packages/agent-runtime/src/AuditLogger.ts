@@ -1,16 +1,15 @@
 import { appendFileSync } from 'fs';
 import type { ToolResult } from '@catdesk/shared-types';
 import { dataPath } from './lib/dataDir';
+import { redactArgs } from './security/redactArgs';
 
+/**
+ * Journal d'audit de l'agent : une ligne JSON `{ts, event, ...}` par
+ * événement, un fichier par jour sous `<data>/audit/` — même convention que le
+ * journal du cœur Rust (core/audit.rs), dans le même dossier.
+ */
 export class AuditLogger {
-  private logPath: string;
-
-  constructor() {
-    // Un fichier par jour, sous data/audit/ — même convention que le journal
-    // d'audit du cœur Rust (core/audit.rs), pour un log combiné uniforme.
-    const date = new Date().toISOString().slice(0, 10);
-    this.logPath = dataPath(`audit-${date}.log`, undefined, 'audit');
-  }
+  constructor(private readonly now: () => Date = () => new Date()) {}
 
   startRun(runId: string, conversationId: string, input: string): void {
     this.write('RUN_START', { runId, conversationId, inputLength: input.length });
@@ -30,12 +29,11 @@ export class AuditLogger {
     args: Record<string, unknown>,
     result: ToolResult,
   ): void {
-    // Sanitize sensitive data from args before logging
-    const safeArgs = this.sanitizeArgs(tool, args);
     this.write('TOOL_CALL', {
       runId,
       tool,
-      args: safeArgs,
+      // Secrets et contenus utilisateur masqués avant d'atteindre le disque.
+      args: redactArgs(args),
       success: result.success,
       // `error` n'existe que sur la branche d'échec de l'union : l'omettre
       // plutôt que d'écrire `undefined` dans la ligne d'audit.
@@ -47,27 +45,15 @@ export class AuditLogger {
     this.write('PERMISSION', { requestId, tool, granted, reason });
   }
 
-  private sanitizeArgs(tool: string, args: Record<string, unknown>): Record<string, unknown> {
-    const sanitized = { ...args };
-    // Don't log file contents in write operations
-    if (tool === 'write_file' && 'content' in sanitized) {
-      sanitized['content'] = `[${String(sanitized['content']).length} chars]`;
-    }
-    // Don't log clipboard content
-    if (tool === 'write_clipboard' && 'content' in sanitized) {
-      sanitized['content'] = '[clipboard content]';
-    }
-    return sanitized;
-  }
-
+  /**
+   * Le fichier du jour est résolu À CHAQUE écriture : figé au démarrage, un
+   * agent resté ouvert après minuit écrivait encore dans le fichier de la veille.
+   */
   private write(event: string, data: Record<string, unknown>): void {
-    const entry = {
-      ts: new Date().toISOString(),
-      event,
-      ...data,
-    };
+    const now = this.now();
+    const path = dataPath(`audit-${now.toISOString().slice(0, 10)}.log`, undefined, 'audit');
     try {
-      appendFileSync(this.logPath, JSON.stringify(entry) + '\n');
+      appendFileSync(path, JSON.stringify({ ts: now.toISOString(), event, ...data }) + '\n');
     } catch {
       // Non-fatal: audit log failure shouldn't crash the runtime
     }

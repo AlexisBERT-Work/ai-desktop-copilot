@@ -11,8 +11,9 @@
     "type-check": "turbo type-check",
     "test": "turbo test",
     "clean": "rimraf apps/desktop/dist packages/agent-runtime/dist .turbo node_modules",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
-    "prepare": "husky"
+    "format": "prettier --write .",
+    "prepare": "husky",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -22,7 +23,7 @@
     "eslint-plugin-react-refresh": "^0.4.26",
     "globals": "^15.15.0",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.3.0",
     "rimraf": "^6.0.0",
     "supabase": "^2.108.0",
@@ -40,7 +41,7 @@
       "eslint --fix",
       "prettier --write"
     ],
-    "*.{json,md,css}": [
+    "*.{json,md,css,yml,yaml}": [
       "prettier --write"
     ]
   }

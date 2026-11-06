@@ -45,6 +45,7 @@ export class TranscribeAudioTool extends BaseTool<Args> {
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
+  override readonly pathArgs = ['path'] as const;
   readonly schema = jsonSchemaFrom(argsSchema);
 
   async execute(rawArgs: Args): Promise<ToolResult> {

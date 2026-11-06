@@ -147,6 +147,9 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy node_modules failed (exit $LASTEXITCO
 Copy-Item -Recurse -Force (Join-Path $agentSrc "dist") (Join-Path $agentOut "dist")
 Copy-Item -Force (Join-Path $agentSrc "package.json") (Join-Path $agentOut "package.json")
 Copy-Item -Force $nodeExe (Join-Path $agentOut "node.exe")
+# Skills livrés avec l'app : en SŒUR de dist/, car le runtime les cherche en
+# join(__dirname, '..', 'skills'), soit dist/../skills ici et src/../skills en dev.
+Copy-Item -Recurse -Force (Join-Path $agentSrc "skills") (Join-Path $agentOut "skills")
 Write-Host "Agent staged → $agentOut"
 
 # ── 3. Ollama binary (+ models, full build only) ─────────────────

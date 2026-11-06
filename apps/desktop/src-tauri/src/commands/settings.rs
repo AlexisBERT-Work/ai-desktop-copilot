@@ -4,7 +4,7 @@ use tracing::info;
 
 use crate::commands::forward_to_agent;
 use crate::core::audit;
-use crate::ipc::protocol;
+use crate::ipc::{bridge, protocol};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,11 +18,11 @@ pub struct UpdateSettingsArgs {
 pub async fn update_settings(args: UpdateSettingsArgs) -> Result<(), String> {
     info!(safe_mode = ?args.safe_mode, "update_settings");
 
-    forward_to_agent(
-        protocol::RPC_SETTINGS_UPDATE,
-        json!({ "safeMode": args.safe_mode }),
-    )
-    .await?;
+    let settings = json!({ "safeMode": args.safe_mode });
+    // Mémorisé AVANT l'envoi : si l'agent n'est pas encore (ou plus) là, le
+    // superviseur rejouera ces réglages à son démarrage.
+    bridge::remember_runtime_settings(settings.clone());
+    forward_to_agent(protocol::RPC_SETTINGS_UPDATE, settings).await?;
 
     // `safeMode` conditionne le blocage de tous les outils à risque ≥ medium :
     // son basculement doit laisser une trace, comme toute décision de sécurité.

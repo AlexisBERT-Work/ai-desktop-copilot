@@ -23,8 +23,18 @@ describe('WarmMemoryStore maintenance', () => {
   });
 
   it('dedupeByValue merges same-value facts under different subjects', () => {
-    store.upsert({ kind: 'preference', subject: 'editeur', value: 'préfère VS Code', confidence: 0.6 });
-    store.upsert({ kind: 'preference', subject: 'editeur_prefere', value: 'Préfère VS Code', confidence: 0.9 });
+    store.upsert({
+      kind: 'preference',
+      subject: 'editeur',
+      value: 'préfère VS Code',
+      confidence: 0.6,
+    });
+    store.upsert({
+      kind: 'preference',
+      subject: 'editeur_prefere',
+      value: 'Préfère VS Code',
+      confidence: 0.9,
+    });
     expect(store.count()).toBe(2);
 
     const retired = store.dedupeByValue();
@@ -52,7 +62,10 @@ describe('WarmMemoryStore maintenance', () => {
 
     const pruned = store.prune({ maxAgeMs: 30 * DAY, minConfidence: 0.5 }, now);
     expect(pruned).toBe(1);
-    const subjects = store.getActiveFacts().map(f => f.subject).sort();
+    const subjects = store
+      .getActiveFacts()
+      .map(f => f.subject)
+      .sort();
     expect(subjects).toEqual(['fresh', 'strong']);
   });
 });

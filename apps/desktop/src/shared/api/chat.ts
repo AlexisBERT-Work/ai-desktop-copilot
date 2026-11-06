@@ -1,16 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-
-export interface ChatSendPayload {
-  conversationId: string;
-  message: string;
-  messageId: string;
-  modelId: string;
-  useTools: boolean;
-  modelMode?: string | undefined;
-  lightModel?: string | undefined;
-  codeModel?: string | undefined;
-  usePlanning?: boolean | undefined;
-}
+import type { ChatSendPayload } from '@catdesk/shared-types';
 
 /**
  * Lance un run agent — les tokens reviennent via les événements
@@ -19,6 +8,15 @@ export interface ChatSendPayload {
  */
 export function chatSend(payload: ChatSendPayload): Promise<void> {
   return invoke('chat_send', { args: payload });
+}
+
+/**
+ * Préchauffe le modèle (ouverture du chat, début de saisie) : l'agent le charge
+ * et lit le début des requêtes — dont l'historique de `conversationId` —
+ * pendant que l'utilisateur tape.
+ */
+export function chatWarmup(model: string, conversationId?: string): Promise<void> {
+  return invoke('chat_warmup', { model, conversationId });
 }
 
 /** Interrompt le run en cours (bouton Stop). */

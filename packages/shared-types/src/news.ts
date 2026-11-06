@@ -15,8 +15,3 @@ export interface NewsItem {
   publishedAt: string; // ISO 8601
   expiresAt: string | null; // ISO 8601 ou null
 }
-
-/** Identité d'installation, émise par Supabase Auth (anonyme par défaut). */
-export interface ClientIdentity {
-  clientId: string; // = auth.uid()
-}

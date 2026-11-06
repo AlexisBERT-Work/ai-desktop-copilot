@@ -29,7 +29,7 @@ describe('proposeSkills', () => {
 
   it('keeps only the best qualifying approach per task type', () => {
     const drafts = proposeSkills([
-      row('git', 'git_commit', 4, 0),       // 100%
+      row('git', 'git_commit', 4, 0), // 100%
       row('git', 'review_diff>git_commit', 6, 2), // 75%
     ]);
     expect(drafts).toHaveLength(1);
@@ -54,14 +54,17 @@ describe('proposeSkills', () => {
 describe('renderSkillDraft', () => {
   it('renders valid frontmatter and numbered tool steps', () => {
     const md = renderSkillDraft({
-      taskType: 'debug', approach: 'analyze_stacktrace>read_file',
-      successRate: 0.875, attempts: 8, slug: 'auto-debug',
+      taskType: 'debug',
+      approach: 'analyze_stacktrace>read_file',
+      successRate: 0.875,
+      attempts: 8,
+      slug: 'auto-debug',
     });
     expect(md).toMatch(/^---\nname: auto-debug\n/);
     expect(md).toContain('status: draft');
     expect(md).toContain('1. `analyze_stacktrace`');
     expect(md).toContain('2. `read_file`');
     expect(md).toContain('88% de succès sur 8 essais'); // rounded
-    expect(md).toContain('rien n\'est appliqué automatiquement');
+    expect(md).toContain("rien n'est appliqué automatiquement");
   });
 });

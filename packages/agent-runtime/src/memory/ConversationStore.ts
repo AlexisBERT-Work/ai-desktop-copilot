@@ -1,7 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import type { OllamaMessage, ConversationSummary } from '@catdesk/shared-types';
 import { createLogger } from '../logger';
-import { loadSqlJs, type Database } from '../lib/sqljs';
+import type { Database } from '../lib/sqljs';
+import { SqliteFile } from '../lib/persistence';
 import { dataPath } from '../lib/dataDir';
 
 export interface ScheduledJob {
@@ -20,75 +19,74 @@ export interface ScheduledJob {
 
 const log = createLogger('memory:sqlite');
 
+interface NewMessage {
+  id: string;
+  role: string;
+  content: string;
+  toolCalls?: unknown;
+  toolCallId?: string;
+}
+
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    model TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    tool_calls TEXT,
+    tool_call_id TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_messages_conversation
+    ON messages(conversation_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS conversation_summaries (
+    conversation_id TEXT PRIMARY KEY,
+    summary TEXT NOT NULL,
+    through_ts INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS scheduled_tasks (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    task TEXT NOT NULL,
+    schedule TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    last_run_at INTEGER,
+    next_run_at INTEGER NOT NULL,
+    last_result TEXT,
+    last_error TEXT,
+    run_count INTEGER NOT NULL DEFAULT 0
+  );
+`;
+
 export class ConversationStore {
   // Affectée dans initialize() — tout accès avant est un bug d'ordre de démarrage.
-  private db!: Database;
-  private dbPath: string;
+  private file!: SqliteFile;
+  private readonly dbPath: string;
 
   constructor() {
     this.dbPath = dataPath('conversations.db');
   }
 
-  async initialize(): Promise<void> {
-    const SqlJs = await loadSqlJs();
-
-    // Load existing DB from file, or create new
-    if (existsSync(this.dbPath)) {
-      const buffer = readFileSync(this.dbPath);
-      this.db = new SqlJs.Database(buffer);
-    } else {
-      this.db = new SqlJs.Database();
-    }
-
-    this.migrate();
-    log.info('ConversationStore initialized', { path: this.dbPath });
+  private get db(): Database {
+    return this.file.db;
   }
 
-  private migrate(): void {
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS conversations (
-        id TEXT PRIMARY KEY,
-        title TEXT,
-        model TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS messages (
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        tool_calls TEXT,
-        tool_call_id TEXT,
-        created_at INTEGER NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_messages_conversation
-        ON messages(conversation_id, created_at);
-
-      CREATE TABLE IF NOT EXISTS conversation_summaries (
-        conversation_id TEXT PRIMARY KEY,
-        summary TEXT NOT NULL,
-        through_ts INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS scheduled_tasks (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        task TEXT NOT NULL,
-        schedule TEXT NOT NULL,
-        enabled INTEGER NOT NULL DEFAULT 1,
-        created_at INTEGER NOT NULL,
-        last_run_at INTEGER,
-        next_run_at INTEGER NOT NULL,
-        last_result TEXT,
-        last_error TEXT,
-        run_count INTEGER NOT NULL DEFAULT 0
-      );
-    `);
-    this.persist();
+  async initialize(): Promise<void> {
+    this.file = await SqliteFile.open(this.dbPath, SCHEMA, log);
+    log.info('ConversationStore initialized', { path: this.dbPath });
   }
 
   createConversation(id: string, model: string, title?: string): void {
@@ -100,17 +98,44 @@ export class ConversationStore {
     this.persist();
   }
 
-  addMessage(
-    conversationId: string,
-    msg: {
-      id: string;
-      role: string;
-      content: string;
-      toolCalls?: unknown;
-      toolCallId?: string;
-    },
-  ): void {
+  addMessage(conversationId: string, msg: NewMessage): void {
     const now = Date.now();
+    this.insertMessage(conversationId, msg, now);
+    this.db.run(`UPDATE conversations SET updated_at=? WHERE id=?`, [now, conversationId]);
+    this.persist();
+  }
+
+  /**
+   * Enregistre un échange (question puis réponse) en une seule persistance —
+   * au lieu de trois réécritures complètes de la base par tour. Les deux
+   * messages reçoivent des horodatages distincts : à la milliseconde près,
+   * leur ordre et la frontière de compaction (`created_at > throughTs`)
+   * seraient ambigus.
+   */
+  recordExchange(
+    conversationId: string,
+    model: string,
+    userText: string,
+    assistantText: string,
+  ): void {
+    let ts = Date.now();
+    this.db.run(
+      `INSERT OR IGNORE INTO conversations (id, title, model, created_at, updated_at) VALUES (?,?,?,?,?)`,
+      [conversationId, null, model, ts, ts],
+    );
+    for (const [role, content] of [
+      ['user', userText],
+      ['assistant', assistantText],
+    ] as const) {
+      if (content.trim()) {
+        this.insertMessage(conversationId, { id: crypto.randomUUID(), role, content }, ts++);
+      }
+    }
+    this.db.run(`UPDATE conversations SET updated_at=? WHERE id=?`, [ts, conversationId]);
+    this.persist();
+  }
+
+  private insertMessage(conversationId: string, msg: NewMessage, createdAt: number): void {
     this.db.run(
       `INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_call_id, created_at)
        VALUES (?,?,?,?,?,?,?)`,
@@ -121,58 +146,9 @@ export class ConversationStore {
         msg.content,
         msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
         msg.toolCallId ?? null,
-        now,
+        createdAt,
       ],
     );
-    this.db.run(`UPDATE conversations SET updated_at=? WHERE id=?`, [now, conversationId]);
-    this.persist();
-  }
-
-  getRecentMessages(conversationId: string, limit: number): OllamaMessage[] {
-    const stmt = this.db.prepare(
-      `SELECT role, content, tool_calls, tool_call_id FROM messages
-       WHERE conversation_id=? ORDER BY created_at DESC LIMIT ?`,
-    );
-    stmt.bind([conversationId, limit]);
-
-    const rows: Array<{
-      role: string;
-      content: string;
-      tool_calls: string | null;
-      tool_call_id: string | null;
-    }> = [];
-    while (stmt.step()) {
-      const row = stmt.getAsObject() as {
-        role: string;
-        content: string;
-        tool_calls: string | null;
-        tool_call_id: string | null;
-      };
-      rows.push(row);
-    }
-    stmt.free();
-
-    return rows.reverse().map(row => ({
-      role: row.role as OllamaMessage['role'],
-      content: row.content,
-      ...(row.tool_calls ? { tool_calls: JSON.parse(row.tool_calls) } : {}),
-      ...(row.tool_call_id ? { tool_call_id: row.tool_call_id } : {}),
-    }));
-  }
-
-  listConversations(limit = 50): ConversationSummary[] {
-    const stmt = this.db.prepare(
-      `SELECT c.id, c.title, c.model, c.created_at as createdAt, c.updated_at as updatedAt,
-              (SELECT COUNT(*) FROM messages WHERE conversation_id=c.id) as messageCount
-       FROM conversations c ORDER BY c.updated_at DESC LIMIT ?`,
-    );
-    stmt.bind([limit]);
-    const rows: ConversationSummary[] = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject() as unknown as ConversationSummary);
-    }
-    stmt.free();
-    return rows;
   }
 
   // ─── Scheduled Tasks ───────────────────────────────────────────
@@ -253,7 +229,7 @@ export class ConversationStore {
   ): Array<{ role: string; content: string; createdAt: number }> {
     const stmt = this.db.prepare(
       `SELECT role, content, created_at FROM messages
-       WHERE conversation_id=? AND created_at > ? ORDER BY created_at ASC LIMIT ?`,
+       WHERE conversation_id=? AND created_at > ? ORDER BY created_at ASC, rowid ASC LIMIT ?`,
     );
     stmt.bind([conversationId, sinceTs, limit]);
     const rows: Array<{ role: string; content: string; createdAt: number }> = [];
@@ -263,6 +239,31 @@ export class ConversationStore {
     }
     stmt.free();
     return rows;
+  }
+
+  /**
+   * Les `limit` messages les PLUS RÉCENTS postérieurs à `sinceTs`, remis dans
+   * l'ordre chronologique — c'est ce que veut le contexte d'un tour. (Avec
+   * `getMessagesSince`, une longue traîne non compactée renvoyait les
+   * premiers messages de la conversation et perdait les derniers.)
+   */
+  getLatestMessagesSince(
+    conversationId: string,
+    sinceTs: number,
+    limit: number,
+  ): Array<{ role: string; content: string; createdAt: number }> {
+    const stmt = this.db.prepare(
+      `SELECT role, content, created_at FROM messages
+       WHERE conversation_id=? AND created_at > ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+    );
+    stmt.bind([conversationId, sinceTs, limit]);
+    const rows: Array<{ role: string; content: string; createdAt: number }> = [];
+    while (stmt.step()) {
+      const r = stmt.getAsObject() as { role: string; content: string; created_at: number };
+      rows.push({ role: r.role, content: r.content, createdAt: r.created_at });
+    }
+    stmt.free();
+    return rows.reverse();
   }
 
   getSummary(conversationId: string): { summary: string; throughTs: number } | null {
@@ -286,18 +287,11 @@ export class ConversationStore {
     this.persist();
   }
 
-  /** Write DB to disk (sql.js is in-memory, must be serialized) */
   private persist(): void {
-    try {
-      const data = this.db.export();
-      writeFileSync(this.dbPath, Buffer.from(data));
-    } catch {
-      // Non-fatal
-    }
+    this.file.persist();
   }
 
   close(): void {
-    this.persist();
-    this.db?.close();
+    this.file?.close();
   }
 }

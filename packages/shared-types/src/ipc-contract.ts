@@ -31,6 +31,7 @@ export type TauriEventName = (typeof TAURI_EVENTS)[keyof typeof TAURI_EVENTS];
 export const RPC_METHODS = {
   agentProcess: 'agent.process',
   agentCancel: 'agent.cancel',
+  agentWarmup: 'agent.warmup',
   permissionResponse: 'permission.response',
   marketSetWatchlist: 'market.set_watchlist',
   pressRunNow: 'press.run_now',

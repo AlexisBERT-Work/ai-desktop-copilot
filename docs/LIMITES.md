@@ -48,8 +48,7 @@ aujourd'hui classé `critical`.
 - Les **poids du modèle sont figés** : il ne « s'améliore » pas seul. Seul le
   système autour apprend — mémoire warm, playbook et EvolutionDaemon sont
   **câblés** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §3, §8),
-  mais les propositions d'évolution restent à valider par l'humain et le
-  système de _skills_ n'existe pas encore.
+  mais les propositions d'évolution restent à valider par l'humain.
 - **La voix tourne sur CPU, pas sur GPU** — par nécessité (pas de CUDA sur
   AMD, VRAM déjà prise par `qwen3:14b`). Conséquence mesurée le 2026-09-11 sur
   le Ryzen 5 5500 : les synthèses récentes de meilleure qualité (**Pocket TTS
@@ -82,6 +81,34 @@ aujourd'hui classé `critical`.
 - **RAG hybride partiel** : la fusion dense + BM25 est implémentée dans
   `VectorStore.ts` ; **pas de reranking ni de GraphRAG** pour l'instant.
 
+## 4 bis. Skills (`load_skill`)
+
+- **L'agent ne découvre pas les skills seul : il faut les lui demander.** Les lister
+  dans le prompt système est **mesuré nuisible** sur `qwen3:14b` (2026-08-16,
+  `think:false`, quatre formulations) : le modèle produit un appel d'outil malformé
+  qu'Ollama jette, et la réponse sort vide sur 2 à 5 requêtes sur 6, y compris sans
+  rapport avec les skills. À réessayer seulement si le modèle du bundle change, et
+  en mesurant.
+- **La phrase doit dire « skill » ou « compétence ».** `load_skill` est hors du
+  noyau, proposé sur ses mots-clés : c'est ce qui le rend gratuit pour les autres
+  tours, mais « applique revue-comparee » seul ne le fait pas proposer.
+- **Le texte seul.** Les fichiers voisins du `SKILL.md` (`scripts/`, `references/`)
+  ne sont ni lus ni exécutés, et les autres clés du frontmatter (`allowed-tools`…)
+  sont ignorées. Un skill conçu autour de ses scripts ne fonctionnera pas ici.
+- **Taille bornée** par la fenêtre de contexte (8 192 tokens) : le corps est coupé à
+  6 000 caractères (signalé par `truncated`), le catalogue à 30 skills, la
+  description à 200 caractères. Un fichier de plus de 128 Ko est ignoré.
+- **Un seul niveau de dossier** : `skills/<nom>/SKILL.md`. Un dépôt cloné tel quel
+  dans `skills/` n'est pas exploré en profondeur. Un fichier sans `description`
+  n'est pas un skill, et un lien qui sort du dossier est refusé (y compris une
+  jonction posée exprès).
+- **Pas d'outils nouveaux.** Un skill s'appuie sur ceux du profil courant : en
+  profil `research`, une procédure qui cite `github_list_issues` échouera. Les
+  outils proposés au modèle sont choisis sur la phrase de l'utilisateur, pas sur le
+  skill : celui-ci peut citer un outil dont le modèle n'a pas le schéma sous les yeux.
+
+---
+
 ## 5. Sécurité — défenses encore manquantes
 
 Présent : sandbox Rust, permissions risk-gated, audit, safe mode, et
@@ -95,6 +122,9 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   sortie des outils est scannée, pas l'entrée utilisateur/fichier.
 - **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
   sont redactés aujourd'hui.
+- **Injection en français** : les motifs de `sanitizeToolOutput` sont en anglais.
+  Une page ou un skill qui écrit « ignore tes consignes » n'est pas cadré. Les
+  skills ont leur propre cadre pour cette raison (voir [SECURITE.md](SECURITE.md)).
 - **Isolation réseau** pour l'exécution de code généré.
 
 ## 6. Tests & qualité
