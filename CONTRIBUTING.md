@@ -120,13 +120,30 @@ files.
 4. Register it in `packages/agent-runtime/src/tools/registerTools.ts` (**not**
    `index.ts` — registration moved out of it). If the tool is developer- or
    infra-oriented, add its name to `RESEARCH_EXCLUDED` in the same file.
-5. Add `packages/agent-runtime/src/tools/<category>/<Name>Tool.test.ts`. Use
+5. Add the words people actually use for it to
+   `packages/agent-runtime/src/llm/toolKeywords.ts`, even if it is excluded from the
+   `research` profile. Outside the core, a tool is only offered on one of these words or
+   on two words shared with its description. They are read by `selectTools` only and
+   never reach the model, so they cost no latency: do not copy them into the description.
+6. Add `packages/agent-runtime/src/tools/<category>/<Name>Tool.test.ts`. Use
    `expectOk` / `expectFail` from `tools/base/testResult` so assertions narrow.
-6. Document it in `docs/CAPACITES.md` — the tool catalogue's single source of truth.
+7. Document it in `docs/CAPACITES.md` — the tool catalogue's single source of truth.
 
 `registerTools.test.ts` asserts that registrations and permission entries match exactly,
 so steps 3 and 4 fail loudly if you skip one — and it fails on a path-like argument
-(`path`, `dir`, `file`, `vault`…) missing from `pathArgs`.
+(`path`, `dir`, `file`, `vault`…) missing from `pathArgs`, or on a tool outside the core
+with no keywords.
+
+## Measuring agent quality
+
+`pnpm --filter @catdesk/agent-runtime eval` plays the French tasks of
+`src/eval/evalTasks.ts` through the real orchestrator and the real model, against a
+simulated world: no real tool ever runs. `--selection` scores tool selection alone, in a
+few seconds and without a GPU. Tune on the `dev` split only: `holdout` is there to measure,
+and `--selection` hides its individual failures on purpose. To fix a holdout failure, move
+the sentence to `dev` and write a new one. A run stops with an error after three failed
+attempts in a row, so a server outage cannot pass for a score. The figures in `docs/SUIVI.md`
+use `--temperature 0`: pass it to compare with them, `--compare` warns if you do not.
 
 ## Keeping the layers honest
 
