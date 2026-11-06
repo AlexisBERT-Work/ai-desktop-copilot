@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-09-11**. Inventaire basé sur les **68 outils du catalogue**
+> À jour au **2026-11-06**. Inventaire basé sur les **69 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 68 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 69 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -206,6 +206,31 @@ permettaient d'exécuter une commande système.
   messages plus anciens et les faits durables de la mémoire tiède. Les tâches de
   fond (consolidation 6 h, évolution 24 h) font désormais leur première passe
   peu après le démarrage — elles n'atteignaient jamais leur premier tick.
+
+### 8 bis. Skills : ajouter une procédure par un simple fichier
+
+| Capacité                                                                       | Outil(s)     | Risque |
+| ------------------------------------------------------------------------------ | ------------ | :----: |
+| **Charger un skill** par son nom, ou **lister** ceux installés (sans argument) | `load_skill` |   🟢   |
+
+- **Format `SKILL.md` standard** : frontmatter `name` / `description`, puis corps
+  Markdown. Pour en ajouter un, déposer
+  `%APPDATA%\com.catdesk.app\agent-data\skills\<nom>\SKILL.md` (ou `<nom>.md`).
+  Il prend effet aussitôt, sans redémarrer.
+- **Deux skills livrés** (`packages/agent-runtime/skills/`) : `revue-comparee`
+  (comparer le traitement d'un sujet par plusieurs journaux) et `verifier-source`
+  (remonter à la source primaire d'un chiffre). Un skill de l'utilisateur de même
+  nom prime : une mise à jour n'écrase pas une personnalisation.
+- **Brouillons** : ceux que l'EvolutionDaemon écrit dans `skill-drafts/`
+  (`proposeSkills`) se chargent en les nommant, marqués non validés, et ne figurent
+  jamais au catalogue. Pour en valider un : le déplacer dans `skills/` et retirer
+  `status: draft`.
+- **Comment on s'en sert** : en le disant, « charge le skill revue-comparee » ou
+  « quels skills as-tu ? ». L'agent ne les découvre pas seul, voir
+  [LIMITES.md](LIMITES.md) § 4 bis. Le contenu d'un skill ne donne aucun droit, voir
+  [SECURITE.md](SECURITE.md).
+
+---
 
 ## 9. Orchestration & autonomie
 

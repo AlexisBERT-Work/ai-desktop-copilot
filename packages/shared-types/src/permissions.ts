@@ -129,6 +129,13 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: true,
     },
+    load_skill: {
+      name: 'load_skill',
+      description: "Charger la procédure d'un skill installé (lecture locale)",
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
     store_memory: {
       name: 'store_memory',
       description: 'Enregistrer en mémoire',

@@ -19,6 +19,12 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Added
 
+- **Skills: add a procedure by dropping a file** (`load_skill`, tool 69). Reads the standard
+  `SKILL.md` format, as `<dataDir>/skills/<name>/SKILL.md` or `<name>.md`; two skills ship with
+  the app. Without a name the tool returns the catalogue. Drafts written by the evolution daemon
+  can finally be read back, by name only. Skills are not listed in the system prompt (measured
+  harmful on `qwen3:14b`), and a skill's text is data: it grants no permission, and
+  `allowed-tools` is ignored (`docs/SECURITE.md`).
 - **Tool selection understands everyday French.** `llm/toolKeywords.ts` lists the words people
   use for each tool outside the core ("agenda", "rendez-vous"…). `selectTools` reads them and
   the model never sees them, so they add no tokens. On the French task set, the expected tool

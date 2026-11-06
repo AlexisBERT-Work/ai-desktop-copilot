@@ -274,7 +274,10 @@ rien à faire au milieu d'un journal.
     web, `read_webpage` exige une URL.
   - **Client MCP** : brancher des outils tiers sans les écrire (rejoint le
     système de plugins ci-dessous).
-  - **Format `SKILL.md`** pour `load_skill` (#17), au lieu d'un format maison.
+  - **`load_skill` proposé sur le nom d'un skill installé** : la phrase doit dire
+    « skill » ou « compétence » ([LIMITES.md](LIMITES.md) § 4 bis). Passer les noms
+    installés à `selectTools` lèverait ça sans coûter de token, mais il faut d'abord
+    voir si la limite gêne à l'usage.
   - **Réglage guidé**, à la OpenJarvis : diagnostic, plan, essai, validation par
     `claude -p`, une modification n'étant gardée que si le jeu `holdout` du banc
     ne baisse pas. Possible maintenant que le banc existe.

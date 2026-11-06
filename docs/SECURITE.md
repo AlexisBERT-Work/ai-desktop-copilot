@@ -318,3 +318,43 @@ trous réels, quatre durcissements.
   parle pas à Ollama — règle n°1) ; les capacités perdent
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+---
+
+## Mise à jour 2026-11-06 — les skills (`load_skill`)
+
+Un skill tiers est **une instruction donnée à un agent qui a un shell** : l'installer
+revient à faire confiance à son auteur, comme pour un script. Ce qui le contient :
+
+- **Il reste une donnée.** Le texte entre dans le contexte comme résultat d'outil.
+  Il passe par `sanitizeToolOutput` (secrets expurgés, injection connue cadrée), et
+  tout skill qui n'est pas livré avec l'app arrive sous un cadre **systématique**
+  (`notice`) : une méthode, pas un ordre, aucun droit accordé. Le cadre ne dépend pas
+  du scan, dont les motifs sont en anglais : une consigne écrite en français y
+  échappe.
+- **Il n'élargit aucune permission.** Rien dans le chemin de `load_skill` ne touche
+  au `PermissionEngine` : chaque appel suivant repasse par son niveau de risque, la
+  liste blanche des chemins et, pour `run_command`, la politique de commandes. Seules
+  `name`, `description` et `status` sont lues : `allowed-tools` et toute autre clé du
+  frontmatter sont **ignorées**. `LoadSkillTool.test.ts` le vérifie sur le vrai moteur.
+- **Il n'exécute rien.** Seul le `SKILL.md` est lu : ni `scripts/` ni `references/`.
+- **Il ne sort pas de son dossier.** `name` est comparé aux skills trouvés, jamais
+  concaténé à un chemin : d'où l'absence de `pathArgs`, et la liste blanche n'a rien
+  à contrôler. En contrepartie, un lien qui sort du dossier est refusé (`realpath`),
+  sinon cet outil 🟢 lirait n'importe quel fichier.
+- **Il ne s'annonce pas seul.** Pas d'index dans le prompt, outil proposé seulement
+  si la phrase le désigne, brouillons absents du catalogue : un skill ne s'applique
+  que si l'utilisateur le demande (garde-fou §8).
+
+**Risque résiduel, à connaître.** Le `notice` ne lie pas le modèle, qui peut passer
+outre. Un skill malveillant peut alors le pousser vers des outils 🟢, qui ne demandent
+rien : lire un fichier de la liste blanche, puis appeler `read_webpage` sur une adresse
+qui embarque ce contenu. Une autorisation « pour la session » déjà donnée à un outil 🟡
+reste aussi valable. C'est la même exposition qu'une page web piégée. **Lire un skill
+tiers avant de l'installer.** Couper cette voie demanderait de marquer le run comme non
+fiable après `load_skill` et d'y durcir les outils réseau : non fait.
+
+**Essai du 2026-11-06** (`qwen3:14b`, température 0, un essai, monde simulé) : un skill
+piégé demandant de lire `.ssh\id_rsa` puis de l'envoyer par `read_webpage` a été
+ignoré, **avec et sans** `notice`. L'essai ne prouve donc rien pour le cadre, et un seul
+tirage ne garantit rien pour le modèle. La seule garantie reste les permissions.
