@@ -1,0 +1,181 @@
+# Veille GitHub quotidienne pour CatDesk, par e-mail, PC éteint.
+#
+# 1. Collecte (notre code, sans IA) : recherche par sujets, Trending, nouvelles
+#    versions des briques suivies, filtres, README → dossiers + consigne + schéma
+#    (src/cli/veilleCollect.ts). C'est toute la recherche : elle ne coûte rien.
+# 2. Résumé par Claude Code en mode non interactif, sur l'ABONNEMENT Claude (jeton
+#    `claude setup-token`, pas de facturation API) : un seul appel, outil Read
+#    uniquement, il juge et résume les dossiers préparés.
+# 3. Mise en page et envoi (notre code) : valide le rapport, ne garde que des
+#    dépôts réellement collectés, SMTP (src/cli/veilleSend.ts).
+# 4. Archive : artefact `veille-archive` (vus.json, rapports/AAAA-MM-JJ.md), repris
+#    au run suivant. Aucun commit : le workflow reste en lecture sur le dépôt.
+#    Pour relire les rapports :
+#      gh run download -R AlexisBERT-Work/ai-desktop-copilot -n veille-archive
+#
+# Réglages (Settings → Secrets and variables → Actions) :
+#   secrets   VEILLE_TO (adresse qui reçoit le rapport), et ceux du récap :
+#             CLAUDE_CODE_OAUTH_TOKEN, SMTP_USER, SMTP_PASSWORD
+#   variables (optionnelles) VEILLE_CLAUDE_MODEL (claude-opus-5-5),
+#             VEILLE_CODE_REF (branche du code, défaut dev), VEILLE_DOCS_REF
+#             (branche dont on lit CAPACITES, AMELIORATIONS et LIMITES, défaut dev),
+#             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465)
+#
+# Ce dépôt est public, ses logs et ses artefacts aussi : ils ne contiennent que
+# des dépôts publics et le backlog déjà public. La veille ne lit ni RECAP_AUDIENCE
+# ni RECAP_FOCUS, et le corps du mail ne passe pas dans les logs.
+#
+# GitHub ne déclenche un `schedule` que depuis la branche par défaut (master) :
+# ce fichier doit y être. Le code exécuté, lui, vient de VEILLE_CODE_REF.
+
+name: Veille GitHub
+
+on:
+  schedule:
+    # Après le brief (4 h 23 UTC, ~7 min). Minute impaire : les créneaux pile à
+    # l'heure sont les plus retardés par GitHub.
+    - cron: '47 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Essai à blanc : rien n’est envoyé ni archivé, aperçu en artefact'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read # artefact du run précédent
+
+concurrency:
+  group: ai-veille
+  cancel-in-progress: false
+
+jobs:
+  veille:
+    # Jamais sur un fork (ni secrets ni raison d'envoyer quoi que ce soit).
+    if: github.repository == 'AlexisBERT-Work/ai-desktop-copilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Depuis master (le matin, ou « Run workflow » laissé sur master) :
+          # le code de VEILLE_CODE_REF, car master ne bouge qu'aux sorties et
+          # n'a pas le script. Depuis une autre branche : cette branche.
+          ref: ${{ github.ref_name == github.event.repository.default_branch && (vars.VEILLE_CODE_REF || 'dev') || github.ref }}
+          persist-credentials: false
+
+      # Ce que CatDesk sait déjà faire et ce qui est prévu : sans ça, Claude
+      # proposerait l'existant. Branche à part : la documentation à jour n'est
+      # pas forcément sur la branche du code.
+      - name: Contexte CatDesk
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ vars.VEILLE_DOCS_REF || 'dev' }}
+          path: catdesk-contexte
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docs/CAPACITES.md
+            docs/AMELIORATIONS.md
+            docs/LIMITES.md
+            packages/agent-runtime/src/tools/registerTools.ts
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @catdesk/agent-runtime...
+
+      # Dernier artefact, quel que soit le run : un essai à blanc n'en produit
+      # pas. Un téléchargement raté fait échouer le job : continuer repartirait
+      # à vide, renverrait tout et écraserait l'archive.
+      - name: Reprendre l'archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ runner.temp }}/veille-archive
+        run: |
+          mkdir -p "$ARCHIVE"
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=veille-archive&per_page=1" \
+            --jq '.artifacts[0].workflow_run.id // ""')
+          if [ -z "$run_id" ]; then
+            echo "Aucune archive : première veille."
+            exit 0
+          fi
+          gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n veille-archive -D "$ARCHIVE"
+
+      - name: Collecte
+        working-directory: packages/agent-runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VEILLE_WORKDIR: ${{ runner.temp }}/veille
+          VEILLE_ARCHIVE: ${{ runner.temp }}/veille-archive
+          VEILLE_CONTEXT: ${{ github.workspace }}/catdesk-contexte
+        run: pnpm veille:collect
+
+      - name: Installer Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Claude ne reçoit que la lecture de fichiers : ni web, ni shell, ni
+      # écriture, ni jeton GitHub. Le contenu des README ne peut donc agir que sur
+      # le texte du rapport, que l'étape suivante valide contre le schéma.
+      - name: Résumé (Claude)
+        timeout-minutes: 15
+        working-directory: ${{ runner.temp }}/veille
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MODEL: ${{ vars.VEILLE_CLAUDE_MODEL || 'claude-opus-5-5' }}
+        run: |
+          if [ -f veille.json ]; then
+            echo "Rien à analyser : Claude n'est pas lancé."
+            exit 0
+          fi
+          claude -p --model "$MODEL" \
+            --permission-mode dontAsk \
+            --allowedTools "Read" \
+            --max-turns 30 \
+            --output-format json \
+            --json-schema "$(cat veille.schema.json)" \
+            < prompt.md > claude-result.json
+          jq '{subtype, is_error, num_turns, duration_ms, total_cost_usd}' claude-result.json
+          jq -e '.structured_output' claude-result.json > veille.json
+
+      - name: Mise en page et envoi
+        working-directory: packages/agent-runtime
+        env:
+          VEILLE_WORKDIR: ${{ runner.temp }}/veille
+          VEILLE_ARCHIVE: ${{ runner.temp }}/veille-archive
+          VEILLE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          VEILLE_TO: ${{ secrets.VEILLE_TO }}
+          VEILLE_OUT: ${{ runner.temp }}/veille-preview.html
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '465' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        # stdout = le texte du rapport en essai à blanc : il va dans l'artefact,
+        # pas dans les logs. Les étapes restent visibles sur stderr.
+        run: pnpm veille:send > /dev/null
+
+      - name: Archive
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: veille-archive
+          path: ${{ runner.temp }}/veille-archive
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Aperçu (essai à blanc)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: veille-preview
+          path: |
+            ${{ runner.temp }}/veille-preview.html
+            ${{ runner.temp }}/veille/veille.json
+          retention-days: 3

@@ -25,6 +25,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | Installeur offline + auto-update               | `docs/DISTRIBUTION.md`                                                   |
 | Techniques d'architecture agent (✅/🟡/⬜)     | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer)  |
 | Dashboard / bourse / news / dailys             | `docs/projects/dashboard.md` (décisions, non maintenu) + `supabase/`     |
+| Veille GitHub quotidienne (mail, pistes)       | `.github/workflows/ai-veille.yml` + `news/veille/` de l'agent            |
 | Choix de stack                                 | `docs/architecture/adr-*.md`                                             |
 | Historique versionné                           | `CHANGELOG.md`                                                           |
 
