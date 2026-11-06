@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderVeilleHtml, renderVeilleMarkdown, veilleSubject } from './renderVeille';
-import { EMPTY_REPORT, type VeilleReport } from './veilleSchema';
+import { EMPTY_REPORT, type VeillePiste, type VeilleReport } from './veilleSchema';
 
 const NOW = new Date('2026-11-06T05:00:00Z');
 
@@ -37,6 +37,14 @@ describe('renderVeilleHtml', () => {
     expect(html).toContain('href="https://github.com/ollama/ollama"');
     expect(html).toContain('href="https://github.com/x/noise"');
     expect(html).toContain('54 dépôts');
+  });
+
+  it('sommaire cliquable dès deux pistes, chaque lien mène à sa carte', () => {
+    const second = { ...REPORT.pistes[0], title: 'Une autre piste' } as VeillePiste;
+    const html = renderVeilleHtml(input({ ...REPORT, pistes: [...REPORT.pistes, second] }));
+    expect(html).toContain('href="#piste-2"');
+    expect(html).toContain('id="piste-2"');
+    expect(renderVeilleHtml(input(REPORT))).not.toContain('href="#piste-1"');
   });
 
   it('un texte piégé reste du texte : ni balise, ni lien', () => {

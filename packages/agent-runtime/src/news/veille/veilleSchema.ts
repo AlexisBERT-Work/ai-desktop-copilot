@@ -50,7 +50,9 @@ const Rejected = z.object({
 });
 
 export const VeilleReportSchema = z.object({
-  headline: z.string().describe('Le fait du jour, en une ligne : il sert d’objet au mail'),
+  headline: z
+    .string()
+    .describe('Le fait du jour en moins de 80 caractères : il sert d’objet au mail'),
   summary: z.string().describe('Deux à quatre phrases : ce qui compte aujourd’hui, et pourquoi'),
   pistes: z
     .array(Piste)

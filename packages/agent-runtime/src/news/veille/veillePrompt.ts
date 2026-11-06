@@ -61,7 +61,7 @@ Une technique éprouvée ailleurs n'est pas acquise : elle a pu marcher sur un m
 ## Rapport
 - **${MAX_PISTES} pistes au plus**, et zéro est une bonne réponse : un jour sans rien de solide donne un rapport vide, jamais du remplissage. \`a_faire\` : le gain est net et le filtre de confiance passe. \`a_garder\` : prometteur, mais trop jeune ou à surveiller.
 - \`releases\` : seulement les versions qui changent quelque chose pour CatDesk (correctif AMD/Vulkan, nouveau modèle, sécurité).
-- \`rejected\` : quelques dépôts qui auraient pu tenter, pas tout le bruit.
+- \`rejected\` : 8 au plus, ceux qui auraient pu tenter, pas tout le bruit.
 - Un fait, une place : ne répète pas dans \`summary\` le détail d'une piste.
 - En français, phrases courtes, sans superlatifs ni formules creuses. Pas d'URL dans le texte : les liens sont ajoutés à la mise en page.
 

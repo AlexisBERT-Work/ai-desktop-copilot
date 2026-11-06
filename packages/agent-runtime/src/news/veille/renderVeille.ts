@@ -74,10 +74,28 @@ function fieldHtml(label: string, value: string): string {
   );
 }
 
-function pisteHtml(p: VeillePiste): string {
+function pisteAnchor(index: number): string {
+  return `piste-${index + 1}`;
+}
+
+/** Sommaire : on peut s'arrêter là. Inutile pour une seule piste. */
+function tocHtml(pistes: VeillePiste[]): string {
+  if (pistes.length < 2) return '';
+  const lines = pistes
+    .map(
+      (p, i) =>
+        `<li style="margin:0 0 4px"><a href="#${pisteAnchor(i)}" style="color:${C.accent}">` +
+        `${escapeHtml(VERDICT_LABEL[p.verdict])} : ${escapeHtml(p.title)}</a></li>`,
+    )
+    .join('');
+  return `<tr><td style="padding:0 2px 16px"><ul style="margin:0;padding-left:20px;font-size:14px">${lines}</ul></td></tr>`;
+}
+
+function pisteHtml(p: VeillePiste, index: number): string {
   const meta = `${INTEGRATION_LABEL[p.integration]} · ${p.domain} · ${EFFORT_LABEL[p.effort]}`;
   return (
     `<tr><td style="padding:16px 18px;background:${C.card};border:1px solid ${C.line};border-radius:8px">` +
+    `<a name="${pisteAnchor(index)}" id="${pisteAnchor(index)}"></a>` +
     `<p style="margin:0 0 4px;font-size:13px;font-weight:600">${escapeHtml(VERDICT_LABEL[p.verdict])}</p>` +
     `<h2 style="margin:0 0 4px;font-size:18px;line-height:1.3;color:${C.ink}">${escapeHtml(p.title)}</h2>` +
     `<p style="margin:0 0 12px;font-size:13px;color:${C.muted}">${repoLink(p.repo)} · ${escapeHtml(meta)}</p>` +
@@ -115,6 +133,7 @@ export function renderVeilleHtml(input: RenderVeilleInput): string {
       `<p style="margin:0;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${C.accent}">Veille CatDesk · ${escapeHtml(dateFr(now))}</p>` +
       `</td></tr>`,
     `<tr><td style="padding:0 2px 16px">${escapeHtml(report.summary)}</td></tr>`,
+    tocHtml(report.pistes),
     ...report.pistes.map(pisteHtml),
     listHtml(
       'Nouvelles versions',
@@ -159,6 +178,9 @@ function pisteMarkdown(p: VeillePiste): string[] {
 export function renderVeilleMarkdown(input: RenderVeilleInput): string {
   const { report, now, candidateCount } = input;
   const out = [`# Veille CatDesk, ${dateFr(now)}`, '', report.headline, '', report.summary, ''];
+  if (report.pistes.length > 1) {
+    out.push(...report.pistes.map(p => `- ${VERDICT_LABEL[p.verdict]} : ${p.title}`), '');
+  }
   out.push(...report.pistes.flatMap(pisteMarkdown));
   if (report.releases.length > 0) {
     out.push('## Nouvelles versions', '');
