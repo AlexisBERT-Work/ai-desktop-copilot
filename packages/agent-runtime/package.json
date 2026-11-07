@@ -13,7 +13,8 @@
     "recap:collect": "tsx src/cli/recapCollect.ts",
     "recap:send": "tsx src/cli/recapSend.ts",
     "veille:collect": "tsx src/cli/veilleCollect.ts",
-    "veille:send": "tsx src/cli/veilleSend.ts"
+    "veille:send": "tsx src/cli/veilleSend.ts",
+    "fil:publish": "tsx src/cli/filPublish.ts"
   },
   "dependencies": {
     "@catdesk/shared-types": "workspace:*",
