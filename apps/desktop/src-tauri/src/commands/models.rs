@@ -4,6 +4,7 @@
 use serde::Serialize;
 
 use crate::core::error::CatdeskError;
+use crate::core::ollama::{http_client, OLLAMA_URL};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +19,9 @@ pub struct ModelInfo {
 /// is too large for the machine's VRAM.
 #[tauri::command]
 pub async fn get_ollama_models_info() -> Result<Vec<ModelInfo>, String> {
-    let response = reqwest::get("http://127.0.0.1:11434/api/tags")
+    let response = http_client()
+        .get(format!("{OLLAMA_URL}/api/tags"))
+        .send()
         .await
         .map_err(|e| CatdeskError::Ollama(e.to_string()))?;
 
@@ -56,7 +59,11 @@ pub async fn get_gpu_vram_bytes() -> Result<Option<u64>, String> {
 /// embedding models — a good proxy for the model whose VRAM fit actually
 /// matters. `None` when Ollama is unreachable or has no non-embedding model.
 pub(crate) async fn heaviest_model() -> Option<ModelInfo> {
-    let response = reqwest::get("http://127.0.0.1:11434/api/tags").await.ok()?;
+    let response = http_client()
+        .get(format!("{OLLAMA_URL}/api/tags"))
+        .send()
+        .await
+        .ok()?;
     let json: serde_json::Value = response.json().await.ok()?;
     json["models"]
         .as_array()?

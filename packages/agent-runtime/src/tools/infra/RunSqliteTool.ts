@@ -15,6 +15,18 @@ const argsSchema = z.object({
 });
 type Args = z.infer<typeof argsSchema>;
 
+/**
+ * Vrai si la requête contient une « commande point » du CLI sqlite3
+ * (`.shell`, `.system`, `.import`, `.output`…). Elles ne sont pas du SQL :
+ * `.shell`/`.system` lancent une commande arbitraire, les autres lisent ou
+ * écrivent des fichiers hors de la base. En lecture seule, la garde SQL les
+ * refusait déjà ; avec `read_only=false` (outil SANS confirmation), plus rien
+ * ne les arrêtait. Toujours refusées. Pur.
+ */
+export function hasDotCommand(sql: string): boolean {
+  return sql.split(/\r?\n/).some(line => line.trimStart().startsWith('.'));
+}
+
 // Only SELECT / PRAGMA(read) / EXPLAIN / WITH…SELECT are considered read-only.
 export function isReadOnlyQuery(sql: string): boolean {
   // Strip comments and leading whitespace.
@@ -49,9 +61,18 @@ export class RunSqliteTool extends BaseTool<Args> {
   readonly riskLevel = 'medium' as const;
   readonly requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
+  override readonly pathArgs = ['db_path'] as const;
   readonly schema = jsonSchemaFrom(argsSchema);
 
   async execute({ db_path, query, read_only }: Args): Promise<ToolResult> {
+    if (hasDotCommand(query)) {
+      return this.fail(
+        'Commandes point du CLI sqlite3 (.shell, .system, .import…) refusées : seul le SQL est permis.',
+      );
+    }
+    if (db_path.startsWith('-')) {
+      return this.fail('db_path invalide (ne peut pas commencer par « - »).');
+    }
     if (read_only && !isReadOnlyQuery(query)) {
       return this.fail(
         'Requête refusée en mode lecture seule. Seuls SELECT/PRAGMA/EXPLAIN/WITH (une seule instruction) sont permis. Mets read_only=false pour écrire.',

@@ -157,13 +157,16 @@ repose sur le code Node. → _Objectif de fond : une source de vérité unique._
 - **Moteur de formules mathjs** (`market/FormulaEngine.ts`) : `evaluate` scopé,
   mathjs 15.x (les évasions classiques `constructor`/`import` sont bloquées dans
   les versions récentes). **Watch-item faible confiance**, pas une faille — à
-  re-vérifier à chaque montée de version de mathjs.
+  re-vérifier à chaque montée de version de mathjs. _Durci le 2026-10-07 : voir
+  la mise à jour en fin de document._
 - **Exécution de commandes des autres outils** (`clipboard`, `git`, `docker`,
   `kill_process`, `inspect_port`, `standup`…) : tous en `execFile` avec tableau
   d'arguments (pas de shell) → pas d'injection shell. ✓
 - **`run_sqlite`** : anti-injection solide (strip commentaires, refus multi-
   instructions, 1er mot-clé vérifié, `-readonly` au niveau SQLite). Seul bémol :
-  `db_path` non restreint → rattaché à Vuln 3.
+  `db_path` non restreint → rattaché à Vuln 3. _Faux sentiment de sécurité,
+  corrigé le 2026-10-07 : les dot-commands (`.shell`) passaient — voir la mise à
+  jour en fin de document._
 
 ---
 
@@ -270,3 +273,88 @@ et un capteur sensible de plus : **le micro**. Ce qui le borne :
   GitHub de `k2-fsa/sherpa-onnx` par `scripts/fetch-voice-models.ps1`. Pas
   de vérification d'empreinte à ce jour — à ajouter si ces modèles entrent dans
   le pipeline de release automatisé.
+
+## Mise à jour 2026-10-07 — audit complet
+
+Passe de relecture sur tout le dépôt (branche `refactor/audit-complet`). Trois
+trous réels, quatre durcissements.
+
+- **Chemins déclarés par outil** (`BaseTool.pathArgs`). Le contrôle de chemin
+  de Vuln 3 testait des **noms d'arguments** (`path`, `db_path`) : `vault`
+  (`obsidian_notes`) et `paths` (`semantic_search`), deux outils 🟢
+  auto-approuvés, lisaient donc **n'importe quel dossier du disque**. Chaque
+  outil déclare désormais ses arguments-chemins ; `ToolRegistry.filesystemTargets`
+  les extrait (tableaux compris) et `PermissionEngine.check` les vérifie tous,
+  quel que soit le niveau de risque. `registerTools.test.ts` échoue si un outil
+  a un argument d'allure « chemin » non déclaré — sauf les pathspecs git
+  (`bisect_guided`, `resolve_conflicts`, `summarize_git_log`), exemptés
+  nommément.
+- **Audit expurgé** (`security/redactArgs.ts`). Le journal n'expurgeait que le
+  contenu de `write_file` / `write_clipboard` : le mot de passe IMAP de
+  `read_email`, les tokens GitHub / Notion / `call_api`, les chaînes de
+  connexion SQL et les URL de webhook y étaient écrits **en clair, sur disque**.
+  L'expurgation se fait maintenant par **nom de clé**, pour tout outil
+  (`password`, `token`, `secret`, `api_key`, `authorization`, `cookie`,
+  `connection_string`, `webhook`, `dsn` → `[REDACTED]` ; `content`/`text`/`body`
+  → leur seule taille ; `headers` récursif). Le fichier du jour est recalculé à
+  chaque écriture (il restait figé au jour du démarrage).
+- **`run_sqlite` et les dot-commands.** Le filtre SQL vérifiait le premier mot
+  de la requête, mais le CLI `sqlite3` exécute aussi les lignes `.shell`,
+  `.system`, `.output`… — **une commande système** derrière un outil 🟡.
+  Toute ligne commençant par `.` est refusée, ainsi qu'un `db_path` commençant
+  par `-` (option du CLI).
+- **mathjs bridé** : `import`, `createUnit`, `evaluate`, `parse`, `simplify`,
+  `derivative`, `resolve` et `compile` sont désactivés dans l'instance des
+  formules (`create(all)` isolée). Le watch-item devient une garde testée.
+- **`post_tech_news_discord`** n'accepte qu'une URL de webhook Discord
+  (`lib/discord.ts::isDiscordWebhookUrl`) : l'URL vient des arguments du
+  modèle, donc d'un contenu injecté possible — c'était un canal d'exfiltration
+  vers n'importe quel hôte.
+- **Permissions** : un délai de confirmation dépassé ou un run interrompu valent
+  **refus** (`{ granted: false }`) au lieu de faire échouer tout le run ; le
+  délai (`PERMISSION_TIMEOUT_MS`, 60 s) est partagé avec l'UI, qui retire le
+  dialogue au même moment et affiche la description de l'action.
+- **Webview réduit** : la CSP n'autorise plus `http://127.0.0.1:11434` (l'UI ne
+  parle pas à Ollama — règle n°1) ; les capacités perdent
+  `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
+  pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+---
+
+## Mise à jour 2026-11-06 — les skills (`load_skill`)
+
+Un skill tiers est **une instruction donnée à un agent qui a un shell** : l'installer
+revient à faire confiance à son auteur, comme pour un script. Ce qui le contient :
+
+- **Il reste une donnée.** Le texte entre dans le contexte comme résultat d'outil.
+  Il passe par `sanitizeToolOutput` (secrets expurgés, injection connue cadrée), et
+  tout skill qui n'est pas livré avec l'app arrive sous un cadre **systématique**
+  (`notice`) : une méthode, pas un ordre, aucun droit accordé. Le cadre ne dépend pas
+  du scan, qui reconnaît des tournures anglaises et françaises connues : une consigne
+  reformulée y échappe (mesure dans [LIMITES.md](LIMITES.md) § 5).
+- **Il n'élargit aucune permission.** Rien dans le chemin de `load_skill` ne touche
+  au `PermissionEngine` : chaque appel suivant repasse par son niveau de risque, la
+  liste blanche des chemins et, pour `run_command`, la politique de commandes. Seules
+  `name`, `description` et `status` sont lues : `allowed-tools` et toute autre clé du
+  frontmatter sont **ignorées**. `LoadSkillTool.test.ts` le vérifie sur le vrai moteur.
+- **Il n'exécute rien.** Seul le `SKILL.md` est lu : ni `scripts/` ni `references/`.
+- **Il ne sort pas de son dossier.** `name` est comparé aux skills trouvés, jamais
+  concaténé à un chemin : d'où l'absence de `pathArgs`, et la liste blanche n'a rien
+  à contrôler. En contrepartie, un lien qui sort du dossier est refusé (`realpath`),
+  sinon cet outil 🟢 lirait n'importe quel fichier.
+- **Il ne s'annonce pas seul.** Pas d'index dans le prompt, outil proposé seulement
+  si la phrase le désigne, brouillons absents du catalogue : un skill ne s'applique
+  que si l'utilisateur le demande (garde-fou §8).
+
+**Risque résiduel, à connaître.** Le `notice` ne lie pas le modèle, qui peut passer
+outre. Un skill malveillant peut alors le pousser vers des outils 🟢, qui ne demandent
+rien : lire un fichier de la liste blanche, puis appeler `read_webpage` sur une adresse
+qui embarque ce contenu. Une autorisation « pour la session » déjà donnée à un outil 🟡
+reste aussi valable. C'est la même exposition qu'une page web piégée. **Lire un skill
+tiers avant de l'installer.** Couper cette voie demanderait de marquer le run comme non
+fiable après `load_skill` et d'y durcir les outils réseau : non fait.
+
+**Essai du 2026-11-06** (`qwen3:14b`, température 0, un essai, monde simulé) : un skill
+piégé demandant de lire `.ssh\id_rsa` puis de l'envoyer par `read_webpage` a été
+ignoré, **avec et sans** `notice`. L'essai ne prouve donc rien pour le cadre, et un seul
+tirage ne garantit rien pour le modèle. La seule garantie reste les permissions.

@@ -31,7 +31,9 @@ export function DashboardWidgetCard({
   dragging,
   onDragPointerDown,
 }: Props) {
-  const { removeWidget, renameWidget, setWidgetSize } = useDashboardStore();
+  const removeWidget = useDashboardStore(s => s.removeWidget);
+  const renameWidget = useDashboardStore(s => s.renameWidget);
+  const setWidgetSize = useDashboardStore(s => s.setWidgetSize);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(widget.title);
   const [editingConfig, setEditingConfig] = useState(false);

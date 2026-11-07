@@ -41,25 +41,19 @@ describe('inferScope', () => {
   });
 
   it('renvoie le scope dominant (>50%)', () => {
-    expect(inferScope([
-      'packages/agent-runtime/src/a.ts',
-      'packages/agent-runtime/src/b.ts',
-    ])).toBe('agent-runtime');
+    expect(inferScope(['packages/agent-runtime/src/a.ts', 'packages/agent-runtime/src/b.ts'])).toBe(
+      'agent-runtime',
+    );
   });
 
   it('gère apps/ et choisit la majorité', () => {
-    expect(inferScope([
-      'apps/desktop/a.rs',
-      'apps/desktop/b.rs',
-      'packages/foo/c.ts',
-    ])).toBe('desktop');
+    expect(inferScope(['apps/desktop/a.rs', 'apps/desktop/b.rs', 'packages/foo/c.ts'])).toBe(
+      'desktop',
+    );
   });
 
   it('renvoie null sans majorité claire (50/50)', () => {
-    expect(inferScope([
-      'packages/a/x.ts',
-      'packages/b/y.ts',
-    ])).toBeNull();
+    expect(inferScope(['packages/a/x.ts', 'packages/b/y.ts'])).toBeNull();
   });
 
   it('renvoie null pour des chemins sans préfixe reconnu', () => {

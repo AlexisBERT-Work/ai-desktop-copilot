@@ -75,7 +75,7 @@ machine, but a few features deliberately reach the network — see [Security](#s
 
 ### Security first
 
-- 68 tools, each with a risk level: auto, once per session, or confirm every time
+- 69 tools, each with a risk level: auto, once per session, or confirm every time
 - Command blocklist and path confinement enforced in Rust
 - Every tool call and every side-effectful command is audited
 - Safe mode: one toggle blocks every medium-or-above tool
@@ -172,7 +172,7 @@ ai-desktop-copilot/
 │
 ├── packages/
 │   ├── agent-runtime/src/
-│   │   ├── tools/        # the 68 tools, one folder per category
+│   │   ├── tools/        # the 69 tools, one folder per category
 │   │   ├── news/         # press-review domain: sources, parsing, aggregation, digests
 │   │   ├── llm/          # Ollama client, completion, planner, model router
 │   │   ├── memory/       # conversations, vectors, warm facts, semantic cache
@@ -238,13 +238,13 @@ Press `Ctrl+Space` anywhere.
 
 ## Agent tools
 
-**68 tools** are registered, covering perception, web, connectors, code and git, system,
-browser, markets and automation. The catalogue — names, arguments and risk levels — is
+**69 tools** are registered, covering perception, web, connectors, code and git, system,
+browser, markets, skills and automation. The catalogue — names, arguments and risk levels — is
 maintained in **[docs/CAPACITES.md](docs/CAPACITES.md)** (single source of truth, in
 French); current limits are in [docs/LIMITES.md](docs/LIMITES.md).
 
 The agent runs in the `research` profile by default: 25 developer and infra tools are
-not exposed to the chat, leaving 43. Set `CATDESK_TOOL_PROFILE=full` to expose all 68.
+not exposed to the chat, leaving 44. Set `CATDESK_TOOL_PROFILE=full` to expose all 69.
 
 ---
 
@@ -253,7 +253,7 @@ not exposed to the chat, leaving 43. Set `CATDESK_TOOL_PROFILE=full` to expose a
 ### Shipped
 
 - Chat overlay, global hotkey, streaming, conversation history
-- ReAct agent loop, 68 tools, risk-gated permission engine, audit trail
+- ReAct agent loop, 69 tools, risk-gated permission engine, audit trail
 - Screen capture, OCR and vision description; audio transcription
 - Headless browser automation (Playwright), sub-agents, cron scheduling
 - Dashboard platform: free-placement widget canvas, printable guide
@@ -274,7 +274,7 @@ not exposed to the chat, leaving 43. Set `CATDESK_TOOL_PROFILE=full` to expose a
 - Voice input wired into the chat (the transcription tool already exists)
 - Optional cloud model providers
 - Linux and macOS support
-- Self-evolving skills (the playbook store and evolution daemon lay the groundwork)
+- Self-evolving skills (drafts are written and load by name; nothing promotes them yet)
 
 ---
 

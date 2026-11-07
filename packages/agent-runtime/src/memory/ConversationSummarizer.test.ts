@@ -38,9 +38,20 @@ describe('ConversationSummarizer.summarize', () => {
     expect(out).toBe('ANCIEN');
   });
 
-  it('falls back to the prior summary on an empty model reply', async () => {
+  it('rend null sur une réponse vide : rien à enregistrer, le marqueur ne bouge pas', async () => {
     const s = new ConversationSummarizer(fakeLlm('   ') as any, 'm');
     const out = await s.summarize([{ role: 'user', content: 'x' }], 'ANCIEN');
-    expect(out).toBe('ANCIEN');
+    expect(out).toBeNull();
+  });
+
+  it("rend null si l'appel échoue (et non l'ancien résumé)", async () => {
+    const failing = {
+      // eslint-disable-next-line require-yield
+      async *streamChat() {
+        throw new Error('Ollama absent');
+      },
+    };
+    const s = new ConversationSummarizer(failing as any, 'm');
+    expect(await s.summarize([{ role: 'user', content: 'x' }], 'ANCIEN')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectTools, type SelectableTool } from './selectTools';
+import { coreTools, selectTools, type SelectableTool } from './selectTools';
 
 const make = (name: string, description = '', category = 'x'): SelectableTool => ({
   name,
@@ -74,5 +74,95 @@ describe('selectTools', () => {
     const names = selectTools(tools, 'quelle heure est-il', 14).map(t => t.name);
     expect(names).not.toContain('docker_ps');
     expect(names).not.toContain('browser_navigate');
+  });
+
+  it("latence : le noyau en tête, puis les outils retenus dans l'ordre d'enregistrement", () => {
+    // Deux formulations qui retiennent les mêmes outils doivent produire la
+    // MÊME liste, dans le même ordre : sinon Ollama relit tout le prompt.
+    const a = selectTools(tools, 'publie la revue de presse tech sur discord et un commit git', 10);
+    const b = selectTools(tools, 'git commit puis discord : revue de presse tech', 10);
+    expect(a.map(t => t.name)).toEqual(b.map(t => t.name));
+
+    const core = coreTools(tools, 10).map(t => t.name);
+    expect(a.slice(0, core.length).map(t => t.name)).toEqual(core);
+    const extras = a.slice(core.length).map(t => tools.indexOf(t));
+    expect(extras).toEqual([...extras].sort((x, y) => x - y));
+  });
+
+  describe('seuil de pertinence', () => {
+    const filler = Array.from({ length: 12 }, (_, i) => make(`filler_${i}`, 'zzz', 'zzz'));
+    const webhook = make('send_webhook', 'Envoie un message vers une adresse web', 'connectors');
+    const picked = (query: string, keywords = {}): string[] =>
+      selectTools([webhook, ...filler], query, 5, keywords).map(t => t.name);
+
+    it('un seul mot commun avec la description ne suffit pas', () => {
+      expect(picked('quelle est mon adresse de livraison ?')).not.toContain('send_webhook');
+    });
+
+    it('deux mots communs suffisent', () => {
+      expect(picked('envoie ce message')).toContain('send_webhook');
+    });
+
+    it('un mot-clé suffit à lui seul', () => {
+      expect(picked('préviens le canal slack', { send_webhook: ['slack'] })).toContain(
+        'send_webhook',
+      );
+    });
+  });
+
+  describe('racines trop courtes', () => {
+    it("« IDs » ne fait pas remonter un outil sur « idée » : la racine « id » n'est pas un mot", () => {
+      const withIds = make('cancel_task', 'Annule une tâche. Donne les IDs.', 'automation');
+      const filler = Array.from({ length: 12 }, (_, i) => make(`filler_${i}`, 'zzz', 'zzz'));
+      const picked = selectTools([withIds, ...filler], 'une idée de repas', 5, {});
+      expect(picked.map(t => t.name)).not.toContain('cancel_task');
+    });
+  });
+
+  describe('mots-clés de sélection', () => {
+    const pool = [...tools, make('read_calendar', 'Lit un fichier .ics', 'files')];
+    const keywords = { read_calendar: ['agenda', 'rendez-vous'], docker_ps: ['conteneur'] };
+    const names = (query: string, limit = 12): string[] =>
+      selectTools(pool, query, limit, keywords).map(t => t.name);
+
+    it('trouve un outil dont la description ne contient pas le mot', () => {
+      expect(names("qu'est-ce que j'ai à l'agenda demain ?")).toContain('read_calendar');
+      expect(
+        selectTools(pool, "qu'est-ce que j'ai à l'agenda demain ?", 12, {}),
+      ).not.toContainEqual(expect.objectContaining({ name: 'read_calendar' }));
+    });
+
+    it('ignore les accents, la casse et la ponctuation', () => {
+      expect(names('Mes RENDEZ VOUS de la semaine')).toContain('read_calendar');
+    });
+
+    it('ne trouve que des débuts de mot', () => {
+      expect(names('des agendas')).toContain('read_calendar');
+      expect(names('la micro-agendaire')).toContain('read_calendar');
+      expect(names('un mégaagenda')).not.toContain('read_calendar');
+    });
+
+    it('passe devant un mot commun avec une description quand les places manquent', () => {
+      // Une seule place hors noyau : « commande » (description) contre « agenda ».
+      const core = coreTools(pool, 8).length;
+      const picked = names('une commande à mon agenda', core + 1);
+      expect(picked).toContain('read_calendar');
+      expect(picked).not.toContain('run_command');
+    });
+
+    it("n'a aucun effet sur le schéma envoyé au modèle", () => {
+      // La table n'est lue que par la sélection : l'objet outil reste le même.
+      const selected = selectTools(pool, 'mon agenda', 12, keywords);
+      const calendar = selected.find(t => t.name === 'read_calendar');
+      expect(calendar).toBe(pool.find(t => t.name === 'read_calendar'));
+      expect(calendar?.description).not.toContain('agenda');
+    });
+  });
+
+  it('les mots grammaticaux ne font remonter aucun outil (prompt minimal et stable)', () => {
+    const names = selectTools(tools, 'Quelle est la capitale de la France ? Une phrase.', 10).map(
+      t => t.name,
+    );
+    expect(names).toEqual(coreTools(tools, 10).map(t => t.name));
   });
 });

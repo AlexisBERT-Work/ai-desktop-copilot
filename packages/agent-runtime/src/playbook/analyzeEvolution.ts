@@ -53,7 +53,10 @@ function pct(rate: number): number {
  * - if no approach wins → propose to REVIEW the task type (recurring failures
  *   with no working strategy → prompt/skill attention needed).
  */
-export function analyzeEvolution(rows: StrategyRow[], opts: AnalyzeOptions = {}): EvolutionProposal[] {
+export function analyzeEvolution(
+  rows: StrategyRow[],
+  opts: AnalyzeOptions = {},
+): EvolutionProposal[] {
   const minAttempts = opts.minAttempts ?? 3;
   const goodRate = opts.goodRate ?? 0.6;
   const badRate = opts.badRate ?? 0.4;
@@ -63,7 +66,11 @@ export function analyzeEvolution(rows: StrategyRow[], opts: AnalyzeOptions = {})
   for (const r of rows) {
     const attempts = r.successes + r.failures;
     if (attempts < minAttempts) continue; // not enough signal
-    const stat: ApproachStat = { approach: r.approach, attempts, successRate: r.successes / attempts };
+    const stat: ApproachStat = {
+      approach: r.approach,
+      attempts,
+      successRate: r.successes / attempts,
+    };
     const list = byType.get(r.taskType) ?? [];
     list.push(stat);
     byType.set(r.taskType, list);
@@ -89,8 +96,8 @@ export function analyzeEvolution(rows: StrategyRow[], opts: AnalyzeOptions = {})
         successRate: best.successRate,
         attempts: best.attempts,
         rationale:
-          `Pour « ${taskType} », l'approche « ${best.approach} » réussit à ${pct(best.successRate)}% `
-          + `sur ${best.attempts} essais — à privilégier par défaut.`,
+          `Pour « ${taskType} », l'approche « ${best.approach} » réussit à ${pct(best.successRate)}% ` +
+          `sur ${best.attempts} essais — à privilégier par défaut.`,
       });
 
       for (const s of stats) {
@@ -104,8 +111,8 @@ export function analyzeEvolution(rows: StrategyRow[], opts: AnalyzeOptions = {})
             successRate: s.successRate,
             attempts: s.attempts,
             rationale:
-              `Pour « ${taskType} », l'approche « ${s.approach} » échoue souvent `
-              + `(${pct(s.successRate)}% de succès sur ${s.attempts} essais) — préférer « ${best.approach} ».`,
+              `Pour « ${taskType} », l'approche « ${s.approach} » échoue souvent ` +
+              `(${pct(s.successRate)}% de succès sur ${s.attempts} essais) — préférer « ${best.approach} ».`,
           });
         }
       }
@@ -119,9 +126,9 @@ export function analyzeEvolution(rows: StrategyRow[], opts: AnalyzeOptions = {})
         successRate: leastBad.successRate,
         attempts: totalAttempts,
         rationale:
-          `Pour « ${taskType} », aucune approche ne dépasse ${pct(goodRate)}% de succès `
-          + `(meilleure : ${pct(leastBad.successRate)}% sur ${totalAttempts} essais cumulés). `
-          + `Le prompt ou un nouveau skill mérite ton attention.`,
+          `Pour « ${taskType} », aucune approche ne dépasse ${pct(goodRate)}% de succès ` +
+          `(meilleure : ${pct(leastBad.successRate)}% sur ${totalAttempts} essais cumulés). ` +
+          `Le prompt ou un nouveau skill mérite ton attention.`,
       });
     }
   }

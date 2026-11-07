@@ -1,10 +1,7 @@
-// @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { EMPTY_PRESS_FEED, type PressFeed } from '@catdesk/shared-types';
 import { PressFeedList } from './PressFeedList';
-
-afterEach(cleanup);
 
 const feed = (over: Partial<PressFeed> = {}): PressFeed => ({
   id: 'f1',
@@ -17,8 +14,8 @@ const feed = (over: Partial<PressFeed> = {}): PressFeed => ({
 describe('PressFeedList', () => {
   it('affiche un message quand il n’y a aucun journal', () => {
     render(<PressFeedList items={[]} busy={false} onEdit={vi.fn()} onRemove={vi.fn()} />);
-    expect(screen.getByText(/Aucun journal personnalisé/)).toBeTruthy();
-    expect(screen.getByText(/\(0\)/)).toBeTruthy();
+    expect(screen.getByText(/Aucun journal personnalisé/)).toBeInTheDocument();
+    expect(screen.getByText(/\(0\)/)).toBeInTheDocument();
   });
 
   it('liste les journaux avec leur badge inactif le cas échéant', () => {
@@ -30,8 +27,8 @@ describe('PressFeedList', () => {
         onRemove={vi.fn()}
       />,
     );
-    expect(screen.getByText('Veille IA')).toBeTruthy();
-    expect(screen.getByText('Revue crypto')).toBeTruthy();
+    expect(screen.getByText('Veille IA')).toBeInTheDocument();
+    expect(screen.getByText('Revue crypto')).toBeInTheDocument();
     expect(screen.getAllByText('inactif')).toHaveLength(1);
   });
 

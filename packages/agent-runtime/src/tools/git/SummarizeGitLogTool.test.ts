@@ -5,7 +5,10 @@ describe('classifyCommit', () => {
   it('extrait type et scope des Conventional Commits', () => {
     expect(classifyCommit('feat(web): add browser tools')).toEqual({ type: 'feat', scope: 'web' });
     expect(classifyCommit('fix: route streamed tokens')).toEqual({ type: 'fix', scope: null });
-    expect(classifyCommit('feat(agent)!: breaking change')).toEqual({ type: 'feat', scope: 'agent' });
+    expect(classifyCommit('feat(agent)!: breaking change')).toEqual({
+      type: 'feat',
+      scope: 'agent',
+    });
   });
 
   it('range les sujets non conventionnels en "other"', () => {
@@ -21,7 +24,12 @@ describe('parseLog', () => {
     ].join('\n');
     const commits = parseLog(raw);
     expect(commits).toHaveLength(2);
-    expect(commits[0]).toMatchObject({ hash: 'abc123', author: 'Alexis', type: 'feat', scope: 'chat' });
+    expect(commits[0]).toMatchObject({
+      hash: 'abc123',
+      author: 'Alexis',
+      type: 'feat',
+      scope: 'chat',
+    });
     expect(commits[1]).toMatchObject({ hash: 'def456', type: 'fix' });
   });
 

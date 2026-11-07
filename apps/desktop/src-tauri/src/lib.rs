@@ -2,8 +2,17 @@ mod commands;
 mod core;
 mod ipc;
 
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, RunEvent};
 use tracing::info;
+
+/// Arrête ce que CatDesk a lancé : l'agent (par fin de stdin, pour qu'il
+/// s'arrête proprement) et l'Ollama embarqué. Appelé à la fermeture de l'app
+/// et avant l'installation d'une mise à jour — Windows ne tue pas les enfants
+/// avec leur parent.
+pub(crate) fn stop_children() {
+    tauri::async_runtime::block_on(ipc::bridge::shutdown());
+    core::ollama::shutdown();
+}
 
 pub fn run() {
     tracing_subscriber::fmt()
@@ -22,7 +31,6 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build());
 
     // The updater plugin requires a `plugins.updater` config block, which only
@@ -36,6 +44,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::chat::chat_send,
             commands::chat::chat_cancel,
+            commands::chat::chat_warmup,
             commands::chat::set_market_watchlist,
             commands::press::run_press_digest,
             commands::press::save_local_press_feed,
@@ -91,12 +100,19 @@ pub fn run() {
             core::tray::setup_tray(app)?;
 
             // Configure window: always-on-top, frameless, transparent
-            let window = app.get_webview_window("main").unwrap();
-            window.set_always_on_top(true)?;
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_always_on_top(true)?;
+            }
 
             info!("CatDesk ready");
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error running CatDesk");
+        .build(tauri::generate_context!())
+        .expect("error building CatDesk")
+        .run(|_app, event| {
+            if let RunEvent::Exit = event {
+                info!("CatDesk exiting — stopping child processes");
+                stop_children();
+            }
+        });
 }

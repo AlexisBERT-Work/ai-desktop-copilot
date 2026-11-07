@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createLogger } from '../logger';
-import { loadSqlJs, type Database } from '../lib/sqljs';
+import type { Database } from '../lib/sqljs';
+import { SqliteFile } from '../lib/persistence';
 import { dataPath } from '../lib/dataDir';
 
 const log = createLogger('market:history');
@@ -18,8 +18,18 @@ export interface PricePoint {
  * alimenter plus tard les formules glissantes (B1). Plafond de points par
  * symbole réglable via CATDESK_MARKET_HISTORY_CAP (défaut 2880 ≈ 24 h à 30 s).
  */
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS price_history (
+    symbol TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    price REAL NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_price_history_symbol_ts
+    ON price_history(symbol, ts);
+`;
+
 export class MarketHistoryStore {
-  private db: Database | null = null;
+  private file: SqliteFile | null = null;
   private readonly dbPath: string;
   private readonly capPerSymbol: number;
 
@@ -32,24 +42,13 @@ export class MarketHistoryStore {
   }
 
   async initialize(): Promise<void> {
-    const SqlJs = await loadSqlJs();
-    if (existsSync(this.dbPath)) {
-      this.db = new SqlJs.Database(readFileSync(this.dbPath));
-    } else {
-      this.db = new SqlJs.Database();
-    }
-
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS price_history (
-        symbol TEXT NOT NULL,
-        ts INTEGER NOT NULL,
-        price REAL NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_price_history_symbol_ts
-        ON price_history(symbol, ts);
-    `);
-    this.persist();
+    this.file = await SqliteFile.open(this.dbPath, SCHEMA, log);
     log.info('MarketHistoryStore initialized', { path: this.dbPath, cap: this.capPerSymbol });
+  }
+
+  /** Base ouverte, ou null avant initialize() / après close() — no-op dans ces cas. */
+  private get db(): Database | null {
+    return this.file?.db ?? null;
   }
 
   /** Ajoute un lot de points (un tick du poller) puis élague et persiste une fois. */
@@ -124,18 +123,11 @@ export class MarketHistoryStore {
   }
 
   private persist(): void {
-    if (this.db === null) return;
-    try {
-      writeFileSync(this.dbPath, Buffer.from(this.db.export()));
-    } catch {
-      // Non-fatal : on retentera au prochain tick.
-    }
+    this.file?.persist();
   }
 
   close(): void {
-    if (this.db === null) return;
-    this.persist();
-    this.db.close();
-    this.db = null;
+    this.file?.close();
+    this.file = null;
   }
 }
