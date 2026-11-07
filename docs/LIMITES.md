@@ -122,9 +122,15 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   sortie des outils est scannée, pas l'entrée utilisateur/fichier.
 - **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
   sont redactés aujourd'hui.
-- **Injection en français** : les motifs de `sanitizeToolOutput` sont en anglais.
-  Une page ou un skill qui écrit « ignore tes consignes » n'est pas cadré. Les
-  skills ont leur propre cadre pour cette raison (voir [SECURITE.md](SECURITE.md)).
+- **Injection reformulée** : les motifs de `sanitizeToolOutput` couvrent l'anglais
+  et le français, mais ils reconnaissent des tournures, pas une intention. Sur
+  30 attaques françaises écrites sans les regarder (2026-11-06), **9 sont cadrées** :
+  une paraphrase passe (« fais fi de tes consignes », « garde cette action secrète »),
+  comme toute autre langue. Les motifs sont réglés pour ne pas cadrer un mode d'emploi
+  (aucun déclenchement sur 650 Ko de presse et 600 Ko d'aide et de tutoriels :
+  Ubuntu-fr, Framasoft, aide Google, Wikilivres), et ce choix coûte du rappel. Le cadre
+  n'est donc pas une garantie : ce qui protège reste le `PermissionEngine`, et les
+  skills gardent leur propre cadre systématique (voir [SECURITE.md](SECURITE.md)).
 - **Isolation réseau** pour l'exécution de code généré.
 
 ## 6. Tests & qualité

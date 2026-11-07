@@ -330,8 +330,8 @@ revient à faire confiance à son auteur, comme pour un script. Ce qui le contie
   Il passe par `sanitizeToolOutput` (secrets expurgés, injection connue cadrée), et
   tout skill qui n'est pas livré avec l'app arrive sous un cadre **systématique**
   (`notice`) : une méthode, pas un ordre, aucun droit accordé. Le cadre ne dépend pas
-  du scan, dont les motifs sont en anglais : une consigne écrite en français y
-  échappe.
+  du scan, qui reconnaît des tournures anglaises et françaises connues : une consigne
+  reformulée y échappe (mesure dans [LIMITES.md](LIMITES.md) § 5).
 - **Il n'élargit aucune permission.** Rien dans le chemin de `load_skill` ne touche
   au `PermissionEngine` : chaque appel suivant repasse par son niveau de risque, la
   liste blanche des chemins et, pour `run_command`, la politique de commandes. Seules

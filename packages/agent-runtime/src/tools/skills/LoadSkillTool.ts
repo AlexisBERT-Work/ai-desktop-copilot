@@ -24,9 +24,9 @@ const MAX_CATALOG_ENTRIES = 30;
 /**
  * Un skill est du texte qu'on donne à un agent qui a un shell, et celui de
  * l'utilisateur a pu venir d'un tiers. Ce cadre est systématique : le scan des
- * sorties d'outils (`sanitizeToolOutput`) ne repère que des tournures anglaises
- * connues, il laisserait passer une consigne écrite en français. Il ne dit pas
- * « n'exécute rien », comme son cadre à lui : la procédure doit rester utilisable.
+ * sorties d'outils (`sanitizeToolOutput`) ne repère que des tournures connues, il
+ * laisserait passer une consigne reformulée. Il ne dit pas « n'exécute rien », comme
+ * son cadre à lui : la procédure doit rester utilisable.
  */
 const NOTICES: Readonly<Record<SkillSource, string | undefined>> = {
   bundled: undefined,
