@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "recap:collect": "tsx src/cli/recapCollect.ts",
-    "recap:send": "tsx src/cli/recapSend.ts"
+    "recap:send": "tsx src/cli/recapSend.ts",
+    "fil:publish": "tsx src/cli/filPublish.ts"
   },
   "dependencies": {
     "@catdesk/shared-types": "workspace:*",

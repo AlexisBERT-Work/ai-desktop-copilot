@@ -67,7 +67,8 @@ function csv(v: string | undefined): string[] {
     .filter(s => s.length > 0);
 }
 
-function workdir(env: EnvLike): string {
+/** Dossier d'échange entre les étapes du brief (collecte, Claude, envoi, Fil). */
+export function recapWorkdir(env: EnvLike): string {
   return env['RECAP_WORKDIR']?.trim() || 'recap-work';
 }
 
@@ -102,7 +103,7 @@ export function readCollectConfig(
   return {
     ok: true,
     config: {
-      workdir: workdir(env),
+      workdir: recapWorkdir(env),
       sourceIds,
       sinceHours: recapWindowHours(env['RECAP_SINCE'], now),
       limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : DEFAULT_LIMIT,
@@ -136,7 +137,7 @@ export function readSendConfig(
   return {
     ok: true,
     config: {
-      workdir: workdir(env),
+      workdir: recapWorkdir(env),
       to,
       dryRun,
       out: env['RECAP_OUT']?.trim() || 'recap-preview.html',
