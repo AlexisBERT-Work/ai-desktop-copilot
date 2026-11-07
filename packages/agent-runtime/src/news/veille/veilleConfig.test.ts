@@ -6,6 +6,7 @@ import {
   REPORTS_DIR,
   STATE_FILE,
   archiveReport,
+  loadPastPistes,
   loadVeilleState,
   readVeilleCollectConfig,
   readVeilleSendConfig,
@@ -106,6 +107,28 @@ describe('loadVeilleState', () => {
     expect(state.releases['ollama/ollama']).toBe('v1');
     const report = join(archive, REPORTS_DIR, '2026-11-06.md');
     expect(readFileSync(report, 'utf-8')).toBe('# Lundi');
+  });
+
+  it('loadPastPistes : rapports des 30 derniers jours, du plus ancien au plus récent', () => {
+    const reports = join(dir, REPORTS_DIR);
+    mkdirSync(reports, { recursive: true });
+    const piste = (title: string, repo: string) =>
+      `## 🟢 À faire ensemble : ${title}\n\n[${repo}](https://github.com/${repo}) · Outil\n`;
+    writeFileSync(join(reports, '2026-09-01.md'), piste('Trop ancienne', 'old/one'));
+    writeFileSync(join(reports, '2026-11-07.md'), piste('Récente', 'new/two'));
+    writeFileSync(join(reports, '2026-11-06.md'), piste('Hier', 'mid/one'));
+    writeFileSync(join(reports, 'notes.md'), piste('Pas un rapport', 'x/y'));
+
+    const past = loadPastPistes(dir, new Date('2026-11-08T05:00:00Z'), 30);
+    expect(past.map(p => `${p.day} ${p.repo}`)).toEqual([
+      '2026-11-06 mid/one',
+      '2026-11-07 new/two',
+    ]);
+    expect(past[0]).toMatchObject({ verdict: 'a_faire', title: 'Hier' });
+  });
+
+  it('loadPastPistes : premier run, aucune archive', () => {
+    expect(loadPastPistes(join(dir, 'absent'), new Date(), 30)).toEqual([]);
   });
 
   it('un fichier abîmé échoue : repartir à vide écraserait l’archive', () => {

@@ -28,13 +28,20 @@ const Piste = z.object({
   integration: z
     .enum(INTEGRATIONS)
     .describe('Forme de l’ajout : skill, serveur MCP, outil BaseTool, sidecar Python, simple idée'),
-  gain: z.string().describe('Ce que CatDesk saura faire de plus, en une phrase concrète'),
+  gain: z.string().describe('Ce que CatDesk saura faire de plus, en une phrase courte et concrète'),
+  why: z
+    .string()
+    .describe(
+      'Pourquoi ce verdict, en une phrase courte : ce qui le rend sûr, ou ce qui manque encore pour passer en a_faire',
+    ),
   how: z
     .string()
     .describe('Où ça se branche dans CatDesk : brique existante, outil ou fichier concerné'),
   license: z.string().describe('Licence et ce qu’elle permet (copier du code, ou s’en inspirer)'),
   effort: z.enum(EFFORTS).describe('S : une soirée. M : quelques jours. L : un chantier'),
-  measure: z.string().describe('Comment vérifier le gain sur qwen3:14b et sur cette machine'),
+  measure: z
+    .string()
+    .describe('Comment vérifier le gain sur qwen3:14b : ce qui est propre à cette piste'),
   risks: z.string().describe('Confiance, sécurité, VRAM, latence : ce qui peut mal tourner'),
 });
 
@@ -46,14 +53,14 @@ const Release = z.object({
 
 const Rejected = z.object({
   repo: z.string().describe('Dépôt, exactement comme le champ `repo` de candidates.json'),
-  reason: z.string().describe('Pourquoi il est écarté, en quelques mots'),
+  reason: z.string().describe('Pourquoi il est écarté, en une ligne courte'),
 });
 
 export const VeilleReportSchema = z.object({
   headline: z
     .string()
     .describe('Le fait du jour en moins de 80 caractères : il sert d’objet au mail'),
-  summary: z.string().describe('Deux à quatre phrases : ce qui compte aujourd’hui, et pourquoi'),
+  summary: z.string().describe('Deux phrases au plus : ce qui compte aujourd’hui, et pourquoi'),
   pistes: z
     .array(Piste)
     .describe('Pistes retenues, de la plus utile à la moins utile. Peut être vide'),

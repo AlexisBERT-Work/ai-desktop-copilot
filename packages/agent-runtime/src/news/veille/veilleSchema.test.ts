@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildVeillePrompt } from './veillePrompt';
+import { PAST_PISTES_FILE, buildVeillePrompt, formatPastPistes } from './veillePrompt';
 import {
   EMPTY_REPORT,
   MAX_PISTES,
@@ -18,6 +18,7 @@ function piste(repo: string, verdict: VeillePiste['verdict'] = 'a_faire'): Veill
     domain: 'Moteur local',
     integration: 'outil',
     gain: 'Un gain',
+    why: 'Une raison',
     how: 'Un branchement',
     license: 'MIT',
     effort: 'S',
@@ -99,11 +100,29 @@ describe('VeilleReportSchema', () => {
 });
 
 describe('buildVeillePrompt', () => {
-  const prompt = buildVeillePrompt({
+  const base = {
     candidateCount: 54,
     releaseCount: 4,
     contextFiles: ['contexte/CAPACITES.md'],
     now: new Date('2026-11-06T05:00:00Z'),
+  };
+  const prompt = buildVeillePrompt({ ...base, pastPistesCount: 0 });
+
+  it('sans pistes passées, pas de section « Déjà proposé »', () => {
+    expect(prompt).not.toContain(PAST_PISTES_FILE);
+    expect(prompt).not.toContain('## Déjà proposé');
+  });
+
+  it('avec des pistes passées : le fichier est annoncé, la règle donnée', () => {
+    const withPast = buildVeillePrompt({ ...base, pastPistesCount: 8 });
+    expect(withPast).toContain(`\`${PAST_PISTES_FILE}\` liste les 8 pistes`);
+    expect(withPast).toContain('## Déjà proposé');
+    expect(withPast).toContain('Déjà proposée le JJ/MM');
+  });
+
+  it('le mail est court : title, gain, why ; le détail va à l’archive', () => {
+    expect(prompt).toContain('`why`');
+    expect(prompt).toContain("Dans l'archive seulement");
   });
 
   it('annonce la matière et le contexte disponibles', () => {
@@ -120,5 +139,14 @@ describe('buildVeillePrompt', () => {
 
   it('les backticks sont rendus, pas échappés', () => {
     expect(prompt).not.toContain('\\`');
+  });
+});
+
+describe('formatPastPistes', () => {
+  it('une ligne par piste : date, verdict, capacité, dépôt', () => {
+    const text = formatPastPistes([
+      { day: '2026-11-07', verdict: 'a_faire', title: 'Masquer les données', repo: 'a/b' },
+    ]);
+    expect(text).toContain('- 2026-11-07 · a_faire · Masquer les données · a/b');
   });
 });

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { isEmailAddress } from '@catdesk/shared-types';
 import { writeFileAtomic } from '../../lib/persistence';
@@ -10,6 +10,7 @@ import {
   type VeilleState,
   type WatchedRelease,
 } from './collectRepos';
+import { parsePastPistes, type ParsedPiste } from './renderVeille';
 
 // Configuration de la veille GitHub, en deux temps autour de la rédaction par
 // Claude Code (.github/workflows/ai-veille.yml) :
@@ -114,6 +115,29 @@ export function loadVeilleState(dir: string): VeilleState {
   const path = join(dir, STATE_FILE);
   if (!existsSync(path)) return EMPTY_STATE;
   return VeilleStateSchema.parse(JSON.parse(readFileSync(path, 'utf-8')));
+}
+
+/** Une piste déjà envoyée, avec le jour du rapport qui la portait. */
+export type PastPiste = ParsedPiste & { day: string };
+
+const REPORT_NAME = /^(\d{4}-\d{2}-\d{2})\.md$/;
+
+/**
+ * Pistes des rapports archivés des `days` derniers jours, du plus ancien au
+ * plus récent : la mémoire des idées. Un fichier qui n'est pas un rapport daté
+ * est ignoré.
+ */
+export function loadPastPistes(dir: string, now: Date, days: number): PastPiste[] {
+  const reports = join(dir, REPORTS_DIR);
+  if (!existsSync(reports)) return [];
+  const since = new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
+  return readdirSync(reports)
+    .map(name => REPORT_NAME.exec(name)?.[1])
+    .filter((day): day is string => day !== undefined && day >= since)
+    .sort()
+    .flatMap(day =>
+      parsePastPistes(readFileSync(join(reports, `${day}.md`), 'utf-8')).map(p => ({ day, ...p })),
+    );
 }
 
 /**

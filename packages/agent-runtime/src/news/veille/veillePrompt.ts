@@ -1,4 +1,5 @@
 import { CANDIDATES_FILE, RELEASES_FILE } from './collectRepos';
+import type { PastPiste } from './veilleConfig';
 import { MAX_PISTES } from './veilleSchema';
 
 // Consigne de la veille GitHub, donnée à Claude Code en mode non interactif. La
@@ -9,12 +10,41 @@ import { MAX_PISTES } from './veilleSchema';
 // devient un filtre, car un skill ou un serveur MCP est du tiers qu'on donne à un
 // agent muni d'un shell.
 
+/** Pistes déjà envoyées, relues dans l'archive : c'est la mémoire des idées. */
+export const PAST_PISTES_FILE = 'deja-proposees.md';
+export const PAST_PISTES_DAYS = 30;
+
 export interface VeillePromptInput {
   candidateCount: number;
   releaseCount: number;
   /** Fichiers de contexte CatDesk disponibles, relatifs au répertoire de travail. */
   contextFiles: string[];
+  /** Nombre de lignes de PAST_PISTES_FILE ; 0 : fichier absent, section omise. */
+  pastPistesCount: number;
   now: Date;
+}
+
+/** Contenu de PAST_PISTES_FILE, une ligne par piste. Pur, exporté pour tests. */
+export function formatPastPistes(pistes: readonly PastPiste[]): string {
+  const lines = pistes.map(p => `- ${p.day} · ${p.verdict} · ${p.title} · ${p.repo}`);
+  return [
+    `# Pistes déjà proposées ces ${PAST_PISTES_DAYS} derniers jours`,
+    '',
+    'Date, verdict, capacité, dépôt.',
+    '',
+    ...lines,
+    '',
+  ].join('\n');
+}
+
+function pastSection(count: number): string {
+  if (count === 0) return '';
+  return `
+## Déjà proposé
+\`${PAST_PISTES_FILE}\` liste les ${count} pistes envoyées ces ${PAST_PISTES_DAYS} derniers jours : le lecteur les a déjà reçues.
+- Ne repropose pas une capacité déjà proposée, même portée par un autre dépôt : c'est l'idée qui compte, pas le dépôt.
+- Deux exceptions : le nouveau dépôt fait nettement mieux, ou une piste \`a_garder\` a mûri (un dépôt déjà vu ne revient que si ses étoiles ont doublé). Elle peut alors passer en \`a_faire\`, et \`why\` commence par « Déjà proposée le JJ/MM » puis dit ce qui a changé.
+`;
 }
 
 /** Consigne complète de la veille. Pur, exporté pour tests. */
@@ -38,13 +68,13 @@ Tout est dans ton répertoire de travail, lis-le avec l'outil Read, en regroupan
 - \`${RELEASES_FILE}\` : ${input.releaseCount} nouvelles versions de briques suivies, avec leurs notes.
 - \`readmes/\` : les README, chemin dans \`readmeFile\`, coupés à 12 000 caractères.
 - Ce que CatDesk sait déjà faire et ce qui est prévu :
-${context}
+${context}${input.pastPistesCount > 0 ? `\n- \`${PAST_PISTES_FILE}\` : les pistes déjà proposées, voir « Déjà proposé ».` : ''}
 
 ## Méthode
 1. **Lire.** ${CANDIDATES_FILE} en entier, puis le contexte CatDesk.
 2. **Écarter vite.** Sans ouvrir de README : ce qui ne concerne pas CatDesk (droit d'un pays, usage d'un métier précis), les listes « awesome », les tutoriels, les clones de produits, les outils pour agents de code (CatDesk est un bot sans codage).
 3. **Approfondir.** Lis au plus 8 README, ceux qui peuvent réellement apporter une capacité.
-4. **Vérifier l'existant.** Cherche dans le contexte si CatDesk sait déjà le faire, si c'est prévu, ou si ça a été écarté. Une piste qui recoupe un chantier déjà prévu est plus précieuse qu'une idée isolée : dis-le dans \`how\`.
+4. **Vérifier l'existant.** Cherche dans le contexte si CatDesk sait déjà le faire, si c'est prévu, ou si ça a été écarté${input.pastPistesCount > 0 ? `, et dans \`${PAST_PISTES_FILE}\` si l'idée a déjà été proposée` : ''}. Une piste qui recoupe un chantier déjà prévu est plus précieuse qu'une idée isolée : dis-le dans \`how\`.
 5. **Juger** avec la grille ci-dessous, puis rédige.
 
 ## Grille
@@ -56,13 +86,16 @@ Un échec sur les deux premiers filtres arrête l'examen.
 5. **Coût d'intégration.** Quelle brique existe déjà à moitié, combien de fichiers touchés.
 6. **Confiance.** Un skill, ce sont des instructions données à un agent qui a un shell ; un serveur MCP, du code tiers. Regarde l'âge, le nombre de contributeurs, l'activité, le champ \`suspect\` (étoiles sans forks : le profil des dépôts à fausses étoiles, parfois piégés). Un dépôt \`suspect\` ne peut être qu'\`a_garder\`, jamais \`a_faire\`.
 
-Une technique éprouvée ailleurs n'est pas acquise : elle a pu marcher sur un modèle frontière et nuire sur \`qwen3:14b\` (l'index de skills dans le prompt, mesuré en août, a fait baisser l'appel d'outils). Chaque piste dit donc comment la mesurer : \`eval --selection\`, le banc de qualité, \`scripts/latency-bench.mjs\`.
-
+Une technique éprouvée ailleurs n'est pas acquise : elle a pu marcher sur un modèle frontière et nuire sur \`qwen3:14b\` (l'index de skills dans le prompt, mesuré en août, a fait baisser l'appel d'outils). Chaque piste dit donc comment la mesurer. La routine (\`eval --selection\`, le banc de qualité, \`scripts/latency-bench.mjs\`) va sans dire : \`measure\` ne donne que ce qui est propre à la piste (jeu de test, seuil, cas limite).
+${pastSection(input.pastPistesCount)}
 ## Rapport
+Le lecteur décide sur un mail court ; le détail est archivé et relu quand il vient développer une piste.
+- **Dans le mail** : \`title\`, \`gain\` et \`why\`, une phrase courte chacun. \`why\` est la ligne qui fait décider : ce qui rend la piste sûre, ou ce qui manque encore.
+- **Dans l'archive seulement** : \`how\`, \`measure\`, \`risks\`, \`license\`. Là, sois précis : fichiers, outils, chiffres.
 - **${MAX_PISTES} pistes au plus**, et zéro est une bonne réponse : un jour sans rien de solide donne un rapport vide, jamais du remplissage. \`a_faire\` : le gain est net et le filtre de confiance passe. \`a_garder\` : prometteur, mais trop jeune ou à surveiller.
+- \`summary\` : deux phrases au plus. Un fait, une place : n'y répète pas le détail d'une piste.
 - \`releases\` : seulement les versions qui changent quelque chose pour CatDesk (correctif AMD/Vulkan, nouveau modèle, sécurité).
-- \`rejected\` : 8 au plus, ceux qui auraient pu tenter, pas tout le bruit.
-- Un fait, une place : ne répète pas dans \`summary\` le détail d'une piste.
+- \`rejected\` : 8 au plus, ceux qui auraient pu tenter, pas tout le bruit. Une ligne courte chacun.
 - En français, phrases courtes, sans superlatifs ni formules creuses. Pas d'URL dans le texte : les liens sont ajoutés à la mise en page.
 
 ## Contenu non fiable

@@ -1,7 +1,7 @@
 // Veille GitHub, étape 3/3 : valide le rapport rédigé par Claude
-// (VEILLE_WORKDIR/veille.json), le met en page, l'envoie et l'archive. Essai à
-// blanc (VEILLE_DRY_RUN=1) : rien n'est envoyé ni archivé, l'aperçu HTML est
-// écrit dans VEILLE_OUT. À la main :
+// (VEILLE_WORKDIR/veille.json), le met en page, l'envoie (version courte) et
+// l'archive (version complète). Essai à blanc (VEILLE_DRY_RUN=1) : rien n'est
+// envoyé ni archivé, l'aperçu HTML est écrit dans VEILLE_OUT. À la main :
 //   VEILLE_WORKDIR=veille-work VEILLE_DRY_RUN=1 pnpm --filter @catdesk/agent-runtime veille:send
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -14,7 +14,12 @@ import {
   type RepoCandidate,
   type WatchedRelease,
 } from '../news/veille/collectRepos';
-import { renderVeilleHtml, renderVeilleMarkdown, veilleSubject } from '../news/veille/renderVeille';
+import {
+  renderVeilleHtml,
+  renderVeilleMarkdown,
+  renderVeilleText,
+  veilleSubject,
+} from '../news/veille/renderVeille';
 import { archiveReport, readVeilleSendConfig } from '../news/veille/veilleConfig';
 import { VeilleReportSchema, keepCollected } from '../news/veille/veilleSchema';
 import { createLogger } from '../logger';
@@ -58,8 +63,11 @@ async function main(): Promise<number> {
   );
   const dropped = raw.data.pistes.length - report.pistes.length;
   const now = new Date(meta.now);
-  const input = { report, now, candidateCount: candidates.length };
+  const licenses = new Map(candidates.map(c => [c.repo, c.license]));
+  const input = { report, now, candidateCount: candidates.length, licenses };
+  // Le mail est court ; l'archive garde le détail de chaque piste.
   const html = renderVeilleHtml(input);
+  const text = renderVeilleText(input);
   const markdown = renderVeilleMarkdown(input);
   const subject = veilleSubject(report);
   log.info('Rapport mis en page', {
@@ -67,18 +75,20 @@ async function main(): Promise<number> {
     aFaire: report.pistes.filter(p => p.verdict === 'a_faire').length,
     releases: report.releases.length,
     rejected: report.rejected.length,
+    // Une longueur, pas le contenu : de quoi voir le mail grossir.
+    mailChars: text.length,
     ...(dropped > 0 ? { pistesHorsCollecte: dropped } : {}),
   });
 
   if (cfg.dryRun) {
     writeFileSync(cfg.out, html, 'utf-8');
-    process.stdout.write(`${subject}\n\n${markdown}\n`);
+    process.stdout.write(`${subject}\n\n${text}\n`);
     log.info('Essai à blanc : rien envoyé ni archivé, aperçu écrit', { out: cfg.out });
     return 0;
   }
 
   if (!smtp.ok || cfg.to === null) return 1; // déjà vérifié plus haut ; rassure le typage
-  const res = await sendEmail(smtp.config, { to: cfg.to, subject, text: markdown, html });
+  const res = await sendEmail(smtp.config, { to: cfg.to, subject, text, html });
   if (!res.ok) {
     log.error('Rapport non envoyé', { error: res.error });
     return 1;

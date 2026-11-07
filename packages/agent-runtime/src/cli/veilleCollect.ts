@@ -1,7 +1,8 @@
 // Veille GitHub, étape 1/3 : collecte des dépôts candidats et préparation de la
 // consigne pour Claude Code (.github/workflows/ai-veille.yml). Aucun LLM ici.
 // Écrit dans VEILLE_WORKDIR : candidates.json, releases.json, readmes/,
-// contexte/, prompt.md, veille.schema.json, meta.json. À la main :
+// contexte/, deja-proposees.md (pistes des rapports archivés), prompt.md,
+// veille.schema.json, meta.json. À la main :
 //   GH_TOKEN=$(gh auth token) VEILLE_WORKDIR=veille-work pnpm --filter @catdesk/agent-runtime veille:collect
 
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -13,8 +14,17 @@ import {
   collectRepos,
   githubSource,
 } from '../news/veille/collectRepos';
-import { loadVeilleState, readVeilleCollectConfig } from '../news/veille/veilleConfig';
-import { buildVeillePrompt } from '../news/veille/veillePrompt';
+import {
+  loadPastPistes,
+  loadVeilleState,
+  readVeilleCollectConfig,
+} from '../news/veille/veilleConfig';
+import {
+  PAST_PISTES_DAYS,
+  PAST_PISTES_FILE,
+  buildVeillePrompt,
+  formatPastPistes,
+} from '../news/veille/veillePrompt';
 import { EMPTY_REPORT, veilleJsonSchema } from '../news/veille/veilleSchema';
 import { createLogger } from '../logger';
 
@@ -88,12 +98,17 @@ async function main(): Promise<number> {
   write(RELEASES_FILE, JSON.stringify(releases, null, 2));
   for (const [file, text] of readmes) write(file, text);
   write('veille.schema.json', JSON.stringify(veilleJsonSchema()));
+  // Mémoire des idées : sans elle, une idée reviendrait par un autre dépôt.
+  const past = loadPastPistes(cfg.archiveDir, now, PAST_PISTES_DAYS);
+  if (past.length > 0) write(PAST_PISTES_FILE, formatPastPistes(past));
+  log.info('Pistes déjà proposées', { pistes: past.length, jours: PAST_PISTES_DAYS });
   write(
     'prompt.md',
     buildVeillePrompt({
       candidateCount: candidates.length,
       releaseCount: releases.length,
       contextFiles: copyContext(cfg.contextDir, cfg.workdir),
+      pastPistesCount: past.length,
       now,
     }),
   );
