@@ -49,6 +49,8 @@ import { ReadWebpageTool } from './web/ReadWebpageTool';
 import { FetchTechNewsTool } from './web/FetchTechNewsTool';
 import { PostTechNewsDiscordTool } from './web/PostTechNewsDiscordTool';
 import { ObsidianNotesTool } from './connectors/ObsidianNotesTool';
+import { NexusCoursesTool } from './connectors/NexusCoursesTool';
+import { NexusInboxTool } from './connectors/NexusInboxTool';
 import { NotionSearchTool } from './connectors/NotionSearchTool';
 import { SendWebhookMessageTool } from './connectors/SendWebhookMessageTool';
 import { CallApiTool } from './connectors/CallApiTool';
@@ -200,6 +202,8 @@ export function registerCoreTools(
   register(new SearchDailiesTool(localDailies, sharedDailies));
   register(new PostTechNewsDiscordTool(llm, defaultModel));
   register(new ObsidianNotesTool());
+  register(new NexusCoursesTool());
+  register(new NexusInboxTool());
   register(new NotionSearchTool());
   register(new SendWebhookMessageTool());
   register(new CallApiTool());

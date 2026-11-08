@@ -19,6 +19,16 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Added
 
+- **Link with Nexus**, the Master's desktop app (repo `Master-App`). Two tools:
+  `nexus_courses` (search and read the courses, notes and teachers' documents, homework due,
+  upcoming evaluations and averages, open a course in Nexus) and `nexus_inbox` (add a quick
+  note). Nexus must run with its « CatDesk » extension on: it then publishes
+  `%LOCALAPPDATA%\Nexus\link.json` with a token of CatDesk's own, accepted only under
+  `/link/v1/`. Nexus runs no model for CatDesk: search returns passages, CatDesk's model
+  answers. The model gets 5 passages cut at 800 characters (path, title, position, text),
+  not Nexus's raw answer: every token a tool returns is read before the answer, ~12 ms each
+  on the target machine. On two course questions, first token 28–43 s → 12–22 s, answers
+  unchanged. See `docs/SECURITE.md` (2026-11-08).
 - **Tool selection understands everyday French.** `llm/toolKeywords.ts` lists the words people
   use for each tool outside the core ("agenda", "rendez-vous"…). `selectTools` reads them and
   the model never sees them, so they add no tokens. On the French task set, the expected tool

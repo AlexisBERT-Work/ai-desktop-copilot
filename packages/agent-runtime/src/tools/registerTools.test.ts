@@ -48,8 +48,8 @@ describe('cohérence outils ↔ permissions', () => {
   const registered = registry.getEnabled();
   const permissionNames = Object.keys(DEFAULT_PERMISSION_CONFIG.tools);
 
-  it('enregistre bien les 68 outils', () => {
-    expect(registered.length).toBe(68);
+  it('enregistre bien les 70 outils', () => {
+    expect(registered.length).toBe(70);
   });
 
   it('chaque outil enregistré a une entrée de permission', () => {
@@ -134,7 +134,7 @@ describe("profil 'research' (bot articles + recherche)", () => {
   });
 
   it('compte : catalogue complet moins les exclusions', () => {
-    expect(names.size).toBe(68 - RESEARCH_EXCLUDED.size);
+    expect(names.size).toBe(70 - RESEARCH_EXCLUDED.size);
   });
 });
 

@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-09-11**. Inventaire basé sur les **68 outils du catalogue**
+> À jour au **2026-11-08**. Inventaire basé sur les **70 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 68 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 70 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -124,17 +124,28 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 
 ## 3. Connecteurs externes
 
-| Capacité                                                  | Outil(s)                 | Risque |
-| --------------------------------------------------------- | ------------------------ | :----: |
-| Chercher/lire des notes dans un vault **Obsidian** local  | `obsidian_notes`         |   🟢   |
-| Chercher/lire des pages **Notion** (API)                  | `notion_search`          |   🟢   |
-| Appeler une **API REST** (GET auto ; écriture confirmée)  | `call_api`               |   🟠   |
-| Poster sur un **webhook Discord/Slack**                   | `send_webhook_message`   |   🟠   |
-| Publier l'actu tech sur un webhook Discord (embeds)¹      | `post_tech_news_discord` |   🟡   |
-| Lire une **boîte mail IMAP** (recherche, en-têtes, corps) | `read_email`             |   🟠   |
+| Capacité                                                                                   | Outil(s)                 | Risque |
+| ------------------------------------------------------------------------------------------ | ------------------------ | :----: |
+| Chercher/lire des notes dans un vault **Obsidian** local                                   | `obsidian_notes`         |   🟢   |
+| Chercher/lire des pages **Notion** (API)                                                   | `notion_search`          |   🟢   |
+| Appeler une **API REST** (GET auto ; écriture confirmée)                                   | `call_api`               |   🟠   |
+| Poster sur un **webhook Discord/Slack**                                                    | `send_webhook_message`   |   🟠   |
+| Publier l'actu tech sur un webhook Discord (embeds)¹                                       | `post_tech_news_discord` |   🟡   |
+| Lire une **boîte mail IMAP** (recherche, en-têtes, corps)                                  | `read_email`             |   🟠   |
+| **Nexus** (appli du Master) : chercher/lire les cours, devoirs, moyennes, ouvrir un cours² | `nexus_courses`          |   🟢   |
+| **Nexus** : ajouter une note rapide (`notes/inbox.md`)²                                    | `nexus_inbox`            |   🟡   |
 
 ¹ URL limitée aux webhooks Discord (`discord.com/api/webhooks/…`). `obsidian_notes`
 ne lit un vault que s'il est dans la liste blanche des chemins.
+
+² Nexus (dépôt `Master-App`) doit être lancé, avec son extension « CatDesk » activée
+(Outils › Extensions). Il publie alors `%LOCALAPPDATA%\Nexus\link.json` : port et jeton
+**propre à CatDesk**, accepté seulement sous `/link/v1/` (le jeton principal de Nexus ne
+sort jamais). CatDesk relit ce fichier à chaque appel (`nexus/link.ts`). Nexus ne fait
+tourner aucun modèle pour CatDesk : `search` renvoie des passages, que le modèle de CatDesk
+cite par leur `path`. Le modèle n'en reçoit que 5, coupés à 800 caractères (la suite par
+`read`) : chaque token renvoyé retarde sa réponse. La note rapide se coupe dans Nexus
+(« Autoriser les notes rapides »).
 
 ## 4. Développement & analyse de code
 

@@ -318,3 +318,26 @@ trous réels, quatre durcissements.
   parle pas à Ollama — règle n°1) ; les capacités perdent
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+## Mise à jour 2026-11-08 — liaison avec Nexus (appli du Master)
+
+Deux outils parlent à **Nexus** (dépôt `Master-App`), une autre application de ce poste :
+`nexus_courses` 🟢 (lecture, plus « ouvrir dans Nexus ») et `nexus_inbox` 🟡 (note
+rapide, confirmée une fois par session).
+
+- **Jeton dédié, borné.** Le jeton principal de Nexus ouvre tout son API (écriture de
+  fichiers, git, SQL, tâches IA) et ne quitte jamais Nexus. CatDesk reçoit un second jeton,
+  régénéré à chaque lancement de Nexus, que son middleware n'accepte **que** sous
+  `/link/v1/` (six routes : info, search, read, today, inbox, open) et jamais pour les
+  websockets. Testé côté Nexus (`backend/tests/test_link.py`).
+- **Désactivé par défaut.** Nexus ne publie `%LOCALAPPDATA%\Nexus\link.json` qu'avec son
+  extension « CatDesk » active, le retire quand on la coupe ou qu'il s'arrête, et nettoie
+  au démarrage le fichier d'un Nexus mort. Le fichier est sous le profil de l'utilisateur :
+  même niveau de confiance que CatDesk lui-même.
+- **Lecture confinée par Nexus.** `read` refuse tout chemin hors du dossier du Master et les
+  dossiers internes (`.nexus/`, `.git/`, `.venv/`…) ; les documents des profs ne sont lus
+  que par leur texte extrait. Aucun chemin du disque de CatDesk n'est en jeu : `document`
+  est relatif au dossier du Master, d'où son nom (pas `path`, qui passerait par la liste
+  blanche de CatDesk).
+- **Contenu non fiable.** Les passages renvoyés viennent des cours et documents des profs :
+  ce sont des données, traitées comme tout résultat d'outil.
