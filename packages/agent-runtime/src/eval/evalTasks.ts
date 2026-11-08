@@ -126,6 +126,9 @@ const QUIET_QUESTIONS: readonly (readonly [id: string, input: string])[] = [
   ['blague', 'raconte-moi une blague'],
   ['merci', "merci beaucoup, c'est parfait"],
   ['velo', 'comment régler les freins de mon vélo ?'],
+  // « master » et « devoir » seuls ne désignent pas Nexus (voir toolKeywords)
+  ['etudes', "c'est quoi la différence entre une licence et un master ?"],
+  ['devoir-verbe', 'je vais devoir cuisiner pour huit, une idée de plat ?'],
 ];
 
 export const EVAL_TASKS: readonly EvalTask[] = [
@@ -184,6 +187,23 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     'obsidian_notes',
   ]),
   dev('connecteurs', 'notion-budget', 'retrouve ma page Notion sur le budget', ['notion_search']),
+  dev(
+    'connecteurs',
+    'nexus-devoirs',
+    "quels devoirs j'ai à rendre cette semaine ?",
+    ['nexus_courses'],
+    { selectionOnly: true },
+  ),
+  dev(
+    'connecteurs',
+    'nexus-cours',
+    "cherche dans mes cours ce que le prof a dit sur l'attention",
+    ['nexus_courses'],
+    { selectionOnly: true },
+  ),
+  dev('connecteurs', 'nexus-note', 'prends note de relire le TD 3', ['nexus_inbox'], {
+    selectionOnly: true,
+  }),
   dev('connecteurs', 'webhook-slack', 'envoie ce résumé sur Slack', ['send_webhook_message'], {
     selectionOnly: true,
   }),

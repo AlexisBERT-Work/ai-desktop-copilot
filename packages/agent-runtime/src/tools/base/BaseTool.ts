@@ -26,7 +26,7 @@ export abstract class BaseTool<A = unknown> implements RegisteredTool {
    * Schéma zod des arguments — source unique : le tool en dérive aussi son
    * JSON Schema via `schema = jsonSchemaFrom(argsSchema)` (plus d'interface
    * Args ni d'entrée TOOL_SCHEMAS à part). Obligatoire : la migration est
-   * terminée, les 68 outils enregistrés en déclarent un.
+   * terminée, les 70 outils enregistrés en déclarent un.
    */
   abstract readonly argsSchema: z.ZodType<A, unknown>;
 

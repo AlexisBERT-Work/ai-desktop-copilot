@@ -302,6 +302,21 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: false,
     },
+    nexus_courses: {
+      name: 'nexus_courses',
+      description:
+        "Interroger Nexus, l'application du Master : chercher et lire les cours, voir les devoirs, ouvrir un cours (lecture seule)",
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
+    nexus_inbox: {
+      name: 'nexus_inbox',
+      description: "Ajouter une note rapide dans Nexus, l'application du Master (notes/inbox.md)",
+      riskLevel: 'medium',
+      enabled: true,
+      requiresConfirmation: true,
+    },
     notion_search: {
       name: 'notion_search',
       description: "Chercher et lire des pages ou bases Notion via l'API Notion",
