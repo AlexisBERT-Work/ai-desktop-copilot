@@ -20,9 +20,52 @@ const argsSchema = z.object({
     .optional()
     .describe('read / open : le `path` d’un résultat de search (relatif au dossier du Master)'),
   days: z.number().int().min(1).max(120).optional().describe('today : horizon en jours (15)'),
-  limit: z.number().int().min(1).max(20).optional().describe('search : nombre de passages (8)'),
+  limit: z.number().int().min(1).max(20).optional().describe('search : nombre de passages (5)'),
 });
 type Args = z.infer<typeof argsSchema>;
+
+/**
+ * Ce que `search` laisse au modèle. Tout ce qu'un outil renvoie est relu par le modèle avant
+ * qu'il réponde : sur la machine cible (qwen3:14b déborde un peu de la carte de 10 Go), un
+ * token de résultat coûte ~12 ms, et 8 passages entiers (~8 000 caractères) faisaient attendre
+ * 24 à 35 s. Mesuré le 2026-11-08 (PR #33). La suite d'un passage coupé reste à `read`.
+ */
+export const SEARCH_LIMIT = 5;
+export const PASSAGE_CHARS = 800;
+
+const searchSchema = z.object({
+  results: z.array(
+    z.object({
+      path: z.string(),
+      title: z.string().optional(),
+      anchor: z.record(z.string(), z.unknown()).optional(),
+      snippet: z.string().optional(),
+      text: z.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * Un passage = son `path` (à citer, ou à `read`), son titre, sa position (page, cellule,
+ * ligne) et son texte, coupé à `PASSAGE_CHARS`. Le reste de la réponse de Nexus (`snippet`
+ * redondant avec `text`, `course` et `kind` déjà dans `path`, `semantic`) ne sert pas au
+ * modèle. Une réponse d'une autre forme passe telle quelle.
+ */
+export function slimSearch(data: unknown): unknown {
+  const parsed = searchSchema.safeParse(data);
+  if (!parsed.success) return data;
+  return {
+    results: parsed.data.results.map(r => {
+      const text = (r.text || r.snippet || '').trim();
+      return {
+        path: r.path,
+        ...(r.title ? { title: r.title } : {}),
+        ...(r.anchor && Object.keys(r.anchor).length > 0 ? { anchor: r.anchor } : {}),
+        text: text.length > PASSAGE_CHARS ? `${text.slice(0, PASSAGE_CHARS).trimEnd()}…` : text,
+      };
+    }),
+  };
+}
 
 /**
  * Nexus, l'application du Master : cours, notes, notebooks, documents des profs, devoirs.
@@ -66,11 +109,10 @@ export class NexusCoursesTool extends BaseTool<Args> {
         if (query.length === 0) {
           return this.fail('search : donne `query` (ce qu’il faut chercher).');
         }
-        return this.result(
-          await this.call('search', {
-            query: { q: query, course: args.course, limit: args.limit ?? 8 },
-          }),
-        );
+        const res = await this.call('search', {
+          query: { q: query, course: args.course, limit: args.limit ?? SEARCH_LIMIT },
+        });
+        return res.ok ? this.ok(slimSearch(res.data)) : this.fail(res.error);
       }
       case 'read': {
         if (args.document === undefined || args.document.length === 0) {

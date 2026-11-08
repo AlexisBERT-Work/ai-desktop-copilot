@@ -143,7 +143,9 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
 **propre à CatDesk**, accepté seulement sous `/link/v1/` (le jeton principal de Nexus ne
 sort jamais). CatDesk relit ce fichier à chaque appel (`nexus/link.ts`). Nexus ne fait
 tourner aucun modèle pour CatDesk : `search` renvoie des passages, que le modèle de CatDesk
-cite par leur `path`. La note rapide se coupe dans Nexus (« Autoriser les notes rapides »).
+cite par leur `path`. Le modèle n'en reçoit que 5, coupés à 800 caractères (la suite par
+`read`) : chaque token renvoyé retarde sa réponse. La note rapide se coupe dans Nexus
+(« Autoriser les notes rapides »).
 
 ## 4. Développement & analyse de code
 

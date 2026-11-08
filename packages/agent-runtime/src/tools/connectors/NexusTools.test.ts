@@ -6,7 +6,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NEXUS_UNREACHABLE } from '../../nexus/link';
 import { expectFail, expectOk } from '../base/testResult';
-import { NexusCoursesTool } from './NexusCoursesTool';
+import { NexusCoursesTool, PASSAGE_CHARS, SEARCH_LIMIT, slimSearch } from './NexusCoursesTool';
 import { NexusInboxTool } from './NexusInboxTool';
 
 interface Call {
@@ -74,18 +74,66 @@ describe('nexus_courses', () => {
     expect(calls[0]?.path).toBe('/link/v1/info');
   });
 
-  it('search : la question, le cours et 8 passages par défaut', async () => {
+  it('search : la question, le cours et 5 passages par défaut', async () => {
     const tool = new NexusCoursesTool(linkPath);
     expectOk(await tool.run({ action: 'search', query: ' attention ', course: 'ia' }));
     expect(calls[0]?.path).toBe('/link/v1/search');
     expect(Object.fromEntries(calls[0]?.params ?? [])).toEqual({
       q: 'attention',
       course: 'ia',
-      limit: '8',
+      limit: String(SEARCH_LIMIT),
     });
     const err = expectFail(await tool.run({ action: 'search' }));
     expect(err.error).toMatch(/query/);
     expect(calls).toHaveLength(1); // rien envoyé sans question
+  });
+
+  it('search : au modèle, seulement path, titre, position et texte coupé', async () => {
+    const long = 'a'.repeat(PASSAGE_CHARS + 50);
+    reply = () => ({
+      status: 200,
+      body: {
+        semantic: true,
+        results: [
+          {
+            path: 'cours/ia/notebooks/03.ipynb',
+            course: 'ia',
+            kind: 'notebook',
+            title: 'Attention',
+            anchor: { cell: 12 },
+            snippet: 'la **attention**',
+            text: long,
+          },
+          {
+            path: 'cours/ia/x.png',
+            course: 'ia',
+            kind: 'doc',
+            title: '',
+            anchor: {},
+            snippet: 'ocr',
+            text: '',
+          },
+        ],
+      },
+    });
+    const res = expectOk(
+      await new NexusCoursesTool(linkPath).run({ action: 'search', query: 'attention' }),
+    );
+    expect(res.data).toEqual({
+      results: [
+        {
+          path: 'cours/ia/notebooks/03.ipynb',
+          title: 'Attention',
+          anchor: { cell: 12 },
+          text: `${'a'.repeat(PASSAGE_CHARS)}…`,
+        },
+        { path: 'cours/ia/x.png', text: 'ocr' }, // pas de texte : l'extrait, faute de mieux
+      ],
+    });
+  });
+
+  it('search : une réponse d’une autre forme passe telle quelle', () => {
+    expect(slimSearch({ autre: 1 })).toEqual({ autre: 1 });
   });
 
   it('read : le document par son path ; refusé sans', async () => {
