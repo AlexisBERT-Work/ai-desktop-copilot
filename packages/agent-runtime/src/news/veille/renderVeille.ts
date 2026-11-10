@@ -28,7 +28,7 @@ const VERDICT_LABEL: Record<VeillePiste['verdict'], string> = {
   a_garder: '🟡 À garder',
 };
 
-const INTEGRATION_LABEL: Record<VeillePiste['integration'], string> = {
+export const INTEGRATION_LABEL: Record<VeillePiste['integration'], string> = {
   skill: 'Skill',
   mcp: 'Serveur MCP',
   outil: 'Outil',
@@ -36,7 +36,7 @@ const INTEGRATION_LABEL: Record<VeillePiste['integration'], string> = {
   idee: 'Idée à reprendre',
 };
 
-const EFFORT_LABEL: Record<VeillePiste['effort'], string> = {
+export const EFFORT_LABEL: Record<VeillePiste['effort'], string> = {
   S: 'une soirée',
   M: 'quelques jours',
   L: 'un chantier',
@@ -57,7 +57,7 @@ const C = {
 };
 const FONT = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
-function repoUrl(repo: string): string {
+export function repoUrl(repo: string): string {
   return `https://github.com/${repo}`;
 }
 
@@ -94,9 +94,14 @@ function pisteWhy(p: VeillePiste): string {
   return `Pourquoi ${VERDICT_EMOJI[p.verdict]} : ${p.why}`;
 }
 
+/** « veille du 7/11, piste 1 » : comment désigner une piste, dans le mail comme dans le Fil. */
+export function pisteRef(now: Date, index: number): string {
+  return `veille du ${shortDate(now)}, piste ${index + 1}`;
+}
+
 function handoff(now: Date): string {
   return (
-    `Pour en développer une, dis-moi : « veille du ${shortDate(now)}, piste 1 ». ` +
+    `Pour en développer une, dis-moi : « ${pisteRef(now, 0)} ». ` +
     `Le détail de chaque piste (où ça se branche, mesure, risques) est gardé dans l'archive.`
   );
 }

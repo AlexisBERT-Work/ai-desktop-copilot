@@ -30,12 +30,13 @@ const DEFAULT_WINDOW_DAYS = 14;
 /** 4 domaines : ~60 dossiers, ce que Claude peut comparer en un seul appel. */
 const DEFAULT_PER_DOMAIN = 15;
 
-function workdir(env: EnvLike): string {
+/** Dossier d'échange avec Claude (VEILLE_WORKDIR). */
+export function veilleWorkdir(env: EnvLike): string {
   return env['VEILLE_WORKDIR']?.trim() || 'veille-work';
 }
 
 function archiveDir(env: EnvLike): string {
-  return env['VEILLE_ARCHIVE']?.trim() || join(workdir(env), 'archive');
+  return env['VEILLE_ARCHIVE']?.trim() || join(veilleWorkdir(env), 'archive');
 }
 
 function positiveInt(value: string | undefined, fallback: number): number {
@@ -62,7 +63,7 @@ export function readVeilleCollectConfig(
   return {
     ok: true,
     config: {
-      workdir: workdir(env),
+      workdir: veilleWorkdir(env),
       archiveDir: archiveDir(env),
       contextDir: env['VEILLE_CONTEXT']?.trim() || '../..',
       token,
@@ -97,7 +98,7 @@ export function readVeilleSendConfig(
   return {
     ok: true,
     config: {
-      workdir: workdir(env),
+      workdir: veilleWorkdir(env),
       archiveDir: archiveDir(env),
       to,
       dryRun,

@@ -3,7 +3,8 @@
 // pour qu'un échec ici ne prive jamais du mail. À la main :
 //   RECAP_WORKDIR=recap-work FIL_SUPABASE_URL=… FIL_SUPABASE_ANON_KEY=… FIL_PUBLISH_TOKEN=… \
 //     pnpm --filter @catdesk/agent-runtime fil:publish -- --from brief
-// Les logs ne portent que des nombres : ceux d'un dépôt public sont publics.
+// `--from veille` lit VEILLE_WORKDIR. Les logs ne portent que des nombres :
+// ceux d'un dépôt public sont publics.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,6 +13,16 @@ import { BRIEF_FILE } from '../news/brief/collectCandidates';
 import { recapWorkdir } from '../news/brief/recapConfig';
 import { type FilCard, briefToCards, parisDay } from '../news/fil/filCards';
 import { publishFil, readFilPublishConfig } from '../news/fil/publishFil';
+import { veilleToCards } from '../news/fil/veilleCards';
+import {
+  CANDIDATES_FILE,
+  RELEASES_FILE,
+  REPORT_FILE,
+  type RepoCandidate,
+  type WatchedRelease,
+} from '../news/veille/collectRepos';
+import { veilleWorkdir } from '../news/veille/veilleConfig';
+import { VeilleReportSchema } from '../news/veille/veilleSchema';
 import { createLogger } from '../logger';
 
 const log = createLogger('cli:fil-publish');
@@ -29,9 +40,21 @@ function briefCards(env: EnvLike): FilCard[] {
   return briefToCards(brief, parisDay(new Date(meta.now)));
 }
 
+function veilleCards(env: EnvLike): FilCard[] {
+  const dir = veilleWorkdir(env);
+  const meta = readJson(join(dir, 'meta.json')) as { now: string };
+  return veilleToCards({
+    report: VeilleReportSchema.parse(readJson(join(dir, REPORT_FILE))),
+    candidates: readJson(join(dir, CANDIDATES_FILE)) as RepoCandidate[],
+    releases: readJson(join(dir, RELEASES_FILE)) as WatchedRelease[],
+    now: new Date(meta.now),
+  });
+}
+
 /** Rapports publiables, par nom de `--from`. */
 const SOURCES: Record<string, (env: EnvLike) => FilCard[]> = {
   brief: briefCards,
+  veille: veilleCards,
 };
 
 function sourceArg(argv: readonly string[]): string | null {
