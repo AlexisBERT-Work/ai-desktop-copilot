@@ -10,8 +10,15 @@ export interface KvCacheStatus {
   modelBytes: number;
 }
 
-/** Pousse au runtime agent les réglages qui le concernent (safe mode…). */
-export function updateRuntimeSettings(settings: { safeMode?: boolean | undefined }): Promise<void> {
+/** Réglages poussés au runtime agent. Toujours envoyés ensemble : le cœur rejoue le dernier envoi tel quel. */
+export interface RuntimeSettings {
+  safeMode: boolean;
+  /** Navigateur de l'agent en lecture seule (aucun formulaire, POST ni WebSocket). */
+  browserReadOnly: boolean;
+}
+
+/** Pousse au runtime agent les réglages qui le concernent. */
+export function updateRuntimeSettings(settings: RuntimeSettings): Promise<void> {
   // La commande Rust prend `args: UpdateSettingsArgs` → enveloppe sous `args`.
   return invoke('update_settings', { args: settings });
 }

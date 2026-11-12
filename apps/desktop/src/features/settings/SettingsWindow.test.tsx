@@ -16,6 +16,17 @@ describe('SettingsWindow', () => {
     expect(screen.getByText(/Catalogue des outils \(\d+ outils\)/)).toBeInTheDocument();
   });
 
+  it("l'onglet Sécurité montre la lecture seule du navigateur et le risque abaissé", () => {
+    render(<SettingsWindow />);
+    fireEvent.click(screen.getByText('Sécurité'));
+    const toggle = screen.getByRole('switch', { name: 'Navigateur en lecture seule' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('→ moyen en lecture seule')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText('→ moyen en lecture seule')).not.toBeInTheDocument();
+  });
+
   it("l'onglet À propos décrit la stack réelle (sans LanceDB)", () => {
     render(<SettingsWindow />);
     fireEvent.click(screen.getByText('À propos'));

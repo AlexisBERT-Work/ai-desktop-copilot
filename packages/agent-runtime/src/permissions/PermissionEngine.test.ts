@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { join } from 'path';
 import { PermissionEngine } from './PermissionEngine';
+import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
 import { ParseDocumentTool } from '../tools/files/ParseDocumentTool';
 import { RunSqliteTool } from '../tools/infra/RunSqliteTool';
 import { ObsidianNotesTool } from '../tools/connectors/ObsidianNotesTool';
@@ -177,5 +178,66 @@ describe('PermissionEngine — confirmation utilisateur', () => {
     const r = await engine.check(highRequest);
     expect(() => engine.resolvePermissionRequest(requestId, true)).not.toThrow();
     expect(r.granted).toBe(false);
+  });
+});
+
+describe('PermissionEngine — navigateur en lecture seule', () => {
+  const navigate = { tool: 'browser_navigate', args: { url: 'https://exemple.fr' } };
+  const click = { tool: 'browser_click', args: { selector: '#ok' } };
+
+  /** Moteur dont la lecture seule se pilote, et qui répond lui-même au dialogue. */
+  function engineWith(readOnly: { on: boolean }, answer = { granted: true, remember: true }) {
+    const asked: Array<Record<string, unknown>> = [];
+    const engine: PermissionEngine = new PermissionEngine(
+      (_m, params) => {
+        const p = params as Record<string, unknown>;
+        asked.push(p);
+        queueMicrotask(() =>
+          engine.resolvePermissionRequest(String(p['requestId']), answer.granted, answer.remember),
+        );
+      },
+      60_000,
+      () => readOnly.on,
+    );
+    return { engine, asked };
+  }
+
+  it('lecture seule : browser_navigate passe à moyen, une confirmation par session', async () => {
+    const { engine, asked } = engineWith({ on: true });
+    expect((await engine.check(navigate)).granted).toBe(true);
+    expect(asked[0]?.['riskLevel']).toBe('medium');
+    const second = await engine.check(navigate);
+    expect(second).toEqual({ granted: true, reason: 'Autorisé (session)' });
+    expect(asked).toHaveLength(1);
+  });
+
+  it('lecture seule coupée : élevé, confirmation à chaque fois malgré la session', async () => {
+    const readOnly = { on: true };
+    const { engine, asked } = engineWith(readOnly);
+    await engine.check(navigate); // autorisé « pour la session » en lecture seule
+    readOnly.on = false;
+    await engine.check(navigate);
+    await engine.check(navigate);
+    expect(asked.map(a => a['riskLevel'])).toEqual(['medium', 'high', 'high']);
+  });
+
+  it('clic et saisie restent élevés, même en lecture seule', async () => {
+    const { engine, asked } = engineWith({ on: true });
+    await engine.check(click);
+    await engine.check(click);
+    expect(asked.map(a => a['riskLevel'])).toEqual(['high', 'high']);
+  });
+
+  it('le mode sans danger bloque toujours browser_navigate (moyen n’est pas faible)', async () => {
+    const { engine } = engineWith({ on: true });
+    engine.updateConfig({ safeMode: true });
+    expect((await engine.check(navigate)).granted).toBe(false);
+  });
+
+  it('sans lecteur de lecture seule : le risque déclaré s’applique', () => {
+    const engine = new PermissionEngine(() => {});
+    const config = DEFAULT_PERMISSION_CONFIG.tools['browser_navigate'];
+    expect(config?.riskLevelWhenReadOnly).toBe('medium');
+    expect(config && engine.effectiveRisk(config)).toBe('high');
   });
 });

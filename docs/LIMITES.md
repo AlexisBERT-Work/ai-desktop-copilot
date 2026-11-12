@@ -82,6 +82,15 @@ aujourd'hui classé `critical`.
 - **RAG hybride partiel** : la fusion dense + BM25 est implémentée dans
   `VectorStore.ts` ; **pas de reranking ni de GraphRAG** pour l'instant.
 
+- **Navigateur en lecture seule** (par défaut) : il ne bloque que les
+  **méthodes** d'écriture. Un site qui écrit par un simple GET (lien « se
+  désabonner », vieux formulaires en GET) n'est pas arrêté. À l'inverse, les
+  recherches envoyées en POST sont refusées : couper la lecture seule pour
+  elles. Les visites répétées perdent le cache HTTP (la route l'interdit) :
+  ≈ 520 ms au lieu de ≈ 265 ms en médiane sur 10 pages ; la première visite
+  ne change pas. Seul le navigateur de l'agent est concerné, pas ceux de
+  l'utilisateur.
+
 ## 5. Sécurité — défenses encore manquantes
 
 Présent : sandbox Rust, permissions risk-gated, audit, safe mode, et

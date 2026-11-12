@@ -159,7 +159,10 @@ async function main(): Promise<void> {
   const orchestrator = new AgentOrchestrator({
     llm,
     tools,
-    permissions: new PermissionEngine(),
+    // Lecture seule du navigateur : lue à chaque décision, BrowserManager fait foi.
+    permissions: new PermissionEngine(undefined, undefined, () =>
+      BrowserManager.get().isReadOnly(),
+    ),
     context: new ContextManager(db, vectorStore, warmStore),
     audit: new AuditLogger(),
     // Palier léger optionnel (CATDESK_MODEL_SMALL) : rétrogradation des tâches triviales.
@@ -259,6 +262,7 @@ async function main(): Promise<void> {
   // ─── IPC ───────────────────────────────────────────────────
   const bridge = new StdinBridge({
     orchestrator,
+    setBrowserReadOnly: on => BrowserManager.get().setReadOnly(on),
     // L'UI ouvre le chat : charger le modèle et lire le prompt fixe pendant la saisie.
     warmup: (model, conversationId) => orchestrator.warmupForUser(model, conversationId),
     setMarketConfig: async (symbols, formulas) => {

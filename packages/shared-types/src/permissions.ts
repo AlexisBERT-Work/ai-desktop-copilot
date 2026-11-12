@@ -42,6 +42,12 @@ export interface ToolPermissionConfig {
   name: string;
   description: string;
   riskLevel: RiskLevel;
+  /**
+   * Risque quand le navigateur est en lecture seule (il ne peut alors rien
+   * envoyer : ni formulaire, ni POST, ni WebSocket). `riskLevel` reste le
+   * risque déclaré, celui de l'outil (registerTools.test le vérifie).
+   */
+  riskLevelWhenReadOnly?: RiskLevel;
   enabled: boolean;
   requiresConfirmation: boolean;
 }
@@ -519,6 +525,10 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       name: 'browser_navigate',
       description: 'Naviguer vers une URL dans le navigateur headless',
       riskLevel: 'high',
+      // Lecture seule : ouvrir une page ne peut plus rien envoyer → une
+      // confirmation par session. Clic et saisie restent `high` : ils agissent
+      // sur la page, même si rien ne part.
+      riskLevelWhenReadOnly: 'medium',
       enabled: true,
       requiresConfirmation: true,
     },
