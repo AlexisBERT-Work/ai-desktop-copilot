@@ -343,3 +343,34 @@ CatDesk.
   chemin ou d'URL ne sont pas modifiées, seulement comptées.
 - **Limite** : une consigne écrite en clair passe toujours. Le nettoyage la rend
   visible aux motifs de détection, il ne la reconnaît pas lui-même.
+
+## Mise à jour 2026-11-12 — données personnelles à la sortie (veille du 7/11)
+
+Le modèle est local : ce qu'il lit reste sur le poste, et masquer ses lectures
+casserait « quel numéro dans ce mail ? ». Le risque est ce qui **part** : une
+injection qui fait recopier un IBAN dans un message Discord, ou un corps
+d'API qui emporte un numéro de carte.
+
+- **`security/personalData.ts`** (pur) : cartes (Luhn, préfixe d'émetteur,
+  longueurs 15/16/19 : un SIRET ne passe pas), IBAN (mod 97, longueur du pays),
+  NIR (clé, Corse 2A/2B), téléphones et e-mails français. Trois niveaux :
+  masqué (forme et somme de contrôle), à vérifier (forme seule : laissé, signalé),
+  signalé (e-mail et téléphone hors Discord). Les caractères invisibles sont
+  retirés d'abord : un espace de largeur nulle dans un IBAN ne le cache plus, et
+  un texte en bloc Tags ne part plus sans que le dialogue le montre.
+- **Crochet `prepareOutboundArgs`** (`ToolRegistry`) sur les trois outils qui
+  sortent (`send_webhook_message`, `post_tech_news_discord`, `call_api`).
+  L'orchestrateur l'appelle **avant** la confirmation : le dialogue, l'audit,
+  le journal d'activité et l'UI voient les arguments masqués, et le dialogue
+  affiche ce qui a été masqué (`PermissionRequestEvent.preview`). `execute` le
+  rappelle (idempotent) : rien ne part en clair, quel que soit l'appelant. Si le
+  masquage plante, l'outil ne part pas.
+- **`call_api`** : corps JSON parcouru (une carte écrite en nombre devient une
+  chaîne masquée), corps texte, chemin et paramètres de l'URL, en-têtes sauf
+  `Authorization`. Rien vers localhost. `post_tech_news_discord` masque aussi la
+  synthèse du modèle, avant la coupe à 2 000 caractères ; jamais les liens.
+- **Le résultat dit ce qui a été fait** (`personalData`), pour que le modèle le
+  répète à l'utilisateur.
+- **Limite** : noms, adresses et téléphones étrangers passent ; un outil qui
+  sortirait du texte sans déclarer le crochet n'est pas couvert. Voir
+  [LIMITES.md](LIMITES.md) § 5.

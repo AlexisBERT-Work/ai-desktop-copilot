@@ -164,7 +164,10 @@ const NIR_CANDIDATE =
   /(?<![\w.,]|\d[^\S\r\n])[1-478](?:[^\S\r\n]?[0-9ABab]){14}(?![\w]|[^\S\r\n]\d)/g;
 const NIR_SHAPE = /^[1-478]\d{2}(?:0[1-9]|1[0-2]|[2-9]\d)(?:\d{2}|2[AB])\d{8}$/;
 
-const EMAIL = /(?<![\w.%+-])[\w.%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24}(?![\w-])/g;
+// « git@github.com:org/depot » est une adresse SSH, pas un e-mail : le « : »
+// suivi d'un chemin l'écarte.
+const EMAIL =
+  /(?<![\w.%+-])[\w.%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24}(?![\w-]|:[\w/~])/g;
 
 // Formats français : 06 12 34 56 78, 06.12.34.56.78, 0612345678, +33 6 12 34 56 78,
 // +33 (0)6 …, 0033 6 …
