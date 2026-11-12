@@ -91,8 +91,15 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 (spotlighting).
 **Manquent** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §7) :
 
-- **Pre-check déterministe** des inputs (patterns d'injection connus) — seule la
-  sortie des outils est scannée, pas l'entrée utilisateur/fichier.
+- **Pre-check déterministe** des inputs — **en partie fait** : les caractères
+  invisibles sont retirés du texte saisi, des sorties d'outils et de la presse
+  (`security/invisibleChars.ts`), mais une consigne écrite **en clair** passe
+  toujours. Les motifs d'injection ne s'appliquent qu'à la sortie des outils, et
+  ils reconnaissent des tournures, pas une intention. Effets assumés du
+  nettoyage : emojis composés (famille, drapeaux régionaux) décomposés, style
+  emoji (VS16) perdu. Un chemin ou une URL contenant un caractère invisible est
+  transmis tel quel (sinon `read_file` ne trouverait plus le fichier) : il est
+  seulement compté dans le journal.
 - **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
   sont redactés aujourd'hui.
 - **Isolation réseau** pour l'exécution de code généré.
