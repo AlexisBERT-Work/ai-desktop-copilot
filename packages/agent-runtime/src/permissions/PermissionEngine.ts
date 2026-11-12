@@ -148,6 +148,7 @@ export class PermissionEngine {
         description,
         args: request.args,
         riskLevel,
+        ...(request.preview !== undefined ? { preview: request.preview } : {}),
       });
     });
   }

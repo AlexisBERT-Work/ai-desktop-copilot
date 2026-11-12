@@ -112,6 +112,13 @@ export function PermissionPrompt() {
                   </p>
                 )}
 
+                {/* Données personnelles masquées ou signalées avant l'envoi */}
+                {request.preview && (
+                  <p className="rounded-xl bg-yellow-400/10 border border-yellow-400/20 px-3 py-2 text-xs text-yellow-200">
+                    {request.preview}
+                  </p>
+                )}
+
                 {/* Args preview */}
                 {Object.keys(request.args).length > 0 && (
                   <div className="rounded-xl bg-white/5 border border-white/8 p-3">
