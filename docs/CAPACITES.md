@@ -107,20 +107,27 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 
 ## 2. Web & navigateur
 
-| Capacité                                                                                                         | Outil(s)             | Risque |
-| ---------------------------------------------------------------------------------------------------------------- | -------------------- | :----: |
-| Récupérer une page web (HTTP simple, détecte les SPA)                                                            | `read_webpage`       |   🟢   |
-| Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   |   🟠   |
-| Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢   |
-| Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢   |
-| Cliquer sur un élément                                                                                           | `browser_click`      |   🟠   |
-| Saisir du texte dans un champ                                                                                    | `browser_type`       |   🟠   |
-| Fermer le navigateur                                                                                             | `browser_close`      |   🟢   |
-| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…)                                                         | `fetch_tech_news`    |   🟢   |
-| **Chercher/lire les dailys** (revues de presse locales + partagées) pour répondre aux questions sur les articles | `search_dailies`     |   🟢   |
+| Capacité                                                                                                         | Outil(s)             | Risque  |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------- | :-----: |
+| Récupérer une page web (HTTP simple, détecte les SPA)                                                            | `read_webpage`       |   🟢    |
+| Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   | 🟠 → 🟡 |
+| Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢    |
+| Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢    |
+| Cliquer sur un élément                                                                                           | `browser_click`      |   🟠    |
+| Saisir du texte dans un champ                                                                                    | `browser_type`       |   🟠    |
+| Fermer le navigateur                                                                                             | `browser_close`      |   🟢    |
+| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…)                                                         | `fetch_tech_news`    |   🟢    |
+| **Chercher/lire les dailys** (revues de presse locales + partagées) pour répondre aux questions sur les articles | `search_dailies`     |   🟢    |
 
 `read_webpage` détecte une SPA (HTML lourd, texte quasi nul) et oriente
 automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
+
+**Navigateur en lecture seule** (par défaut, Réglages › Sécurité) : le navigateur
+de l'agent lit mais n'envoie rien — toute requête autre que GET/HEAD/OPTIONS est
+refusée, les WebSockets fermées, les service workers bloqués. `browser_navigate`
+passe alors de 🟠 à 🟡 (une confirmation par session) ; clic et saisie restent 🟠.
+Un formulaire refusé est signalé dans le résultat (« formulaire non envoyé »).
+Pour remplir un formulaire en ligne, couper la lecture seule.
 
 ## 3. Connecteurs externes
 

@@ -4,6 +4,7 @@ import type {
   PermissionConfig,
   PermissionGrant,
   RiskLevel,
+  ToolPermissionConfig,
 } from '@catdesk/shared-types';
 import {
   DEFAULT_PERMISSION_CONFIG,
@@ -22,10 +23,21 @@ export class PermissionEngine {
   /** Demandes de confirmation en attente d'une réponse de l'UI, par requestId. */
   private pendingRequests = new Map<string, (result: PermissionResult) => void>();
 
+  /**
+   * @param browserReadOnly lit la lecture seule du navigateur (BrowserManager,
+   *   seule source de vérité). Par défaut : jamais — le risque déclaré s'applique.
+   */
   constructor(
     private readonly notify: NotifyFn = stdoutNotifier,
     private readonly timeoutMs: number = PERMISSION_TIMEOUT_MS,
+    private readonly browserReadOnly: () => boolean = () => false,
   ) {}
+
+  /** Risque appliqué maintenant : abaissé si l'outil le prévoit et que le navigateur est en lecture seule. */
+  effectiveRisk(toolConfig: ToolPermissionConfig): RiskLevel {
+    const lowered = toolConfig.riskLevelWhenReadOnly;
+    return lowered !== undefined && this.browserReadOnly() ? lowered : toolConfig.riskLevel;
+  }
 
   updateConfig(config: Partial<PermissionConfig>): void {
     this.config = { ...this.config, ...config };
@@ -48,9 +60,11 @@ export class PermissionEngine {
       return { granted: false, reason: `Tool désactivé: ${request.tool}` };
     }
 
+    const risk = this.effectiveRisk(toolConfig);
+
     // Safe mode: block everything above low
-    if (this.config.safeMode && toolConfig.riskLevel !== 'low') {
-      log.info('Blocked by safe mode', { tool: request.tool, risk: toolConfig.riskLevel });
+    if (this.config.safeMode && risk !== 'low') {
+      log.info('Blocked by safe mode', { tool: request.tool, risk });
       return {
         granted: false,
         reason: 'Mode sécurisé actif — seules les opérations de lecture sont autorisées',
@@ -58,10 +72,7 @@ export class PermissionEngine {
     }
 
     // Critical tools require explicit enablement
-    if (
-      toolConfig.riskLevel === 'critical' &&
-      !this.config.enabledCritical.includes(request.tool)
-    ) {
+    if (risk === 'critical' && !this.config.enabledCritical.includes(request.tool)) {
       return {
         granted: false,
         reason: `Outil critique non activé dans les paramètres de sécurité`,
@@ -79,12 +90,14 @@ export class PermissionEngine {
     }
 
     // LOW risk: auto-approve
-    if (toolConfig.riskLevel === 'low') {
+    if (risk === 'low') {
       return { granted: true, reason: 'Auto-approuvé (risque faible)' };
     }
 
-    // MEDIUM risk: check session cache
-    if (toolConfig.riskLevel === 'medium' && this.sessionGrants.get(request.tool)?.granted) {
+    // MEDIUM risk: check session cache. Une autorisation donnée en lecture
+    // seule ne vaut que tant que le risque est `medium` : lecture seule coupée,
+    // `browser_navigate` redevient `high` et redemande à chaque fois.
+    if (risk === 'medium' && this.sessionGrants.get(request.tool)?.granted) {
       return { granted: true, reason: 'Autorisé (session)' };
     }
 
@@ -95,12 +108,12 @@ export class PermissionEngine {
     // Request user confirmation via UI
     const result = await this.requestUserConfirmation(
       request,
-      toolConfig.riskLevel,
+      risk,
       toolConfig.description,
       signal,
     );
 
-    if (result.granted && toolConfig.riskLevel === 'medium' && result.remember) {
+    if (result.granted && risk === 'medium' && result.remember) {
       this.sessionGrants.set(request.tool, { granted: true, timestamp: Date.now() });
     }
 

@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Globe } from 'lucide-react';
 import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
 import type { RiskLevel } from '@catdesk/shared-types';
 import { useSettingsStore } from './settingsStore';
@@ -17,10 +17,46 @@ const RISK_DOT: Record<RiskLevel, string> = {
   critical: 'bg-red-400',
 };
 
-/** Onglet Sécurité : mode sans danger + catalogue des outils groupés par risque. */
+const RISK_LABEL: Record<RiskLevel, string> = {
+  low: 'faible',
+  medium: 'moyen',
+  high: 'élevé',
+  critical: 'critique',
+};
+
+/** Interrupteur des réglages de sécurité (même apparence pour chacun). */
+function SecuritySwitch({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-label={label}
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative mt-0.5 w-10 h-5 rounded-full transition-colors focus:outline-none shrink-0
+        ${checked ? 'bg-orange-500' : 'bg-white/15'}`}
+    >
+      <span
+        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform
+          ${checked ? 'left-[22px]' : 'left-0.5'}`}
+      />
+    </button>
+  );
+}
+
+/** Onglet Sécurité : mode sans danger, navigateur en lecture seule, catalogue des outils par risque. */
 export function SecurityTab() {
   const safeMode = useSettingsStore(s => s.safeMode);
   const setSafeMode = useSettingsStore(s => s.setSafeMode);
+  const browserReadOnly = useSettingsStore(s => s.browserReadOnly);
+  const setBrowserReadOnly = useSettingsStore(s => s.setBrowserReadOnly);
   const tools = Object.values(DEFAULT_PERMISSION_CONFIG.tools);
 
   const byRisk: Record<RiskLevel, typeof tools> = {
@@ -47,18 +83,30 @@ export function SecurityTab() {
             opérations de lecture restent autorisées.
           </p>
         </div>
-        <button
-          role="switch"
-          aria-checked={safeMode}
-          onClick={() => setSafeMode(!safeMode)}
-          className={`relative mt-0.5 w-10 h-5 rounded-full transition-colors focus:outline-none shrink-0
-            ${safeMode ? 'bg-orange-500' : 'bg-white/15'}`}
-        >
-          <span
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform
-              ${safeMode ? 'left-[22px]' : 'left-0.5'}`}
-          />
-        </button>
+        <SecuritySwitch label="Mode sans danger" checked={safeMode} onChange={setSafeMode} />
+      </div>
+
+      {/* Navigateur en lecture seule */}
+      <div
+        className={`flex items-start gap-4 p-4 rounded-xl border transition-colors
+        ${browserReadOnly ? 'bg-orange-500/8 border-orange-500/25' : 'bg-white/3 border-white/8'}`}
+      >
+        <Globe
+          className={`w-5 h-5 mt-0.5 shrink-0 ${browserReadOnly ? 'text-orange-400' : 'text-white/30'}`}
+        />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-white/90">Navigateur en lecture seule</p>
+          <p className="text-xs text-white/45 mt-0.5">
+            Le navigateur de l&apos;agent lit les pages mais n&apos;envoie rien : ni formulaire, ni
+            requête d&apos;écriture, ni WebSocket. Ouvrir une page ne demande alors qu&apos;une
+            confirmation par session. Coupe-le pour remplir un formulaire en ligne.
+          </p>
+        </div>
+        <SecuritySwitch
+          label="Navigateur en lecture seule"
+          checked={browserReadOnly}
+          onChange={setBrowserReadOnly}
+        />
       </div>
 
       {/* Tools table */}
@@ -85,23 +133,38 @@ export function SecurityTab() {
                     </span>
                   </div>
                   <div className="space-y-0.5 pl-3.5">
-                    {byRisk[risk].map(tool => (
-                      <div
-                        key={tool.name}
-                        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-lg
-                        ${safeMode && risk !== 'low' ? 'opacity-40' : ''}`}
-                      >
-                        <code className="text-xs text-white/70 font-mono w-44 shrink-0 truncate">
-                          {tool.name}
-                        </code>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${RISK_COLORS[risk]}`}
+                    {byRisk[risk].map(tool => {
+                      const lowered =
+                        browserReadOnly && tool.riskLevelWhenReadOnly !== undefined
+                          ? tool.riskLevelWhenReadOnly
+                          : undefined;
+                      const effective = lowered ?? risk;
+                      return (
+                        <div
+                          key={tool.name}
+                          className={`flex items-center gap-2 py-1.5 px-2.5 rounded-lg
+                        ${safeMode && effective !== 'low' ? 'opacity-40' : ''}`}
                         >
-                          {risk}
-                        </span>
-                        <span className="text-xs text-white/30 truncate">{tool.description}</span>
-                      </div>
-                    ))}
+                          <code className="text-xs text-white/70 font-mono w-44 shrink-0 truncate">
+                            {tool.name}
+                          </code>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${RISK_COLORS[risk]}`}
+                          >
+                            {risk}
+                          </span>
+                          {lowered !== undefined && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${RISK_COLORS[lowered]}`}
+                              title="Risque appliqué tant que le navigateur est en lecture seule"
+                            >
+                              → {RISK_LABEL[lowered]} en lecture seule
+                            </span>
+                          )}
+                          <span className="text-xs text-white/30 truncate">{tool.description}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ),

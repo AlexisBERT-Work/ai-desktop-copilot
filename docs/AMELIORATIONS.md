@@ -61,7 +61,7 @@ et chaque morceau est reporté dans le jalon ci-dessus. `git show <commit>` suff
 à le retrouver.
 
 **Hors jalon, à trancher d'abord** : Supabase depuis le webview (§ 1.2),
-friction `browser_navigate`, système de plugins, Linux/macOS, Pocket TTS (§ 4).
+système de plugins, Linux/macOS, Pocket TTS (§ 4).
 
 ---
 
@@ -317,10 +317,11 @@ rien à faire au milieu d'un journal.
   par Supabase Studio (Authentication → Users). Chantier à part.
 - **Système de plugins** — la voie est ouverte (`BaseTool` + `registerTools` +
   `DEFAULT_PERMISSION_CONFIG`), mais rien ne charge de tool tiers à l'exécution.
-- **Friction de `browser_navigate`** — classé `high`, donc confirmation à chaque
-  appel, ce qui casse un enchaînement navigateur en plusieurs étapes. Reclasser
-  en `medium` (une fois par session) serait cohérent avec `browser_click` /
-  `browser_type`… qui sont eux aussi `high`. À trancher ensemble.
+- ✅ **Friction de `browser_navigate`** — tranchée le 2026-11-12 par la
+  lecture seule du navigateur (veille du 6/11, branche
+  `feat/navigateur-lecture-seule`) : `medium` tant que rien ne peut partir,
+  `high` sinon. Clic et saisie restent `high`. Suite possible : l'arbre
+  d'accessibilité avec `ref` cliquables (🟡 de la veille).
 - **Linux / macOS** — `sandbox.rs`, les scripts PowerShell et les outils
   presse-papiers/OpenApp sont écrits pour Windows.
 

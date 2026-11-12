@@ -15,6 +15,7 @@ vi.mock('../../shared/api/models', () => ({
 }));
 
 import { migrateSettings, useSettingsStore } from './settingsStore';
+import { updateRuntimeSettings } from '../../shared/api/settings';
 import { useChatStore } from '../chat/store/chatStore';
 
 describe('migrateSettings', () => {
@@ -30,7 +31,13 @@ describe('migrateSettings', () => {
         },
         0,
       ),
-    ).toEqual({ defaultModel: null, temperature: 0.3, maxIterations: 4, safeMode: true });
+    ).toEqual({
+      defaultModel: null,
+      temperature: 0.3,
+      maxIterations: 4,
+      safeMode: true,
+      browserReadOnly: true,
+    });
   });
 
   it('v0 illisible : défauts sûrs', () => {
@@ -39,6 +46,7 @@ describe('migrateSettings', () => {
       temperature: 0.7,
       maxIterations: 10,
       safeMode: false,
+      browserReadOnly: true,
     });
   });
 });
@@ -77,5 +85,34 @@ describe('choix du modèle (sélecteur du chat = Réglages › Modèle)', () => 
     useSettingsStore.getState().setMaxIterations(0);
     expect(useSettingsStore.getState().temperature).toBe(2);
     expect(useSettingsStore.getState().maxIterations).toBe(1);
+  });
+});
+
+describe('réglages de sécurité poussés à l’agent', () => {
+  beforeEach(() => {
+    vi.mocked(updateRuntimeSettings).mockClear();
+    useSettingsStore.setState({ safeMode: false, browserReadOnly: true });
+  });
+
+  it('lecture seule du navigateur active par défaut', () => {
+    expect(useSettingsStore.getInitialState().browserReadOnly).toBe(true);
+  });
+
+  it('chaque bascule envoie LES DEUX réglages (le cœur rejoue le dernier envoi tel quel)', () => {
+    useSettingsStore.getState().setBrowserReadOnly(false);
+    expect(updateRuntimeSettings).toHaveBeenLastCalledWith({
+      safeMode: false,
+      browserReadOnly: false,
+    });
+    useSettingsStore.getState().setSafeMode(true);
+    expect(updateRuntimeSettings).toHaveBeenLastCalledWith({
+      safeMode: true,
+      browserReadOnly: false,
+    });
+  });
+
+  it('la synchronisation au démarrage envoie les deux', () => {
+    useSettingsStore.getState().syncToRuntime();
+    expect(updateRuntimeSettings).toHaveBeenCalledWith({ safeMode: false, browserReadOnly: true });
   });
 });
