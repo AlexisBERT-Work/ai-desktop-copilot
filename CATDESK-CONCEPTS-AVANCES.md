@@ -478,6 +478,9 @@ masque les PII/secrets avant que le LLM ne les voie, et bloque les tentatives d'
 Tu as déjà : sandbox Rust, permissions risk-gated, audit. Il manque :
 
 1. **Pre-check déterministe** sur les inputs (regex patterns d'injection connus).
+   🟡 En partie fait (2026-11-12) : les caractères invisibles sont retirés du texte
+   saisi, des sorties d'outils et de la presse (`security/invisibleChars.ts`) ; les
+   motifs d'injection ne portent encore que sur la sortie des outils.
 2. **Post-execution scan** sur les outputs d'outils (le plus important — surtout pour la
    lecture web et l'OCR qui ingèrent du contenu non fiable).
 3. **Redaction PII/secrets** avant que tout output ne rentre dans le contexte.
