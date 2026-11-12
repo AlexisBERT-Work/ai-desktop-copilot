@@ -304,6 +304,15 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
   sortent de chaque sortie d'outil, du texte saisi et des articles de presse.
   Pleine chasse et lettres mathématiques sont ramenées en ASCII. Rien n'est
   bloqué : ce qui est retiré est journalisé. Les chemins et URL restent intacts.
+- **Données personnelles masquées à la sortie** (`security/personalData.ts`) :
+  dans ce que `send_webhook_message`, `post_tech_news_discord` et `call_api`
+  envoient, les cartes (Luhn), IBAN (mod 97) et numéros de sécurité sociale
+  (clé) deviennent « [IBAN masqué] ». E-mails et téléphones sont masqués sur
+  Discord, signalés ailleurs. Un numéro qui a la forme sans la somme de contrôle
+  part tel quel, signalé « à vérifier ». Le masquage a lieu **avant** le dialogue
+  de confirmation, qui montre ce qui part vraiment et ce qui a été masqué. Rien
+  vers un serveur local. Ce que l'agent **lit** n'est pas masqué : le modèle est
+  local.
 - **Audit** : chaque appel d'outil journalisé (horodatage, args **expurgés** —
   mots de passe, tokens, webhooks masqués —, résultat) et chaque
   ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).

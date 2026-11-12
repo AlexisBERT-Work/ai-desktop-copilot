@@ -100,8 +100,15 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   emoji (VS16) perdu. Un chemin ou une URL contenant un caractère invisible est
   transmis tel quel (sinon `read_file` ne trouverait plus le fichier) : il est
   seulement compté dans le journal.
-- **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
-  sont redactés aujourd'hui.
+- **Redaction PII** — **en partie fait**, et seulement pour ce qui **sort**
+  (`security/personalData.ts`) : cartes, IBAN, numéros de sécurité sociale,
+  e-mails et téléphones français, dans trois outils (webhook, Discord,
+  `call_api`). Pas couverts : noms, adresses postales, dates de naissance,
+  téléphones étrangers, RIB sans IBAN, IBAN hors des 39 pays connus, et tout
+  autre outil qui sortirait du texte. E-mails et téléphones ne sont masqués que
+  sur Discord. Un `call_api` qui masque re-sérialise son corps JSON : un entier
+  au-delà de 2^53 y perd sa précision (un corps sans rien à masquer part à
+  l'octet près). Ce que le modèle lit n'est pas masqué, par choix.
 - **Isolation réseau** pour l'exécution de code généré.
 
 ## 6. Tests & qualité

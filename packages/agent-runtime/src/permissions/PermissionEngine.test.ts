@@ -150,6 +150,24 @@ describe('PermissionEngine — confirmation utilisateur', () => {
 
     engine.resolvePermissionRequest(String(sent[0]?.params['requestId']), true);
     expect((await pending).granted).toBe(true);
+    expect(sent[0]?.params).not.toHaveProperty('preview');
+  });
+
+  it('transmet au dialogue ce que le masquage des données personnelles a fait', async () => {
+    const sent: Array<Record<string, unknown>> = [];
+    const engine = new PermissionEngine((_m, params) =>
+      sent.push(params as Record<string, unknown>),
+    );
+    const pending = engine.check({
+      tool: 'send_webhook_message',
+      args: { message: 'IBAN [IBAN masqué]' },
+      preview: 'Masqué avant envoi : 1 IBAN.',
+    });
+    await Promise.resolve();
+    expect(sent[0]?.['preview']).toBe('Masqué avant envoi : 1 IBAN.');
+    expect(sent[0]?.['args']).toEqual({ message: 'IBAN [IBAN masqué]' });
+    engine.resolvePermissionRequest(String(sent[0]?.['requestId']), false);
+    expect((await pending).granted).toBe(false);
   });
 
   it('un délai dépassé vaut REFUS — il ne fait plus échouer le run', async () => {

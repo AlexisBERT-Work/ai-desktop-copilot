@@ -288,10 +288,9 @@ rien à faire au milieu d'un journal.
   une PR chacune, validées à chaque étape :
   - ✅ **Caractères invisibles retirés avant le modèle** (11/11, d'après guard-spec) :
     branche `feat/nettoyage-unicode`. Voir [LIMITES.md](LIMITES.md) § 5.
-  - **Données personnelles masquées à la sortie** (7/11) : cartes, IBAN et NIR
-    validés par somme de contrôle masqués dans `send_webhook_message`,
-    `post_tech_news_discord` et `call_api` ; e-mails et téléphones masqués sur
-    Discord seulement, signalés ailleurs.
+  - ✅ **Données personnelles masquées à la sortie** (7/11) : branche
+    `feat/masquage-donnees-perso`. Reste : noms et adresses, téléphones
+    étrangers. Voir [LIMITES.md](LIMITES.md) § 5.
   - **Navigateur en lecture seule imposée** (6/11) : tranche la friction de
     `browser_navigate` (plus bas).
   - **Dictée dans le champ actif de n'importe quelle appli** (8/11) : raccourci

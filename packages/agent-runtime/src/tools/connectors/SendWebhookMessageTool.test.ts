@@ -64,3 +64,28 @@ describe('SendWebhookMessageTool', () => {
     expect(res.success).toBe(false);
   });
 });
+
+describe('SendWebhookMessageTool — données personnelles', () => {
+  const tool = new SendWebhookMessageTool();
+  const message = 'Facture : jean@exemple.fr, IBAN FR76 3000 6000 0112 3456 7890 189';
+
+  it('Discord : IBAN et e-mail masqués avant la confirmation', () => {
+    const out = tool.prepareOutboundArgs({ message, username: 'Bot 06 12 34 56 78' });
+    expect(out.args['message']).toBe('Facture : [e-mail masqué], IBAN [IBAN masqué]');
+    expect(out.args['username']).toBe('Bot [téléphone masqué]');
+    expect(out.notice).toBe('Masqué avant envoi : 1 IBAN, 1 e-mail, 1 téléphone.');
+  });
+
+  it('Slack : l’IBAN est masqué, l’e-mail seulement signalé', () => {
+    const out = tool.prepareOutboundArgs({ message, platform: 'slack' });
+    expect(out.args['message']).toBe('Facture : jean@exemple.fr, IBAN [IBAN masqué]');
+    expect(out.notice).toBe(
+      'Masqué avant envoi : 1 IBAN. Envoyé tel quel, à toi de voir : 1 e-mail.',
+    );
+  });
+
+  it('rien à masquer : arguments identiques, pas de notice', () => {
+    const args = { message: 'Déploiement terminé', webhook_url: 'https://hooks.slack.com/x' };
+    expect(tool.prepareOutboundArgs(args)).toEqual({ args });
+  });
+});

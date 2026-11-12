@@ -5,6 +5,7 @@ import type {
   PermissionConfig,
   OllamaMessage,
   StreamChunk,
+  ToolResult,
 } from '@catdesk/shared-types';
 import type { OllamaClient } from './llm/OllamaClient';
 import type { ToolRegistry } from './ToolRegistry';
@@ -51,6 +52,23 @@ function logInvisible(
 ): void {
   if (totalRemoved(removed) === 0 && keptVerbatim === 0) return;
   log.warn('Invisible characters removed', { runId, source, removed, keptVerbatim });
+}
+
+/**
+ * Ajoute au résultat ce que le masquage des données personnelles a fait, pour
+ * que le modèle puisse le dire à l'utilisateur. Un échec reste tel quel.
+ */
+function withOutboundNotice(result: ToolResult, notice: string | undefined): ToolResult {
+  if (notice === undefined || !result.success) return result;
+  const data = result.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return { ...result, data: { result: data, personalData: notice } };
+  }
+  const record = data as Record<string, unknown>;
+  // L'outil a pu dire lui-même ce qu'il a masqué dans ce qu'il a construit.
+  const own = record['personalData'];
+  const personalData = typeof own === 'string' ? `${own} ${notice}` : notice;
+  return { ...result, data: { ...record, personalData } };
 }
 
 // Avec ~50 outils exposés, le prompt (schémas + system + historique) dépasse
@@ -627,7 +645,28 @@ export class AgentOrchestrator {
     },
   ): AsyncGenerator<AgentStep, OllamaMessage> {
     const { tools, permissions, audit, activity } = this.deps;
-    yield { type: 'tool_start', toolName: toolCall.name, args: toolCall.args };
+    // Données personnelles masquées AVANT tout le reste (outils qui sortent du
+    // poste) : le dialogue de confirmation, l'audit et le journal d'activité
+    // voient ce qui part vraiment, pas ce que le modèle a écrit.
+    const outbound = tools.prepareOutboundArgs(toolCall.name, toolCall.args);
+    const args = outbound.ok ? outbound.args : toolCall.args;
+    yield { type: 'tool_start', toolName: toolCall.name, args };
+    if (!outbound.ok) {
+      yield { type: 'tool_blocked', toolName: toolCall.name, reason: outbound.error };
+      return {
+        role: 'tool',
+        content: JSON.stringify({ error: outbound.error }),
+        tool_call_id: toolCall.id,
+      };
+    }
+    const notice = outbound.notice;
+    if (notice !== undefined) {
+      log.warn('Personal data in outbound args', {
+        runId: opts.runId,
+        tool: toolCall.name,
+        notice,
+      });
+    }
 
     try {
       // Permission gate. Les chemins à vérifier sont ceux que l'OUTIL déclare
@@ -635,8 +674,9 @@ export class AgentOrchestrator {
       const permission = await permissions.check(
         {
           tool: toolCall.name,
-          args: toolCall.args,
-          paths: tools.filesystemTargets(toolCall.name, toolCall.args),
+          args,
+          paths: tools.filesystemTargets(toolCall.name, args),
+          ...(notice !== undefined ? { preview: notice } : {}),
           context: {
             conversationId: opts.conversationId,
             ...(opts.activeWindow !== undefined ? { activeWindow: opts.activeWindow } : {}),
@@ -656,9 +696,10 @@ export class AgentOrchestrator {
       }
 
       opts.usedTools.push(toolCall.name); // record the approach for the playbook
-      const result = await tools.execute(toolCall.name, toolCall.args);
-      audit.logToolCall(opts.runId, toolCall.name, toolCall.args, result);
-      activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
+      const raw = await tools.execute(toolCall.name, args);
+      audit.logToolCall(opts.runId, toolCall.name, args, raw);
+      activity?.recordToolCall(toolCall.name, args, raw.success);
+      const result = withOutboundNotice(raw, notice);
 
       yield { type: 'tool_result', toolName: toolCall.name, result };
       // Post-execution safety scan (§7): a tool output becomes LLM context,
@@ -686,7 +727,7 @@ export class AgentOrchestrator {
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       log.error('Tool execution failed', { tool: toolCall.name, error });
-      activity?.recordToolCall(toolCall.name, toolCall.args, false);
+      activity?.recordToolCall(toolCall.name, args, false);
       yield { type: 'tool_error', toolName: toolCall.name, error };
       // Un message d'exception peut recopier un contenu externe : même nettoyage.
       const cleaner = createToolDataCleaner();
