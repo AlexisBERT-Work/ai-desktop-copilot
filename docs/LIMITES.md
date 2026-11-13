@@ -83,7 +83,10 @@ aujourd'hui classé `critical`.
   `VectorStore.ts` ; **pas de reranking ni de GraphRAG** pour l'instant.
 - **`semantic_search` sans Kensaku** : mots-clés seulement, fichiers texte et
   code de 500 Ko au plus. Ni PDF, ni Office, ni images : demandés, ils sont
-  écartés, et le résultat le dit (`ignoredExtensions`). Au plus 5 000 fichiers
+  écartés, et le résultat le dit (`ignoredExtensions`). « Seulement mes `.py` »
+  ramène aussi des `.md`, classés après s'ils sont moins pertinents :
+  `extensions` élargit la recherche, il ne la restreint jamais, parce que le
+  modèle le devine. Au plus 5 000 fichiers
   par recherche, dans l'ordre du parcours : au-delà, le reste n'est pas lu. Sur
   le poste de référence, Documents + Bureau + Téléchargements atteignent ce
   plafond, et une recherche sans dossier prend **~1 s** (4 s avant la lecture en

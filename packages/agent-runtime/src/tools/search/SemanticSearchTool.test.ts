@@ -27,6 +27,7 @@ beforeAll(() => {
   writeFileSync(join(dir, 'compte-rendu.md'), "Compte rendu de la réunion d'été : budget validé.");
   writeFileSync(join(dir, 'syndicat.md'), 'Le syndicat demande une union des forces.');
   writeFileSync(join(dir, 'devis.pdf'), '%PDF-1.7 binaire');
+  writeFileSync(join(dir, 'panne.log'), 'Le webhook Discord a répondu 429.');
   mkdirSync(join(dir, 'node_modules'));
   writeFileSync(join(dir, 'node_modules', 'bruit.md'), 'webhook webhook webhook');
   writeFileSync(join(outside, 'secret.md'), 'webhook discord secret');
@@ -121,28 +122,40 @@ describe('semantic_search — moteur par mots-clés', () => {
     ]);
   });
 
-  it('écarte les extensions qu’il ne sait pas lire (PDF, images), garde les autres', async () => {
+  it('une liste d’extensions devinée ne fait perdre aucun fichier texte', async () => {
+    // Ce que le modèle passe sans qu'on le lui demande : avant, la liste
+    // remplaçait les types par défaut, et `guide.md` disparaissait.
     const data = expectOk(
       await tool.run({
         query: 'webhook discord',
         paths: [dir],
-        extensions: ['.PDF', '.md', 'png'],
+        extensions: ['.PDF', '.docx', 'txt'],
       }),
     ).data as Payload & { ignoredExtensions?: string[] };
-    expect(data.ignoredExtensions).toEqual(['.pdf', '.png']);
     const files = data.results.map(r => r.absolutePath);
-    expect(files).toEqual([realpathSync(join(dir, 'guide.md'))]);
+    expect(files).toEqual(
+      expect.arrayContaining([
+        realpathSync(join(dir, 'guide.md')),
+        realpathSync(join(dir, '.env.example')),
+      ]),
+    );
+    // PDF et Office ne sont jamais lus en octets bruts, et le résultat le dit.
     expect(files).not.toContain(realpathSync(join(dir, 'devis.pdf')));
+    expect(data.ignoredExtensions).toEqual(['.pdf', '.docx']);
   });
 
-  it('que des extensions illisibles : aucun fichier lu, et il dit pourquoi', async () => {
-    const data = expectOk(
-      await tool.run({ query: 'devis', paths: [dir], extensions: ['.pdf', '.docx'] }),
-    ).data as Payload & { totalScanned: number; ignoredExtensions: string[]; message: string };
-    expect(data.results).toEqual([]);
-    expect(data.totalScanned).toBe(0);
-    expect(data.ignoredExtensions).toEqual(['.pdf', '.docx']);
-    expect(data.message).toMatch(/Kensaku/);
+  it('une extension hors des types par défaut s’ajoute à eux', async () => {
+    const sans = expectOk(await tool.run({ query: 'webhook', paths: [dir] })).data as Payload;
+    expect(sans.results.map(r => r.absolutePath)).not.toContain(
+      realpathSync(join(dir, 'panne.log')),
+    );
+
+    const avec = expectOk(await tool.run({ query: 'webhook', paths: [dir], extensions: ['log'] }))
+      .data as Payload & { ignoredExtensions?: string[] };
+    const files = avec.results.map(r => r.absolutePath);
+    expect(files).toContain(realpathSync(join(dir, 'panne.log')));
+    expect(files).toContain(realpathSync(join(dir, 'guide.md')));
+    expect(avec.ignoredExtensions).toBeUndefined();
   });
 
   it('garde la forme des résultats', async () => {
@@ -198,7 +211,7 @@ describe('semantic_search — moteur Kensaku', () => {
     expect(data.results).toHaveLength(1);
   });
 
-  it('filtre par extension seulement si le modèle en donne', async () => {
+  it('les extensions ne restreignent pas Kensaku (une liste devinée perdait des fichiers)', async () => {
     const kensaku = fakeKensaku({
       ok: true,
       version: '1.0.17',
@@ -207,7 +220,10 @@ describe('semantic_search — moteur Kensaku', () => {
     });
     const tool = new SemanticSearchTool({ kensaku, pathWhitelist: onlyDocs });
     const data = expectOk(await tool.run({ query: 'devis', extensions: ['md'] })).data as Payload;
-    expect(data.results.map(r => r.absolutePath)).toEqual([realpathSync(join(dir, 'guide.md'))]);
+    expect(data.results.map(r => r.absolutePath)).toEqual([
+      realpathSync(join(dir, 'devis.pdf')),
+      realpathSync(join(dir, 'guide.md')),
+    ]);
   });
 
   it('Kensaku indisponible : l’ancien moteur répond', async () => {

@@ -137,9 +137,11 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   outside the whitelist and unchecked. It now searches the whitelist folders, minus `%TEMP%`.
 - **`semantic_search` split accented words**: `[a-z]` turned "réunion" into "union". Terms are
   now Unicode letters, and French function words are dropped.
-- **Keyword `semantic_search` read PDF and images as raw bytes** when `extensions` asked for
-  them, and the model guesses `extensions` on almost every call. That engine now skips the
-  types it cannot read (`ignoredExtensions` in the result).
+- **`semantic_search` lost files when the model guessed `extensions`** (almost every call):
+  the list replaced the default text types (`.md` gone), filtered Kensaku (a `.webp` screenshot
+  dropped), and made the keyword engine read PDF and images as raw bytes. `extensions` now only
+  widens the search, and the keyword engine skips the types it cannot read
+  (`ignoredExtensions` in the result).
 
 ### Security
 
