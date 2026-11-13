@@ -41,13 +41,16 @@ cpal = "0.15"
 
 # Job Object : arrêter Ollama AVEC ses runners llama-server (~9 Go de VRAM),
 # y compris si CatDesk plante — core/process_tree.rs. Version déjà présente
-# dans l'arbre de dépendances (tauri).
+# dans l'arbre de dépendances (tauri). Dictée (core/voice/dictation.rs) :
+# frappes Unicode, fenêtre active, niveau d'intégrité de la cible.
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_System_JobObjects",
   "Win32_System_Threading",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 
 [profile.release]

@@ -8,13 +8,16 @@
 use std::time::Duration;
 
 use serde_json::json;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::oneshot;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::core::audit;
 use crate::core::error::CatdeskError;
-use crate::core::voice::{ListenerCommand, SpeakerCommand, VoiceConfig, VoiceHandle, VoiceStatus};
+use crate::core::hotkeys;
+use crate::core::voice::{
+    pill, ListenerCommand, SpeakerCommand, VoiceConfig, VoiceHandle, VoiceStatus,
+};
 
 /// Chargement de Parakeet (~640 Mo int8) compris : au-delà, quelque chose cloche.
 const START_TIMEOUT: Duration = Duration::from_secs(20);
@@ -125,5 +128,39 @@ pub async fn voice_configure(
 pub async fn voice_warmup(voice: State<'_, VoiceHandle>) -> Result<(), String> {
     let _ = voice.listener.send(ListenerCommand::Warmup);
     let _ = voice.speaker.send(SpeakerCommand::Warmup);
+    Ok(())
+}
+
+/// Active ou coupe la dictée (`Ctrl+Alt+Espace` maintenu → texte tapé dans
+/// l'application active). Commande à part : `VoiceConfig` n'a pas de valeurs
+/// par défaut côté serde, un champ de plus casserait les appels existants.
+///
+/// Activer exige les modèles de reconnaissance ; un raccourci déjà pris par
+/// une autre application est renvoyé tel quel à l'UI, qui recoche « off ».
+#[tauri::command]
+pub async fn voice_set_dictation(
+    app: AppHandle,
+    voice: State<'_, VoiceHandle>,
+    enabled: bool,
+) -> Result<(), String> {
+    if enabled && !voice.status().stt_available {
+        return Err(CatdeskError::Refused(
+            "La dictée a besoin des modèles de reconnaissance (Paramètres › Voix)".into(),
+        )
+        .into());
+    }
+    let changed = hotkeys::set_dictation_hotkey(&app, enabled)?;
+    if enabled {
+        // Sans pastille la dictée marche quand même : on le signale, sans bloquer.
+        if let Err(e) = pill::ensure(&app) {
+            warn!("voice: {e}");
+        }
+    } else {
+        pill::close(&app);
+    }
+    // Un raccourci global qui ouvre le micro : son activation laisse une trace.
+    if changed {
+        audit::log("VOICE_DICTATION_SETTING", json!({ "enabled": enabled }));
+    }
     Ok(())
 }

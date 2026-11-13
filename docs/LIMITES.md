@@ -61,6 +61,23 @@ aujourd'hui classé `critical`.
   micro. Et CatDesk ne se laisse pas encore couper en parlant par-dessus
   (barge-in) — le haut-parleur repasserait dans le micro sans annulation
   d'écho. Voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+- **La dictée ne tape pas partout** :
+  - pas dans une application lancée **en administrateur** : Windows y bloque la
+    frappe (UIPI). La pastille le dit. Même chose pour le bureau sécurisé
+    (fenêtre UAC, écran de verrouillage) ;
+  - les jeux en plein écran, les bureaux à distance et les machines virtuelles
+    peuvent ignorer les frappes Unicode. Il n'y a pas de repli par le
+    presse-papier, par choix (il reste intact) ; il viendra si la mesure montre
+    une application courante qui refuse ;
+  - le texte arrive **d'un bloc au relâchement**, pas en direct ; 60 s au plus ;
+    aucun retour à la ligne (Entrée à la main entre deux phrases) ;
+  - sur AZERTY, **AltGr+Espace** vaut Ctrl+Alt+Espace et déclenche aussi la
+    dictée ;
+  - pendant la transcription d'une question orale (quelques centaines de ms),
+    un appui est ignoré (« CatDesk transcrit déjà ») ;
+  - la pastille est une seconde fenêtre WebView2 (quelques dizaines de Mo de
+    RAM) tant que la dictée est activée, et elle s'affiche sur l'écran principal
+    seulement.
 
 ## 4. Capacités partielles / à durcir
 

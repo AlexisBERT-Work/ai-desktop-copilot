@@ -40,3 +40,12 @@ export function voiceConfigure(config: VoiceConfig): Promise<void> {
 export function voiceWarmup(): Promise<void> {
   return invoke('voice_warmup');
 }
+
+/**
+ * Active ou coupe la dictée (Ctrl+Alt+Espace maintenu : le texte s'écrit dans
+ * l'application active). Rejette si les modèles manquent ou si le raccourci
+ * est déjà pris par une autre application.
+ */
+export function voiceSetDictation(enabled: boolean): Promise<void> {
+  return invoke('voice_set_dictation', { enabled });
+}

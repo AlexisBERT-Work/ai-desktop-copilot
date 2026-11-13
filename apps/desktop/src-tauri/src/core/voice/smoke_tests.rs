@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use sherpa_onnx::{LinearResampler, Wave};
 
+use super::dictation;
 use super::models::{SttPaths, VoiceModels};
 use super::stt::Recognizer;
 use super::tts::Synthesizer;
@@ -156,4 +157,59 @@ fn smoke_le_rappel_peut_interrompre_la_synthese() {
         },
     );
     assert_eq!(*calls.lock().unwrap(), 1);
+}
+
+/// Chemin de la dictée au relâchement : VAD de dictée sur l'enregistrement
+/// entier, Parakeet par prise, jointure. Mesure le temps « relâchement →
+/// texte » (sans la frappe, quelques ms) — budget visé : < 800 ms pour 5 s.
+#[test]
+#[ignore = "modèles réels requis (resources/voice)"]
+fn smoke_dictee_vad_hors_ligne_puis_stt() {
+    let m = models();
+    let paths = m.stt().expect("modèles STT présents");
+    let vad = vad::create_for_dictation(&paths).expect("VAD de dictée");
+    let stt = Recognizer::create(&paths).expect("Parakeet se charge");
+    let speech = french_test_wav_16k(&paths);
+    // Comme une vraie dictée : 0,4 s avant de parler, 0,3 s avant de lâcher.
+    let mut samples = vec![0.0f32; 6_400];
+    samples.extend_from_slice(&speech);
+    samples.extend(std::iter::repeat(0.0f32).take(4_800));
+    let audio_s = samples.len() as f32 / vad::SAMPLE_RATE as f32;
+
+    let direct = stt.transcribe(&speech);
+    let mut runs = Vec::new();
+    let mut text = String::new();
+    for _ in 0..5 {
+        let started = Instant::now();
+        let segments = vad::segments(&vad, &samples);
+        text = dictation::join_segments(segments.iter().map(|s| stt.transcribe(s)));
+        runs.push(started.elapsed().as_millis());
+    }
+    runs.sort_unstable();
+    let median = runs[runs.len() / 2];
+    eprintln!(
+        "dictée: {audio_s:.1} s enregistrées, médiane {median} ms (min {} / max {} ms) sur 5 passes",
+        runs[0],
+        runs[runs.len() - 1]
+    );
+    eprintln!("dictée : {text:?}");
+    eprintln!("direct : {direct:?}");
+
+    assert!(!text.is_empty());
+    // Le VAD ne mange pas de mots : même texte qu'en transcription directe,
+    // à la ponctuation près.
+    let words = |t: &str| {
+        t.to_lowercase()
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .map(String::from)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(words(&text), words(&direct));
+    // Silence seul : aucun segment, donc rien à taper.
+    assert!(vad::segments(&vad, &vec![0.0f32; 32_000]).is_empty());
+    assert!(
+        median as f32 / 1000.0 < audio_s * 0.25,
+        "transcription trop lente pour la dictée"
+    );
 }

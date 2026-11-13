@@ -19,6 +19,16 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Added
 
+- **Dictation in any application** (Settings > Voice, off by default). Hold `Ctrl+Alt+Space`
+  and speak: on release, the text is typed into the focused field of whatever app was in
+  front (Word, a browser, a chat app). Everything stays on the CPU, like the rest of the
+  voice: Silero VAD over the whole recording, then Parakeet. Text goes in as Unicode
+  keystrokes, so the clipboard is never touched and no Enter is ever typed. Nothing is typed
+  if the focus moved, if the target app runs as administrator, or while Ctrl/Alt are still
+  held. A small non-focusable pill shows the state; the audit logs the outcome and timings,
+  never the text. Measured: 5.7 s of speech to text in 0.3 s (median), 56 characters with
+  accents and emoji typed in 1 ms into a real Win32 edit box. The WER test on the user's own
+  voice uses `scripts/dictation-wer.mjs`.
 - **Tool selection understands everyday French.** `llm/toolKeywords.ts` lists the words people
   use for each tool outside the core ("agenda", "rendez-vous"…). `selectTools` reads them and
   the model never sees them, so they add no tokens. On the French task set, the expected tool

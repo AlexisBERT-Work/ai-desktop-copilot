@@ -2,8 +2,35 @@
 //
 // Miroir des types Rust de `core/voice` (sérialisés en camelCase).
 
-/** État de la chaîne voix, tenu côté Rust et publié sur `voice:state`. */
-export type VoiceState = 'idle' | 'listening' | 'transcribing' | 'speaking';
+/**
+ * État de la chaîne voix, tenu côté Rust et publié sur `voice:state`.
+ * `dictating` : raccourci de dictée maintenu (le texte ira dans l'application
+ * active, pas au modèle).
+ */
+export type VoiceState = 'idle' | 'listening' | 'transcribing' | 'speaking' | 'dictating';
+
+/** Étape d'une dictée, publiée sur `voice:dictation` (pastille). */
+export type VoiceDictationPhase = 'recording' | 'transcribing' | 'done';
+
+/** Issue d'une dictée — miroir de `dictation::Outcome` (vérifié côté Rust). */
+export type VoiceDictationOutcome =
+  | 'inserted'
+  | 'empty'
+  | 'focus_changed'
+  | 'elevated'
+  | 'keys_held'
+  | 'blocked'
+  | 'no_models'
+  | 'mic_error'
+  | 'busy';
+
+export interface VoiceDictationEvent {
+  phase: VoiceDictationPhase;
+  /** Présent quand `phase === 'done'`. */
+  outcome?: VoiceDictationOutcome;
+  /** Caractères reconnus (tapés si `inserted`) — jamais le texte. */
+  chars: number;
+}
 
 export interface VoiceConfig {
   /** Dossier Piper, ex. `vits-piper-fr_FR-miro-high`. */

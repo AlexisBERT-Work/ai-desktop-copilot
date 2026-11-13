@@ -13,14 +13,21 @@
 //! - [`listener`] : micro → VAD → STT → événement `voice:transcript` ;
 //! - [`speaker`] : file de phrases → TTS → haut-parleurs.
 //!
+//! La dictée (`Ctrl+Alt+Espace` maintenu, désactivée par défaut) passe par
+//! le même thread d'écoute, mais tape le texte dans l'application active
+//! ([`dictation`]) au lieu de l'envoyer au modèle ; [`pill`] montre qu'elle
+//! enregistre.
+//!
 //! L'UI ne voit que des commandes (`commands/voice.rs`) et des événements ;
 //! elle découpe les réponses du modèle en phrases et les envoie une à une,
 //! ce qui permet de parler avant la fin de la génération.
 
 pub mod capture;
+pub mod dictation;
 pub mod listener;
 pub mod machine;
 pub mod models;
+pub mod pill;
 pub mod playback;
 pub mod speaker;
 pub mod stt;
@@ -86,6 +93,10 @@ pub enum ListenerCommand {
     /// Charge les modèles sans écouter, pour que le premier Ctrl+Espace ne
     /// paie pas les ~3 s de chargement de Parakeet.
     Warmup,
+    /// Raccourci de dictée enfoncé, avec la fenêtre qui avait le focus.
+    DictateStart(dictation::Target),
+    /// Raccourci relâché, à cet instant (la latence se mesure d'ici).
+    DictateEnd(std::time::Instant),
 }
 
 pub enum SpeakerCommand {

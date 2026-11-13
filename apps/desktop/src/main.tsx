@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom/client';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import App from './App';
 import { DashboardRoot } from './features/dashboard/DashboardRoot';
+import { DictationPill } from './features/voice/DictationPill';
 import './styles/globals.css';
 
-// Deux fenêtres partagent ce bundle : la bulle IA ("main") et l'app Marchés &
-// News ("dashboard"). On choisit la racine selon le label de la fenêtre.
+// Trois fenêtres partagent ce bundle : la bulle IA ("main"), l'app Marchés &
+// News ("dashboard") et la pastille de dictée ("dictation-pill", créée par
+// Rust quand la dictée est activée). On choisit la racine selon le label.
 let label = 'main';
 try {
   label = getCurrentWindow().label;
@@ -28,6 +30,12 @@ if (label === 'dashboard') {
   });
 }
 
+function rootFor(windowLabel: string) {
+  if (windowLabel === 'dashboard') return <DashboardRoot />;
+  if (windowLabel === 'dictation-pill') return <DictationPill />;
+  return <App />;
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>{label === 'dashboard' ? <DashboardRoot /> : <App />}</React.StrictMode>,
+  <React.StrictMode>{rootFor(label)}</React.StrictMode>,
 );
