@@ -83,12 +83,13 @@ Les quatre outils « documents » passent par le sidecar Python (`files/`), lanc
 Ce n'est **pas un outil de l'agent** mais une entrée/sortie de l'app, tenue en
 Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 
-| Capacité                                                                    | Moteur (100 % CPU, `sherpa-onnx`)                | Mesuré (Ryzen 5 5500)         |
-| --------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------- |
-| **`Ctrl+Espace` ouvre la bulle et le micro** ; fin de phrase au silence     | VAD Silero (0,7 s de silence = fin de tour)      | —                             |
-| **Reconnaissance** du français (25 langues détectées, ponctuation comprise) | Parakeet TDT 0.6B v3 int8 (NVIDIA, CC-BY-4.0)    | 5 s d'audio en 0,3 s          |
-| **Lecture des réponses à voix haute**, phrase par phrase pendant l'écriture | Piper `fr_FR-miro-high` (voix `siwis` en option) | 1er son 83 ms, 18× temps réel |
-| Voix de secours sans modèle                                                 | `speechSynthesis` Windows (Hortense)             | —                             |
+| Capacité                                                                    | Moteur (100 % CPU, `sherpa-onnx`)                | Mesuré (Ryzen 5 5500)            |
+| --------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------- |
+| **`Ctrl+Espace` ouvre la bulle et le micro** ; fin de phrase au silence     | VAD Silero (0,7 s de silence = fin de tour)      | —                                |
+| **Reconnaissance** du français (25 langues détectées, ponctuation comprise) | Parakeet TDT 0.6B v3 int8 (NVIDIA, CC-BY-4.0)    | 5 s d'audio en 0,3 s             |
+| **Lecture des réponses à voix haute**, phrase par phrase pendant l'écriture | Piper `fr_FR-miro-high` (voix `siwis` en option) | 1er son 83 ms, 18× temps réel    |
+| Voix de secours sans modèle                                                 | `speechSynthesis` Windows (Hortense)             | —                                |
+| **Dictée dans toutes les applications** : `Ctrl+Alt+Espace` maintenu        | VAD Silero (enregistrement entier) + Parakeet    | 5,7 s de parole → texte en 0,3 s |
 
 - Le micro se ferme **dès la prise de parole obtenue** (un tour), après 8 s
   sans parole, ou quand la bulle se ferme (Échap). Un clic sur le bouton micro
@@ -97,6 +98,16 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 - Le Markdown est retiré avant lecture (puces, gras, liens → texte ; un bloc
   de code devient « Bloc de code omis »).
 - Option « réécouter après une réponse orale » : enchaîner sans raccourci.
+- **Dictée** (désactivée par défaut, Paramètres › Voix) : tant que
+  `Ctrl+Alt+Espace` est tenu, le micro enregistre ; au relâchement, le texte
+  s'écrit dans le champ actif de **n'importe quelle application** (Word,
+  navigateur, messagerie). Frappes Unicode : presse-papier intact, accents et
+  emoji compris, **jamais de retour à la ligne** (Entrée enverrait le
+  message). Rien n'est tapé si la fenêtre a changé entre l'appui et la fin, si
+  l'application tourne en administrateur, ou si Ctrl/Alt restent tenus. Une
+  pastille en bas de l'écran montre l'état, puis le nombre de caractères écrits
+  ou la raison d'un refus. 60 s au plus par dictée. Le texte ne passe jamais
+  par le modèle.
 - **Rien ne touche la VRAM** : la RX 6700 reste entière pour `qwen3:14b`.
 - Modèles (~800 Mo) : embarqués par l'installeur (`resources/voice/`), ou
   `scripts/fetch-voice-models.ps1` en dev, ou déposés dans

@@ -13,7 +13,7 @@
 
 ## 0. Ce qui bloque sur toi
 
-Sept choses restent ouvertes, et **aucune ne peut être faite sans toi** :
+Huit choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
 | #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,8 +25,10 @@ Sept choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 | 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
 | 6   | **Appliquer les migrations Supabase** — `pnpm exec supabase db push` (#27 et #29 sont dans `dev`).                                              | Le Supabase de prod est partagé par tous les postes : aucune session n'y a touché. Sans `20261029170000`, le titre de l'an dernier bloquera en silence chaque daily du jour dès l'été 2027.                                                                                |
 
+| 7 | **Mesurer la dictée au micro** (branche `feat/dictee-vocale`) — `node scripts/dictation-wer.mjs --sheet`, 20 phrases dans Bloc-notes, Word et Edge, puis le script sur chaque fichier et `--audit`. | Seuls ta voix et ton micro donnent le taux d'erreur (cible < 8 %) et la latence réelle (cible < 800 ms pour 5 s). Cas limites à essayer : focus changé pendant la transcription, champ mot de passe, appli en administrateur, bulle déjà en écoute, CatDesk en train de parler. |
+
 Les points 1 à 5 forment le jalon **0.2.0** ci-dessous ; le point 0 passe avant tout,
-le 6 ne dépend d'aucune version.
+les points 6 et 7 ne dépendent d'aucune version.
 
 ---
 
@@ -283,6 +285,11 @@ rien à faire au milieu d'un journal.
     réutilisation du cache de préfixe sous Ollama (`scripts/latency-bench.mjs`) :
     les rapports se contredisent selon les versions, et tout le gain de latence
     du 2026-10-08 en dépend.
+- ✅ **Dictée dans toutes les applications** — 2026-11-13 (veille du 8/11,
+  branche `feat/dictee-vocale`) : `Ctrl+Alt+Espace` maintenu, texte tapé dans
+  le champ actif, voir [CAPACITES.md](CAPACITES.md) § 1 bis. Reste : la mesure
+  au micro (§ 0, point 7) ; un repli par le presse-papier seulement si une
+  application courante refuse la frappe Unicode.
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :

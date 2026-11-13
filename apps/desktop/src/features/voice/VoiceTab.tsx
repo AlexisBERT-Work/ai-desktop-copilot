@@ -48,6 +48,7 @@ export function VoiceTab() {
   const readAloud = useVoiceStore(s => s.readAloud);
   const autoListen = useVoiceStore(s => s.autoListenOnOverlay);
   const continueAfter = useVoiceStore(s => s.continueAfterAnswer);
+  const dictation = useVoiceStore(s => s.dictation);
   const voice = useVoiceStore(s => s.voice);
   const speed = useVoiceStore(s => s.speed);
   const status = useVoiceStore(s => s.status);
@@ -56,6 +57,7 @@ export function VoiceTab() {
   const setReadAloud = useVoiceStore(s => s.setReadAloud);
   const setAutoListen = useVoiceStore(s => s.setAutoListenOnOverlay);
   const setContinue = useVoiceStore(s => s.setContinueAfterAnswer);
+  const setDictation = useVoiceStore(s => s.setDictation);
   const setVoice = useVoiceStore(s => s.setVoice);
   const setSpeed = useVoiceStore(s => s.setSpeed);
   const testVoice = useVoiceStore(s => s.testVoice);
@@ -114,6 +116,13 @@ export function VoiceTab() {
         checked={continueAfter}
         onChange={setContinue}
         disabled={!enabled}
+      />
+      <Toggle
+        label="Dictée dans toutes les applications"
+        description="Maintenir Ctrl+Alt+Espace et parler : au relâchement, le texte s'écrit dans le champ actif (Word, navigateur, messagerie…). Tout reste sur cette machine, le presse-papier n'est pas touché et aucun retour à la ligne n'est tapé."
+        checked={dictation}
+        onChange={on => void setDictation(on)}
+        disabled={!enabled || !stt}
       />
 
       {/* Voix et vitesse */}

@@ -23,6 +23,7 @@ export const TAURI_EVENTS = {
   voiceState: 'voice:state',
   voiceTranscript: 'voice:transcript',
   voiceLevel: 'voice:level',
+  voiceDictation: 'voice:dictation',
 } as const;
 
 export type TauriEventName = (typeof TAURI_EVENTS)[keyof typeof TAURI_EVENTS];

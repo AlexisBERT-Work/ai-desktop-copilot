@@ -318,3 +318,40 @@ trous réels, quatre durcissements.
   parle pas à Ollama — règle n°1) ; les capacités perdent
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+## Mise à jour 2026-11-13 — dictée dans toutes les applications (veille du 8/11)
+
+Un raccourci global qui ouvre le micro, et un texte tapé dans **une autre
+application** que CatDesk : deux nouveautés sensibles. Ce qui les borne
+(`core/voice/dictation.rs`, `core/hotkeys.rs`) :
+
+- **Désactivée par défaut.** Le raccourci `Ctrl+Alt+Espace` n'est enregistré
+  qu'une fois la case cochée (Paramètres › Voix), et retiré dès qu'elle est
+  décochée ou que la voix est coupée. Chaque changement est audité
+  (`VOICE_DICTATION_SETTING`).
+- **Micro tenu à la main** : il n'est ouvert que tant que la touche est
+  enfoncée, 60 s au plus, avec une pastille visible pendant tout ce temps.
+  L'audio reste en mémoire, il n'est jamais écrit sur disque.
+- **Le texte ne sort pas** : ni modèle, ni réseau. Il n'apparaît ni dans le
+  journal ni dans l'audit : `VOICE_DICTATE` ne note que l'issue, le nombre de
+  caractères et les durées (`ms`, `audioMs`, `sttMs`, `waitMs`). La pastille
+  n'affiche que le nombre de caractères.
+- **Il ne va que là où l'utilisateur parlait** : la fenêtre au premier plan est
+  figée à l'appui et comparée juste avant de taper. Si elle a changé, rien
+  n'est tapé (`focus_changed`).
+- **Jamais vers plus élevé** : le niveau d'intégrité de la fenêtre cible est
+  comparé à celui de CatDesk, et un jeton illisible vaut refus (`elevated`).
+  Il n'y a pas d'UIAccess ni de contournement de l'UIPI.
+- **Pas de raccourci involontaire** : la frappe attend que Ctrl, Alt, Maj et
+  Windows soient physiquement relâchés (`keys_held` après 5 s). Une touche
+  neutre (VK 0xE8) est envoyée à l'appui pour que le relâchement d'Alt
+  n'active pas la barre de menus.
+- **Frappes Unicode seulement** (`SendInput`, `KEYEVENTF_UNICODE`), d'un seul
+  bloc atomique. Le presse-papier n'est jamais lu ni écrit. Retours à la
+  ligne, tabulations et caractères de contrôle sont retirés : une Entrée
+  enverrait un message dans Discord ou Teams avant relecture.
+- **Pastille sans pouvoirs** : elle ne peut pas prendre le focus
+  (`WS_EX_NOACTIVATE`), la souris la traverse, et sa capacité Tauri se limite à
+  écouter des événements (`capabilities/dictation-pill.json`).
+- **Risque résiduel** : dicter dans un champ mot de passe y tape ce qui est
+  dit, comme un clavier. C'est voulu, et rien n'en est conservé.

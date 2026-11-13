@@ -5,6 +5,7 @@ import {
   voiceConfigure,
   voiceListenStart,
   voiceListenStop,
+  voiceSetDictation,
   voiceSpeak,
   voiceSpeakEnd,
   voiceStatus,
@@ -39,6 +40,8 @@ interface VoiceSettings {
   autoListenOnOverlay: boolean;
   /** Après une réponse à une question orale, réécouter sans raccourci. */
   continueAfterAnswer: boolean;
+  /** Ctrl+Alt+Espace maintenu : le texte s'écrit dans l'application active. */
+  dictation: boolean;
   voice: string;
   speed: number;
 }
@@ -76,6 +79,8 @@ interface VoiceActions {
   setReadAloud: (on: boolean) => void;
   setAutoListenOnOverlay: (on: boolean) => void;
   setContinueAfterAnswer: (on: boolean) => void;
+  /** Coche/décoche la dictée ; repasse à « off » si Rust refuse (raccourci pris…). */
+  setDictation: (on: boolean) => Promise<void>;
   setVoice: (voice: string) => void;
   setSpeed: (speed: number) => void;
 }
@@ -101,6 +106,20 @@ function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * Pousse à Rust l'état effectif de la dictée : voix activée, dictée cochée et
+ * modèles présents. Un refus (raccourci déjà pris) décoche la case.
+ */
+async function syncDictation(): Promise<void> {
+  const { enabled, dictation, status } = useVoiceStore.getState();
+  const wanted = enabled && dictation && (status?.sttAvailable ?? false);
+  try {
+    await voiceSetDictation(wanted);
+  } catch (err) {
+    useVoiceStore.setState({ dictation: false, hint: message(err) });
+  }
+}
+
 export const useVoiceStore = create<VoiceStore>()(
   persist(
     (set, get) => ({
@@ -108,6 +127,7 @@ export const useVoiceStore = create<VoiceStore>()(
       readAloud: true,
       autoListenOnOverlay: true,
       continueAfterAnswer: false,
+      dictation: false,
       voice: DEFAULT_VOICE,
       speed: 1,
 
@@ -131,6 +151,8 @@ export const useVoiceStore = create<VoiceStore>()(
           if (enabled && (status.sttAvailable || status.ttsAvailable)) {
             await voiceWarmup().catch(() => {});
           }
+          // Rien à retirer au démarrage : le raccourci n'existe pas encore.
+          if (get().dictation) await syncDictation();
         } catch (err) {
           set({ hint: message(err) });
         }
@@ -251,6 +273,7 @@ export const useVoiceStore = create<VoiceStore>()(
         } else {
           void voiceWarmup().catch(() => {});
         }
+        if (get().dictation) void syncDictation();
       },
       setReadAloud: readAloud => {
         set({ readAloud });
@@ -258,6 +281,10 @@ export const useVoiceStore = create<VoiceStore>()(
       },
       setAutoListenOnOverlay: autoListenOnOverlay => set({ autoListenOnOverlay }),
       setContinueAfterAnswer: continueAfterAnswer => set({ continueAfterAnswer }),
+      setDictation: async dictation => {
+        set({ dictation, hint: null });
+        await syncDictation();
+      },
       setVoice: voice => {
         set({ voice });
         void voiceConfigure({ voice, speed: get().speed }).catch(err =>
@@ -278,6 +305,7 @@ export const useVoiceStore = create<VoiceStore>()(
         readAloud: s.readAloud,
         autoListenOnOverlay: s.autoListenOnOverlay,
         continueAfterAnswer: s.continueAfterAnswer,
+        dictation: s.dictation,
         voice: s.voice,
         speed: s.speed,
       }),
