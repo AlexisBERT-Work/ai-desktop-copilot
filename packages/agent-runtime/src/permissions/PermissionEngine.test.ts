@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'path';
 import { PermissionEngine } from './PermissionEngine';
 import { ParseDocumentTool } from '../tools/files/ParseDocumentTool';
@@ -127,6 +129,88 @@ describe('PermissionEngine path whitelist', () => {
       path: join(HOME, 'Documents', 'rapport.pdf'),
     });
     expect(r.granted).toBe(true);
+  });
+});
+
+describe('PermissionEngine — liste blanche à travers jonctions et liens', () => {
+  // Vraies jonctions : `junction` sous Windows (sans droits d'administrateur),
+  // lien symbolique ailleurs. Liste blanche propre au test : `autorise` et
+  // `documents`, ce dernier étant lui-même une jonction vers `vrais-documents`.
+  let base = '';
+  let allowed = '';
+  let engine: PermissionEngine;
+
+  beforeAll(() => {
+    base = mkdtempSync(join(tmpdir(), 'catdesk-perm-'));
+    allowed = join(base, 'autorise');
+    const outside = join(base, 'dehors');
+    const realDocs = join(base, 'vrais-documents');
+    const gone = join(base, 'disparu');
+    for (const dir of [allowed, outside, realDocs, gone]) mkdirSync(dir);
+    writeFileSync(join(allowed, 'doc.txt'), 'ok');
+    writeFileSync(join(outside, 'secret.txt'), 'non');
+    writeFileSync(join(realDocs, 'note.txt'), 'ok');
+    symlinkSync(outside, join(allowed, 'lien'), 'junction');
+    symlinkSync(realDocs, join(base, 'documents'), 'junction');
+    // Lien pendant : sa cible a disparu après sa création.
+    symlinkSync(gone, join(allowed, 'pendant'), 'junction');
+    rmSync(gone, { recursive: true });
+  });
+  afterAll(() => rmSync(base, { recursive: true, force: true }));
+
+  beforeEach(() => {
+    // Approuve tout dialogue : un outil `medium` qui atteint la confirmation a
+    // passé la liste blanche.
+    engine = new PermissionEngine((_method, params) => {
+      engine.resolvePermissionRequest(String((params as { requestId: string }).requestId), true);
+    });
+    engine.updateConfig({ pathWhitelist: [allowed, join(base, 'documents')] });
+  });
+
+  const check = (tool: string, path: string) =>
+    engine.check({ tool, args: { path }, paths: [path], context: { conversationId: 'c' } });
+
+  it('refuse la lecture au travers d’une jonction, par tous les outils', async () => {
+    for (const tool of ['read_file', 'parse_document']) {
+      const r = await check(tool, join(allowed, 'lien', 'secret.txt'));
+      expect(r.granted).toBe(false);
+      expect(r.reason).toContain('Chemin non autorisé');
+      expect(r.reason).toContain('mène à');
+    }
+    // La jonction elle-même, listée comme un dossier.
+    expect((await check('list_directory', join(allowed, 'lien'))).granted).toBe(false);
+  });
+
+  it('refuse l’écriture d’un nouveau fichier sous une jonction', async () => {
+    for (const tool of ['write_file', 'export_document']) {
+      const r = await check(tool, join(allowed, 'lien', 'nouveau', 'rapport.pdf'));
+      expect(r.granted).toBe(false);
+      expect(r.reason).toContain('mène à');
+    }
+  });
+
+  it('refuse l’écriture au travers d’un lien dont la cible a disparu', async () => {
+    const r = await check('write_file', join(allowed, 'pendant', 'x.txt'));
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('cible est absente');
+  });
+
+  it('accepte toujours un chemin normal, existant ou à créer', async () => {
+    expect((await check('read_file', join(allowed, 'doc.txt'))).granted).toBe(true);
+    expect((await check('list_directory', allowed)).granted).toBe(true);
+    expect((await check('write_file', join(allowed, 'neuf', 'sous', 'x.txt'))).granted).toBe(true);
+  });
+
+  it('une racine de la liste qui est une jonction reste autorisée, sous ses deux formes', async () => {
+    expect((await check('read_file', join(base, 'documents', 'note.txt'))).granted).toBe(true);
+    expect((await check('read_file', join(base, 'vrais-documents', 'note.txt'))).granted).toBe(
+      true,
+    );
+  });
+
+  it('garde le refus de `..` et la frontière de dossier', async () => {
+    expect((await check('read_file', `${allowed}/../dehors/secret.txt`)).granted).toBe(false);
+    expect((await check('read_file', `${allowed}-evil/x.txt`)).granted).toBe(false);
   });
 });
 

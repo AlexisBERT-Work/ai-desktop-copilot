@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { expandPathEntry, isPathAllowed, pathEnv, type PathEnv } from '../permissions/pathPolicy';
+import { withRealPaths, type ResolvePath } from '../permissions/realPath';
 
 /**
  * Où chercher quand on ne précise rien : les dossiers de la liste blanche, sauf
@@ -20,29 +21,16 @@ export function defaultSearchRoots(
   return roots.length > 0 ? roots : whitelist.map(entry => expandPathEntry(entry, env));
 }
 
-export type ResolvePath = (path: string) => Promise<string>;
-
 /** Rend le chemin réel si `path` est dans le périmètre, `null` sinon. */
 export type ScopeCheck = (path: string) => Promise<string | null>;
-
-async function withRealPaths(paths: readonly string[], resolve: ResolvePath): Promise<string[]> {
-  const all = [...paths];
-  for (const path of paths) {
-    try {
-      all.push(await resolve(path));
-    } catch {
-      // Racine absente : seul le chemin écrit compte.
-    }
-  }
-  return all;
-}
 
 /**
  * Filtre des chemins renvoyés par un moteur de recherche. Chaque chemin est
  * RÉSOLU (jonctions, liens symboliques) puis doit tomber à la fois sous une
- * racine demandée et sous la liste blanche de CatDesk. Les deux, parce qu'une
- * racine demandée a été vérifiée lexicalement par le moteur de permissions :
- * si elle est elle-même une jonction vers `C:\Windows`, sa forme résolue y mène.
+ * racine demandée et sous la liste blanche de CatDesk. Les deux : le moteur de
+ * permissions a vérifié les racines au moment de la demande (`realPath.ts`),
+ * mais un moteur externe renvoie ce qu'il a indexé, et le disque a pu changer
+ * depuis.
  *
  * Les racines comptent sous leur forme écrite ET résolue : un dossier Documents
  * redirigé ailleurs reste autorisé. Un chemin qui ne se résout pas (fichier

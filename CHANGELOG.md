@@ -165,6 +165,13 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   keyword engine) goes through `realpath`, then must sit under a requested folder and the
   whitelist, so a junction cannot lead outside. `isPathAllowed` is now a shared pure function
   (`permissions/pathPolicy.ts`).
+- **The path whitelist follows junctions and symbolic links, for every tool.** `PermissionEngine`
+  checks each declared path as written, then where it really leads (`realpath`; a file to be
+  created resolves through its nearest existing parent, a dangling link is refused). A junction
+  in Documents pointing to `C:\Windows` no longer lets `read_file`, `parse_document`,
+  `list_directory`, `write_file`… through. Whitelist roots count as written and as resolved (a
+  redirected Documents stays allowed), and a path outside the whitelist never reaches the disk
+  (no SMB connection for `\\host\share`).
 
 ### Changed
 
