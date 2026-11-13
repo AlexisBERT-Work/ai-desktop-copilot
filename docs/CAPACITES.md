@@ -159,6 +159,11 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
   ne trouve rien dans les dossiers autorisés : l'ancien moteur, par mots-clés,
   sur les fichiers texte et code de 500 Ko au plus. Le résultat dit lequel a
   répondu (`engine`).
+- **`extensions` élargit, ne restreint jamais** : le modèle en devine presque à
+  chaque appel (`[".pdf",".docx",".txt"]`), et la description n'y change rien
+  (mesuré au banc). Kensaku couvre déjà tous les types ; l'ancien moteur ajoute
+  les types texte demandés aux siens. Un PDF, un document Office ou une image y
+  sont écartés, jamais lus en octets bruts, et listés (`ignoredExtensions`).
 - **Où il cherche** : les dossiers demandés, sinon Documents, Bureau et
   Téléchargements (la liste blanche, sans le dossier temporaire). Avant, sans
   dossier, il fouillait celui de l'agent. Chaque résultat est **résolu**
@@ -170,7 +175,9 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
   le relais, et le journal le dit une fois.
 - Les mots « retrouve », « quel fichier », « le fichier où »… le font proposer
   (`llm/toolKeywords.ts`) : 4 des 5 phrases « retrouve le fichier où… » du banc,
-  contre 0 avant.
+  contre 0 avant. Sa description dit qu'il trouve aussi les PDF et les captures
+  d'écran, sans quoi le modèle cherchait une capture dans sa mémoire. Au banc
+  complet (température 0), 5 des 6 tâches « fichier » réussissent.
 
 ## 5. Git & GitHub
 

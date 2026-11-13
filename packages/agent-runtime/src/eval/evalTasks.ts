@@ -442,7 +442,9 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     'fichier-loyer',
     "j'ai un fichier quelque part qui parle du loyer de mars, tu le retrouves ?",
     ['semantic_search'],
-    { answer: /870/ },
+    // Le nom du fichier suffit, comme pour les autres tâches « fichier » (corrigé
+    // le 2026-11-13 : l'oracle exigeait le montant, la réponse juste était refusée).
+    { answer: /870|bail-appartement/i },
   ),
   holdout(
     'recherche',

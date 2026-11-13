@@ -33,7 +33,8 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   index. No new tool. The CLI runs only if its SHA-256 is pinned (1.0.16, 1.0.17), without a
   shell, with `--` before the query; anything else falls back to the keyword engine.
   `scripts/fetch-kensaku.ps1` installs it, run by hand. "Find the file where…" sentences now
-  reach the tool: 4/5 on the bench (was 0/5).
+  reach the tool: 4/5 on the bench (was 0/5), and 5 of the 6 file tasks pass through the real
+  model (temperature 0).
 
 ### Performance
 
@@ -136,6 +137,11 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   outside the whitelist and unchecked. It now searches the whitelist folders, minus `%TEMP%`.
 - **`semantic_search` split accented words**: `[a-z]` turned "réunion" into "union". Terms are
   now Unicode letters, and French function words are dropped.
+- **`semantic_search` lost files when the model guessed `extensions`** (almost every call):
+  the list replaced the default text types (`.md` gone), filtered Kensaku (a `.webp` screenshot
+  dropped), and made the keyword engine read PDF and images as raw bytes. `extensions` now only
+  widens the search, and the keyword engine skips the types it cannot read
+  (`ignoredExtensions` in the result).
 
 ### Security
 

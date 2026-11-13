@@ -250,7 +250,8 @@ rien à faire au milieu d'un journal.
   refiltrés par la liste blanche, ancien moteur en repli. Au passage :
   dossiers par défaut (c'était le dossier de l'agent), termes accentués, et
   lecture en parallèle (4,1 s → 1,0 s sans dossier). Sélection : 4/5 phrases
-  « retrouve le fichier où… » (0/5 avant). Reste chez toi : § 0, point 7.
+  « retrouve le fichier où… » (0/5 avant) ; banc : 5/6 tâches « fichier ».
+  Reste chez toi : § 0, point 7.
 
 - **Trouvé par le banc de qualité** (2026-11-05), par ordre de gêne :
   - **Réponses vides** : 1 à 2 tâches sur 90. Ollama renvoie `content` vide et
