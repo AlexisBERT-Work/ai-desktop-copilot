@@ -354,7 +354,42 @@ trous réels, quatre durcissements.
 Reste ouvert : le haché est vérifié **avant** l'exécution, et un fichier
 remplacé entre les deux passerait. Il faut pour cela pouvoir écrire dans
 `%LOCALAPPDATA%`, donc déjà exécuter du code sous le compte de l'utilisateur.
-`PermissionEngine` reste lexical pour les autres outils (voir `LIMITES.md` § 5).
+`PermissionEngine` restait lexical pour les autres outils : réglé le même jour
+(section suivante).
 L'index de Kensaku contient le texte extrait des fichiers indexés : il reste
 dans `%APPDATA%\kensaku`, et ses extraits passent par le cadrage habituel des
 sorties d'outils avant d'atteindre le modèle.
+
+## Mise à jour 2026-11-13 — liste blanche résolue, pour tous les outils
+
+La section précédente fermait la faille pour `semantic_search` seulement. Une
+jonction posée dans `%USERPROFILE%\Documents` vers `C:\Windows` laissait encore
+`read_file`, `parse_document`, `list_directory`… lire au travers, et
+`write_file` ou `export_document` écrire au travers : `PermissionEngine`
+comparait le chemin écrit, sans demander au disque où il mène.
+
+- **Deux contrôles par chemin déclaré** (`permissions/realPath.ts::createPathGuard`,
+  appelé par `PermissionEngine.check` pour chaque entrée de `request.paths`) :
+  le chemin écrit doit être sous une racine (refus de `..`, frontière de
+  dossier, liste vide = tout autorisé, comme avant), puis son chemin réel
+  (`fs.promises.realpath`) aussi.
+- **Fichier à créer** : il n'existe pas encore, donc on résout son plus proche
+  parent existant et on y rajoute le reste. Écrire `Documents\lien\nouveau.txt`
+  vise la cible de `lien` : refusé si elle est hors liste.
+- **Lien pendant** (sa cible n'existe plus) : refusé, car écrire au travers
+  recréerait la cible ailleurs. Destination illisible (accès refusé, boucle de
+  liens) : refusée aussi.
+- **Racines sous leurs deux formes**, écrite et résolue : un Documents redirigé
+  (OneDrive, autre disque) reste autorisé. `search/scope.ts` partage désormais
+  `withRealPaths` avec le moteur au lieu d'en garder sa copie.
+- **Rien n'est résolu hors liste.** Un chemin qui échoue au contrôle écrit n'est
+  jamais présenté au disque : `realpath` sur `\\hôte\partage` ouvrirait une
+  connexion SMB et y tenterait une authentification NTLM du compte.
+- **Testé avec de vraies jonctions** (`PermissionEngine.test.ts` : lecture,
+  écriture d'un nouveau fichier, lien pendant, racine redirigée, `..` et
+  voisin `Documents-evil`) et par des cas simulés (`realPath.test.ts`, dont le
+  chemin UNC jamais résolu).
+
+Reste ouvert : une fenêtre entre la vérification et l'ouverture du fichier par
+l'outil. Une jonction créée entre les deux n'est pas vue. La poser demande déjà
+d'exécuter quelque chose sur le poste (ou `run_command`, 🟠 confirmé).
