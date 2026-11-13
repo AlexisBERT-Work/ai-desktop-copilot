@@ -76,7 +76,9 @@ const argsSchema = z.object({
   paths: z
     .array(z.string())
     .optional()
-    .describe('Directories to search (defaults to Documents, Desktop and Downloads)'),
+    .describe(
+      'Only folders the user named. Omit otherwise: Documents, Desktop and Downloads are searched. Never guess a path.',
+    ),
   extensions: z
     .array(z.string())
     .optional()
@@ -301,7 +303,7 @@ function countTerms(text: string, terms: readonly string[]): number {
 export class SemanticSearchTool extends BaseTool<Args> {
   readonly name = 'semantic_search';
   readonly description =
-    'Cherche dans les fichiers locaux par similarité de contenu (keyword scoring). Retourne les fichiers les plus pertinents avec un extrait du passage correspondant.';
+    'Retrouve un fichier local d’après ce qu’il contient, PDF et captures d’écran compris. Renvoie les plus pertinents avec un extrait.';
   readonly category = 'filesystem' as const;
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;

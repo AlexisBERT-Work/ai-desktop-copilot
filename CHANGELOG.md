@@ -33,7 +33,8 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   index. No new tool. The CLI runs only if its SHA-256 is pinned (1.0.16, 1.0.17), without a
   shell, with `--` before the query; anything else falls back to the keyword engine.
   `scripts/fetch-kensaku.ps1` installs it, run by hand. "Find the file where…" sentences now
-  reach the tool: 4/5 on the bench (was 0/5).
+  reach the tool: 4/5 on the bench (was 0/5), and 5 of the 6 file tasks pass through the real
+  model (temperature 0).
 
 ### Performance
 

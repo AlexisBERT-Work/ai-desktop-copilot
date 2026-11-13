@@ -170,7 +170,9 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
   le relais, et le journal le dit une fois.
 - Les mots « retrouve », « quel fichier », « le fichier où »… le font proposer
   (`llm/toolKeywords.ts`) : 4 des 5 phrases « retrouve le fichier où… » du banc,
-  contre 0 avant.
+  contre 0 avant. Sa description dit qu'il trouve aussi les PDF et les captures
+  d'écran, sans quoi le modèle cherchait une capture dans sa mémoire. Au banc
+  complet (température 0), 5 des 6 tâches « fichier » réussissent.
 
 ## 5. Git & GitHub
 
