@@ -14,6 +14,68 @@ const ok =
 
 const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
 
+const fold = (s: string): string =>
+  s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+/**
+ * Les fichiers du poste fictif pour `semantic_search` : on se souvient du
+ * contenu, pas du nom. Un fichier sort si un de ses mots est dans la requête,
+ * comme le ferait un vrai moteur (Kensaku ou mots-clés).
+ */
+const LOCAL_FILES = [
+  {
+    file: 'Documents/devis-cuisine.pdf',
+    words: ['devis', 'cuisine'],
+    snippet: 'Devis cuisine : 7 450 € TTC, pose comprise, livraison semaine 6.',
+  },
+  {
+    file: 'Documents/notes-maison.md',
+    words: ['portail', 'code', 'maison'],
+    snippet: 'Code du portail : 4821B. Boîte aux lettres n° 12.',
+  },
+  {
+    file: 'Pictures/capture-2026-11-02.png',
+    words: ['cuda', 'erreur', 'capture'],
+    snippet: 'RuntimeError: CUDA out of memory (tried to allocate 2.00 GiB)',
+    matchType: 'Content',
+  },
+  {
+    file: 'Downloads/indexation-bdd.pdf',
+    words: ['indexation', 'index', 'base', 'donnees', 'pdf'],
+    snippet: 'Les index B-tree accélèrent les recherches par égalité et par plage.',
+  },
+  {
+    file: 'Documents/bail-appartement.pdf',
+    words: ['bail', 'loyer', 'contrat', 'appartement'],
+    snippet: 'Loyer de mars : 870 € charges comprises, payable le 5.',
+  },
+];
+
+const searchLocalFiles: SimulatedResponse = args => {
+  const query = fold(String(args['query'] ?? ''));
+  const hits = LOCAL_FILES.filter(f => f.words.some(w => query.includes(w)));
+  return {
+    success: true,
+    data: {
+      query: args['query'],
+      engine: 'kensaku',
+      results: hits.map(f => ({
+        file: f.file,
+        absolutePath: `C:/Users/moi/${f.file}`,
+        score: 0.9,
+        matchCount: 1,
+        snippet: f.snippet,
+        sizeBytes: 48_213,
+        matchType: f.matchType ?? 'Both',
+      })),
+      totalMatched: hits.length,
+    },
+  };
+};
+
 /**
  * Un poste fictif, fixe : les tâches du banc attendent ses faits dans la
  * réponse (« dentiste », « 231,40 »). Chaque fait est assez singulier pour que
@@ -138,6 +200,7 @@ export function simulatedWorld(now: Date): SimulatedWorld {
     fetch_tech_news: ok({
       items: [{ source: 'Hacker News', title: 'Rust 2.0 est annoncé pour 2027' }],
     }),
+    semantic_search: searchLocalFiles,
     read_clipboard: ok({ text: 'Commander les billets pour Lyon' }),
     search_memory: ok({
       results: [{ content: 'Mon comptable s’appelle M. Durand.', score: 0.82 }],

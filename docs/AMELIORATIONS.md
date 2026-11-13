@@ -13,20 +13,21 @@
 
 ## 0. Ce qui bloque sur toi
 
-Sept choses restent ouvertes, et **aucune ne peut être faite sans toi** :
+Huit choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
-| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0   | **Relire et fusionner la [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)** (`refactor/audit-complet` → `dev`).          | Audit, latence et correctifs du 2026-10-07 au 2026-10-09 : ~30 commits. Tout est testé, mais c'est ta branche de travail qui change. Le Supabase coupé le 2026-10-08 est **rétabli** (vérifié le 2026-10-09 : session anonyme, tables, RPC de publication).                |
-| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe. |
-| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                |
-| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                      |
-| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
-| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
-| 6   | **Appliquer les migrations Supabase** — `pnpm exec supabase db push` (#27 et #29 sont dans `dev`).                                              | Le Supabase de prod est partagé par tous les postes : aucune session n'y a touché. Sans `20261029170000`, le titre de l'an dernier bloquera en silence chaque daily du jour dès l'été 2027.                                                                                |
+| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | **Relire et fusionner la [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)** (`refactor/audit-complet` → `dev`).          | Audit, latence et correctifs du 2026-10-07 au 2026-10-09 : ~30 commits. Tout est testé, mais c'est ta branche de travail qui change. Le Supabase coupé le 2026-10-08 est **rétabli** (vérifié le 2026-10-09 : session anonyme, tables, RPC de publication).                                           |
+| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe.                            |
+| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                                           |
+| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                                                 |
+| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                                                       |
+| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                                                   |
+| 6   | **Appliquer les migrations Supabase** — `pnpm exec supabase db push` (#27 et #29 sont dans `dev`).                                              | Le Supabase de prod est partagé par tous les postes : aucune session n'y a touché. Sans `20261029170000`, le titre de l'an dernier bloquera en silence chaque daily du jour dès l'été 2027.                                                                                                           |
+| 7   | **Installer Kensaku, si tu le veux** — `powershell -File scripts/fetch-kensaku.ps1`, puis l'application Kensaku 1.0.17 (même release).          | Installer un binaire tiers est ta décision, pas celle d'une session. Ensuite : indexer Documents, Bureau et Téléchargements, la lancer une fois, puis `pnpm --filter @catdesk/agent-runtime test` (le test du vrai CLI ne tourne qu'une fois le CLI posé) et un œil sur la VRAM pendant l'indexation. |
 
 Les points 1 à 5 forment le jalon **0.2.0** ci-dessous ; le point 0 passe avant tout,
-le 6 ne dépend d'aucune version.
+les points 6 et 7 ne dépendent d'aucune version.
 
 ---
 
@@ -243,6 +244,14 @@ Le premier token est passé de 19-47 s à 1-2,5 s (mesures dans
 
 Reprises de l'ancienne section « Prochaines pistes » de `SUIVI.md`, qui n'avait
 rien à faire au milieu d'un journal.
+
+- ✅ **Kensaku comme moteur de `semantic_search`** (veille du 6/11, 2026-11-13).
+  Aucun outil ajouté. Binaire épinglé par SHA-256, résultats résolus et
+  refiltrés par la liste blanche, ancien moteur en repli. Au passage :
+  dossiers par défaut (c'était le dossier de l'agent), termes accentués, et
+  lecture en parallèle (4,1 s → 1,0 s sans dossier). Sélection : 4/5 phrases
+  « retrouve le fichier où… » (0/5 avant) ; banc : 5/6 tâches « fichier ».
+  Reste chez toi : § 0, point 7.
 
 - **Trouvé par le banc de qualité** (2026-11-05), par ordre de gêne :
   - **Réponses vides** : 1 à 2 tâches sur 90. Ollama renvoie `content` vide et

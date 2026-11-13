@@ -81,6 +81,27 @@ aujourd'hui classé `critical`.
   (planification opt-in basique seulement).
 - **RAG hybride partiel** : la fusion dense + BM25 est implémentée dans
   `VectorStore.ts` ; **pas de reranking ni de GraphRAG** pour l'instant.
+- **`semantic_search` sans Kensaku** : mots-clés seulement, fichiers texte et
+  code de 500 Ko au plus. Ni PDF, ni Office, ni images : demandés, ils sont
+  écartés, et le résultat le dit (`ignoredExtensions`). « Seulement mes `.py` »
+  ramène aussi des `.md`, classés après s'ils sont moins pertinents :
+  `extensions` élargit la recherche, il ne la restreint jamais, parce que le
+  modèle le devine. Au plus 5 000 fichiers
+  par recherche, dans l'ordre du parcours : au-delà, le reste n'est pas lu. Sur
+  le poste de référence, Documents + Bureau + Téléchargements atteignent ce
+  plafond, et une recherche sans dossier prend **~1 s** (4 s avant la lecture en
+  parallèle).
+- **`semantic_search` avec Kensaku** : un binaire tiers, qu'il faut installer
+  soi-même, avec l'application qui construit l'index (le CLI ne fait que le
+  lire : sans index, code 3, et CatDesk revient aux mots-clés). Ce que Kensaku
+  indexe, c'est **son** réglage de dossiers, pas la liste blanche de CatDesk :
+  CatDesk écarte après coup ce qui en sort, mais une recherche peut alors ne
+  rien rendre de Kensaku. L'application télécharge une fois un modèle d'OCR
+  (~6 Mo) et indexe en tâche de fond. D'après sa documentation, c'est en basse
+  priorité et sur CPU : ni la VRAM ni la charge n'ont été mesurées ici. La
+  qualité de son tier « sens » en français n'est pas mesurée non plus. Chaque
+  nouvelle version de Kensaku demande une mise à jour de CatDesk (empreinte
+  épinglée), sinon c'est l'ancien moteur qui répond.
 
 ## 5. Sécurité — défenses encore manquantes
 
@@ -96,6 +117,11 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 - **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
   sont redactés aujourd'hui.
 - **Isolation réseau** pour l'exécution de code généré.
+- **Liste blanche lexicale** : `PermissionEngine` compare le chemin écrit, sans
+  suivre les jonctions. Une jonction posée dans Documents vers un autre dossier
+  laisse `read_file` lire au travers. Seul `semantic_search` résout ses
+  résultats avant de les vérifier (2026-11-13). Créer une jonction demande déjà
+  un accès au disque (ou `run_command`, 🟠 confirmé).
 
 ## 6. Tests & qualité
 

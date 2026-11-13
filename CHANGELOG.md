@@ -28,6 +28,13 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   real orchestrator and the real model, against a simulated world, with no LLM judge. Strict
   success went from 61/90 to 74/90 with the keywords, then 76/90 with the selection threshold
   below. `eval --selection` needs no GPU.
+- **`semantic_search` can use Kensaku** (github.com/yjid/kensaku, MIT): names, text inside
+  PDF/Office files, text in screenshots (OCR) and meaning, read from the Kensaku app's local
+  index. No new tool. The CLI runs only if its SHA-256 is pinned (1.0.16, 1.0.17), without a
+  shell, with `--` before the query; anything else falls back to the keyword engine.
+  `scripts/fetch-kensaku.ps1` installs it, run by hand. "Find the file where…" sentences now
+  reach the tool: 4/5 on the bench (was 0/5), and 5 of the 6 file tasks pass through the real
+  model (temperature 0).
 
 ### Performance
 
@@ -58,6 +65,8 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **The warm-up also reads the open conversation**, not just the fixed prompt: in the real
   app, with a real history, the first question of a session went from 61-71 s to 3.5 s
   and the following ones from ~10 s to ~3 s.
+- **Keyword `semantic_search` reads files in parallel** (16 at a time): a search with no folder
+  over Documents, Desktop and Downloads (5,000 files) went from 4.1 s to 1.0 s.
 
 ### Fixed
 
@@ -124,6 +133,15 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - Python sidecar logs were invalid JSON as soon as a message contained a quote or a
   newline.
 - Four PowerShell scripts with non-ASCII text had no BOM and were read as cp1252.
+- **`semantic_search` with no folder searched the agent's own directory** (`process.cwd()`),
+  outside the whitelist and unchecked. It now searches the whitelist folders, minus `%TEMP%`.
+- **`semantic_search` split accented words**: `[a-z]` turned "réunion" into "union". Terms are
+  now Unicode letters, and French function words are dropped.
+- **`semantic_search` lost files when the model guessed `extensions`** (almost every call):
+  the list replaced the default text types (`.md` gone), filtered Kensaku (a `.webp` screenshot
+  dropped), and made the keyword engine read PDF and images as raw bytes. `extensions` now only
+  widens the search, and the keyword engine skips the types it cannot read
+  (`ignoredExtensions` in the result).
 
 ### Security
 
@@ -149,6 +167,10 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **Smaller webview surface**: the CSP no longer allows the Ollama port, and the
   capabilities drop `set-always-on-top`, notifications, global shortcuts and the updater
   (all driven from Rust). The unused notification plugin is removed.
+- **`semantic_search` results are resolved and re-checked**: every path (from Kensaku or the
+  keyword engine) goes through `realpath`, then must sit under a requested folder and the
+  whitelist, so a junction cannot lead outside. `isPathAllowed` is now a shared pure function
+  (`permissions/pathPolicy.ts`).
 
 ### Changed
 
