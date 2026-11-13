@@ -49,6 +49,20 @@ export interface VoiceStatus {
   config: VoiceConfig;
 }
 
+/**
+ * Vocabulaire personnel de la reconnaissance (`voice_vocabulary_get` / `_set`) :
+ * un terme par ligne, « Terme = entendu, entendu » pour les variantes.
+ */
+export interface VoiceVocabulary {
+  text: string;
+  /** Fichier sur le disque (`<données>/voice/vocabulaire.txt`). */
+  path: string | null;
+  terms: number;
+  aliases: number;
+  /** Lignes ignorées et pourquoi, en français. */
+  problems: string[];
+}
+
 export interface VoiceStateEvent {
   state: VoiceState;
 }

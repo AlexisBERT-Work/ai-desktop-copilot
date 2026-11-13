@@ -6,6 +6,7 @@ import {
   voiceListenStart,
   voiceListenStop,
   voiceSetDictation,
+  voiceSetVocabularyEnabled,
   voiceSpeak,
   voiceSpeakEnd,
   voiceStatus,
@@ -42,6 +43,8 @@ interface VoiceSettings {
   continueAfterAnswer: boolean;
   /** Ctrl+Alt+Espace maintenu : le texte s'écrit dans l'application active. */
   dictation: boolean;
+  /** Noms propres réécrits d'après le vocabulaire (fichier tenu côté Rust). */
+  vocabulary: boolean;
   voice: string;
   speed: number;
 }
@@ -81,6 +84,7 @@ interface VoiceActions {
   setContinueAfterAnswer: (on: boolean) => void;
   /** Coche/décoche la dictée ; repasse à « off » si Rust refuse (raccourci pris…). */
   setDictation: (on: boolean) => Promise<void>;
+  setVocabulary: (on: boolean) => void;
   setVoice: (voice: string) => void;
   setSpeed: (speed: number) => void;
 }
@@ -128,6 +132,7 @@ export const useVoiceStore = create<VoiceStore>()(
       autoListenOnOverlay: true,
       continueAfterAnswer: false,
       dictation: false,
+      vocabulary: true,
       voice: DEFAULT_VOICE,
       speed: 1,
 
@@ -153,6 +158,8 @@ export const useVoiceStore = create<VoiceStore>()(
           }
           // Rien à retirer au démarrage : le raccourci n'existe pas encore.
           if (get().dictation) await syncDictation();
+          // Rust démarre avec la correction active : on ne pousse que le refus.
+          if (!get().vocabulary) await voiceSetVocabularyEnabled(false).catch(() => {});
         } catch (err) {
           set({ hint: message(err) });
         }
@@ -285,6 +292,10 @@ export const useVoiceStore = create<VoiceStore>()(
         set({ dictation, hint: null });
         await syncDictation();
       },
+      setVocabulary: vocabulary => {
+        set({ vocabulary });
+        void voiceSetVocabularyEnabled(vocabulary).catch(err => set({ hint: message(err) }));
+      },
       setVoice: voice => {
         set({ voice });
         void voiceConfigure({ voice, speed: get().speed }).catch(err =>
@@ -306,6 +317,7 @@ export const useVoiceStore = create<VoiceStore>()(
         autoListenOnOverlay: s.autoListenOnOverlay,
         continueAfterAnswer: s.continueAfterAnswer,
         dictation: s.dictation,
+        vocabulary: s.vocabulary,
         voice: s.voice,
         speed: s.speed,
       }),
