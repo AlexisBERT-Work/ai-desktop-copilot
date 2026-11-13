@@ -29,6 +29,19 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   never the text. Measured: 5.7 s of speech to text in 0.3 s (median), 56 characters with
   accents and emoji typed in 1 ms into a real Win32 edit box. The WER test on the user's own
   voice uses `scripts/dictation-wer.mjs`.
+- **Voice vocabulary** (Settings > Voice): one proper noun per line, written the way you want
+  to read it. After Parakeet, words that sound the same and are spelled almost the same are
+  rewritten ("Cat Desk" → "CatDesk", "Olama" → "Ollama", "Kwen" → "Qwen"), with a French
+  phonetic key, elisions ("l'Olama") and plurals handled. Badly mangled names take explicit
+  variants after "=" (`Kensaku = consacu`). It applies to the voice chat and to dictation,
+  costs under 1 ms per sentence, and never reaches the language model. File format and
+  matching approach adapted from Umless (Apache-2.0). On a Piper → Parakeet bench (20 names ×
+  3 sentences, 2 voices), exact names went from 16 % to 46 % with names alone and 62 % with
+  variants learned from the other voice, with 2 false replacements in 200 sentences without
+  names. Single-word variants under 3 letters are refused ("Ollama = a"). Sherpa-onnx
+  hotwords were measured and left out: no name gained once the vocabulary is applied, 6-30 %
+  slower. Not yet measured on a
+  real voice.
 - **Tool selection understands everyday French.** `llm/toolKeywords.ts` lists the words people
   use for each tool outside the core ("agenda", "rendez-vous"…). `selectTools` reads them and
   the model never sees them, so they add no tokens. On the French task set, the expected tool

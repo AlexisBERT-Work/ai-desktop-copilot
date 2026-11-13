@@ -90,6 +90,7 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 | **Lecture des réponses à voix haute**, phrase par phrase pendant l'écriture | Piper `fr_FR-miro-high` (voix `siwis` en option) | 1er son 83 ms, 18× temps réel    |
 | Voix de secours sans modèle                                                 | `speechSynthesis` Windows (Hortense)             | —                                |
 | **Dictée dans toutes les applications** : `Ctrl+Alt+Espace` maintenu        | VAD Silero (enregistrement entier) + Parakeet    | 5,7 s de parole → texte en 0,3 s |
+| **Vocabulaire** : les noms propres écrits comme tu les écris                | correction phonétique française après Parakeet   | < 1 ms par phrase                |
 
 - Le micro se ferme **dès la prise de parole obtenue** (un tour), après 8 s
   sans parole, ou quand la bulle se ferme (Échap). Un clic sur le bouton micro
@@ -108,6 +109,17 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
   pastille en bas de l'écran montre l'état, puis le nombre de caractères écrits
   ou la raison d'un refus. 60 s au plus par dictée. Le texte ne passe jamais
   par le modèle.
+- **Vocabulaire** (actif par défaut, vide tant qu'on n'y écrit rien ;
+  Paramètres › Voix) : un nom par ligne, écrit comme on veut le lire
+  (« CatDesk », « Ollama », « Maëlle »). Ce que Parakeet entend presque
+  pareil est récrit : « Cat Desk », « Olama », « Kwen », « Thibaut ». Pour
+  un nom très déformé, on ajoute après « = » ce que la voix écrit à sa place
+  (`Kensaku = consacu`). Vaut pour la bulle et pour la dictée. Le fichier
+  (`<données>/voice/vocabulaire.txt`) est en service dès l'enregistrement.
+  Banc Piper → Parakeet, 20 noms × 3 phrases et 2 voix : noms exacts de
+  16 % à **46 %** avec les noms seuls, **62 %** avec des variantes. Faux
+  remplacements : 2 sur 200 phrases sans nom. Pas encore mesuré avec une
+  vraie voix ([AMELIORATIONS.md](AMELIORATIONS.md) § 0, point 8).
 - **Rien ne touche la VRAM** : la RX 6700 reste entière pour `qwen3:14b`.
 - Modèles (~800 Mo) : embarqués par l'installeur (`resources/voice/`), ou
   `scripts/fetch-voice-models.ps1` en dev, ou déposés dans

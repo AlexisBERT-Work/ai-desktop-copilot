@@ -15,6 +15,7 @@ vi.mock('../../shared/api/voice', () => ({
   voiceListenStart: vi.fn(() => Promise.resolve()),
   voiceListenStop: vi.fn(() => Promise.resolve()),
   voiceSetDictation: vi.fn(() => Promise.resolve()),
+  voiceSetVocabularyEnabled: vi.fn(() => Promise.resolve()),
   voiceSpeak: vi.fn(() => Promise.resolve()),
   voiceSpeakEnd: vi.fn(() => Promise.resolve()),
   voiceStatus: vi.fn(() => Promise.resolve(STATUS)),
@@ -22,7 +23,7 @@ vi.mock('../../shared/api/voice', () => ({
   voiceWarmup: vi.fn(() => Promise.resolve()),
 }));
 
-import { voiceSetDictation } from '../../shared/api/voice';
+import { voiceSetDictation, voiceSetVocabularyEnabled } from '../../shared/api/voice';
 import { useVoiceStore } from './voiceStore';
 
 const setDictation = vi.mocked(voiceSetDictation);
@@ -77,5 +78,37 @@ describe('voiceStore — dictée', () => {
     useVoiceStore.setState({ dictation: true });
     await useVoiceStore.getState().init();
     expect(setDictation).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('voiceStore — vocabulaire', () => {
+  const setVocabularyEnabled = vi.mocked(voiceSetVocabularyEnabled);
+
+  beforeEach(() => {
+    setVocabularyEnabled.mockReset();
+    setVocabularyEnabled.mockResolvedValue(undefined);
+    useVoiceStore.setState({ enabled: true, vocabulary: true, status: STATUS, hint: null });
+  });
+
+  it('actif par défaut, et persisté', () => {
+    expect(useVoiceStore.getInitialState().vocabulary).toBe(true);
+    const persisted = useVoiceStore.persist.getOptions().partialize?.(useVoiceStore.getState());
+    expect(persisted).toHaveProperty('vocabulary', true);
+  });
+
+  it('décocher coupe la correction côté Rust, recocher la rétablit', async () => {
+    useVoiceStore.getState().setVocabulary(false);
+    await vi.waitFor(() => expect(setVocabularyEnabled).toHaveBeenLastCalledWith(false));
+    useVoiceStore.getState().setVocabulary(true);
+    await vi.waitFor(() => expect(setVocabularyEnabled).toHaveBeenLastCalledWith(true));
+  });
+
+  it('au démarrage : Rust part actif, seul un refus est poussé', async () => {
+    await useVoiceStore.getState().init();
+    expect(setVocabularyEnabled).not.toHaveBeenCalled();
+
+    useVoiceStore.setState({ vocabulary: false });
+    await useVoiceStore.getState().init();
+    expect(setVocabularyEnabled).toHaveBeenCalledWith(false);
   });
 });

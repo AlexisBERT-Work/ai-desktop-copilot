@@ -78,6 +78,29 @@ aujourd'hui classé `critical`.
   - la pastille est une seconde fenêtre WebView2 (quelques dizaines de Mo de
     RAM) tant que la dictée est activée, et elle s'affiche sur l'écran principal
     seulement.
+- **Le vocabulaire ne corrige que ce qui ressemble au nom** (Paramètres ›
+  Voix ; mesuré au banc avec deux voix de synthèse Piper, pas encore avec une
+  vraie voix) :
+  - un nom que la reconnaissance écrit loin de son orthographe (« GitHub »
+    entendu « Jeb », « Kubernetes » entendu « Tuberneutre », « Hugging Face »
+    entendu « Aguine Face ») ne se corrige que par une variante « = ». Avec
+    les noms seuls, un peu plus de la moitié des noms du banc restent faux
+    (46 % justes) ; avec des variantes, 62 % ;
+  - un prénom proche d'un autre est récrit : « Maël » devient « Maëlle » si
+    seule Maëlle est dans la liste. C'est la seule erreur relevée par le banc
+    sur 200 phrases sans nom (2 fois) ;
+  - un mot courant mis dans la liste (« Mistral ») ou en variante
+    (« Maëlle = elle », « Supabase = base ») est récrit **partout**, y
+    compris dans une dictée tapée ailleurs. Une variante d'un seul mot de
+    moins de 3 lettres est refusée ; pour le reste, c'est à l'utilisateur
+    d'en juger, et l'aide de la carte le dit. Au banc, recopier tout ce que
+    la voix a écrit à la place des noms donne 5 % de faux remplacements
+    (32 % avant le refus des variantes comme « Ollama = a »). Sans les mots
+    courants, on reste à 1 % ;
+  - pas de hotwords (biais du décodeur vers les noms) : mesurés, ils ne
+    gagnent rien une fois le vocabulaire appliqué, et ralentissent (voir [AMELIORATIONS.md](AMELIORATIONS.md)
+    § 4) ;
+  - les variantes s'écrivent à la main : rien n'apprend des corrections.
 
 ## 4. Capacités partielles / à durcir
 

@@ -355,3 +355,30 @@ application** que CatDesk : deux nouveautés sensibles. Ce qui les borne
   écouter des événements (`capabilities/dictation-pill.json`).
 - **Risque résiduel** : dicter dans un champ mot de passe y tape ce qui est
   dit, comme un clavier. C'est voulu, et rien n'en est conservé.
+
+## Mise à jour 2026-11-13 — vocabulaire de la reconnaissance vocale (veille du 13/11)
+
+Un fichier que l'utilisateur écrit (`vocabulaire.txt`) réécrit désormais ce
+que Parakeet a entendu, pour la bulle comme pour la dictée
+(`core/voice/vocabulary.rs`). Ce qui le borne :
+
+- **Fichier local, dans le dossier de données** :
+  `%APPDATA%\com.catdesk.app\agent-data\voice\vocabulaire.txt`
+  (`core::data_dir`). Il ne sort jamais de la machine et ne passe pas par le
+  modèle.
+- **Entrée validée côté Rust** avant écriture : 32 Ko au plus, pas de
+  caractère de contrôle (hors retour à la ligne et tabulation). À la lecture :
+  500 entrées au plus, 200 caractères par ligne ; ce qui dépasse est ignoré et
+  signalé. Écriture atomique (fichier temporaire puis renommage) : un fichier
+  à moitié écrit ne peut pas être chargé.
+- **Audit** : `VOICE_VOCABULARY` à chaque enregistrement, avec le nombre de
+  noms et de variantes, **jamais les noms** (des prénoms de proches peuvent y
+  figurer). Le journal de débogage note qu'une correction a eu lieu, jamais le
+  texte.
+- **Pas d'exécution** : une ligne est un mot à écrire, rien n'est interprété
+  (ni expression régulière, ni commande). Le temps de correction est borné par
+  la taille du fichier (moins de 1 ms par phrase avec 20 noms).
+- **Risque résiduel** : un mot courant mis dans le vocabulaire (« Mistral »)
+  est récrit partout avec sa majuscule, y compris dans une dictée tapée
+  ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
+  sans effacer le fichier.
