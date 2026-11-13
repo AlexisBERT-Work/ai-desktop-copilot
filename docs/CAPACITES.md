@@ -158,7 +158,9 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
   l'index local de l'application Kensaku, en lecture seule. Sans lui, ou s'il
   ne trouve rien dans les dossiers autorisés : l'ancien moteur, par mots-clés,
   sur les fichiers texte et code de 500 Ko au plus. Le résultat dit lequel a
-  répondu (`engine`).
+  répondu (`engine`). Un PDF, un document Office ou une image demandés par
+  `extensions` sont écartés par l'ancien moteur, jamais lus en octets bruts, et
+  le résultat les liste (`ignoredExtensions`).
 - **Où il cherche** : les dossiers demandés, sinon Documents, Bureau et
   Téléchargements (la liste blanche, sans le dossier temporaire). Avant, sans
   dossier, il fouillait celui de l'agent. Chaque résultat est **résolu**

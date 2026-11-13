@@ -121,6 +121,30 @@ describe('semantic_search — moteur par mots-clés', () => {
     ]);
   });
 
+  it('écarte les extensions qu’il ne sait pas lire (PDF, images), garde les autres', async () => {
+    const data = expectOk(
+      await tool.run({
+        query: 'webhook discord',
+        paths: [dir],
+        extensions: ['.PDF', '.md', 'png'],
+      }),
+    ).data as Payload & { ignoredExtensions?: string[] };
+    expect(data.ignoredExtensions).toEqual(['.pdf', '.png']);
+    const files = data.results.map(r => r.absolutePath);
+    expect(files).toEqual([realpathSync(join(dir, 'guide.md'))]);
+    expect(files).not.toContain(realpathSync(join(dir, 'devis.pdf')));
+  });
+
+  it('que des extensions illisibles : aucun fichier lu, et il dit pourquoi', async () => {
+    const data = expectOk(
+      await tool.run({ query: 'devis', paths: [dir], extensions: ['.pdf', '.docx'] }),
+    ).data as Payload & { totalScanned: number; ignoredExtensions: string[]; message: string };
+    expect(data.results).toEqual([]);
+    expect(data.totalScanned).toBe(0);
+    expect(data.ignoredExtensions).toEqual(['.pdf', '.docx']);
+    expect(data.message).toMatch(/Kensaku/);
+  });
+
   it('garde la forme des résultats', async () => {
     const data = expectOk(await tool.run({ query: 'webhook', paths: [dir], limit: 1 }))
       .data as Payload;

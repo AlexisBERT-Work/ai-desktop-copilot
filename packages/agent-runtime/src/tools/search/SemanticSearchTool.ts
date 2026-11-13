@@ -52,6 +52,42 @@ const DEFAULT_EXTENSIONS = new Set([
   '.env.example',
 ]);
 
+/**
+ * Ce que le moteur par mots-clés lirait en octets bruts : seul Kensaku
+ * (extraction de texte, OCR) sait y chercher. Demandées sans lui, elles sont
+ * écartées plutôt que lues comme du texte.
+ */
+const BINARY_EXTENSIONS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.odt',
+  '.ods',
+  '.odp',
+  '.epub',
+  '.msg',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.tif',
+  '.tiff',
+  '.webp',
+  '.heic',
+  '.zip',
+  '.7z',
+  '.rar',
+  '.mp3',
+  '.mp4',
+  '.wav',
+  '.mov',
+]);
+
 // Directories that are never searched
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -331,7 +367,12 @@ export class SemanticSearchTool extends BaseTool<Args> {
     const roots = requested.length > 0 ? requested : defaultSearchRoots(whitelist);
     const explicitExts =
       (args.extensions?.length ?? 0) > 0
-        ? new Set((args.extensions as string[]).map(e => (e.startsWith('.') ? e : `.${e}`)))
+        ? new Set(
+            (args.extensions as string[]).map(e => {
+              const ext = e.trim().toLowerCase();
+              return ext.startsWith('.') ? ext : `.${ext}`;
+            }),
+          )
         : null;
     const queryTerms = tokenize(query);
     // Chaque résultat, des deux moteurs, est résolu (jonctions) puis revérifié.
@@ -348,14 +389,33 @@ export class SemanticSearchTool extends BaseTool<Args> {
     if (viaKensaku !== null) return viaKensaku;
 
     if (queryTerms.length === 0) return this.fail('La requête ne contient aucun terme exploitable');
+    // Ce moteur ne lit que du texte : un PDF ou une image demandés sont écartés,
+    // jamais lus en octets bruts (le modèle en ajoute parfois sans qu'on les demande).
+    const ignored = [...(explicitExts ?? [])].filter(e => BINARY_EXTENSIONS.has(e));
+    const exts =
+      explicitExts === null
+        ? DEFAULT_EXTENSIONS
+        : new Set([...explicitExts].filter(e => !BINARY_EXTENSIONS.has(e)));
+    if (exts.size === 0) {
+      return this.ok({
+        query,
+        engine: 'keywords',
+        results: [],
+        totalScanned: 0,
+        ignoredExtensions: ignored,
+        message:
+          'PDF, documents Office et images ne se cherchent qu’avec Kensaku, qui n’a rien donné ici (absent, ou dossier non indexé). Ce moteur ne lit que des fichiers texte.',
+      });
+    }
     return this.searchKeywords(
       query,
       queryTerms,
       roots,
-      explicitExts ?? DEFAULT_EXTENSIONS,
+      exts,
       max_file_size,
       limit,
       inScope,
+      ignored,
     );
   }
 
@@ -417,7 +477,9 @@ export class SemanticSearchTool extends BaseTool<Args> {
     maxFileSize: number,
     limit: number,
     inScope: ScopeCheck,
+    ignored: readonly string[],
   ): Promise<ToolResult> {
+    const ignoredField = ignored.length > 0 ? { ignoredExtensions: ignored } : {};
     const allFiles: string[] = [];
     for (const dir of roots) {
       await walkDir(dir, exts, allFiles);
@@ -429,6 +491,7 @@ export class SemanticSearchTool extends BaseTool<Args> {
         engine: 'keywords',
         results: [],
         totalScanned: 0,
+        ...ignoredField,
         message: 'Aucun fichier trouvé dans les chemins spécifiés',
       });
     }
@@ -444,6 +507,7 @@ export class SemanticSearchTool extends BaseTool<Args> {
       totalScanned: read,
       totalMatched: scored.length,
       ...(dropped > 0 ? { outOfScope: dropped } : {}),
+      ...ignoredField,
     });
   }
 }
