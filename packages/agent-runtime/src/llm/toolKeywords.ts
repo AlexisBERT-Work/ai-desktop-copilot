@@ -83,6 +83,13 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'qui abordent',
     'fichiers qui',
     'documents qui',
+    // On se souvient du contenu, pas du nom : « retrouve le fichier où… ».
+    'retrouve',
+    'fichier où',
+    'document où',
+    'quel fichier',
+    'quel document',
+    "capture d'écran où",
   ],
 
   // Connecteurs

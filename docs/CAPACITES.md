@@ -149,7 +149,28 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
 | Inférer les **conventions de style** du projet                              | `analyze_code_style`   |   🟢   |
 | **Profiler un projet** à l'ouverture (stack, scripts, structure, README)    | `load_project_context` |   🟢   |
 | Auditer un `.env` vs `.env.example` (clés manquantes, secrets)              | `audit_env`            |   🟢   |
-| Recherche locale par mots-clés/sémantique                                   | `semantic_search`      |   🟢   |
+| **Retrouver un fichier par son contenu** (« le fichier où je parle de… »)   | `semantic_search`      |   🟢   |
+
+- **`semantic_search` a deux moteurs** (2026-11-13). Avec
+  [Kensaku](https://github.com/yjid/kensaku) installé
+  (`scripts/fetch-kensaku.ps1`, c'est toi qui le lances) : noms, texte des PDF
+  et des documents Office, texte des captures d'écran (OCR) et sens, depuis
+  l'index local de l'application Kensaku, en lecture seule. Sans lui, ou s'il
+  ne trouve rien dans les dossiers autorisés : l'ancien moteur, par mots-clés,
+  sur les fichiers texte et code de 500 Ko au plus. Le résultat dit lequel a
+  répondu (`engine`).
+- **Où il cherche** : les dossiers demandés, sinon Documents, Bureau et
+  Téléchargements (la liste blanche, sans le dossier temporaire). Avant, sans
+  dossier, il fouillait celui de l'agent. Chaque résultat est **résolu**
+  (jonctions, liens) puis revérifié contre la liste blanche ; un résultat
+  écarté est compté dans `outOfScope`.
+- **Kensaku n'est lancé que si son empreinte SHA-256 est épinglée**
+  (`search/kensakuBackend.ts::KENSAKU_PINNED` : 1.0.16 et 1.0.17), sans shell,
+  borné à 10 s. Absent, inconnu, sans index ou en échec : l'ancien moteur prend
+  le relais, et le journal le dit une fois.
+- Les mots « retrouve », « quel fichier », « le fichier où »… le font proposer
+  (`llm/toolKeywords.ts`) : 4 des 5 phrases « retrouve le fichier où… » du banc,
+  contre 0 avant.
 
 ## 5. Git & GitHub
 

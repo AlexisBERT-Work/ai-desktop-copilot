@@ -229,6 +229,29 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('recherche', 'docs-locaux', 'cherche dans mes documents locaux le contrat de bail', [
     'semantic_search',
   ]),
+  // « Retrouve le fichier où… » : on se souvient du contenu, pas du nom
+  // (`semantic_search`, servi par Kensaku quand il est installé).
+  dev(
+    'recherche',
+    'fichier-devis',
+    'retrouve le fichier où je parle du devis de la cuisine',
+    ['semantic_search'],
+    { answer: /7[\s\u202f]?450|devis-cuisine/i },
+  ),
+  dev(
+    'recherche',
+    'fichier-portail',
+    "dans quel document j'ai noté le code du portail ?",
+    ['semantic_search'],
+    { answer: /4821/ },
+  ),
+  dev(
+    'recherche',
+    'fichier-capture',
+    "retrouve la capture d'écran où il y avait l'erreur CUDA",
+    ['semantic_search'],
+    { answer: /capture-2026-11-02|out of memory/i },
+  ),
   dev(
     'recherche',
     'rech-dailys',
@@ -406,6 +429,20 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     {
       answer: /1,2|lev[ée]e/i,
     },
+  ),
+  holdout(
+    'recherche',
+    'fichier-pdf',
+    "où est passé le PDF sur l'indexation des bases de données ?",
+    ['semantic_search'],
+    { answer: /b-tree|indexation-bdd/i },
+  ),
+  holdout(
+    'recherche',
+    'fichier-loyer',
+    "j'ai un fichier quelque part qui parle du loyer de mars, tu le retrouves ?",
+    ['semantic_search'],
+    { answer: /870/ },
   ),
   holdout(
     'recherche',

@@ -12,6 +12,7 @@ import {
 } from '@catdesk/shared-types';
 import { stdoutNotifier, type NotifyFn } from '../ipc/Notifier';
 import { createLogger } from '../logger';
+import { isPathAllowed } from './pathPolicy';
 
 const log = createLogger('security:permissions');
 
@@ -153,39 +154,7 @@ export class PermissionEngine {
   }
 
   private isPathAllowed(path: string): boolean {
-    if (this.config.pathWhitelist.length === 0) return true;
-
-    // Normalize the same way on both sides: lowercase + forward slashes. This
-    // MUST be applied AFTER env-var expansion so the expanded values (which keep
-    // their original casing and backslashes) are normalized too — otherwise a
-    // whitelist entry like "%USERPROFILE%\Documents" expands to
-    // "C:/Users/Name\Documents" and never matches a lowercased "/documents/…".
-    const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();
-
-    const userProfile = process.env['USERPROFILE'] ?? 'C:/Users/user';
-    const temp = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
-
-    const normalized = norm(path);
-
-    // Reject path traversal outright: no legitimate whitelisted path needs a
-    // `..` segment. Without this, `…/Downloads/../.ssh/id_rsa` slips through the
-    // startsWith() check below (it starts with the whitelisted `…/Downloads`)
-    // and Node's fs then resolves the `..` to read outside the allowed roots.
-    if (normalized.split('/').some(seg => seg === '..')) return false;
-
-    const expandedWhitelist = this.config.pathWhitelist.map(p =>
-      norm(p.replace(/%userprofile%/gi, userProfile).replace(/%temp%/gi, temp)),
-    );
-
-    // Require a directory-boundary match so an allowed root like `…/documents`
-    // does not also authorize a sibling `…/documents-evil`. Accept an exact
-    // match or the root followed by a separator.
-    return expandedWhitelist.some(allowed => {
-      if (allowed.length === 0) return false;
-      if (normalized === allowed) return true;
-      const withSep = allowed.endsWith('/') ? allowed : `${allowed}/`;
-      return normalized.startsWith(withSep);
-    });
+    return isPathAllowed(path, this.config.pathWhitelist);
   }
 
   clearSessionGrants(): void {

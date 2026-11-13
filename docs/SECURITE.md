@@ -318,3 +318,43 @@ trous réels, quatre durcissements.
   parle pas à Ollama — règle n°1) ; les capacités perdent
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+## Mise à jour 2026-11-13 — Kensaku sous `semantic_search`
+
+`semantic_search` peut s'appuyer sur [Kensaku](https://github.com/yjid/kensaku)
+(MIT), un moteur local tiers. Ce qui le borne :
+
+- **Binaire épinglé.** Le CLI n'est lancé que si son SHA-256 figure dans
+  `search/kensakuBackend.ts::KENSAKU_PINNED` (1.0.16 et 1.0.17, relevés dans le
+  `SHA256SUMS` de chaque release et recoupés avec l'API GitHub). Rien avant
+  1.0.16, qui corrige une lecture de fichier arbitraire par son outil MCP
+  `read_snippet`. Le haché est refait dès que la date ou la taille du fichier
+  change ; un haché illisible vaut refus. CatDesk n'installe rien :
+  `scripts/fetch-kensaku.ps1` télécharge et vérifie, et c'est l'utilisateur qui
+  le lance. Un test vérifie que le script et l'agent épinglent la même version.
+- **Lecture seule, sans shell.** Seule la sous-commande `search` est appelée
+  (jamais `mcp`, `serve`, `connect` ni `reindex`), par `execFile`, avec `--`
+  avant la requête : une requête qui commence par un tiret n'est pas une option.
+  Délai de 10 s, sortie bornée à 2 Mo, JSON validé par zod (une entrée mal formée
+  est ignorée).
+- **Résultats refiltrés.** Kensaku indexe les dossiers de **son** réglage. Chaque
+  chemin qu'il renvoie est résolu (`realpath` : jonctions, liens) puis doit être
+  à la fois sous une racine demandée et sous la liste blanche, l'une et l'autre
+  sous leur forme écrite ou résolue. Le reste est écarté et compté
+  (`outOfScope`). Le moteur par mots-clés passe désormais par le même filtre.
+  Testé avec une vraie jonction vers un dossier extérieur.
+- **Fin d'un contournement.** Sans `paths`, `semantic_search` parcourait
+  `process.cwd()`, le dossier de l'agent. Comme aucun chemin n'était déclaré, le
+  moteur de permissions n'avait rien à vérifier. Il cherche maintenant dans les
+  dossiers de la liste blanche.
+- **Contrôle partagé.** `isPathAllowed` est extrait en fonction pure
+  (`permissions/pathPolicy.ts`), utilisée par `PermissionEngine` et par le filtre
+  ci-dessus. Le comportement du moteur ne change pas (tests inchangés).
+
+Reste ouvert : le haché est vérifié **avant** l'exécution, et un fichier
+remplacé entre les deux passerait. Il faut pour cela pouvoir écrire dans
+`%LOCALAPPDATA%`, donc déjà exécuter du code sous le compte de l'utilisateur.
+`PermissionEngine` reste lexical pour les autres outils (voir `LIMITES.md` § 5).
+L'index de Kensaku contient le texte extrait des fichiers indexés : il reste
+dans `%APPDATA%\kensaku`, et ses extraits passent par le cadrage habituel des
+sorties d'outils avant d'atteindre le modèle.
