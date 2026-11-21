@@ -13,6 +13,8 @@ export interface PermissionRequest {
   args: Record<string, unknown>;
   /** Chemins du disque visés, à vérifier contre la liste blanche (BaseTool.pathArgs). */
   paths?: string[];
+  /** Ce que le masquage des données personnelles a fait (outils qui sortent du poste). */
+  preview?: string;
   context?: {
     conversationId?: string;
     activeWindow?: string;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AgentOrchestrator, parseToolArgs } from './AgentOrchestrator';
 import type { OllamaClient } from './llm/OllamaClient';
-import type { ToolRegistry } from './ToolRegistry';
+import type { OutboundPreparation, ToolRegistry } from './ToolRegistry';
 import type { PermissionEngine } from './permissions/PermissionEngine';
 import type { ContextManager } from './ContextManager';
 import type { AuditLogger } from './AuditLogger';
@@ -45,6 +45,8 @@ interface HarnessOptions {
   withFactExtractor?: boolean;
   /** Outils exposés (défaut : le seul outil echo). */
   toolDefs?: Array<{ name: string; description: string }>;
+  /** Masquage des arguments sortants (défaut : arguments rendus tels quels). */
+  outbound?: (name: string, args: Record<string, unknown>) => OutboundPreparation;
 }
 
 function makeHarness(opts: HarnessOptions = {}) {
@@ -93,6 +95,9 @@ function makeHarness(opts: HarnessOptions = {}) {
       ],
     execute: executeTool,
     filesystemTargets: () => [],
+    prepareOutboundArgs:
+      opts.outbound ??
+      ((_name: string, args: Record<string, unknown>): OutboundPreparation => ({ ok: true, args })),
   } as unknown as ToolRegistry;
 
   const check = vi.fn(async () =>
@@ -389,6 +394,76 @@ describe('AgentOrchestrator — caractères invisibles', () => {
     expect(lastUser?.content).not.toMatch(/[\u{E0000}-\u{E007F}]/u);
     expect(h.recordTurn).toHaveBeenCalled();
     expect(JSON.stringify(h.recordTurn.mock.calls)).not.toMatch(/[\u{E0000}-\u{E007F}]/u);
+  });
+});
+
+describe('AgentOrchestrator — données personnelles sortantes', () => {
+  const masked = { message: 'IBAN [IBAN masqué]' };
+  const notice = 'Masqué avant envoi : 1 IBAN.';
+  const outbound = (): OutboundPreparation => ({ ok: true, args: masked, notice });
+
+  it('dialogue, exécution, audit et UI voient les arguments masqués', async () => {
+    const h = makeHarness({
+      outbound,
+      toolResult: { success: true, data: { delivered: true } },
+      turns: [[nativeCall('echo', { message: 'IBAN FR7630006000011234567890189' })], [token('ok')]],
+    });
+    const steps = await collect(h.orchestrator.process('envoie mon IBAN', 'conv-1', CONFIG));
+
+    expect(h.check).toHaveBeenCalledWith(
+      expect.objectContaining({ args: masked, preview: notice }),
+      undefined,
+    );
+    expect(h.executeTool).toHaveBeenCalledWith('echo', masked);
+    expect(h.logToolCall).toHaveBeenCalledWith(expect.any(String), 'echo', masked, {
+      success: true,
+      data: { delivered: true },
+    });
+    expect(steps).toContainEqual({ type: 'tool_start', toolName: 'echo', args: masked });
+    expect(JSON.stringify(steps)).not.toContain('FR7630006000011234567890189');
+  });
+
+  it('le modèle apprend ce qui a été masqué, pour le dire à l’utilisateur', async () => {
+    const h = makeHarness({
+      outbound,
+      toolResult: { success: true, data: { delivered: true } },
+      turns: [[nativeCall('echo', {})], [token('ok')]],
+    });
+    await collect(h.orchestrator.process('envoie', 'conv-1', CONFIG));
+
+    const toolMsg = (h.llmCalls[1]?.messages ?? []).find(m => m.role === 'tool');
+    expect(JSON.parse(toolMsg?.content ?? '{}')).toEqual({ delivered: true, personalData: notice });
+  });
+
+  it('masquage en échec : l’outil ne part pas', async () => {
+    const h = makeHarness({
+      outbound: () => ({ ok: false, error: 'Masquage des données personnelles impossible : boum' }),
+      turns: [[nativeCall('echo', {})], [token('ok')]],
+    });
+    const steps = await collect(h.orchestrator.process('envoie', 'conv-1', CONFIG));
+
+    expect(h.executeTool).not.toHaveBeenCalled();
+    expect(h.check).not.toHaveBeenCalled();
+    expect(steps).toContainEqual({
+      type: 'tool_blocked',
+      toolName: 'echo',
+      reason: 'Masquage des données personnelles impossible : boum',
+    });
+  });
+
+  it('sans rien à masquer : pas de preview, résultat inchangé', async () => {
+    const h = makeHarness({
+      toolResult: { success: true, data: { delivered: true } },
+      turns: [[nativeCall('echo', { message: 'salut' })], [token('ok')]],
+    });
+    await collect(h.orchestrator.process('envoie', 'conv-1', CONFIG));
+
+    expect(h.check).toHaveBeenCalledWith(
+      expect.not.objectContaining({ preview: expect.anything() }),
+      undefined,
+    );
+    const toolMsg = (h.llmCalls[1]?.messages ?? []).find(m => m.role === 'tool');
+    expect(JSON.parse(toolMsg?.content ?? '{}')).toEqual({ delivered: true });
   });
 });
 
