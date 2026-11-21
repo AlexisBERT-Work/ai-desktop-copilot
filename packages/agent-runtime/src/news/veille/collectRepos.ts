@@ -141,6 +141,7 @@ export interface WatchedRelease {
  */
 export const VeilleStateSchema = z.object({
   repos: z.record(
+    z.string(),
     z.object({
       firstSeen: z.string(),
       /** Dernier jour où il a été présenté ; à défaut, firstSeen. */
@@ -154,7 +155,7 @@ export const VeilleStateSchema = z.object({
       rejected: z.object({ cause: z.string(), day: z.string() }).optional(),
     }),
   ),
-  releases: z.record(z.string()),
+  releases: z.record(z.string(), z.string()),
 });
 
 export type VeilleState = z.infer<typeof VeilleStateSchema>;
