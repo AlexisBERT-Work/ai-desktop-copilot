@@ -80,6 +80,10 @@ marque n'a pas été lu, même si d'autres champs disent le contraire, et
 Banc complet et `latency-bench` non rejoués : rien n'entre dans le prompt
 système, et une sortie qui tient n'est pas touchée.
 
+**Compression des sorties JSON (veille du 14/11) : écartée.** Mesurée sur 18
+vraies sorties d'outils, elle ne retire que 12,4 % des tokens réels (seuil fixé :
+30 %), et rien sur la prose. Détail dans [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+
 ## 2026-11-20 — Garde-fous de réponse
 
 Plan A de l'analyse des rapports de veille du 6 au 20/11, sur la branche
