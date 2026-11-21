@@ -2,8 +2,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { isFresh } from './collectRepos';
 import {
+  CONTEXT_FILES,
   REPORTS_DIR,
+  ROADMAP_FILE,
   STATE_FILE,
   archiveReport,
   loadPastPistes,
@@ -86,27 +89,95 @@ describe('loadVeilleState', () => {
     expect(loadVeilleState(dir)).toEqual(state);
   });
 
+  it('relit le vus.json de l’artefact d’avant le 2026-11-21, sans lastSeen ni écart', () => {
+    // Forme exacte de l'artefact veille-archive au 2026-11-21.
+    const legacy = {
+      repos: {
+        'mattpocock/skills': { firstSeen: '2026-11-06', stars: 316526 },
+        'CapriChooms/CapriCore': { firstSeen: '2026-11-11', stars: 120 },
+      },
+      releases: { 'ollama/ollama': 'v0.40.17' },
+    };
+    writeFileSync(join(dir, STATE_FILE), JSON.stringify(legacy));
+    const state = loadVeilleState(dir);
+    expect(state).toEqual(legacy);
+    // Comme avant : il revient s'il double, passé le délai.
+    expect(isFresh(state, 'CapriChooms/CapriCore', 240, new Date('2026-11-21T05:00:00Z'))).toBe(
+      true,
+    );
+  });
+
   it('archiveReport : le rapport est rangé, et le run suivant sait ce qui a été vu', () => {
     const archive = join(dir, 'archive');
     archiveReport(archive, {
       day: '2026-11-06',
       markdown: '# Lundi',
-      candidates: [{ repo: 'a/b', stars: 10 }],
+      candidates: [{ repo: 'a/b', stars: 10, clones: [] }],
       releases: [{ repo: 'ollama/ollama', version: 'v1' }],
+      rejected: [],
     });
     archiveReport(archive, {
       day: '2026-11-07',
       markdown: '# Mardi',
-      candidates: [{ repo: 'c/d', stars: 20 }],
+      candidates: [{ repo: 'c/d', stars: 20, clones: [] }],
       releases: [],
+      rejected: [],
     });
 
     const state = loadVeilleState(archive);
-    expect(state.repos['a/b']).toEqual({ firstSeen: '2026-11-06', stars: 10 });
-    expect(state.repos['c/d']).toEqual({ firstSeen: '2026-11-07', stars: 20 });
+    expect(state.repos['a/b']).toEqual({
+      firstSeen: '2026-11-06',
+      lastSeen: '2026-11-06',
+      stars: 10,
+    });
+    expect(state.repos['c/d']).toEqual({
+      firstSeen: '2026-11-07',
+      lastSeen: '2026-11-07',
+      stars: 20,
+    });
     expect(state.releases['ollama/ollama']).toBe('v1');
     const report = join(archive, REPORTS_DIR, '2026-11-06.md');
     expect(readFileSync(report, 'utf-8')).toBe('# Lundi');
+  });
+
+  it('archiveReport : un écarté pour de bon, et ses clones, ne reviennent plus au run suivant', () => {
+    const archive = join(dir, 'archive');
+    archiveReport(archive, {
+      day: '2026-11-13',
+      markdown: '# Vendredi',
+      candidates: [
+        {
+          repo: 'spam/blender-lab',
+          stars: 506,
+          clones: [{ repo: 'spam2/blender-forge', stars: 509 }],
+        },
+        { repo: 'young/repo', stars: 30, clones: [] },
+      ],
+      releases: [],
+      rejected: [
+        { repo: 'spam/blender-lab', cause: 'suspect' },
+        { repo: 'young/repo', cause: 'trop_jeune' },
+      ],
+    });
+    const state = loadVeilleState(archive);
+    const later = new Date('2026-12-30T05:00:00Z');
+    expect(isFresh(state, 'spam/blender-lab', 50_000, later)).toBe(false);
+    expect(isFresh(state, 'spam2/blender-forge', 50_000, later)).toBe(false);
+    expect(isFresh(state, 'young/repo', 60, later)).toBe(true);
+  });
+
+  it('le contexte lu par la collecte est celui que le workflow extrait (sparse-checkout)', () => {
+    const workflow = readFileSync(
+      join(__dirname, '../../../../../.github/workflows/ai-veille.yml'),
+      'utf-8',
+    ).replace(/\r\n/g, '\n');
+    const sparse = /sparse-checkout: \|\n((?:\s{12}\S.*\n)+)/.exec(workflow)?.[1] ?? '';
+    const listed = sparse
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    expect(listed).toEqual([...CONTEXT_FILES]);
+    expect(listed).toContain(ROADMAP_FILE);
   });
 
   it('loadPastPistes : rapports des 30 derniers jours, du plus ancien au plus récent', () => {

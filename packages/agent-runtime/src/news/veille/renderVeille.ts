@@ -1,6 +1,12 @@
 import { escapeHtml } from '../dailyEmail';
 import { cutAtSentence } from '../newsText';
-import { VERDICTS, type VeillePiste, type VeilleReport } from './veilleSchema';
+import {
+  RETURNABLE_CAUSE,
+  VERDICTS,
+  type RejectCause,
+  type VeillePiste,
+  type VeilleReport,
+} from './veilleSchema';
 
 // Mise en page du rapport de veille. Deux lectures, deux formats :
 //   - le mail (HTML + texte) est court : de quoi décider, rien de plus ;
@@ -34,6 +40,15 @@ export const INTEGRATION_LABEL: Record<VeillePiste['integration'], string> = {
   outil: 'Outil',
   sidecar: 'Sidecar Python',
   idee: 'Idée à reprendre',
+};
+
+export const CAUSE_LABEL: Record<RejectCause, string> = {
+  licence: 'licence',
+  suspect: 'suspect',
+  hors_sujet: 'hors sujet',
+  concurrent: 'concurrent',
+  deja_couvert: 'déjà couvert',
+  trop_jeune: 'trop jeune',
 };
 
 export const EFFORT_LABEL: Record<VeillePiste['effort'], string> = {
@@ -265,7 +280,15 @@ export function renderVeilleMarkdown(input: RenderVeilleInput): string {
   }
   if (report.rejected.length > 0) {
     out.push('## Écartés', '');
-    out.push(...report.rejected.map(r => `- [${r.repo}](${repoUrl(r.repo)}) : ${r.reason}`));
+    out.push(
+      `Pour de bon, sauf « ${CAUSE_LABEL[RETURNABLE_CAUSE]} » : la veille ne les représentera plus.`,
+      '',
+    );
+    out.push(
+      ...report.rejected.map(
+        r => `- [${r.repo}](${repoUrl(r.repo)}) · ${CAUSE_LABEL[r.cause]} : ${r.reason}`,
+      ),
+    );
     out.push('');
   }
   out.push(footer(candidateCount), '');

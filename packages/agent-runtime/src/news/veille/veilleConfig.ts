@@ -6,9 +6,8 @@ import {
   EMPTY_STATE,
   VeilleStateSchema,
   markSeen,
-  type RepoCandidate,
+  type ShownReport,
   type VeilleState,
-  type WatchedRelease,
 } from './collectRepos';
 import { parsePastPistes, type ParsedPiste } from './renderVeille';
 
@@ -24,6 +23,22 @@ type EnvLike = Record<string, string | undefined>;
 
 export const STATE_FILE = 'vus.json';
 export const REPORTS_DIR = 'rapports';
+
+/**
+ * Ce que CatDesk sait déjà faire et ce qui est prévu, lu dans la branche
+ * VEILLE_DOCS_REF (sparse-checkout du workflow, à garder identique) : sans ça,
+ * Claude proposerait l'existant. AMELIORATIONS § 4 porte l'état des pistes de
+ * la veille déjà retenues (✅ et numéro de PR).
+ */
+export const CONTEXT_FILES = [
+  'docs/CAPACITES.md',
+  'docs/AMELIORATIONS.md',
+  'docs/LIMITES.md',
+  'packages/agent-runtime/src/tools/registerTools.ts',
+] as const;
+
+/** Le document qui dit quelles pistes sont faites. */
+export const ROADMAP_FILE = 'docs/AMELIORATIONS.md';
 
 /** Assez large pour ne rien rater après quelques matins sans run. */
 const DEFAULT_WINDOW_DAYS = 14;
@@ -142,20 +157,15 @@ export function loadPastPistes(dir: string, now: Date, days: number): PastPiste[
 }
 
 /**
- * Range un rapport envoyé et ce qu'il a montré. À n'appeler qu'après l'envoi :
- * un échec remet ainsi les mêmes dépôts au lendemain.
+ * Range un rapport envoyé, ce qu'il a montré et ce qu'il a écarté. À n'appeler
+ * qu'après l'envoi : un échec remet ainsi les mêmes dépôts au lendemain.
  */
 export function archiveReport(
   dir: string,
-  report: {
-    day: string;
-    markdown: string;
-    candidates: readonly Pick<RepoCandidate, 'repo' | 'stars'>[];
-    releases: readonly Pick<WatchedRelease, 'repo' | 'version'>[];
-  },
+  report: ShownReport & { day: string; markdown: string },
 ): void {
   mkdirSync(join(dir, REPORTS_DIR), { recursive: true });
   writeFileAtomic(join(dir, REPORTS_DIR, `${report.day}.md`), report.markdown);
-  const state = markSeen(loadVeilleState(dir), report.candidates, report.releases, report.day);
+  const state = markSeen(loadVeilleState(dir), report, report.day);
   writeFileAtomic(join(dir, STATE_FILE), JSON.stringify(state));
 }
