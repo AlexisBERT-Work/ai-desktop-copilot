@@ -29,7 +29,7 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 **En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
 point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (#49),
 `feat/recherche-web` (#51), `feat/parse-document-formats` (#52),
-`feat/inspect-file-leaks` ; voir les entrées des 21 et 22/11.
+`feat/inspect-file-leaks` (#53) ; voir les entrées des 21 et 22/11.
 `feat/garde-fous-reponse` est entrée dans `dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
