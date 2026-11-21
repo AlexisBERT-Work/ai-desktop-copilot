@@ -5,6 +5,7 @@ import type {
   PermissionConfig,
   OllamaMessage,
   StreamChunk,
+  ToolResult,
 } from '@catdesk/shared-types';
 import type { OllamaClient } from './llm/OllamaClient';
 import type { ToolRegistry } from './ToolRegistry';
@@ -29,12 +30,46 @@ import type { PlaybookStore } from './playbook/PlaybookStore';
 import { approachSignature } from './playbook/PlaybookStore';
 import { classifyTask, type TaskType } from './playbook/classifyTask';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
+import {
+  cleanInvisible,
+  createToolDataCleaner,
+  totalRemoved,
+  type InvisibleCounts,
+} from './security/invisibleChars';
 import { looksGarbled } from './lib/readableText';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
 import { buildSystemPrompt, buildTurnContext, withTurnContext } from './prompts/systemPrompt';
 
 const log = createLogger('agent:orchestrator');
+
+/** Journalise ce que le nettoyage a retiré (rien n'est bloqué). Muet si rien. */
+function logInvisible(
+  runId: string,
+  source: string,
+  removed: InvisibleCounts,
+  keptVerbatim = 0,
+): void {
+  if (totalRemoved(removed) === 0 && keptVerbatim === 0) return;
+  log.warn('Invisible characters removed', { runId, source, removed, keptVerbatim });
+}
+
+/**
+ * Ajoute au résultat ce que le masquage des données personnelles a fait, pour
+ * que le modèle puisse le dire à l'utilisateur. Un échec reste tel quel.
+ */
+function withOutboundNotice(result: ToolResult, notice: string | undefined): ToolResult {
+  if (notice === undefined || !result.success) return result;
+  const data = result.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return { ...result, data: { result: data, personalData: notice } };
+  }
+  const record = data as Record<string, unknown>;
+  // L'outil a pu dire lui-même ce qu'il a masqué dans ce qu'il a construit.
+  const own = record['personalData'];
+  const personalData = typeof own === 'string' ? `${own} ${notice}` : notice;
+  return { ...result, data: { ...record, personalData } };
+}
 
 // Avec ~50 outils exposés, le prompt (schémas + system + historique) dépasse
 // largement 4096 tokens. Sans une fenêtre assez grande, Ollama tronque le
@@ -196,13 +231,18 @@ export class AgentOrchestrator {
    * sinon l'UI, qui n'attend que des étapes, resterait en « réfléchit… ».
    */
   async *process(
-    input: string,
+    rawInput: string,
     conversationId: string,
     config: AgentConfig,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStep> {
     const runId = crypto.randomUUID();
     log.info('Run started', { runId, conversationId, model: config.model });
+    // Un texte collé peut porter une consigne invisible (bloc Tags) : on la
+    // retire avant tout, cache, historique et mémoire compris.
+    const cleaned = cleanInvisible(rawInput);
+    logInvisible(runId, 'user_input', cleaned.removed);
+    const input = cleaned.text;
     this.deps.audit.startRun(runId, conversationId, input);
     const { scheduler } = this.deps;
     // Premier plan : le travail de fond en cours cède le GPU tout de suite, et
@@ -605,7 +645,28 @@ export class AgentOrchestrator {
     },
   ): AsyncGenerator<AgentStep, OllamaMessage> {
     const { tools, permissions, audit, activity } = this.deps;
-    yield { type: 'tool_start', toolName: toolCall.name, args: toolCall.args };
+    // Données personnelles masquées AVANT tout le reste (outils qui sortent du
+    // poste) : le dialogue de confirmation, l'audit et le journal d'activité
+    // voient ce qui part vraiment, pas ce que le modèle a écrit.
+    const outbound = tools.prepareOutboundArgs(toolCall.name, toolCall.args);
+    const args = outbound.ok ? outbound.args : toolCall.args;
+    yield { type: 'tool_start', toolName: toolCall.name, args };
+    if (!outbound.ok) {
+      yield { type: 'tool_blocked', toolName: toolCall.name, reason: outbound.error };
+      return {
+        role: 'tool',
+        content: JSON.stringify({ error: outbound.error }),
+        tool_call_id: toolCall.id,
+      };
+    }
+    const notice = outbound.notice;
+    if (notice !== undefined) {
+      log.warn('Personal data in outbound args', {
+        runId: opts.runId,
+        tool: toolCall.name,
+        notice,
+      });
+    }
 
     try {
       // Permission gate. Les chemins à vérifier sont ceux que l'OUTIL déclare
@@ -613,8 +674,9 @@ export class AgentOrchestrator {
       const permission = await permissions.check(
         {
           tool: toolCall.name,
-          args: toolCall.args,
-          paths: tools.filesystemTargets(toolCall.name, toolCall.args),
+          args,
+          paths: tools.filesystemTargets(toolCall.name, args),
+          ...(notice !== undefined ? { preview: notice } : {}),
           context: {
             conversationId: opts.conversationId,
             ...(opts.activeWindow !== undefined ? { activeWindow: opts.activeWindow } : {}),
@@ -634,18 +696,24 @@ export class AgentOrchestrator {
       }
 
       opts.usedTools.push(toolCall.name); // record the approach for the playbook
-      const result = await tools.execute(toolCall.name, toolCall.args);
-      audit.logToolCall(opts.runId, toolCall.name, toolCall.args, result);
-      activity?.recordToolCall(toolCall.name, toolCall.args, result.success);
+      const raw = await tools.execute(toolCall.name, args);
+      audit.logToolCall(opts.runId, toolCall.name, args, raw);
+      activity?.recordToolCall(toolCall.name, args, raw.success);
+      const result = withOutboundNotice(raw, notice);
 
       yield { type: 'tool_result', toolName: toolCall.name, result };
       // Post-execution safety scan (§7): a tool output becomes LLM context,
       // so redact secrets and neutralize injection BEFORE it gets there.
       // Applied to BOTH success and error branches — an error message can
       // echo file contents, injected text, or secrets just as easily.
+      // L'invisible (bloc Tags, bidi, largeur nulle, ANSI) est retiré PENDANT la
+      // sérialisation : après, ESC n'est plus qu'un texte « \u001b ».
       // `?? 'null'` : JSON.stringify(undefined) vaut undefined, pas une chaîne.
+      const cleaner = createToolDataCleaner();
       const rawContent =
-        JSON.stringify(result.success ? result.data : { error: result.error }) ?? 'null';
+        JSON.stringify(result.success ? result.data : { error: result.error }, cleaner.replacer) ??
+        'null';
+      logInvisible(opts.runId, toolCall.name, cleaner.removed, cleaner.keptVerbatim);
       const scan = sanitizeToolOutput(rawContent);
       if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {
         log.warn('Tool output sanitized', {
@@ -659,13 +727,13 @@ export class AgentOrchestrator {
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       log.error('Tool execution failed', { tool: toolCall.name, error });
-      activity?.recordToolCall(toolCall.name, toolCall.args, false);
+      activity?.recordToolCall(toolCall.name, args, false);
       yield { type: 'tool_error', toolName: toolCall.name, error };
-      return {
-        role: 'tool',
-        content: JSON.stringify({ error }),
-        tool_call_id: toolCall.id,
-      };
+      // Un message d'exception peut recopier un contenu externe : même nettoyage.
+      const cleaner = createToolDataCleaner();
+      const content = JSON.stringify({ error }, cleaner.replacer);
+      logInvisible(opts.runId, toolCall.name, cleaner.removed, cleaner.keptVerbatim);
+      return { role: 'tool', content, tool_call_id: toolCall.id };
     }
   }
 

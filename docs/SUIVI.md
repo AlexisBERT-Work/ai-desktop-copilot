@@ -8,7 +8,7 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-11-05.
+> Dernière mise à jour : 2026-11-06.
 
 ---
 
@@ -24,6 +24,7 @@ la liste de ce que git ne transporte pas dans
 
 **Branche en cours : `feat/selection-outils-banc`**, coupée de la précédente
 (mots-clés de sélection, seuil et banc de qualité, voir l'entrée du 2026-11-05).
+**`feat/load-skill`** en est coupée à son tour (skills, entrée du 2026-11-06).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -48,6 +49,34 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans cette branche le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-06 — Skills : `load_skill` (#17)
+
+Report à la main de `8c72f82` (tag `archive/feat-veille`), sur `feat/load-skill`,
+coupée de `feat/selection-outils-banc` : il faut `pathArgs`, `toolKeywords.ts` et le
+banc, absents de `dev` tant que #26 et #30 ne sont pas fusionnées.
+
+- **69ᵉ outil** : ajouter une procédure en déposant un `SKILL.md`, sans écrire de
+  TypeScript. Deux skills livrés, et les brouillons de `proposeSkills` sont enfin
+  relus. Doc : [CAPACITES.md](CAPACITES.md) § 8 bis, [LIMITES.md](LIMITES.md) § 4 bis.
+- **Écarts avec l'archive** : pas d'index dans le prompt, ni d'option pour le remettre
+  (`CATDESK_SKILL_INDEX` retiré) ; catalogue par l'outil, appelé sans nom ; disposition
+  standard `<nom>/SKILL.md` ; `description` sur plusieurs lignes ; cadre `notice` et
+  refus des liens qui sortent du dossier ([SECURITE.md](SECURITE.md)).
+- **Sélection** : sur les tâches d'avant, rien ne bouge (32/32, 36/36, 30/35, 6/6). Avec
+  les 8 tâches ajoutées : 36/36, 38/38, 32/37, 6/6. `load_skill` ne sort sur aucune des
+  139 phrases qui n'en parlent pas : le prompt des autres tours est inchangé.
+
+| `qwen3:14b`, température 0, un essai, sans les réglages de CatDesk | Résultat |
+| ------------------------------------------------------------------ | -------- |
+| 6 tâches skills + 2 de contrôle, `holdout` compris                 | 8/8      |
+| Appels à risque non demandés                                       | 0        |
+| Vrai texte d'un skill sous `notice`                                | suivi    |
+| Skill piégé, avec et sans `notice`                                 | ignoré   |
+
+Sans « à appeler en premier » dans la description, le modèle sautait le skill sur
+`skill-applique`. **Banc complet non relancé** : seules les tâches ci-dessus ont tourné.
+Le prompt des autres tâches n'a pas changé, mais ce n'est pas une mesure.
 
 ## 2026-11-05 — Mots-clés de sélection et banc de qualité
 
