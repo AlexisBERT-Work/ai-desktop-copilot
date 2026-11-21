@@ -12,6 +12,7 @@ import { RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
 import { stdoutNotifier, type NotifyFn } from './Notifier';
 import { createLogger } from '../logger';
+import { DesktopHost } from '../lib/desktopHost';
 
 const log = createLogger('ipc:bridge');
 
@@ -68,6 +69,8 @@ export interface StdinBridgeDeps {
   onClose?: () => void;
   /** Émission des notifications (défaut : stdout). */
   notify?: NotifyFn;
+  /** Réponse de l'hôte à une `desktop.request` (défaut : `DesktopHost.get()`). */
+  resolveDesktop?: (payload: unknown) => void;
 }
 
 interface AgentProcessParams {
@@ -290,6 +293,13 @@ export class StdinBridge {
             : [];
           await this.deps.setMarketConfig?.(symbols, formulas);
           this.sendResponse(request.id, { ok: true });
+          return;
+        }
+
+        // Résultat d'une opération native (fenêtres) demandée par un outil.
+        // Notification comme permission.response : rien à renvoyer.
+        case RPC_METHODS.desktopResponse: {
+          (this.deps.resolveDesktop ?? (p => DesktopHost.get().resolve(p)))(request.params);
           return;
         }
 

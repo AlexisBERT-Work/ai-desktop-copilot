@@ -34,6 +34,7 @@ pub const RPC_PRESS_FEEDS_DELETE: &str = "press.feeds.delete";
 pub const RPC_PRESS_LOCAL_RUN_NOW: &str = "press.local.run_now";
 pub const RPC_PRESS_LOCAL_SYNC: &str = "press.local.sync";
 pub const RPC_SETTINGS_UPDATE: &str = "settings.update";
+pub const RPC_DESKTOP_RESPONSE: &str = "desktop.response";
 
 // ─── Notifications JSON-RPC agent → hôte ───────────────────────
 pub const NOTIF_AGENT_STEP: &str = "agent.step";
@@ -43,6 +44,7 @@ pub const NOTIF_MARKET_UPDATE: &str = "market.update";
 pub const NOTIF_PRESS_FEEDS: &str = "press.feeds";
 pub const NOTIF_DAILIES_LOCAL: &str = "dailies.local";
 pub const NOTIF_PRESS_LOCAL_PROGRESS: &str = "press.local.progress";
+pub const NOTIF_DESKTOP_REQUEST: &str = "desktop.request";
 
 /// Enveloppe JSON-RPC 2.0 d'une requête vers l'agent (id aléatoire).
 pub fn rpc_request(method: &str, params: serde_json::Value) -> serde_json::Value {
@@ -98,6 +100,7 @@ mod tests {
         RPC_PRESS_LOCAL_RUN_NOW,
         RPC_PRESS_LOCAL_SYNC,
         RPC_SETTINGS_UPDATE,
+        RPC_DESKTOP_RESPONSE,
         NOTIF_AGENT_STEP,
         NOTIF_PERMISSION_REQUEST,
         NOTIF_PROACTIVE_SUGGESTION,
@@ -105,6 +108,7 @@ mod tests {
         NOTIF_PRESS_FEEDS,
         NOTIF_DAILIES_LOCAL,
         NOTIF_PRESS_LOCAL_PROGRESS,
+        NOTIF_DESKTOP_REQUEST,
     ];
 
     /// Chaque constante Rust doit apparaître comme littéral `'…'` dans le TS.

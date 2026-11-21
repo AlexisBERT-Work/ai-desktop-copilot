@@ -362,6 +362,12 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                 // statut du panneau « Mes journaux », fenêtre dashboard).
                 app.emit(protocol::EVENT_PRESS_PROGRESS, params)?;
             }
+            protocol::NOTIF_DESKTOP_REQUEST => {
+                // Opération native demandée par un outil de l'agent (fenêtres,
+                // UI Automation) : hors de la boucle de lecture, réponse par
+                // `desktop.response`.
+                tokio::spawn(answer_desktop_request(params));
+            }
             _ => {
                 warn!("Unknown agent notification: {method}");
             }
@@ -439,6 +445,49 @@ async fn dispatch_agent_step(window: tauri::WebviewWindow, step: &Value) -> Resu
     }
 
     Ok(())
+}
+
+/// Délai au-delà duquel une opération native est déclarée échouée (la lecture
+/// elle-même s'arrête à ~3 s, chaque appel UI Automation à 2 s).
+const DESKTOP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Valide, exécute (fil bloquant) et répond à une `desktop.request`. La
+/// validation et l'audit vivent dans `core::desktop`.
+async fn answer_desktop_request(params: Value) {
+    let request_id = params
+        .get("requestId")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty() && id.len() <= 64)
+        .map(str::to_owned);
+    let Some(request_id) = request_id else {
+        warn!("desktop.request sans requestId valide");
+        return;
+    };
+    let action = params.get("action").and_then(Value::as_str).unwrap_or("");
+    let args = params.get("params").cloned().unwrap_or(Value::Null);
+    let outcome = match crate::core::desktop::parse_request(action, &args) {
+        Err(error) => Err(error),
+        Ok(request) => {
+            let job = tokio::task::spawn_blocking(move || crate::core::desktop::execute(request));
+            match tokio::time::timeout(DESKTOP_TIMEOUT, job).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(join)) => Err(format!("Lecture des fenêtres interrompue ({join})")),
+                Err(_) => Err("La fenêtre ne répond pas (délai dépassé).".to_string()),
+            }
+        }
+    };
+    let payload = match outcome {
+        Ok(data) => serde_json::json!({ "requestId": request_id, "ok": true, "data": data }),
+        Err(error) => serde_json::json!({ "requestId": request_id, "ok": false, "error": error }),
+    };
+    if let Err(e) = send_to_agent(protocol::rpc_notification(
+        protocol::RPC_DESKTOP_RESPONSE,
+        payload,
+    ))
+    .await
+    {
+        warn!("desktop.response non transmise à l'agent : {e}");
+    }
 }
 
 /// Send a message to the agent runtime via stdin.

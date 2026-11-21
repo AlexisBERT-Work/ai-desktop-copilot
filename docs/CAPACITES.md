@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-11-08**. Inventaire basé sur les **71 outils du catalogue**
+> À jour au **2026-11-21**. Inventaire basé sur les **73 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 71 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 73 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -68,6 +68,8 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 | Capturer l'écran (total/partiel)                                                   | `capture_screen`   |   🟢   |
 | Lire le **texte de l'écran (OCR)** Tesseract fra+eng                               | `ocr_region`       |   🟢   |
 | **Décrire visuellement** l'écran (modèle multimodal `minicpm-v`)                   | `describe_screen`  |   🟢   |
+| **Lire une fenêtre** par l'accessibilité Windows, ou lister les fenêtres ouvertes  | `read_window`      |   🟢   |
+| **Fenêtre** au premier plan, réduite, agrandie, restaurée ou fermée (`WM_CLOSE`)   | `window_action`    |   🟠   |
 | **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD)           | `transcribe_audio` |   🟢   |
 | **Parser un document** PDF / DOCX / CSV → texte + métadonnées                      | `parse_document`   |   🟢   |
 | **Analyser un tableau** (CSV/XLSX : agrégats, group-by, stats)                     | `analyze_data`     |   🟢   |
@@ -75,8 +77,33 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 | Lire un **calendrier** `.ics` (occurrences récurrentes développées)                | `read_calendar`    |   🟢   |
 
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
-Les quatre outils « documents » passent par le sidecar Python (`files/`), lancé
-à la demande.
+
+**Fenêtres par UI Automation** (veilles du 15 et du 19/11, Plan E point 2,
+2026-11-21). `read_window` lit l'arbre d'accessibilité de Windows au lieu d'une
+capture + OCR : une liste numérotée d'éléments (« 3. bouton « Enregistrer » »,
+« 5. champ « Objet » = « Devis » (désactivé) »), le texte d'un document par
+`TextPattern` (Bloc-notes : lu en 0,13 s). Sans fenêtre, il liste les fenêtres
+ouvertes (id, titre, appli). `window_action` met une fenêtre au premier plan,
+la réduit, l'agrandit, la restaure ou lui demande de se fermer (`WM_CLOSE` :
+l'appli garde la main et peut proposer d'enregistrer). Une fenêtre se désigne
+par une partie de son titre, le nom de son appli ou son id. Une action sur un
+nom qui désigne plusieurs fenêtres est refusée, avec leur liste et leurs id ;
+la lecture prend la première et signale les autres.
+
+- Tout passe par le cœur Rust (`core/desktop.rs`, crate `windows` de Microsoft,
+  MIT OR Apache-2.0, déjà dans l'arbre par Tauri) : l'agent émet
+  `desktop.request`, Rust valide, exécute, audite et répond par
+  `desktop.response`. Hors de l'application (banc, agent seul), l'outil échoue
+  proprement au bout de 12 s.
+- Bornes : 40 fenêtres listées, 600 éléments visités, 80 lignes et 4 000
+  caractères rendus, 3 s de parcours, 2 s par appel UI Automation (une appli
+  figée ne bloque pas). Un champ mot de passe n'est jamais lu. Fenêtres
+  éligibles : visibles, de premier niveau, jamais celles de CatDesk.
+- Ni frappe ni clic dans la fenêtre ([LIMITES.md](LIMITES.md) § 1). Une appli
+  sans accessibilité (certains jeux, des applis Electron anciennes) ne rend
+  presque rien : repli `ocr_region` ou `describe_screen`.
+  Les quatre outils « documents » passent par le sidecar Python (`files/`), lancé
+  à la demande.
 
 ### 1 bis. Lui parler, l'entendre répondre (mode « Jarvis », 2026-09-11)
 

@@ -41,6 +41,8 @@ export const RPC_METHODS = {
   pressLocalRunNow: 'press.local.run_now',
   pressLocalSync: 'press.local.sync',
   settingsUpdate: 'settings.update',
+  /** Réponse de l'hôte à une `desktop.request` de l'agent (lecture native : fenêtres). */
+  desktopResponse: 'desktop.response',
 } as const;
 
 export type RpcMethodName = (typeof RPC_METHODS)[keyof typeof RPC_METHODS];
@@ -54,6 +56,8 @@ export const RPC_NOTIFICATIONS = {
   pressFeeds: 'press.feeds',
   dailiesLocal: 'dailies.local',
   pressLocalProgress: 'press.local.progress',
+  /** L'agent demande à l'hôte une opération native (UI Automation) ; réponse : `desktop.response`. */
+  desktopRequest: 'desktop.request',
 } as const;
 
 export type RpcNotificationName = (typeof RPC_NOTIFICATIONS)[keyof typeof RPC_NOTIFICATIONS];

@@ -62,6 +62,8 @@ import { GitHubPRTool } from './github/GitHubPRTool';
 import { CaptureScreenTool } from './screen/CaptureScreenTool';
 import { OcrRegionTool } from './screen/OcrRegionTool';
 import { DescribeScreenTool } from './screen/DescribeScreenTool';
+import { ReadWindowTool } from './screen/ReadWindowTool';
+import { WindowActionTool } from './screen/WindowActionTool';
 import { TranscribeAudioTool } from './audio/TranscribeAudioTool';
 import { ParseDocumentTool } from './files/ParseDocumentTool';
 import { AnalyzeDataTool } from './files/AnalyzeDataTool';
@@ -229,6 +231,8 @@ export function registerCoreTools(
   register(new CaptureScreenTool());
   register(new OcrRegionTool());
   register(new DescribeScreenTool(llm, visionModel));
+  register(new ReadWindowTool());
+  register(new WindowActionTool());
   register(new TranscribeAudioTool());
   register(new ParseDocumentTool());
   register(new AnalyzeDataTool());

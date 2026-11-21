@@ -155,6 +155,28 @@ export function simulatedWorld(now: Date): SimulatedWorld {
     }),
     ocr_region: ok({ text: 'Total TTC : 1 284,50 €', confidence: 0.86 }),
     capture_screen: ok({ path: 'C:/Users/moi/AppData/Local/Temp/capture.png', width: 2560 }),
+    read_window: args =>
+      typeof args['window'] === 'string' && args['window'].length > 0
+        ? {
+            success: true,
+            data: {
+              fenetre: { id: 4261382, titre: 'courses.txt – Bloc-notes', appli: 'Notepad.exe' },
+              elements:
+                '1. document « Éditeur de texte » = « Pain, lait, beurre. Dentiste jeudi 14 h. »\n2. menu « Fichier »',
+            },
+          }
+        : {
+            success: true,
+            data: {
+              fenetres: [
+                { id: 4261382, titre: 'courses.txt – Bloc-notes', appli: 'Notepad.exe' },
+                { id: 131556, titre: 'Calculatrice', appli: 'CalculatorApp.exe' },
+                { id: 262746, titre: 'Spotify Premium', appli: 'Spotify.exe' },
+              ],
+              total: 3,
+            },
+          },
+    window_action: ok({ action: 'close', fait: true }),
     parse_document: ok({
       pages: 4,
       text: 'Le rapport conclut à une hausse de 12 % des ventes, portée par le marché allemand.',

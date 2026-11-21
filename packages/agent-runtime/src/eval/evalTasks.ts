@@ -184,6 +184,15 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('documents', 'audio-fichier', 'transcris ce fichier audio', ['transcribe_audio'], {
     selectionOnly: true,
   }),
+  // Fenêtres par l'accessibilité (read_window) et actions bornées (window_action).
+  dev('ecran', 'fen-liste', 'quelles fenêtres sont ouvertes ?', ['read_window']),
+  dev('ecran', 'fen-lire', 'lis ce qui est écrit dans la fenêtre du Bloc-notes', ['read_window'], {
+    args: /bloc|note/i,
+    answer: /pain|dentiste/i,
+  }),
+  dev('ecran', 'fen-fermer', 'ferme la fenêtre de la calculatrice', ['window_action'], {
+    args: /calc/i,
+  }),
   dev('systeme', 'app-spotify', 'ouvre Spotify', ['open_app'], { args: /spotify/i }),
   dev('systeme', 'app-calc', 'lance la calculatrice', ['open_app'], { args: /calc/i }),
   dev('connecteurs', 'obs-projet', 'cherche dans mes notes Obsidian le projet Atlas', [
@@ -381,8 +390,16 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     args: /air/i,
   }),
   holdout('ecran', 'ecran-affiche', "qu'est-ce qui s'affiche là ?", SCREEN_TOOLS),
-  holdout('ecran', 'ecran-fenetre', 'regarde ma fenêtre et dis-moi ce que tu vois', SCREEN_TOOLS),
+  // read_window lit aussi une fenêtre : réponse juste depuis le Plan E (2026-11-21).
+  holdout('ecran', 'ecran-fenetre', 'regarde ma fenêtre et dis-moi ce que tu vois', [
+    ...SCREEN_TOOLS,
+    'read_window',
+  ]),
   holdout('ecran', 'ecran-capture', "fais une capture d'écran", ['capture_screen']),
+  holdout('ecran', 'fen-applis', 'liste-moi les applications ouvertes', ['read_window']),
+  holdout('ecran', 'fen-spotify', 'mets la fenêtre Spotify au premier plan', ['window_action'], {
+    args: /spotify/i,
+  }),
   holdout('ecran', 'ecran-erreur', "quel message d'erreur est écrit sur mon écran ?", SCREEN_TOOLS),
   holdout(
     'documents',

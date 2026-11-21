@@ -604,3 +604,40 @@ que Parakeet a entendu, pour la bulle comme pour la dictée
   est récrit partout avec sa majuscule, y compris dans une dictée tapée
   ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
   sans effacer le fichier.
+
+## Mise à jour 2026-11-21 — fenêtres Windows par UI Automation (veilles du 15 et du 19/11)
+
+L'agent lit les fenêtres par l'arbre d'accessibilité (`read_window`, `low`) et
+agit sur elles (`window_action`, `high`). Il ne touche à aucune API native :
+il émet `desktop.request`, le cœur Rust (`core/desktop.rs`) fait tout le
+reste.
+
+- **Entrées validées côté Rust** (`parse_request`) : action d'une liste
+  fermée, fenêtre désignée par un id ou par un titre de 200 caractères au plus,
+  sans caractère de contrôle ; `requestId` de 64 caractères au plus. Une demande
+  mal formée reçoit une erreur, rien n'est exécuté.
+- **Fenêtres éligibles** seulement : visibles, de premier niveau, sans
+  propriétaire, ni fenêtres outils ni masquées, et **jamais celles de
+  CatDesk** (pid courant) : le modèle ne peut ni fermer la bulle ni lire ses
+  propres dialogues de permission. Un id hors de cette liste est refusé.
+- **Lecture** : la valeur d'un champ mot de passe n'est jamais demandée.
+  Bornes : 600 éléments visités, 80 lignes, 4 000 caractères, 3 s de parcours,
+  2 s par appel UI Automation (une appli figée ne bloque pas le cœur), 10 s
+  pour toute la demande. Ce qui est lu entre dans le contexte comme toute
+  sortie d'outil : `sanitizeToolOutput` cadre une consigne affichée dans une
+  fenêtre (page web, mail).
+- **Actions** : premier plan, réduire, agrandir, restaurer, `WM_CLOSE`. Pas de
+  `TerminateProcess` : l'appli peut refuser ou demander d'enregistrer. Ni
+  frappe ni clic. Confirmation à chaque appel ; le dialogue montre la fenêtre
+  visée telle que le modèle l'a nommée. Si ce nom désigne plusieurs fenêtres,
+  le cœur **ne fait rien** et renvoie la liste avec les id (`single_window`) ;
+  la lecture, elle, prend la première et signale les autres.
+- **Audit** après succès : `DESKTOP_LIST_WINDOWS` (nombre),
+  `DESKTOP_READ_WINDOW` (appli, éléments rendus et visités, **jamais le
+  contenu**), `DESKTOP_WINDOW_ACTION` (action, appli, titre coupé à 80
+  caractères).
+- **Risque résiduel** : la lecture voit ce que l'utilisateur voit, y compris un
+  mail ou une conversation ouverte, et le modèle peut le répéter. Un titre qui
+  ne désigne qu'une fenêtre, mais pas celle que l'utilisateur pensait, passe :
+  la confirmation montre le nom demandé, pas la fenêtre trouvée. `close` reste
+  une demande que l'appli peut refuser.
