@@ -75,7 +75,9 @@ function score(file) {
     .map(l => l.trim())
     .filter(Boolean);
   if (lines.length !== PHRASES.length) {
-    console.warn(`! ${lines.length} lignes pour ${PHRASES.length} phrases : alignement ligne à ligne`);
+    console.warn(
+      `! ${lines.length} lignes pour ${PHRASES.length} phrases : alignement ligne à ligne`,
+    );
   }
   let errors = 0;
   let total = 0;
@@ -86,7 +88,9 @@ function score(file) {
     errors += e;
     total += r.length;
     const mark = e === 0 ? 'ok ' : `${e}  `;
-    console.log(`${String(i + 1).padStart(2)} ${mark} ${e === 0 ? '' : `→ ${lines[i] ?? '(absente)'}`}`);
+    console.log(
+      `${String(i + 1).padStart(2)} ${mark} ${e === 0 ? '' : `→ ${lines[i] ?? '(absente)'}`}`,
+    );
   });
   const wer = (100 * errors) / total;
   console.log(`\nWER ${wer.toFixed(1)} % (${errors} erreurs sur ${total} mots) — cible < 8 %`);
