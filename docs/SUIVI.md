@@ -26,8 +26,10 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20).
+**En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
+point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (voir
+l'entrée du 2026-11-21 ci-dessous). `feat/garde-fous-reponse` est entrée dans
+`dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -52,6 +54,29 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-21 — Fenêtres Windows par UI Automation (Plan E, point 2)
+
+Veilles du 15 et du 19/11, sur `feat/fenetres-uia`, coupée de `dev`. Deux
+outils (73 au catalogue), voir [CAPACITES.md](CAPACITES.md) § 1 :
+
+- **`read_window`** (🟢) lit une fenêtre par l'arbre d'accessibilité au lieu
+  d'une capture + OCR, ou liste les fenêtres ouvertes. Comble la lecture de
+  [LIMITES.md](LIMITES.md) § 1.
+- **`window_action`** (🟠, confirmation à chaque appel) : premier plan,
+  réduire, agrandir, restaurer, demande de fermeture (`WM_CLOSE`). Ni frappe ni
+  clic dans la fenêtre.
+
+L'appel natif est en Rust (`core/desktop.rs`), par un canal inverse ajouté au
+contrat IPC : l'agent émet `desktop.request`, le cœur valide, exécute, audite
+et répond par `desktop.response`. Crate `windows` 0.61 (Microsoft, MIT OR
+Apache-2.0) : déjà dans l'arbre par Tauri et WebView2, `Cargo.lock` ne gagne
+qu'une ligne. Essayé en vrai sur le poste (test `#[ignore]`
+`lit_les_fenetres_du_poste`) : liste des fenêtres, Bloc-notes lu en 0,13 s
+(27 éléments, texte du document compris), fermeture par `WM_CLOSE`, audit
+écrit. Banc de sélection : 3 tâches `dev` et 2 `holdout` ajoutées, `dev` sans
+raté (45/45), `holdout` 85 % comme avant. `h-ecran-fenetre` (« regarde ma
+fenêtre… ») accepte désormais `read_window`, qui y répond aussi.
 
 ## 2026-11-20 — Garde-fous de réponse
 

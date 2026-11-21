@@ -1,6 +1,6 @@
 # CE QUE CATDESK NE SAIT PAS (ENCORE) FAIRE
 
-> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-08-31**.
+> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-11-21**.
 > Liste honnête des bornes actuelles, pour ne pas survendre l'outil.
 
 ---
@@ -10,13 +10,20 @@
 Ces actions n'existent ni comme outil, ni comme fiche de permission — l'agent ne
 peut pas les appeler, et rien n'est « à moitié câblé ».
 
-| Action manquante                  | Contournement actuel                          |
-| --------------------------------- | --------------------------------------------- |
-| **Fermer une fenêtre**            | —                                             |
-| **Gérer/déplacer les fenêtres**   | —                                             |
-| **Envoyer des frappes clavier**   | `browser_type`, pour le navigateur uniquement |
-| **Supprimer un fichier**          | volontairement absent                         |
-| **Élever les privilèges (admin)** | volontairement absent                         |
+| Action manquante                         | Contournement actuel                                            |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| **Déplacer, redimensionner une fenêtre** | `window_action` : premier plan, réduire, agrandir, restaurer    |
+| **Cliquer ou taper dans une fenêtre**    | `browser_click` / `browser_type`, pour le navigateur uniquement |
+| **Supprimer un fichier**                 | volontairement absent                                           |
+| **Élever les privilèges (admin)**        | volontairement absent                                           |
+
+**Fermer une fenêtre** et la **lire** sans capture sont comblés depuis le
+2026-11-21 (`read_window`, `window_action`, par UI Automation, voir
+[CAPACITES.md](CAPACITES.md) § 1). La fermeture est une demande (`WM_CLOSE`) :
+une appli qui ouvre « Enregistrer les modifications ? » attend la réponse de
+l'utilisateur, et une appli lancée en administrateur refuse la demande d'un
+processus normal (le message le dit). Une appli sans accessibilité ne rend
+presque rien à la lecture : repli `ocr_region`.
 
 Suppression de fichier et élévation de privilèges sont des **absences
 délibérées**, pas des trous à combler : le niveau de risque `critical` existe

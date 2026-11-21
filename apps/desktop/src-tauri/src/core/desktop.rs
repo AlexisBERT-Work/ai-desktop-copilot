@@ -14,8 +14,9 @@
 //!   caractères, 3 s de parcours, 2 s par appel UI Automation (une appli figée
 //!   ne bloque pas). La valeur d'un champ mot de passe n'est jamais lue.
 //! - **Actions** : premier plan, réduire, agrandir, restaurer, demande de
-//!   fermeture (`WM_CLOSE` : l'appli peut proposer d'enregistrer). Aucune frappe,
-//!   aucun clic dans la fenêtre.
+//!   fermeture (`WM_CLOSE` : l'appli peut proposer d'enregistrer), sur une
+//!   fenêtre désignée sans ambiguïté (`single_window`). Aucune frappe, aucun
+//!   clic dans la fenêtre.
 //! - **Audit** après succès : appli et nombre d'éléments pour une lecture (pas
 //!   le contenu), appli et titre pour une action.
 
@@ -169,6 +170,24 @@ pub fn pick_window(
             Ok((first, matches.take(5).cloned().collect()))
         }
     }
+}
+
+/// Une action ne se fait que sur une fenêtre désignée sans ambiguïté : fermer
+/// « la première » de deux fenêtres au même titre pourrait viser la mauvaise.
+/// La lecture, elle, prend la première et signale les autres.
+pub fn single_window(windows: &[WindowInfo], target: &WindowTarget) -> Result<WindowInfo, String> {
+    let (window, others) = pick_window(windows, target)?;
+    if others.is_empty() {
+        return Ok(window);
+    }
+    let candidates: Vec<String> = std::iter::once(&window)
+        .chain(others.iter())
+        .map(|w| format!("{} « {} » ({})", w.id, clip(&w.title, 60), w.app))
+        .collect();
+    Err(format!(
+        "Plusieurs fenêtres correspondent : {}. Rien n'a été fait : préciser le titre ou passer l'id.",
+        candidates.join(" ; ")
+    ))
 }
 
 /// Coupe à `max` caractères (pas octets), en le marquant.
@@ -373,7 +392,7 @@ mod native {
                 Ok(out)
             }
             DesktopRequest::Act(target, action) => {
-                let (window, _) = pick_window(&eligible_windows(), &target)?;
+                let window = single_window(&eligible_windows(), &target)?;
                 act(&window, action)?;
                 audit::log(
                     "DESKTOP_WINDOW_ACTION",
@@ -722,6 +741,25 @@ mod tests {
         // Un id qui n'est pas une fenêtre éligible est refusé, quel qu'il soit.
         assert!(pick_window(&windows, &WindowTarget::Id(999)).is_err());
         assert!(pick_window(&windows, &WindowTarget::Title("Paint".into())).is_err());
+    }
+
+    #[test]
+    fn une_action_refuse_une_fenetre_ambigue() {
+        let windows = [
+            win(1, "Sans titre - Bloc-notes", "notepad.exe"),
+            win(2, "Calculatrice", "CalculatorApp.exe"),
+            win(3, "notes.txt - Bloc-notes", "notepad.exe"),
+        ];
+        let err = single_window(&windows, &WindowTarget::Title("bloc-notes".into())).unwrap_err();
+        assert!(err.contains("Rien n'a été fait"), "{err}");
+        assert!(err.contains("1 « Sans titre - Bloc-notes »") && err.contains("3 « notes.txt"));
+        assert_eq!(single_window(&windows, &WindowTarget::Id(3)).unwrap().id, 3);
+        assert_eq!(
+            single_window(&windows, &WindowTarget::Title("calculatrice".into()))
+                .unwrap()
+                .id,
+            2
+        );
     }
 
     #[test]

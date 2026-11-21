@@ -361,11 +361,22 @@ rien à faire au milieu d'un journal.
     paraphrase passe (9 attaques françaises sur 30 cadrées), voir
     [LIMITES.md](LIMITES.md) § 5.
   - À garder (🟡), sans date : arbre d'accessibilité avec `ref` cliquables (après
-    la lecture seule), reclassement des passages (lifeboat), citations vérifiées
+    la lecture seule ; la lecture des fenêtres Windows est faite, Plan E plus bas), reclassement des passages (lifeboat), citations vérifiées
     d'un compte rendu (tingo), leçons tirées des corrections, capture du son
     système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
     Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
     (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
+- **Plan E — capacités tirées de la veille du 13 au 19/11** (2026-11-21) : une
+  branche et une PR vers `dev` par point, aucune fusionnée sans toi.
+  - ✅ **Fenêtres Windows par UI Automation** (veilles du 15 et du 19/11,
+    `feat/fenetres-uia`) : `read_window` lit une fenêtre par l'arbre
+    d'accessibilité ou liste les fenêtres, `window_action` la met au premier
+    plan, la réduit, l'agrandit, la restaure ou demande sa fermeture. Côté Rust
+    (`core/desktop.rs`), voir [CAPACITES.md](CAPACITES.md) § 1. Restent : un
+    clic ou une saisie dans une fenêtre (par un id d'élément de `read_window`,
+    `Invoke`/`ValuePattern`, à confirmer à chaque appel), après un temps
+    d'usage de la lecture ; la mesure sur des applis réelles du poste (Outlook,
+    Word, Teams), seul le Bloc-notes et la liste ont été essayés en vrai.
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :
