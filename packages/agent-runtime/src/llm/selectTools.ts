@@ -17,6 +17,12 @@ export interface SelectableTool {
   name: string;
   description: string;
   category: string;
+  /**
+   * Mots-clés portés par l'outil lui-même, pour les outils chargés à
+   * l'exécution (MCP : déclarés par l'utilisateur) qui ne peuvent pas figurer
+   * dans `TOOL_KEYWORDS`. Jamais envoyés au modèle, comme la table.
+   */
+  keywords?: readonly string[];
 }
 
 /**
@@ -139,7 +145,7 @@ export function selectTools<T extends SelectableTool>(
 
   const score = (t: T): number => {
     const hayTokens = new Set(tokens(`${t.name} ${t.description} ${t.category}`));
-    let s = keywordScore(paddedQuery, keywords[t.name]);
+    let s = keywordScore(paddedQuery, keywords[t.name] ?? t.keywords);
     for (const w of qWords) {
       for (const h of hayTokens) {
         if (h === w || h.startsWith(w) || w.startsWith(h)) {

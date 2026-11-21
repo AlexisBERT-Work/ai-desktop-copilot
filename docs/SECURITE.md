@@ -604,3 +604,38 @@ que Parakeet a entendu, pour la bulle comme pour la dictée
   est récrit partout avec sa majuscule, y compris dans une dictée tapée
   ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
   sans effacer le fichier.
+
+## Mise à jour 2026-11-21 — client MCP (veille du 15/11)
+
+L'agent peut appeler les outils de serveurs MCP que l'utilisateur déclare dans
+`mcp-servers.json` (`agent-runtime/src/mcp/`). Un serveur MCP est du **code
+tiers qui tourne avec les droits de l'utilisateur** : CatDesk ne le rend pas
+sûr, il borne ce que le modèle peut en faire.
+
+- **Rien par défaut** : sans fichier, aucun processus n'est lancé. Seule une
+  commande locale (stdio) est acceptée : une entrée `url`, ou une commande en
+  `http://`, fait refuser le serveur. Les `.cmd`/`.bat`/`.ps1` sont refusés
+  (il faudrait un shell, qui réinterpréterait les arguments).
+- **Liste blanche d'outils** obligatoire, sans joker : un outil ajouté plus
+  tard au serveur n'est pas exposé. 8 outils par serveur au plus.
+- **Permissions** : `high` par défaut (confirmation à chaque appel), `medium`
+  au mieux. `PermissionEngine.registerDynamicTool` refuse `low`, tout nom hors
+  `mcp__` et tout nom d'outil intégré. Les arguments qui nomment un chemin
+  passent par la liste blanche résolue, comme pour les autres outils.
+- **Sorties** : auditées et nettoyées par `sanitizeToolOutput` dans
+  l'orchestrateur. La description et le schéma d'arguments, qui entrent dans le
+  prompt, sont relus : invisibles retirés, une description où le scan voit une
+  consigne ou un secret est remplacée par le nom de l'outil.
+- **Bornes** : durée de chaque appel (`notifications/cancelled` envoyé au
+  serveur), sortie coupée et signalée au modèle, appels par minute, message de
+  1 Mo au plus (au-delà le serveur est arrêté), pas de relance avant 30 s.
+- **Environnement minimal** : `PATH`, dossiers système et du profil, plus le
+  `env` de la déclaration. Les jetons chargés du `.env` de CatDesk
+  (`GITHUB_TOKEN`, `NOTION_TOKEN`…) ne sont pas transmis (testé).
+- **Aucune capacité client** annoncée : le serveur ne peut demander ni une
+  génération au modèle (sampling), ni la liste des dossiers (roots).
+- **Risque résiduel** : le serveur lui-même peut lire le disque ou le réseau
+  sans passer par CatDesk ; la liste blanche des chemins ne couvre que les
+  arguments que le modèle lui passe. Ne déclarer que des serveurs relus,
+  installés depuis leurs sources, et leur donner leurs propres dossiers
+  autorisés quand ils en ont (serveur de fichiers).

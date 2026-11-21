@@ -11,6 +11,8 @@ import { registerAutomationTools, registerCoreTools } from '../tools/registerToo
 import type { CronScheduler } from '../CronScheduler';
 import type { SubAgentRunner } from '../SubAgentRunner';
 import type { SimulatedWorld } from './simulatedWorld';
+import { parseMcpConfig } from '../mcp/mcpConfig';
+import { CallBudget, McpTool, exposedToolName } from '../mcp/McpTool';
 
 export interface SimulatedCall {
   name: string;
@@ -67,7 +69,10 @@ export class SimulatedToolRegistry extends ToolRegistry {
   }
 }
 
-/** Le catalogue réel du profil courant, branché sur le monde simulé. */
+/**
+ * Le catalogue réel du profil courant, branché sur le monde simulé, plus les
+ * outils du serveur MCP d'exemple (`EXAMPLE_MCP_DECLARATION`).
+ */
 export function buildSimulatedRegistry(world: SimulatedWorld): SimulatedToolRegistry {
   const registry = new SimulatedToolRegistry(world);
   // Jamais joint : seuls les constructeurs des outils en ont besoin.
@@ -89,5 +94,46 @@ export function buildSimulatedRegistry(world: SimulatedWorld): SimulatedToolRegi
   // Doubles vides : ces constructeurs ne font que stocker la référence, et
   // `execute` ci-dessus empêche tout appel.
   registerAutomationTools(registry, {} as SubAgentRunner, {} as CronScheduler);
+  for (const tool of exampleMcpTools()) registry.register(tool);
   return registry;
+}
+
+/**
+ * Un serveur MCP déclaré comme le ferait un utilisateur (`mcp-servers.json`) :
+ * le banc vérifie qu'un outil MCP est proposé sur les mots de sa déclaration,
+ * et seulement sur eux. Jamais lancé : `execute` ne passe pas par l'outil.
+ */
+export const EXAMPLE_MCP_DECLARATION = {
+  servers: {
+    meteo: {
+      command: 'node',
+      args: ['meteo-mcp/index.js'],
+      tools: ['get_forecast'],
+      descriptions: { get_forecast: 'Prévisions météo pour une ville' },
+      keywords: ['météo', 'quel temps', 'pleuvoir', 'pluie', 'prévisions', 'neiger'],
+    },
+  },
+};
+
+function exampleMcpTools(): McpTool[] {
+  const unreachable = {
+    callTool: (): Promise<never> => Promise.reject(new Error('banc : aucun serveur lancé')),
+  };
+  return parseMcpConfig(EXAMPLE_MCP_DECLARATION).servers.flatMap(server =>
+    server.tools.flatMap(toolName => {
+      const name = exposedToolName(server.id, toolName);
+      if (name === undefined) return [];
+      const info = {
+        name: toolName,
+        inputSchema: {
+          type: 'object',
+          properties: { city: { type: 'string' }, days: { type: 'integer' } },
+          required: ['city'],
+        },
+      };
+      return [
+        new McpTool(name, server, info, unreachable, new CallBudget(server.maxCallsPerMinute)),
+      ];
+    }),
+  );
 }

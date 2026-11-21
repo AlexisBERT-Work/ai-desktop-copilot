@@ -26,8 +26,10 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20).
+**En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
+point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (#49) ;
+voir les entrées du 2026-11-21. `feat/garde-fous-reponse` est entrée dans
+`dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -52,6 +54,30 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-21 — Client MCP borné (Plan E, point 1)
+
+Veille du 15/11, branche `feat/client-mcp` coupée de `dev`. L'agent appelle les
+outils de serveurs MCP **locaux** déclarés dans `mcp-servers.json` ; sans ce
+fichier, rien ne change (71 outils). Doc : [CAPACITES.md](CAPACITES.md) § 3 bis.
+
+- **Client stdio écrit à la main** (`agent-runtime/src/mcp/`), sans le SDK
+  officiel, qui embarque un serveur HTTP complet. Quatre messages seulement ;
+  aucune capacité client annoncée (ni sampling, ni roots).
+- **Bornes** : liste blanche d'outils (8 par serveur), durée, sortie coupée et
+  signalée, appels par minute, message de 1 Mo au plus, pas de relance avant
+  30 s, environnement sans les jetons du `.env`, aucun serveur distant.
+- **Permissions** : `high` par défaut, `medium` au mieux, inscrits au moteur
+  (`registerDynamicTool`, qui refuse `low` et les noms d'outils intégrés).
+  Audit et `sanitizeToolOutput` comme tout outil ; description et schéma du
+  serveur relus avant d'entrer dans le prompt.
+- **Sélection** : un outil MCP porte ses mots-clés (`SelectableTool.keywords`)
+  et n'est proposé que sur eux. Banc : un serveur déclaré d'exemple (météo),
+  3 tâches. `eval --selection` (après fusion de `dev`) : `dev` 46/46 et 40/40,
+  `holdout` 37/43 (86 %).
+- **Non mesuré** : aucun vrai serveur MCP n'a été branché (le protocole est
+  testé de bout en bout contre un faux serveur Node), donc ni le premier token
+  (seuil de la veille : +4 s au plus pour 2 outils) ni le banc complet.
 
 ## 2026-11-20 — Garde-fous de réponse
 

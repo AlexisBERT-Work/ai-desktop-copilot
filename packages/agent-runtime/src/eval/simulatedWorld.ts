@@ -213,5 +213,7 @@ export function simulatedWorld(now: Date): SimulatedWorld {
     list_scheduled_tasks: ok({
       tasks: [{ id: 'tache-1', name: 'Résumé actu du matin', schedule: 'daily', enabled: true }],
     }),
+    // Serveur MCP déclaré d'exemple (EXAMPLE_MCP_DECLARATION) : un outil MCP rend du texte.
+    mcp__meteo__get_forecast: ok('Prévisions : 12 °C, averses l’après-midi, vent faible.'),
   };
 }
