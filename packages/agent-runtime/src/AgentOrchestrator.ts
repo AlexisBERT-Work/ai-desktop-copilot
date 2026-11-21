@@ -46,7 +46,14 @@ import {
   type ToolOutcome,
 } from './checks/claimCheck';
 import { figuresNotice, findUnsourcedFigures, SOURCE_TOOLS } from './checks/numberCheck';
-import { contextUsage, messagesTokens, overflowNotice, textTokens } from './llm/contextBudget';
+import {
+  contextUsage,
+  messagesTokens,
+  overflowNotice,
+  textTokens,
+  toolOutputBudget,
+} from './llm/contextBudget';
+import { fitToBudget } from './llm/fitToBudget';
 import { looksGarbled } from './lib/readableText';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
@@ -89,6 +96,12 @@ function withOutboundNotice(result: ToolResult, notice: string | undefined): Too
 // génération interminable. On élargit donc num_ctx et on borne num_predict.
 const NUM_CTX = CONFIG.numCtx;
 const MAX_TOKENS = CONFIG.maxTokens;
+/** Place gardée pour le mot qui accompagne une sortie réduite (fitForModel). */
+const FIT_NOTICE_TOKENS = 90;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 // Max number of tools sent to the model per call. ~50 tools ≈ several thousand
 // prompt tokens → slow prompt eval on local models. We send only the relevant
 // subset (see selectTools). Set to 0 to disable the filter and send all.
@@ -633,7 +646,15 @@ export class AgentOrchestrator {
           })),
         });
 
-        for (const toolCall of toolCalls) {
+        for (const [index, toolCall] of toolCalls.entries()) {
+          // Place que la sortie peut prendre sans faire déborder le prompt
+          // suivant (Ollama couperait sans prévenir, voir llm/contextBudget.ts).
+          const budgetTokens = toolOutputBudget({
+            used: fixedTokens + messagesTokens(messages),
+            numCtx: NUM_CTX,
+            maxTokens: MAX_TOKENS,
+            remainingCalls: toolCalls.length - index,
+          });
           messages.push(
             yield* this.runToolCall(toolCall, {
               runId,
@@ -641,6 +662,7 @@ export class AgentOrchestrator {
               ...(ctx.activeWindow !== undefined ? { activeWindow: ctx.activeWindow } : {}),
               usedTools,
               outcomes: toolOutcomes,
+              budgetTokens,
               signal,
             }),
           );
@@ -757,6 +779,44 @@ export class AgentOrchestrator {
   }
 
   /**
+   * Données d'un outil réussi telles qu'elles partent au modèle : réduites au
+   * budget s'il le faut, avec un mot qui dit ce qui manque et comment
+   * demander la suite. L'UI et l'audit gardent le résultat entier.
+   */
+  private fitForModel(
+    toolName: string,
+    data: unknown,
+    budgetTokens: number,
+    runId: string,
+  ): unknown {
+    const fitted = fitToBudget(data, Math.max(0, budgetTokens - FIT_NOTICE_TOKENS));
+    if (!fitted.cut) return data;
+    log.info('Tool output fitted to the context window', {
+      runId,
+      tool: toolName,
+      originalTokens: fitted.originalTokens,
+      tokens: fitted.tokens,
+      budgetTokens,
+    });
+    // Banc du 2026-11-21 : avec « n'en cite rien » seul, le modèle a conclu que
+    // les pages coupées « ne mentionnent pas de code », sur la foi des champs
+    // `lastPage: 30` et `truncated: false` de l'outil. D'où le mot plus net, et
+    // `truncated` remis à vrai.
+    const notice =
+      `Sortie coupée pour tenir dans la mémoire du modèle (environ ${fitted.originalTokens} tokens, ` +
+      `${budgetTokens} disponibles). Tout ce qui suit une marque « coupé » n'a PAS été lu, même si ` +
+      `d'autres champs disent le contraire : n'en dis rien, pas même que cette partie est vide. ` +
+      (this.deps.tools.continuationHint(toolName) ??
+        'Pour la suite, rappelle l’outil sur une partie plus précise.');
+    if (!isPlainObject(fitted.data)) return { sortieCoupee: notice, resultat: fitted.data };
+    return {
+      sortieCoupee: notice,
+      ...fitted.data,
+      ...(typeof fitted.data['truncated'] === 'boolean' ? { truncated: true } : {}),
+    };
+  }
+
+  /**
    * Exécute un tool call : porte de permission, exécution auditée, puis scan
    * de sécurité de la sortie. Yield les étapes UI (tool_start puis
    * blocked/result/error) et rend le message `role: 'tool'` à rejouer au LLM.
@@ -769,6 +829,8 @@ export class AgentOrchestrator {
       activeWindow?: string;
       usedTools: string[];
       outcomes: ToolOutcome[];
+      /** Tokens que la sortie peut occuper dans le prompt suivant. */
+      budgetTokens: number;
       signal: AbortSignal | undefined;
     },
   ): AsyncGenerator<AgentStep, OllamaMessage> {
@@ -839,9 +901,10 @@ export class AgentOrchestrator {
       // sérialisation : après, ESC n'est plus qu'un texte « \u001b ».
       // `?? 'null'` : JSON.stringify(undefined) vaut undefined, pas une chaîne.
       const cleaner = createToolDataCleaner();
-      const rawContent =
-        JSON.stringify(result.success ? result.data : { error: result.error }, cleaner.replacer) ??
-        'null';
+      const forModel = result.success
+        ? this.fitForModel(toolCall.name, result.data, opts.budgetTokens, opts.runId)
+        : { error: result.error };
+      const rawContent = JSON.stringify(forModel, cleaner.replacer) ?? 'null';
       logInvisible(opts.runId, toolCall.name, cleaner.removed, cleaner.keptVerbatim);
       const scan = sanitizeToolOutput(rawContent);
       if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {

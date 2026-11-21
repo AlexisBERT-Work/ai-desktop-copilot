@@ -86,6 +86,13 @@ const holdout = (
   options?: TaskOptions,
 ): EvalTask => task('holdout', category, `h-${id}`, input, tools, options);
 
+/**
+ * Long PDF (simulatedWorld : LONG_PDF_CODES) : le code 1, et soit les trois codes,
+ * soit l'aveu d'une lecture partielle. Jamais un code inventé.
+ */
+const LONG_PDF_ANSWER =
+  /^(?![\s\S]*\b(?!AX-7319|BK-2864|CQ-5021)[A-Z]{2}-\d{4}\b)(?=[\s\S]*AX-7319)(?:(?=[\s\S]*BK-2864)(?=[\s\S]*CQ-5021)|(?=[\s\S]*(?:[Cc]oup|[Pp]artie|[Pp]artiel|pas (?:pu|eu|accès)|[Mm]anqu|[Ss]uite|reste|[Ii]ncompl|[Tt]ronqu|[Cc]ontinu|davantage)))/;
+
 const SCREEN_TOOLS = ['describe_screen', 'capture_screen', 'ocr_region'];
 
 /**
@@ -175,6 +182,16 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     args: /rapport\.pdf/,
     answer: /12\s?%/,
   }),
+  dev(
+    'documents',
+    'doc-long-codes',
+    'donne-moi les trois codes de vérification du PDF C:/docs/audit-annuel.pdf',
+    ['parse_document'],
+    {
+      args: /audit-annuel\.pdf/,
+      answer: LONG_PDF_ANSWER,
+    },
+  ),
   dev('documents', 'data-excel', 'analyse le fichier excel ventes.xlsx', ['analyze_data'], {
     args: /ventes\.xlsx/,
   }),
@@ -390,6 +407,13 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     'que dit le contrat.docx dans mes documents ?',
     ['parse_document'],
     { args: /contrat\.docx/ },
+  ),
+  holdout(
+    'documents',
+    'doc-long-tout',
+    'lis tout C:/docs/audit-annuel.pdf et liste chaque code de vérification qu’il contient',
+    ['parse_document'],
+    { args: /audit-annuel\.pdf/, answer: LONG_PDF_ANSWER },
   ),
   holdout(
     'documents',

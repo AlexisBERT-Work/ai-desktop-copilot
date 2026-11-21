@@ -13,6 +13,12 @@ const argsSchema = z.object({
       'Absolute path to a local .pdf, .docx or .csv file. The format is detected from the extension.',
     ),
   max_pages: z.number().default(50).describe('PDF only: maximum number of pages to extract'),
+  start_page: z
+    .number()
+    .int()
+    .min(1)
+    .default(1)
+    .describe('PDF only: first page to extract, to read the rest of a long PDF'),
   max_rows: z.number().default(1000).describe('CSV only: maximum number of rows to parse'),
 });
 type Args = z.infer<typeof argsSchema>;
@@ -57,10 +63,12 @@ export class ParseDocumentTool extends BaseTool<Args> {
   readonly requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
   override readonly pathArgs = ['path'] as const;
+  override readonly continuationHint =
+    'Pour la suite d’un PDF, rappelle parse_document avec start_page = la première page manquante (les en-têtes « --- Page N --- » montrent où le texte s’arrête).';
   readonly schema = jsonSchemaFrom(argsSchema);
 
   async execute(rawArgs: Args): Promise<ToolResult> {
-    const { path, max_pages = 50, max_rows = 1000 } = rawArgs;
+    const { path, max_pages = 50, start_page = 1, max_rows = 1000 } = rawArgs;
 
     if (!path?.trim()) return this.fail('path est requis');
 
@@ -71,7 +79,7 @@ export class ParseDocumentTool extends BaseTool<Args> {
 
     const params =
       format === 'pdf'
-        ? { path, maxPages: max_pages }
+        ? { path, maxPages: max_pages, startPage: start_page }
         : format === 'csv'
           ? { path, maxRows: max_rows }
           : { path };

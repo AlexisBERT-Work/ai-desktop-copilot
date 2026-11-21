@@ -209,7 +209,11 @@ def transcribe_audio(params: dict) -> dict:
 
 def parse_pdf(params: dict) -> dict:
     from files.pdf_parser import parse_pdf_file
-    return parse_pdf_file(params["path"], max_pages=params.get("maxPages", 50))
+    return parse_pdf_file(
+        params["path"],
+        max_pages=params.get("maxPages", 50),
+        start_page=params.get("startPage", 1),
+    )
 
 
 def parse_docx(params: dict) -> dict:

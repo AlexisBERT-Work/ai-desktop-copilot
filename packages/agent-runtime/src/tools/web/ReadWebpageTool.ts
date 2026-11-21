@@ -20,6 +20,8 @@ export class ReadWebpageTool extends BaseTool<Args> {
   readonly riskLevel = 'low' as const;
   readonly requiresConfirmation = false;
   override readonly argsSchema = argsSchema;
+  override readonly continuationHint =
+    'Pour une autre partie de la page, rappelle read_webpage avec un selector CSS plus précis.';
   readonly schema = jsonSchemaFrom(argsSchema);
 
   async execute(rawArgs: Args): Promise<ToolResult> {

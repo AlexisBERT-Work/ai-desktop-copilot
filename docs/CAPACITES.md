@@ -69,7 +69,7 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 | Lire le **texte de l'écran (OCR)** Tesseract fra+eng                               | `ocr_region`       |   🟢   |
 | **Décrire visuellement** l'écran (modèle multimodal `minicpm-v`)                   | `describe_screen`  |   🟢   |
 | **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD)           | `transcribe_audio` |   🟢   |
-| **Parser un document** PDF / DOCX / CSV → texte + métadonnées                      | `parse_document`   |   🟢   |
+| **Parser un document** PDF / DOCX / CSV → texte (`start_page` : suite d'un PDF)    | `parse_document`   |   🟢   |
 | **Analyser un tableau** (CSV/XLSX : agrégats, group-by, stats)                     | `analyze_data`     |   🟢   |
 | **Exporter un document** Markdown → PDF / DOCX / HTML                              | `export_document`  |   🟡   |
 | Lire un **calendrier** `.ics` (occurrences récurrentes développées)                | `read_calendar`    |   🟢   |
@@ -333,6 +333,15 @@ réponse finale, l'orchestrateur vérifie que :
   **annotée**, jamais bloquée (un calcul du modèle n'est pas dans les sources) ;
 - le prompt **tenait dans `num_ctx`** : au-delà, Ollama coupe sans erreur, et
   l'utilisateur en est prévenu.
+
+**Sorties d'outils à la taille de la fenêtre** (`llm/fitToBudget.ts`,
+2026-11-21) : avant d'entrer dans le prompt, chaque sortie est réduite à la place
+qui reste (fenêtre moins la réponse, partagée entre les appels de l'étape). Les
+listes perdent leur fin, puis les textes longs, et chaque coupe est marquée. Le
+modèle reçoit un mot qui dit que la partie coupée n'a pas été lue, et comment
+demander la suite (`start_page` pour `parse_document`, un `selector` pour
+`read_webpage`). L'UI et l'audit gardent la sortie entière. Coût : 5 à 15 ms par
+sortie, rien dans le prompt système.
 
 Une seule relance par run (2 à 5 s, seulement quand un contrôle échoue). Une
 réponse dont l'annonce reste fausse n'entre pas dans le cache sémantique et

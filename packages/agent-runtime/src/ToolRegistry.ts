@@ -18,6 +18,12 @@ export interface RegisteredTool extends ToolDefinition {
    * nouveau par `execute`, qui ne laisse ainsi rien partir en clair.
    */
   prepareOutboundArgs?(args: Record<string, unknown>): OutboundArgs;
+  /**
+   * Comment lire la suite quand la sortie a été réduite pour tenir dans la
+   * fenêtre (ex. `start_page`). Jamais dans le schéma : ne coûte un token
+   * qu'au tour où la sortie est coupée.
+   */
+  readonly continuationHint?: string | undefined;
 }
 
 /** Arguments prêts à sortir, et ce qu'il faut en dire à l'utilisateur. */
@@ -54,6 +60,11 @@ export class ToolRegistry {
 
   has(name: string): boolean {
     return this.tools.has(name);
+  }
+
+  /** Comment demander la suite d'une sortie réduite (voir RegisteredTool). */
+  continuationHint(name: string): string | undefined {
+    return this.tools.get(name)?.continuationHint;
   }
 
   /** Chemins à vérifier contre la liste blanche avant d'exécuter `name`. */

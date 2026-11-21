@@ -292,9 +292,17 @@ rien à faire au milieu d'un journal.
     texte envoyé : un token par chiffre, les blancs gratuits, le reste à 2,7
     caractères par token. Calibré sur 14 textes, il tombe entre 0,86 et 1,5
     fois le réel. Un compteur bien en dessous de l'estimation trahit la coupe.
-    **Suite** (Plan B de la veille) : découper `parse_document`,
-    `read_webpage` et `search_dailies` sur ce budget, avant d'envoyer le
-    prompt, plutôt que prévenir après.
+    **Suite traitée** sur `feat/budget-sorties-outils` (Plan B, 2026-11-21) :
+    chaque sortie d'outil est réduite à la place qui reste **avant** d'envoyer
+    le prompt (`llm/fitToBudget.ts`), avec un mot qui dit ce qui manque, et
+    `parse_document` prend un `start_page`. Banc, long PDF de 30 pages
+    (~12 000 tokens) : sans réduction, prompt coupé par Ollama et aucune réponse
+    (délai dépassé après 131 s) ; avec, le prompt tient (5 849 tokens comptés),
+    le modèle donne le code de la page 1 et dit que la suite n'a pas été lue. Il
+    ne relit pas tout seul, il propose : chaque relecture repartirait d'un
+    historique déjà plein. Reste : un `start_page` exact (il propose « page 2 »
+    alors qu'il en a lu 7) et la compression des sorties JSON (veille du 14/11 ;
+    `parse_document` renvoie un CSV deux fois, en `rows` et en `text`).
   - **Tâches planifiées fiables** : `CronScheduler` tourne en premier plan, sans
     heure fixe ni notification.
   - **Brief du matin à la voix**. Prérequis : `read_calendar` exige un chemin
