@@ -118,10 +118,24 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 (spotlighting).
 **Manquent** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §7) :
 
-- **Pre-check déterministe** des inputs (patterns d'injection connus) — seule la
-  sortie des outils est scannée, pas l'entrée utilisateur/fichier.
-- **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
-  sont redactés aujourd'hui.
+- **Pre-check déterministe** des inputs — **en partie fait** : les caractères
+  invisibles sont retirés du texte saisi, des sorties d'outils et de la presse
+  (`security/invisibleChars.ts`), mais une consigne écrite **en clair** passe
+  toujours. Les motifs d'injection ne s'appliquent qu'à la sortie des outils, et
+  ils reconnaissent des tournures, pas une intention. Effets assumés du
+  nettoyage : emojis composés (famille, drapeaux régionaux) décomposés, style
+  emoji (VS16) perdu. Un chemin ou une URL contenant un caractère invisible est
+  transmis tel quel (sinon `read_file` ne trouverait plus le fichier) : il est
+  seulement compté dans le journal.
+- **Redaction PII** — **en partie fait**, et seulement pour ce qui **sort**
+  (`security/personalData.ts`) : cartes, IBAN, numéros de sécurité sociale,
+  e-mails et téléphones français, dans trois outils (webhook, Discord,
+  `call_api`). Pas couverts : noms, adresses postales, dates de naissance,
+  téléphones étrangers, RIB sans IBAN, IBAN hors des 39 pays connus, et tout
+  autre outil qui sortirait du texte. E-mails et téléphones ne sont masqués que
+  sur Discord. Un `call_api` qui masque re-sérialise son corps JSON : un entier
+  au-delà de 2^53 y perd sa précision (un corps sans rien à masquer part à
+  l'octet près). Ce que le modèle lit n'est pas masqué, par choix.
 - **Injection en français** : les motifs de `sanitizeToolOutput` sont en anglais.
   Une page ou un skill qui écrit « ignore tes consignes » n'est pas cadré. Les
   skills ont leur propre cadre pour cette raison (voir [SECURITE.md](SECURITE.md)).

@@ -3,6 +3,14 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { API_USER_AGENT, httpRequest, type HttpResponse } from '../../lib/http';
+import {
+  mergeSummaries,
+  scanPersonalData,
+  toOutbound,
+  type MaskedArgs,
+  type PersonalDataSummary,
+} from '../../security/personalData';
+import type { OutboundArgs } from '../../ToolRegistry';
 
 const argsSchema = z.object({
   url: z
@@ -68,6 +76,109 @@ export function buildHeaders(
   return headers;
 }
 
+// En-têtes jamais touchés : un jeton n'est pas une donnée personnelle à masquer.
+const UNMASKED_HEADERS = new Set(['authorization', 'cookie', 'x-api-key']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function maskJsonValue(
+  value: unknown,
+  scans: PersonalDataSummary[],
+  state: { changed: boolean },
+): unknown {
+  if (typeof value === 'string') {
+    const scan = scanPersonalData(value);
+    scans.push(scan);
+    if (scan.text !== value) state.changed = true;
+    return scan.text;
+  }
+  // Un numéro de carte ou de sécu écrit en nombre devient une chaîne masquée.
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
+    const digits = String(value);
+    const scan = scanPersonalData(digits);
+    scans.push(scan);
+    if (scan.text === digits) return value;
+    state.changed = true;
+    return scan.text;
+  }
+  if (Array.isArray(value)) return value.map(v => maskJsonValue(v, scans, state));
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, maskJsonValue(v, scans, state)]),
+    );
+  }
+  return value;
+}
+
+function maskBody(body: string, scans: PersonalDataSummary[]): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    const scan = scanPersonalData(body);
+    scans.push(scan);
+    return scan.text;
+  }
+  const state = { changed: false };
+  const masked = maskJsonValue(parsed, scans, state);
+  // Re-sérialisé seulement si quelque chose a changé : JSON.parse arrondit les
+  // entiers au-delà de 2^53, un corps sans rien à masquer part à l'octet près.
+  return state.changed ? JSON.stringify(masked) : body;
+}
+
+// Un IBAN part aussi bien dans le chemin ou un paramètre de l'URL que dans le
+// corps : on lit l'URL décodée. Elle n'est réécrite que si l'on a masqué.
+function maskUrl(raw: string, scans: PersonalDataSummary[]): string {
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // « % » mal formé : lu tel quel.
+  }
+  const scan = scanPersonalData(decoded);
+  if (scan.findings.some(f => f.level === 'masked')) {
+    scans.push(scan);
+    return scan.text;
+  }
+  scans.push({ findings: scan.findings, invisibleRemoved: 0 });
+  return raw;
+}
+
+/**
+ * Données personnelles masquées dans ce que `call_api` envoie : corps (JSON
+ * parcouru ou texte), URL, en-têtes. Carte, IBAN et NIR sont masqués, e-mails
+ * et téléphones seulement signalés (ce n'est pas Discord). Rien vers un
+ * serveur local : la donnée ne quitte pas le poste.
+ */
+export function maskApiArgs(args: Record<string, unknown>): MaskedArgs {
+  const none: MaskedArgs = { args, summary: mergeSummaries([]) };
+  const rawUrl = args['url'];
+  if (typeof rawUrl !== 'string') return none;
+  const v = validateApiUrl(rawUrl.trim());
+  // URL invalide : execute la refusera. Serveur local : rien ne sort.
+  if (!v.ok || LOCAL_HOSTS.has(v.url.hostname)) return none;
+
+  const scans: PersonalDataSummary[] = [];
+  const out: Record<string, unknown> = { ...args, url: maskUrl(rawUrl, scans) };
+  if (typeof args['body'] === 'string') out['body'] = maskBody(args['body'], scans);
+  const headers = args['headers'];
+  if (isRecord(headers)) {
+    out['headers'] = Object.fromEntries(
+      Object.entries(headers).map(([name, value]) => {
+        if (typeof value !== 'string' || UNMASKED_HEADERS.has(name.toLowerCase())) {
+          return [name, value];
+        }
+        const scan = scanPersonalData(value);
+        scans.push(scan);
+        return [name, scan.text];
+      }),
+    );
+  }
+  return { args: out, summary: mergeSummaries(scans) };
+}
+
 export class CallApiTool extends BaseTool<Args> {
   readonly name = 'call_api';
   readonly description =
@@ -77,6 +188,10 @@ export class CallApiTool extends BaseTool<Args> {
   readonly requiresConfirmation = true;
   override readonly argsSchema = argsSchema;
   readonly schema = jsonSchemaFrom(argsSchema);
+
+  prepareOutboundArgs(args: Record<string, unknown>): OutboundArgs {
+    return toOutbound(maskApiArgs(args));
+  }
 
   async execute(args: Args): Promise<ToolResult> {
     const { url: rawUrl, method, headers: extraHeaders, body, token, timeout_ms } = args;
