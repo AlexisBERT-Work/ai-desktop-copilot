@@ -51,6 +51,14 @@ import { looksGarbled } from './lib/readableText';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
 import { buildSystemPrompt, buildTurnContext, withTurnContext } from './prompts/systemPrompt';
+import { complete } from './llm/completion';
+import {
+  buildTransformPrompt,
+  cleanTransformOutput,
+  transformMaxTokens,
+  validateTransformRequest,
+  type TransformResult,
+} from './selection/transform';
 
 const log = createLogger('agent:orchestrator');
 
@@ -280,6 +288,72 @@ export class AgentOrchestrator {
       this.activeRuns--;
       this.lastForegroundUse = Date.now();
       scheduler?.endForeground();
+    }
+  }
+
+  /**
+   * Transforme un texte sélectionné dans une autre application selon la
+   * consigne de l'utilisateur. Hors de la boucle d'outils (voir
+   * `selection/transform.ts`) : aucun outil, aucun historique, aucune mémoire.
+   *
+   * Latence : même prompt système que le chat (stable) — son début reste dans
+   * le cache d'Ollama — et même `num_ctx` (celui d'OllamaClient : pas de
+   * rechargement). La conversation, elle, sort du cache : le scheduler la
+   * re-préchauffe au prochain créneau calme. Ne lève jamais.
+   */
+  async transformSelection(
+    rawText: string,
+    rawInstruction: string,
+    model: string,
+    signal?: AbortSignal,
+  ): Promise<TransformResult> {
+    const invalid = validateTransformRequest(rawText, rawInstruction);
+    if (invalid !== null) return { ok: false, error: invalid };
+    // Une sélection copiée d'une page peut porter une consigne invisible.
+    const text = cleanInvisible(rawText);
+    const instruction = cleanInvisible(rawInstruction);
+    logInvisible('selection', 'selection_text', text.removed);
+    logInvisible('selection', 'selection_instruction', instruction.removed);
+
+    const { llm, context, scheduler, idleUnloader } = this.deps;
+    scheduler?.beginForeground();
+    idleUnloader?.begin(model);
+    this.activeRuns++;
+    const started = Date.now();
+    try {
+      const raw = await complete(
+        llm,
+        model,
+        buildSystemPrompt(context.getWarmFacts()),
+        buildTransformPrompt(text.text, instruction.text),
+        {
+          think: false,
+          temperature: 0.2,
+          maxTokens: transformMaxTokens(text.text),
+          signal,
+        },
+      );
+      const output = cleanTransformOutput(raw, rawText);
+      // Jamais le texte dans le journal : seulement des longueurs.
+      log.info('Selection transformed', {
+        model,
+        charsIn: rawText.length,
+        charsOut: output.length,
+        ms: Date.now() - started,
+      });
+      if (output.trim() === '') return { ok: false, error: "Le modèle n'a rien renvoyé." };
+      return { ok: true, text: output };
+    } catch (err) {
+      if (signal?.aborted) return { ok: false, error: 'Transformation annulée.' };
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn('Selection transform failed', { model, error: message });
+      return { ok: false, error: `Transformation impossible : ${message}` };
+    } finally {
+      this.activeRuns--;
+      this.lastForegroundUse = Date.now();
+      idleUnloader?.end();
+      scheduler?.endForeground();
+      scheduler?.cacheDisturbed();
     }
   }
 

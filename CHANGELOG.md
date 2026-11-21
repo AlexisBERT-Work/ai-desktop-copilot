@@ -45,6 +45,15 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   never the text. Measured: 5.7 s of speech to text in 0.3 s (median), 56 characters with
   accents and emoji typed in 1 ms into a real Win32 edit box. The WER test on the user's own
   voice uses `scripts/dictation-wer.mjs`.
+- **Transform the selected text in any application** (Settings > Shortcuts, off by default).
+  Select text anywhere, press `Ctrl+Alt+T`, pick an instruction (fix, rephrase, shorten, more
+  formal, to English) or type one; the result shows before/after and Enter replaces the
+  selection. Copy and paste are a bounded `Ctrl+C` / `Ctrl+V`, nothing else is ever sent; the
+  user's clipboard is saved and restored, and the pasted text is kept out of the `Win+V`
+  history. The model gets no tools, and nothing goes to history, memory or cache. Same guards
+  as dictation: frozen target window, no elevated targets, held modifiers waited for. Measured
+  on `qwen3:14b`: 17/17 clean outputs, median first token 1.6 s, 270 words fixed in 40.8 s
+  (`scripts/selection-bench.mjs`).
 - **Voice vocabulary** (Settings > Voice): one proper noun per line, written the way you want
   to read it. After Parakeet, words that sound the same and are spelled almost the same are
   rewritten ("Cat Desk" → "CatDesk", "Olama" → "Ollama", "Kwen" → "Qwen"), with a French

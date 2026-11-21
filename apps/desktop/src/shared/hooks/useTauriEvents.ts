@@ -10,11 +10,13 @@ import {
 } from '../../features/proactive/proactiveStore';
 import { useMarketStore } from '../../features/market/marketStore';
 import { useVoiceStore } from '../../features/voice/voiceStore';
+import { useSelectionStore } from '../../features/selection/selectionStore';
 import type {
   TokenEvent,
   DoneEvent,
   ErrorEvent,
   MarketSnapshot,
+  SelectionEvent,
   VoiceLevelEvent,
   VoiceStateEvent,
   VoiceTranscriptEvent,
@@ -33,6 +35,9 @@ export function useTauriEvents() {
   const setError = useChatStore(s => s.setError);
   const toggle = useOverlayStore(s => s.toggle);
   const syncToRuntime = useSettingsStore(s => s.syncToRuntime);
+  const syncSelectionHotkey = useSettingsStore(s => s.syncSelectionHotkey);
+  const applySelection = useSelectionStore(s => s.apply);
+  const cancelSelection = useSelectionStore(s => s.cancel);
   const showSuggestion = useProactiveStore(s => s.show);
   const applyMarket = useMarketStore(s => s.apply);
   // Actions seulement (stables) — `useShallow` évite un objet neuf à chaque rendu.
@@ -56,6 +61,8 @@ export function useTauriEvents() {
     syncToRuntime();
     // État des modèles voix + préchauffage (indépendant de l'agent).
     void voice.init();
+    // Raccourci Ctrl+Alt+T, s'il a été activé (le cœur ne le retient pas).
+    void syncSelectionHotkey();
 
     const unlisteners: Promise<() => void>[] = [];
 
@@ -87,6 +94,18 @@ export function useTauriEvents() {
     unlisteners.push(
       listen<VoiceLevelEvent>(TAURI_EVENTS.voiceLevel, e => voice.applyLevel(e.payload.rms)),
     );
+
+    // Texte sélectionné (Ctrl+Alt+T) : la bulle s'ouvre sur la consigne, puis
+    // sur l'avant/après — ou dit pourquoi rien n'a été copié.
+    unlisteners.push(
+      listen<SelectionEvent>(TAURI_EVENTS.selectionUpdate, e => {
+        if (applySelection(e.payload)) useOverlayStore.getState().show('selection');
+      }),
+    );
+    // Refermer la bulle (Échap, Ctrl+Espace, ✕) abandonne la sélection en attente.
+    const unsubscribeOverlay = useOverlayStore.subscribe((state, prev) => {
+      if (prev.mode === 'selection' && state.mode !== 'selection') cancelSelection();
+    });
 
     // Plan steps (planning enabled)
     unlisteners.push(
@@ -137,6 +156,7 @@ export function useTauriEvents() {
     );
 
     return () => {
+      unsubscribeOverlay();
       unlisteners.forEach(p => p.then(fn => fn()));
     };
   }, [
@@ -146,6 +166,9 @@ export function useTauriEvents() {
     setToolActivity,
     setError,
     syncToRuntime,
+    syncSelectionHotkey,
+    applySelection,
+    cancelSelection,
     showSuggestion,
     applyMarket,
     toggle,

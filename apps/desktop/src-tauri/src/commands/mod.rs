@@ -2,6 +2,7 @@ pub mod chat;
 pub mod models;
 pub mod permissions;
 pub mod press;
+pub mod selection;
 pub mod settings;
 pub mod tuning;
 pub mod voice;

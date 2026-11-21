@@ -33,6 +33,27 @@ const BLOCKED_COMMAND_PATTERNS: &[&str] = &[
 
 const MAX_COMMAND_LEN: usize = 2048;
 
+/// Texte collé dans une autre application (transformation de sélection) :
+/// ~3 600 tokens de sortie au plus côté agent, large marge.
+const MAX_PASTE_CHARS: usize = 32_000;
+
+/// Garde-fou de tout texte que CatDesk pose dans le presse-papiers pour le
+/// coller par Ctrl+V dans une autre application (`core::selection`) : non
+/// vide, borné, sans caractère NUL (il couperait `CF_UNICODETEXT` en deux).
+pub fn check_paste_text(text: &str) -> Result<()> {
+    if text.trim().is_empty() {
+        bail!("Rien à coller : le résultat est vide");
+    }
+    let chars = text.chars().count();
+    if chars > MAX_PASTE_CHARS {
+        bail!("Résultat trop long pour être collé ({chars} caractères, au plus {MAX_PASTE_CHARS})");
+    }
+    if text.contains('\0') {
+        bail!("Résultat refusé : il contient un caractère NUL");
+    }
+    Ok(())
+}
+
 /// Check a command string against the safety blocklist.
 pub fn check_command(command: &str) -> Result<()> {
     if command.len() > MAX_COMMAND_LEN {
@@ -250,5 +271,16 @@ mod tests {
         assert!(check_path("C:\\Windows\\System32\\cmd.exe").is_err());
         assert!(check_path("C:\\Users\\autre\\doc.txt").is_err());
         assert!(check_path("D:\\data\\x.txt").is_err());
+    }
+
+    #[test]
+    fn paste_text_is_bounded_and_without_nul() {
+        assert!(check_paste_text("Je suis là.\nÀ demain.").is_ok());
+        assert!(check_paste_text(&"é".repeat(MAX_PASTE_CHARS)).is_ok());
+        assert!(check_paste_text(" \n ").is_err());
+        assert!(check_paste_text(&"a".repeat(MAX_PASTE_CHARS + 1)).is_err());
+        let with_nul = String::from_utf8(vec![b'a', 0, b'b']).unwrap();
+        let err = check_paste_text(&with_nul).unwrap_err().to_string();
+        assert!(err.contains("NUL"), "{err}");
     }
 }

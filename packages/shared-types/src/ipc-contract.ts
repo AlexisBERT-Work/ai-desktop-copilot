@@ -24,6 +24,7 @@ export const TAURI_EVENTS = {
   voiceTranscript: 'voice:transcript',
   voiceLevel: 'voice:level',
   voiceDictation: 'voice:dictation',
+  selectionUpdate: 'selection:update',
 } as const;
 
 export type TauriEventName = (typeof TAURI_EVENTS)[keyof typeof TAURI_EVENTS];
@@ -41,6 +42,8 @@ export const RPC_METHODS = {
   pressLocalRunNow: 'press.local.run_now',
   pressLocalSync: 'press.local.sync',
   settingsUpdate: 'settings.update',
+  selectionTransform: 'selection.transform',
+  selectionCancel: 'selection.cancel',
 } as const;
 
 export type RpcMethodName = (typeof RPC_METHODS)[keyof typeof RPC_METHODS];
@@ -54,6 +57,7 @@ export const RPC_NOTIFICATIONS = {
   pressFeeds: 'press.feeds',
   dailiesLocal: 'dailies.local',
   pressLocalProgress: 'press.local.progress',
+  selectionResult: 'selection.result',
 } as const;
 
 export type RpcNotificationName = (typeof RPC_NOTIFICATIONS)[keyof typeof RPC_NOTIFICATIONS];

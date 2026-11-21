@@ -5,6 +5,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use tracing::{info, warn};
 
 use crate::core::error::CatdeskError;
+use crate::core::selection;
 use crate::core::voice::{dictation, ListenerCommand, VoiceHandle};
 use crate::ipc::protocol::EVENT_UI_OVERLAY_TOGGLE;
 
@@ -94,5 +95,53 @@ pub fn set_dictation_hotkey(app: &AppHandle, enabled: bool) -> Result<bool, Catd
             ))
         })?;
     info!("Dictation hotkey registered: {shortcut:?}");
+    Ok(true)
+}
+
+/// Transformer la sélection : `Ctrl+Alt+T` (« transformer »). Sur AZERTY,
+/// AltGr+T ne produit aucun caractère : rien n'est volé à la frappe.
+fn selection_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyT)
+}
+
+/// Enregistre ou retire le raccourci « transformer la sélection ».
+/// Désactivé par défaut : un raccourci global qui envoie Ctrl+C à
+/// l'application active n'existe que si l'utilisateur l'a demandé.
+///
+/// À l'appui, la fenêtre active est figée (c'est elle qui recevra le
+/// résultat) et la touche neutre de la dictée part tout de suite, Alt encore
+/// tenu, pour que son relâchement n'ouvre pas la barre de menus. La copie
+/// elle-même se fait hors de ce thread (`selection::on_hotkey`).
+///
+/// Renvoie `true` si l'état a changé.
+pub fn set_selection_hotkey(app: &AppHandle, enabled: bool) -> Result<bool, CatdeskError> {
+    let global_shortcut = app.global_shortcut();
+    let shortcut = selection_shortcut();
+    if global_shortcut.is_registered(shortcut) == enabled {
+        return Ok(false);
+    }
+    if !enabled {
+        global_shortcut.unregister(shortcut).map_err(|e| {
+            CatdeskError::Refused(format!(
+                "Raccourci de transformation impossible à retirer ({e})"
+            ))
+        })?;
+        info!("Selection hotkey unregistered");
+        return Ok(true);
+    }
+    global_shortcut
+        .on_shortcut(shortcut, |app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let target = dictation::foreground();
+                dictation::send_menu_mask();
+                selection::on_hotkey(app, target);
+            }
+        })
+        .map_err(|e| {
+            CatdeskError::Refused(format!(
+                "Raccourci Ctrl+Alt+T indisponible, sans doute pris par une autre application ({e})"
+            ))
+        })?;
+    info!("Selection hotkey registered: {shortcut:?}");
     Ok(true)
 }

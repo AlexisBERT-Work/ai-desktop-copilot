@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../shared/api/settings', () => ({
   updateRuntimeSettings: vi.fn(() => Promise.resolve()),
 }));
+vi.mock('../../shared/api/selection', () => ({
+  selectionSetEnabled: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('../../shared/api/models', () => ({
   getOllamaModelsInfo: vi.fn(() =>
     Promise.resolve([
@@ -16,6 +19,7 @@ vi.mock('../../shared/api/models', () => ({
 
 import { migrateSettings, useSettingsStore } from './settingsStore';
 import { updateRuntimeSettings } from '../../shared/api/settings';
+import { selectionSetEnabled } from '../../shared/api/selection';
 import { useChatStore } from '../chat/store/chatStore';
 
 describe('migrateSettings', () => {
@@ -114,5 +118,41 @@ describe('réglages de sécurité poussés à l’agent', () => {
   it('la synchronisation au démarrage envoie les deux', () => {
     useSettingsStore.getState().syncToRuntime();
     expect(updateRuntimeSettings).toHaveBeenCalledWith({ safeMode: false, browserReadOnly: true });
+  });
+});
+
+describe('settingsStore — transformer la sélection (Ctrl+Alt+T)', () => {
+  const setEnabled = vi.mocked(selectionSetEnabled);
+
+  beforeEach(() => {
+    setEnabled.mockReset();
+    setEnabled.mockResolvedValue(undefined);
+    useSettingsStore.setState({ selectionTransform: false, selectionHint: null });
+  });
+
+  it('désactivé par défaut, et persisté', () => {
+    expect(useSettingsStore.getInitialState().selectionTransform).toBe(false);
+    const persisted = useSettingsStore.persist.getOptions().partialize?.({
+      ...useSettingsStore.getState(),
+      selectionTransform: true,
+    }) as { selectionTransform?: boolean };
+    expect(persisted.selectionTransform).toBe(true);
+    // Absent des réglages déjà enregistrés : la fusion de `persist` garde le défaut.
+    expect(migrateSettings({}, 0).selectionTransform).toBeUndefined();
+  });
+
+  it('activer enregistre le raccourci au cœur', async () => {
+    await useSettingsStore.getState().setSelectionTransform(true);
+    expect(setEnabled).toHaveBeenCalledWith(true);
+    expect(useSettingsStore.getState().selectionTransform).toBe(true);
+  });
+
+  it('un raccourci pris ailleurs recoche « non » et dit pourquoi', async () => {
+    setEnabled.mockRejectedValueOnce(
+      'Raccourci Ctrl+Alt+T indisponible, sans doute pris par une autre application',
+    );
+    await useSettingsStore.getState().setSelectionTransform(true);
+    expect(useSettingsStore.getState().selectionTransform).toBe(false);
+    expect(useSettingsStore.getState().selectionHint).toMatch(/Ctrl\+Alt\+T indisponible/);
   });
 });

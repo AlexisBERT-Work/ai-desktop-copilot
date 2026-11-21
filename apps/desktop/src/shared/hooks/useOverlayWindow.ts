@@ -18,6 +18,7 @@ const PANEL_SIZE: Record<Exclude<OverlayMode, 'hidden'>, { w: number; h: number 
   chat: { w: 724, h: 648 },
   command: { w: 648, h: 470 },
   settings: { w: 748, h: 568 },
+  selection: { w: 644, h: 470 },
 };
 
 /** Gap from the screen edges; extra bottom gap keeps the bubble above the taskbar. */

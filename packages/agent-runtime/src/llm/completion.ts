@@ -8,6 +8,8 @@ export interface CompleteOptions {
   numCtx?: number;
   timeoutMs?: number;
   temperature?: number;
+  /** Plafond de tokens générés (`num_predict`) ; défaut : celui d'OllamaClient. */
+  maxTokens?: number;
   think?: boolean;
   signal?: AbortSignal | undefined;
   /**
@@ -53,6 +55,7 @@ async function completeOnce(
     messages: [{ role: 'user', content: user }],
     temperature: opts.temperature ?? 0.3,
     ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
+    ...(opts.maxTokens !== undefined ? { maxTokens: opts.maxTokens } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     ...(opts.think !== undefined ? { think: opts.think } : {}),
     ...(signal !== undefined ? { signal } : {}),

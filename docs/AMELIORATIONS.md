@@ -317,7 +317,7 @@ rien à faire au milieu d'un journal.
     réutilisation du cache de préfixe sous Ollama (`scripts/latency-bench.mjs`) :
     les rapports se contredisent selon les versions, et tout le gain de latence
     du 2026-10-08 en dépend.
-- **Pistes de la veille GitHub** (rapports du 6 au 13/11, workflow `ai-veille.yml`).
+- **Pistes de la veille GitHub** (rapports du 6 au 16/11, workflow `ai-veille.yml`).
   Les pistes retenues ont été développées une par une, une branche et une PR
   chacune, puis fusionnées dans `dev` le 2026-11-21 :
   - ✅ **Navigateur en lecture seule par défaut** (6/11, PR #36) : tranche la
@@ -356,6 +356,18 @@ rien à faire au milieu d'un journal.
       piège principal mesuré au banc ;
     - proposer une variante depuis une correction faite à la main après une
       dictée (rien n'apprend aujourd'hui).
+  - ✅ **Transformer le texte sélectionné** (16/11, branche
+    `feat/transformer-selection`) : `Ctrl+Alt+T`, consigne dans la bulle,
+    avant/après puis Entrée remplace, voir [CAPACITES.md](CAPACITES.md)
+    § 1 ter. Mesuré : 17/17 sorties propres, premier token médian 1,6 s, mais
+    270 mots récrits en 41 s (le seuil de la veille, 15 s, n'est pas tenu : le
+    modèle écrit ~8 mots/s sur la RX 6700). Reste : l'essai réel dans Word,
+    Edge et Teams (le test du presse-papier,
+    `cargo test -- --ignored selection_win --nocapture`, est à lancer depuis
+    un terminal ordinaire : les processus lancés par l'app Claude n'ont pas
+    accès au presse-papier) ; garder la mise en forme (HTML du presse-papier)
+    si le texte brut gêne à l'usage ; un modèle plus petit pour les longs
+    textes, si la mesure le justifie.
   - ✅ **Motifs d'injection et d'exfiltration en français** (PR #32) :
     `sanitizeToolOutput` cadre aussi « ignore tes consignes ». Reste : une
     paraphrase passe (9 attaques françaises sur 30 cadrées), voir
