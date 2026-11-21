@@ -151,6 +151,20 @@ aujourd'hui classé `critical`.
   ne change pas. Seul le navigateur de l'agent est concerné, pas ceux de
   l'utilisateur.
 
+- **Accord par site** : la clé est le domaine enregistrable. Un domaine qui
+  héberge les pages de ses utilisateurs sans sous-domaine propre
+  (`sites.google.com/…`, `docs.google.com/…`) ne fait qu'un site ; seuls les
+  suffixes partagés de la liste publique (`github.io`, `blogspot.com`…) sont
+  séparés. L'accord vit dans le processus de l'agent : un redémarrage de
+  l'agent l'oublie (il redemande).
+- **« À toi de jouer » est une heuristique sur la page** : champs, iframes et
+  éléments de défi VISIBLES, cadre principal et iframes visibles (12 au plus).
+  Un paiement chez un prestataire inconnu dont l'iframe ne porte ni champ ni
+  titre reconnaissable peut passer ; à l'inverse, un CAPTCHA visible n'importe
+  où sur la page bloque tout clic sur cette page (naviguer ailleurs reste
+  possible). Le navigateur de l'agent est invisible : l'utilisateur fait
+  l'étape dans le sien. Les champs mot de passe ne sont pas rendus.
+
 ## 4 bis. Skills (`load_skill`)
 
 - **L'agent ne découvre pas les skills seul : il faut les lui demander.** Les lister

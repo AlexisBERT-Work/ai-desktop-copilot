@@ -1,5 +1,5 @@
 import { appendFileSync } from 'fs';
-import type { ToolResult } from '@catdesk/shared-types';
+import type { PermissionResult, ToolResult } from '@catdesk/shared-types';
 import { dataPath } from './lib/dataDir';
 import { redactArgs } from './security/redactArgs';
 
@@ -41,8 +41,22 @@ export class AuditLogger {
     });
   }
 
-  logPermission(requestId: string, tool: string, granted: boolean, reason?: string): void {
-    this.write('PERMISSION', { requestId, tool, granted, reason });
+  /**
+   * Décision de permission : refus, ou accord avec sa portée (`once` : cette
+   * fois ; `site` : ce site pour la session, `site` dit lequel ; `session`).
+   * Un accord « ce site » réutilisé sans redemander est tracé ici, sans
+   * `requestId` : c'est la seule trace qu'il ait servi.
+   */
+  logPermission(runId: string, tool: string, result: PermissionResult): void {
+    this.write('PERMISSION', {
+      runId,
+      tool,
+      granted: result.granted,
+      ...(result.scope !== undefined ? { scope: result.scope } : {}),
+      ...(result.site !== undefined ? { site: result.site } : {}),
+      ...(result.requestId !== undefined ? { requestId: result.requestId } : {}),
+      ...(result.reason !== undefined ? { reason: result.reason } : {}),
+    });
   }
 
   /**

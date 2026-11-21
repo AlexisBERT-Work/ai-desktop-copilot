@@ -8,7 +8,7 @@ import type {
   PressFeedInput,
   PressRunStatus,
 } from '@catdesk/shared-types';
-import { RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
+import { GRANT_SCOPES, RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
 import { stdoutNotifier, type NotifyFn } from './Notifier';
 import { createLogger } from '../logger';
@@ -302,11 +302,9 @@ export class StdinBridge {
             log.warn('permission.response mal formée', { params: request.params });
             return;
           }
-          orchestrator.resolvePermission(
-            p.requestId,
-            p.granted,
-            typeof p.remember === 'boolean' ? p.remember : undefined,
-          );
+          // Portée inconnue : ignorée, l'accord vaut alors une fois.
+          const scope = GRANT_SCOPES.find(s => s === p.scope);
+          orchestrator.resolvePermission(p.requestId, p.granted, scope);
           return;
         }
 

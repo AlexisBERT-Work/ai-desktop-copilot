@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BlockedWrite } from '../../lib/browserManager';
+import type { Handoff } from '../../lib/browserHandoff';
 
 // Aucun vrai navigateur : on observe ce que les outils font de la réponse du gestionnaire.
 const manager = {
   navigate: vi.fn(),
   click: vi.fn(),
   fill: vi.fn(),
+  detectHandoff: vi.fn<() => Promise<Handoff | null>>(async () => null),
   isOpen: vi.fn(() => true),
   getCurrentUrl: vi.fn(() => 'https://exemple.fr/'),
 };
@@ -31,6 +33,58 @@ const beacon: BlockedWrite = {
 beforeEach(() => {
   vi.clearAllMocks();
   manager.isOpen.mockReturnValue(true);
+  manager.getCurrentUrl.mockReturnValue('https://exemple.fr/');
+  manager.detectHandoff.mockResolvedValue(null);
+});
+
+describe('targetUrl — le site visé par l’accord « pour ce site »', () => {
+  it('browser_navigate : l’URL demandée', () => {
+    const tool = new BrowserNavigateTool();
+    expect(tool.targetUrl({ url: 'https://www.exemple.fr/a' })).toBe('https://www.exemple.fr/a');
+    expect(tool.targetUrl({ url: 42 })).toBeUndefined();
+  });
+
+  it('browser_click et browser_type : la page courante, rien sans page ouverte', () => {
+    manager.getCurrentUrl.mockReturnValue('https://boutique.fr/panier');
+    expect(new BrowserClickTool().targetUrl()).toBe('https://boutique.fr/panier');
+    expect(new BrowserTypeTool().targetUrl()).toBe('https://boutique.fr/panier');
+    manager.isOpen.mockReturnValue(false);
+    expect(new BrowserClickTool().targetUrl()).toBeUndefined();
+  });
+});
+
+describe('à toi de jouer — CAPTCHA, code à usage unique, paiement', () => {
+  it('clic sur une page de paiement : rien n’est cliqué, la main revient à l’utilisateur', async () => {
+    manager.detectHandoff.mockResolvedValue({
+      kind: 'payment',
+      evidence: 'autocomplete=cc-number',
+    });
+    manager.getCurrentUrl.mockReturnValue('https://boutique.fr/paiement');
+    const { data } = expectOk(await new BrowserClickTool().run({ selector: '#payer' }));
+    expect(manager.click).not.toHaveBeenCalled();
+    expect(data).toMatchObject({
+      handedOff: true,
+      reason: 'payment',
+      url: 'https://boutique.fr/paiement',
+      userAction: expect.stringContaining('À toi de jouer'),
+    });
+  });
+
+  it('saisie face à un code 2FA : rien n’est tapé', async () => {
+    manager.detectHandoff.mockResolvedValue({ kind: 'one_time_code', evidence: 'x' });
+    const { data } = expectOk(
+      await new BrowserTypeTool().run({ selector: '#code', text: '123456' }),
+    );
+    expect(manager.fill).not.toHaveBeenCalled();
+    expect(data).toMatchObject({ handedOff: true, reason: 'one_time_code' });
+  });
+
+  it('CAPTCHA : idem pour le clic', async () => {
+    manager.detectHandoff.mockResolvedValue({ kind: 'captcha', evidence: 'iframe' });
+    const { data } = expectOk(await new BrowserClickTool().run({ selector: '#envoyer' }));
+    expect(manager.click).not.toHaveBeenCalled();
+    expect(data).toMatchObject({ handedOff: true, reason: 'captcha' });
+  });
 });
 
 describe('browser_navigate', () => {

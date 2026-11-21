@@ -98,6 +98,7 @@ function makeHarness(opts: HarnessOptions = {}) {
     prepareOutboundArgs:
       opts.outbound ??
       ((_name: string, args: Record<string, unknown>): OutboundPreparation => ({ ok: true, args })),
+    targetUrl: () => undefined,
   } as unknown as ToolRegistry;
 
   const check = vi.fn(async () =>
@@ -124,7 +125,8 @@ function makeHarness(opts: HarnessOptions = {}) {
   const startRun = vi.fn();
   const completeRun = vi.fn();
   const logToolCall = vi.fn();
-  const audit = { startRun, completeRun, logToolCall } as unknown as AuditLogger;
+  const logPermission = vi.fn();
+  const audit = { startRun, completeRun, logToolCall, logPermission } as unknown as AuditLogger;
 
   const playbookRecord = vi.fn();
   const playbook = { bestApproach: () => null, record: playbookRecord } as unknown as PlaybookStore;
@@ -166,6 +168,7 @@ function makeHarness(opts: HarnessOptions = {}) {
     rememberExchange,
     completeRun,
     logToolCall,
+    logPermission,
     playbookRecord,
     cachePut,
     extractAndStore,
@@ -317,6 +320,26 @@ describe('AgentOrchestrator — exécution des outils', () => {
     expect(h.executeTool).not.toHaveBeenCalled();
     const toolMsg = (h.llmCalls[1]?.messages ?? []).find(m => m.role === 'tool');
     expect(toolMsg?.content).toContain('Permission denied: trop risqué');
+    // Le refus est audité ; un accord automatique (cas des autres tests) ne l'est pas.
+    expect(h.logPermission).toHaveBeenCalledWith(expect.any(String), 'echo', {
+      granted: false,
+      reason: 'trop risqué',
+    });
+  });
+
+  it('audite la portée d’un accord donné par l’utilisateur (ici : ce site)', async () => {
+    const h = makeHarness({ turns: [[nativeCall('echo', { x: 1 })], [token('ok')]] });
+    const grant = { granted: true, scope: 'site', site: 'exemple.fr' };
+    h.check.mockResolvedValueOnce(grant);
+    await collect(h.orchestrator.process('utilise echo', 'conv-1', CONFIG));
+    expect(h.logPermission).toHaveBeenCalledWith(expect.any(String), 'echo', grant);
+    expect(h.executeTool).toHaveBeenCalled();
+  });
+
+  it('un accord automatique (risque faible) n’écrit pas de ligne PERMISSION', async () => {
+    const h = makeHarness({ turns: [[nativeCall('echo', { x: 1 })], [token('ok')]] });
+    await collect(h.orchestrator.process('utilise echo', 'conv-1', CONFIG));
+    expect(h.logPermission).not.toHaveBeenCalled();
   });
 
   it("relaie l'échec d'un outil qui jette sans casser la boucle", async () => {

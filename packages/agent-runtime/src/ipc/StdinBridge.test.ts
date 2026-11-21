@@ -26,10 +26,29 @@ describe('handleRequest — routage des méthodes du contrat', () => {
     await dispatch(bridge, {
       jsonrpc: '2.0',
       method: RPC_METHODS.permissionResponse,
-      params: { requestId: 'req-9', granted: true, remember: true },
+      params: { requestId: 'req-9', granted: true, scope: 'site' },
     });
 
-    expect(resolvePermission).toHaveBeenCalledWith('req-9', true, true);
+    expect(resolvePermission).toHaveBeenCalledWith('req-9', true, 'site');
+  });
+
+  it('permission.response : portée absente ou inconnue → undefined (vaut « une fois »)', async () => {
+    const resolvePermission = vi.fn();
+    const bridge = new StdinBridge({
+      orchestrator: { resolvePermission } as unknown as AgentOrchestrator,
+    });
+    for (const scope of [undefined, 'toujours', 42]) {
+      await dispatch(bridge, {
+        jsonrpc: '2.0',
+        method: RPC_METHODS.permissionResponse,
+        params: { requestId: 'req-1', granted: true, scope },
+      });
+    }
+    expect(resolvePermission.mock.calls).toEqual([
+      ['req-1', true, undefined],
+      ['req-1', true, undefined],
+      ['req-1', true, undefined],
+    ]);
   });
 
   it('permission.response mal formée est ignorée, pas propagée', async () => {

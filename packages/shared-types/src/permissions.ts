@@ -8,6 +8,17 @@ import type { RiskLevel } from './ipc';
  */
 export const PERMISSION_TIMEOUT_MS = 60_000;
 
+/**
+ * Portée d'un accord donné dans la carte de confirmation :
+ * - `once` : cette fois seulement ;
+ * - `site` : cet outil, sur ce site (domaine enregistrable), jusqu'à la fin de
+ *   la session — proposé seulement si l'outil le prévoit (`siteGrantWhenReadOnly`) ;
+ * - `session` : cet outil, partout, jusqu'à la fin de la session — risque `medium` seulement.
+ */
+export type GrantScope = 'once' | 'site' | 'session';
+
+export const GRANT_SCOPES: readonly GrantScope[] = ['once', 'site', 'session'];
+
 export interface PermissionRequest {
   tool: string;
   args: Record<string, unknown>;
@@ -15,6 +26,8 @@ export interface PermissionRequest {
   paths?: string[];
   /** Ce que le masquage des données personnelles a fait (outils qui sortent du poste). */
   preview?: string;
+  /** Page web visée (BaseTool.targetUrl), pour l'accord « pour ce site ». */
+  url?: string;
   context?: {
     conversationId?: string;
     activeWindow?: string;
@@ -24,7 +37,16 @@ export interface PermissionRequest {
 export interface PermissionResult {
   granted: boolean;
   reason?: string;
-  remember?: boolean;
+  /**
+   * Portée de l'accord, quand il vient de l'utilisateur (réponse à la carte, ou
+   * accord « ce site » / « session » déjà donné). Absente pour un accord
+   * automatique (risque faible, aucune confirmation requise) et pour un refus.
+   */
+  scope?: GrantScope;
+  /** Site (domaine enregistrable) visé, quand l'accord par site s'appliquait. */
+  site?: string;
+  /** Demande de confirmation à laquelle l'utilisateur a répondu. */
+  requestId?: string;
 }
 
 export interface PermissionGrant {
@@ -50,6 +72,14 @@ export interface ToolPermissionConfig {
    * risque déclaré, celui de l'outil (registerTools.test le vérifie).
    */
   riskLevelWhenReadOnly?: RiskLevel;
+  /**
+   * Accord « pour ce site » proposé tant que le navigateur est en lecture
+   * seule : il vaut pour cet outil et le domaine enregistrable (eTLD+1) de la
+   * page visée, jusqu'à la fin de la session. Lecture seule coupée, il n'est
+   * plus ni proposé ni appliqué : un formulaire pourrait partir, l'outil
+   * redemande à chaque fois.
+   */
+  siteGrantWhenReadOnly?: boolean;
   enabled: boolean;
   requiresConfirmation: boolean;
 }
@@ -549,10 +579,11 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       name: 'browser_navigate',
       description: 'Naviguer vers une URL dans le navigateur headless',
       riskLevel: 'high',
-      // Lecture seule : ouvrir une page ne peut plus rien envoyer → une
-      // confirmation par session. Clic et saisie restent `high` : ils agissent
-      // sur la page, même si rien ne part.
+      // Lecture seule : ouvrir une page ne peut plus rien envoyer → accord
+      // une fois, pour ce site ou pour la session. Clic et saisie restent
+      // `high` : ils agissent sur la page, même si rien ne part.
       riskLevelWhenReadOnly: 'medium',
+      siteGrantWhenReadOnly: true,
       enabled: true,
       requiresConfirmation: true,
     },
@@ -574,6 +605,9 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       name: 'browser_click',
       description: 'Cliquer sur un élément de la page',
       riskLevel: 'high',
+      // Site de la page courante. CAPTCHA, code à usage unique et paiement
+      // rendent la main à l'utilisateur, accord ou pas (browserHandoff.ts).
+      siteGrantWhenReadOnly: true,
       enabled: true,
       requiresConfirmation: true,
     },
@@ -581,6 +615,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       name: 'browser_type',
       description: 'Saisir du texte dans un champ de la page',
       riskLevel: 'high',
+      siteGrantWhenReadOnly: true,
       enabled: true,
       requiresConfirmation: true,
     },

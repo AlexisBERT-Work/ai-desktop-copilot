@@ -44,6 +44,22 @@ pub const NOTIF_PRESS_FEEDS: &str = "press.feeds";
 pub const NOTIF_DAILIES_LOCAL: &str = "dailies.local";
 pub const NOTIF_PRESS_LOCAL_PROGRESS: &str = "press.local.progress";
 
+/// Portée d'un accord donné dans la carte de confirmation (miroir de
+/// `GRANT_SCOPES`, shared-types/permissions.ts — test miroir plus bas). Une
+/// valeur inconnue est refusée dès la désérialisation : rien d'inventé ne part
+/// vers l'agent, qui ramène de son côté à `once` une portée non proposée.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GrantScope {
+    /// Cette fois seulement.
+    #[default]
+    Once,
+    /// Cet outil, sur ce site (domaine enregistrable), jusqu'à la fin de la session.
+    Site,
+    /// Cet outil, partout, jusqu'à la fin de la session (risque moyen seulement).
+    Session,
+}
+
 /// Enveloppe JSON-RPC 2.0 d'une requête vers l'agent (id aléatoire).
 pub fn rpc_request(method: &str, params: serde_json::Value) -> serde_json::Value {
     serde_json::json!({
@@ -136,6 +152,37 @@ mod tests {
             "le contrat TS a {ts_value_count} entrées mais le miroir Rust en a {} — synchroniser protocol.rs",
             ALL_CONSTANTS.len()
         );
+    }
+
+    const TS_PERMISSIONS: &str =
+        include_str!("../../../../../packages/shared-types/src/permissions.ts");
+
+    /// Les portées Rust et `GRANT_SCOPES` (TS) sont les mêmes, dans le même ordre.
+    #[test]
+    fn grant_scopes_match_ts() {
+        let line = TS_PERMISSIONS
+            .lines()
+            .find(|l| l.contains("export const GRANT_SCOPES"))
+            .expect("GRANT_SCOPES introuvable dans permissions.ts");
+        let rust: Vec<String> = [GrantScope::Once, GrantScope::Site, GrantScope::Session]
+            .iter()
+            .map(|s| format!("'{}'", serde_json::json!(s).as_str().unwrap_or_default()))
+            .collect();
+        let expected = format!("[{}]", rust.join(", "));
+        assert!(
+            line.contains(&expected),
+            "GRANT_SCOPES diverge : TS `{}`, Rust {expected}",
+            line.trim()
+        );
+    }
+
+    #[test]
+    fn grant_scope_serde() {
+        let site: GrantScope = serde_json::from_value(serde_json::json!("site")).unwrap();
+        assert_eq!(site, GrantScope::Site);
+        assert_eq!(GrantScope::default(), GrantScope::Once);
+        assert!(serde_json::from_value::<GrantScope>(serde_json::json!("toujours")).is_err());
+        assert!(serde_json::from_value::<GrantScope>(serde_json::json!("Site")).is_err());
     }
 
     #[test]

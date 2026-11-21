@@ -3,7 +3,9 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { BrowserManager } from '../../lib/browserManager';
+import { handoffReport } from '../../lib/browserHandoff';
 import { blockedWritesReport } from './blockedWrites';
+import { currentPageUrl } from './currentPage';
 
 const argsSchema = z.object({
   selector: z.string().min(1).describe('CSS selector or text locator of the element to click'),
@@ -21,6 +23,11 @@ export class BrowserClickTool extends BaseTool<Args> {
   override readonly argsSchema = argsSchema;
   readonly schema = jsonSchemaFrom(argsSchema);
 
+  /** Site de l'accord « pour ce site » : celui de la page courante. */
+  override targetUrl(): string | undefined {
+    return currentPageUrl();
+  }
+
   async execute(rawArgs: Args): Promise<ToolResult> {
     const { selector, timeout_ms } = rawArgs;
 
@@ -30,6 +37,11 @@ export class BrowserClickTool extends BaseTool<Args> {
     }
 
     try {
+      // CAPTCHA, code à usage unique, paiement : à l'utilisateur, même autorisé.
+      const handoff = await BrowserManager.get().detectHandoff();
+      if (handoff !== null) {
+        return this.ok(handoffReport(handoff, BrowserManager.get().getCurrentUrl()));
+      }
       const blocked = await BrowserManager.get().click(selector.trim(), timeout_ms);
       return this.ok({
         clicked: selector,

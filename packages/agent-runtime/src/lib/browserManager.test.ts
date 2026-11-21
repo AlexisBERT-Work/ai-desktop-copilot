@@ -42,6 +42,23 @@ const PAGE = `<!doctype html><html><head><title>Formulaire</title></head><body>
 <button id="ws" onclick="new WebSocket('ws://' + location.host + '/ws')">ws</button>
 </body></html>`;
 
+/** Pages du relevé « à toi de jouer », servies en GET. */
+const HANDOFF_PAGES: Record<string, string> = {
+  '/otp': `<!doctype html><title>Vérification</title><form>
+<label for="c">Code reçu par SMS</label><input id="c" name="code" autocomplete="one-time-code">
+<button id="ok">Valider</button></form>`,
+  // Le champ de carte vit dans une iframe, comme chez un prestataire de paiement.
+  '/carte': `<!doctype html><title>Paiement</title><input name="email">
+<iframe src="/cadre-carte" width="300" height="60"></iframe>`,
+  '/cadre-carte': `<!doctype html><input name="n" autocomplete="cc-number" placeholder="1234 1234 1234 1234">`,
+  // Même iframe, mais masquée : un cadre invisible n'est pas relevé.
+  '/carte-masquee': `<!doctype html><title>Accueil</title><input name="q">
+<iframe src="/cadre-carte" style="display:none"></iframe>`,
+  '/ordinaire': `<!doctype html><title>Connexion</title><form>
+<input type="email" name="email"><input type="password" name="password">
+<input name="hidden-otp" type="hidden" value="x"><button>Se connecter</button></form>`,
+};
+
 describe.skipIf(findSystemBrowser() === undefined)('BrowserManager — lecture seule', () => {
   const received: string[] = [];
   let server: Server;
@@ -52,8 +69,11 @@ describe.skipIf(findSystemBrowser() === undefined)('BrowserManager — lecture s
   beforeAll(async () => {
     server = createServer((req, res) => {
       received.push(`${req.method ?? '?'} ${req.url ?? ''}`);
+      const handoffPage = HANDOFF_PAGES[req.url ?? ''];
       if (req.method === 'GET' && req.url === '/') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(PAGE);
+      } else if (req.method === 'GET' && handoffPage !== undefined) {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(handoffPage);
       } else {
         res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
       }
@@ -71,11 +91,14 @@ describe.skipIf(findSystemBrowser() === undefined)('BrowserManager — lecture s
     if (launchError !== '') ctx.skip(`navigateur non démarré : ${launchError}`);
   });
 
+  // Fermer Chromium peut dépasser 10 s sur une machine chargée (suite complète
+  // en parallèle) ; les connexions keep-alive restantes retiendraient `close`.
   afterAll(async () => {
     await browser.setReadOnly(true);
     await browser.close();
+    server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
-  });
+  }, 30_000);
 
   const writesReceived = (): string[] => received.filter(r => !r.startsWith('GET '));
 
@@ -110,6 +133,23 @@ describe.skipIf(findSystemBrowser() === undefined)('BrowserManager — lecture s
       { method: 'WEBSOCKET', url: expect.stringContaining('/ws'), resourceType: 'websocket' },
     ]);
     expect(writesReceived()).toEqual([]);
+  }, 30_000);
+
+  it('à toi de jouer : code à usage unique repéré dans la vraie page', async () => {
+    await browser.navigate(`${base}/otp`);
+    expect(await browser.detectHandoff()).toMatchObject({ kind: 'one_time_code' });
+  }, 30_000);
+
+  it('à toi de jouer : champ de carte dans une iframe visible, pas dans une masquée', async () => {
+    await browser.navigate(`${base}/carte`, { waitUntil: 'load' });
+    expect(await browser.detectHandoff()).toMatchObject({ kind: 'payment' });
+    await browser.navigate(`${base}/carte-masquee`, { waitUntil: 'load' });
+    expect(await browser.detectHandoff()).toBeNull();
+  }, 30_000);
+
+  it('à toi de jouer : une connexion ordinaire n’est pas rendue', async () => {
+    await browser.navigate(`${base}/ordinaire`);
+    expect(await browser.detectHandoff()).toBeNull();
   }, 30_000);
 
   it('lecture seule coupée : le formulaire part', async () => {

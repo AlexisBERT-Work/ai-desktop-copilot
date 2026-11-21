@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import type { RpcMethodName } from './ipc-contract';
+import type { GrantScope } from './permissions';
 
 // ─── Tauri Commands (React → Rust via invoke) ──────────────────
 
@@ -62,12 +63,20 @@ export interface PermissionRequestEvent {
   riskLevel: RiskLevel;
   args: Record<string, unknown>;
   preview?: string;
+  /**
+   * Portées proposées, dans l'ordre d'affichage (`once` toujours en tête).
+   * Le moteur de permissions en décide ; une réponse hors liste vaut `once`.
+   */
+  scopes?: GrantScope[];
+  /** Site (domaine enregistrable) de l'accord « pour ce site », quand il est proposé. */
+  site?: string;
 }
 
 export interface PermissionResponsePayload {
   requestId: string;
   granted: boolean;
-  remember?: boolean;
+  /** Portée de l'accord ; absente ou non proposée : `once`. */
+  scope?: GrantScope;
 }
 
 // ─── JSON-RPC (Rust ↔ Node.js) ────────────────────────────────

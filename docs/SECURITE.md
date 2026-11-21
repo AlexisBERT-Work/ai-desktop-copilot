@@ -604,3 +604,53 @@ que Parakeet a entendu, pour la bulle comme pour la dictée
   est récrit partout avec sa majuscule, y compris dans une dictée tapée
   ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
   sans effacer le fichier.
+
+## Mise à jour 2026-11-21 — accord par site et « à toi de jouer » (veilles des 15 et 20/11)
+
+Restait la friction de `browser_click` et `browser_type` (`high`, une
+confirmation par action) : chercher puis cliquer un résultat demandait autant
+de clics que d'étapes. Un accord « pour la session » aurait ouvert tous les
+sites ; l'accord par site ne relâche que celui qu'on regarde.
+
+- **Portée d'un accord** (`GrantScope` : `once` | `site` | `session`,
+  shared-types). Le moteur décide des portées proposées et les envoie dans
+  `permission.request` (`scopes`, `site`) ; l'UI n'affiche que celles-là ; une
+  réponse hors liste vaut `once`. Le cœur Rust désérialise la portée en enum
+  (`ipc/protocol.rs`, test miroir de `GRANT_SCOPES`) : une valeur inconnue est
+  refusée avant de partir vers l'agent.
+- **Clé outil + site** (`PermissionEngine.sessionGrants`, `grantKey`) : le site
+  est le domaine enregistrable (eTLD+1) calculé par `tldts` avec la liste des
+  suffixes publics, partie privée comprise (`lib/registrableDomain.ts`) — un
+  suffixe partagé (`github.io`, `co.uk`) ne s'étend pas à ses voisins, une IP ou
+  `localhost` sont leur propre site, `about:blank` n'en a pas. L'URL vient de
+  l'outil (`BaseTool.targetUrl`, comme `pathArgs` pour les chemins) : l'URL
+  demandée pour `browser_navigate`, la page courante pour le clic et la saisie
+  — une redirection vers un autre domaine redemande donc à l'action suivante.
+- **Seulement en lecture seule** (`siteGrantWhenReadOnly`, sur les trois
+  outils) : un clic ne peut alors rien envoyer, la page de confiance piégée
+  qui pousserait l'agent à « payer » ou « envoyer » n'obtient rien. Lecture
+  seule coupée, l'accord par site n'est ni proposé ni appliqué : clic et saisie
+  redemandent à chaque fois. Il revient avec la lecture seule. Le mode sans
+  danger l'emporte toujours.
+- **Audit** : l'agent écrit une ligne `PERMISSION` pour chaque décision de
+  l'utilisateur ou refus (`AuditLogger.logPermission` : `scope`, `site`,
+  `requestId`), y compris quand un accord « ce site » sert sans redemander —
+  c'est sa seule trace. Le cœur garde `PERMISSION_DECISION` avec la portée.
+  Un accord automatique (risque faible) n'en écrit pas : `TOOL_CALL` suffit.
+- **À toi de jouer** (`lib/browserHandoff.ts`, idée de `detect_handoff`,
+  Omodaka9375/browserr) : avant d'agir, `browser_click` et `browser_type`
+  relèvent dans le cadre principal et les iframes visibles les champs, iframes
+  et éléments de défi visibles, et une décision pure classe la page : paiement
+  (`autocomplete=cc-*`, numéro de carte, cryptogramme, iframes Stripe,
+  Braintree, Adyen, PayPal…), code à usage unique (`one-time-code`, libellés
+  2FA, cases d'un chiffre), CAPTCHA (iframes reCAPTCHA/hCaptcha/Turnstile hors
+  mode invisible, page d'attente Cloudflare, formulaire `captcha`). L'outil
+  n'agit pas et rend un résultat « à toi de jouer » à transmettre. Le relevé
+  est une chaîne évaluée dans la page (pas une fonction : `tsx` y glisserait
+  des `__name()`).
+- **Testé** : moteur (portées, sous-domaines, suffixes partagés, redirection,
+  lecture seule coupée puis rétablie, mode sans danger, portée forgée), 20
+  pages synthétiques pour la détection (10 à rendre, 10 formulaires ordinaires :
+  aucune erreur), un vrai navigateur sur un serveur local (code 2FA, carte dans
+  une iframe visible et pas dans une masquée, connexion ordinaire), la carte
+  React et le relais Rust. Limites : [LIMITES.md](LIMITES.md) § 4.
