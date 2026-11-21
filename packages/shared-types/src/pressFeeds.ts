@@ -30,6 +30,12 @@ export interface PressFeed {
   articleLimit: number;
   /** Actif : seul un journal actif est collecté/publié. */
   enabled: boolean;
+  /**
+   * Adresse qui reçoit la daily de ce journal par e-mail, après chaque
+   * génération (journaux LOCAUX seulement : les journaux partagés n'en ont
+   * pas). Null = pas d'envoi.
+   */
+  emailTo: string | null;
 }
 
 /** Données saisies à la création/édition d'un journal personnalisé. */
@@ -47,4 +53,13 @@ export const EMPTY_PRESS_FEED: PressFeedInput = {
   sinceHours: 24,
   articleLimit: 12,
   enabled: true,
+  emailTo: null,
 };
+
+/**
+ * Forme plausible d'une adresse e-mail (un @, un domaine à point, sans
+ * espace). Volontairement lâche : le serveur SMTP tranche. Pur.
+ */
+export function isEmailAddress(x: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
+}

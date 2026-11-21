@@ -27,6 +27,7 @@ const INPUT = {
   sinceHours: 24,
   articleLimit: 8,
   enabled: true,
+  emailTo: null,
 };
 
 describe('sanitizeFeed', () => {
@@ -45,6 +46,16 @@ describe('sanitizeFeed', () => {
     });
     expect(f).toMatchObject({ category: 'misc', sinceHours: 24, articleLimit: 12, enabled: true });
   });
+
+  it('garde une adresse e-mail plausible et écarte le reste', () => {
+    expect(sanitizeFeed({ id: 'a', name: 'X', emailTo: ' moi@boulot.fr ' })?.emailTo).toBe(
+      'moi@boulot.fr',
+    );
+    expect(sanitizeFeed({ id: 'a', name: 'X', emailTo: 'pas-une-adresse' })?.emailTo).toBeNull();
+    expect(sanitizeFeed({ id: 'a', name: 'X', emailTo: 42 })?.emailTo).toBeNull();
+    // Ancien fichier, d'avant l'envoi par e-mail.
+    expect(sanitizeFeed({ id: 'a', name: 'X' })?.emailTo).toBeNull();
+  });
 });
 
 describe('LocalPressFeedStore', () => {
@@ -58,9 +69,12 @@ describe('LocalPressFeedStore', () => {
     expect(store.list()[0]?.name).toBe('Veille IA v2');
     expect(store.list()).toHaveLength(1);
 
+    store.save({ ...INPUT, id: created.id, name: 'Veille IA v2', emailTo: 'moi@boulot.fr' });
+
     // Relecture depuis le disque par une nouvelle instance.
     const reread = new LocalPressFeedStore(dir);
     expect(reread.list()[0]?.name).toBe('Veille IA v2');
+    expect(reread.list()[0]?.emailTo).toBe('moi@boulot.fr');
 
     expect(reread.delete(created.id)).toBe(true);
     expect(reread.delete(created.id)).toBe(false);

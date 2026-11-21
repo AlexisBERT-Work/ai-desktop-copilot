@@ -48,6 +48,7 @@ import { LocalPressFeedStore } from './news/LocalPressFeedStore';
 import { LocalDailyStore } from './news/LocalDailyStore';
 import { SharedDailyReader } from './news/SharedDailyReader';
 import { LocalPressScheduler } from './news/LocalPressScheduler';
+import { sendConfiguredEmail } from './lib/email';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
 import { SkillStore } from './skills/SkillStore';
@@ -246,6 +247,9 @@ async function main(): Promise<void> {
     CONFIG.pressHour,
     dailies => stdoutNotifier(RPC_NOTIFICATIONS.dailiesLocal, { dailies }),
     status => stdoutNotifier(RPC_NOTIFICATIONS.pressLocalProgress, { status }),
+    // Envoi par e-mail des journaux qui ont un destinataire (SMTP_* du .env,
+    // ou smtp.env du dossier de données — relu à chaque envoi).
+    sendConfiguredEmail,
   );
   localPress.start();
   lifecycle.onShutdown('local-press', () => localPress.stop());

@@ -4,6 +4,7 @@ import type { PressFeed, PressFeedInput } from '@catdesk/shared-types';
 import {
   EMPTY_DRAFT as EMPTY,
   draftToInput,
+  emailError,
   feedToDraft,
   regexError,
   type Draft,
@@ -30,6 +31,11 @@ export interface PressFeedsBackend {
   runStartedMsg: string;
   /** Abonnement optionnel : pousse la liste à jour (stores événementiels). */
   subscribe?: (cb: (items: PressFeed[]) => void) => () => void;
+  /**
+   * Le backend sait envoyer la daily d'un journal par e-mail (agent local
+   * seulement) : l'éditeur affiche alors la section « Envoi par e-mail ».
+   */
+  supportsEmail?: boolean;
 }
 
 // Logique métier (brouillon ↔ modèle, parsing, validation) : pressFeedsModel.ts (testé).
@@ -79,6 +85,11 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
     const excErr = regexError(draft.excludeRegex);
     if (incErr !== null || excErr !== null) {
       setErr(`Regex invalide : ${incErr ?? excErr}`);
+      return;
+    }
+    const mailErr = emailError(draft.emailTo);
+    if (mailErr !== null) {
+      setErr(mailErr);
       return;
     }
     const input = draftToInput(draft);
@@ -135,6 +146,7 @@ export function PressFeedsManager({ backend }: { backend: PressFeedsBackend }) {
           editingId={editingId}
           busy={busy}
           err={err}
+          supportsEmail={backend.supportsEmail === true}
           onSave={save}
           onCancel={resetForm}
         />

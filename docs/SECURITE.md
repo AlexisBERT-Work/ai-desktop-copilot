@@ -319,6 +319,53 @@ trous réels, quatre durcissements.
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
 
+## Mise à jour 2026-10-16 — dailys envoyées par e-mail
+
+Nouveau **flux sortant** : SMTP authentifié (`lib/email.ts`, nodemailer), pour
+envoyer les dailys des journaux locaux qui ont un destinataire. Ce qui le borne :
+
+- **Pas un outil** : aucun appel du modèle ne déclenche d'envoi. Le
+  destinataire est saisi par l'utilisateur dans l'UI (« Mes journaux »), validé
+  côté UI et côté agent (`pressFeedRecord`), et le contenu se limite aux dailys
+  générées à partir de flux RSS publics. Une injection dans un article peut
+  altérer le texte d'un résumé, pas choisir le destinataire.
+- **Secret hors git et hors logs** : `SMTP_PASSWORD` vit dans le `.env` de
+  l'agent (gitignoré) ou dans `smtp.env` du dossier de données ; les logs ne
+  portent que l'adresse masquée (`a***@domaine.fr`), et les messages d'erreur
+  SMTP ne recopient pas les identifiants.
+- **`smtp.env` ne règle que SMTP** : le fichier est dans un dossier écrivable par
+  l'utilisateur, donc seules les clés `SMTP_*` en sont lues (`pickSmtpKeys`,
+  testé) — il ne peut pas basculer `CATDESK_TOOL_PROFILE` ni injecter
+  `NODE_OPTIONS` dans les enfants de l'agent.
+- **TLS obligatoire** : port 465 en TLS direct, sinon `requireTLS` (STARTTLS
+  exigé) ; délais bornés (connexion 15 s, socket 30 s).
+- **Les journaux partagés n'envoient jamais** : `press_feeds` (Supabase) n'a pas
+  de colonne destinataire, et la lecture `snake_case` force `emailTo: null`.
+- **`pnpm audit`** : la dépendance directe `nodemailer@10.1.1` est à jour ; les 7
+  alertes nodemailer restantes visent la copie 9.0.1 tirée par `imapflow` et
+  `mailparser` (déjà là avant, suivies dans #25).
+
+**Le récap dans le cloud** (`.github/workflows/ai-recap.yml`, même date) : le
+dépôt est **public**, donc ses logs aussi. Les identifiants SMTP et l'adresse de
+destination sont des **secrets GitHub** (masqués dans les logs, jamais transmis
+à un fork : le job ne tourne que sur `AlexisBERT-Work/ai-desktop-copilot`) ; le
+texte du récap ne va pas dans les logs (stdout jeté), seulement dans l'artefact
+d'un essai à blanc. Jeton du job réduit à `contents: read` + `actions: read`
+(lecture de la date du dernier envoi).
+
+Depuis le 2026-10-17, la rédaction est confiée à **Claude Code** (`claude -p`)
+avec le jeton d'abonnement `CLAUDE_CODE_OAUTH_TOKEN` (secret, exposé à cette
+seule étape). Claude n'a que `Read`, `WebFetch` et `WebSearch`, en mode
+`dontAsk` : ni shell, ni écriture, ni jeton GitHub, et il tourne dans un
+dossier temporaire hors du dépôt (aucun `CLAUDE.md`, réglage ou serveur MCP du
+projet chargé). Le contenu des articles — non fiable, potentiellement piégé —
+ne peut donc agir que sur le texte du brief, que `recap:send` valide contre le
+schéma, échappe, et dont il ne garde que les liens http(s). Depuis la v2
+(2026-10-21), le mail est **texte seul** : plus aucune image téléchargée ni
+jointe, donc plus d'URL d'image à filtrer. Les entrées `audience`, `focus` et
+`extra_sources` d'un lancement manuel apparaissent dans les logs publics :
+n'y mettre rien de confidentiel (pas de nom d'entreprise).
+
 ---
 
 ## Mise à jour 2026-11-06 — les skills (`load_skill`)
@@ -358,6 +405,30 @@ fiable après `load_skill` et d'y durcir les outils réseau : non fait.
 piégé demandant de lire `.ssh\id_rsa` puis de l'envoyer par `read_webpage` a été
 ignoré, **avec et sans** `notice`. L'essai ne prouve donc rien pour le cadre, et un seul
 tirage ne garantit rien pour le modèle. La seule garantie reste les permissions.
+
+## Mise à jour 2026-11-06 — veille GitHub quotidienne et « Le Fil »
+
+La veille (`.github/workflows/ai-veille.yml`) lit chaque nuit des README écrits par des
+inconnus et les fait juger par Claude. Ce qui la borne :
+
+- **Claude n'a que `Read`** (`--allowedTools "Read"`, mode `dontAsk`) : ni web, ni
+  shell, ni écriture, ni jeton GitHub. Un README piégé ne peut agir que sur le texte du
+  rapport, que `veille:send` valide contre le schéma zod.
+- **Les liens viennent du code** : `keepCollected` ne garde que des dépôts réellement
+  collectés, au nom valide, et la mise en page construit chaque URL à partir de ce nom.
+  Claude ne peut ni inventer un dépôt, ni glisser un lien.
+- **Dépôt public, logs publics** : ni le corps du mail ni l'adresse ne passent dans les
+  logs (stdout jeté, des nombres seulement). Le destinataire et les identifiants SMTP
+  sont des secrets GitHub, et le job ne tourne pas sur un fork.
+- **Dépôts à fausses étoiles** : le code lève `suspect` sur un dépôt jeune dont les
+  chiffres ne ressemblent pas à un usage réel (étoiles sans forks, ou trop de forks), et
+  un dépôt `suspect` ne peut pas être proposé « à faire ».
+
+**Le Fil** (2026-11-08, `supabase/migrations/20261108000000_fil.sql`) : les workflows
+publient des cartes par la RPC `fil_publish`, avec la clé anon et un jeton de
+publication. Seul le sha256 du jeton est en base, dans une table sans policy et
+invisible depuis l'API ; la fonction, `security definer`, valide elle-même le jeton et
+les cartes.
 
 ## Mise à jour 2026-11-08 — liaison avec Nexus (appli du Master)
 

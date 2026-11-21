@@ -216,6 +216,63 @@ reste partiellement contaminé (voir plus haut), et un seul essai ne dit rien d'
 Portes : type-check 3/3, lint 0, 814 tests agent, 54 desktop. Rust et Python non
 touchés, donc non relancés.
 
+## 2026-10-16 — Récap « Actu IA » par e-mail (branche `feat/recap-ia-email`)
+
+Besoin : recevoir chaque matin, sur une adresse pro, un récap de l'actualité de
+l'IA (rôle de référent IA). Branche coupée de `refactor/audit-complet`, à
+proposer vers `dev` après la PR #26.
+
+- **Groupe de sources « IA »** : 12 flux vérifiés en direct (ActuIA, JDN IA,
+  The Verge / TechCrunch / Ars Technica / MIT Tech Review rubriques IA, The
+  Decoder, OpenAI, Google DeepMind, Google IA, Hugging Face, Simon Willison) —
+  ~70 articles sur 48 h. Écartés : Le Big Data et L'Usine Digitale (403),
+  VentureBeat (429), Anthropic (pas de flux).
+- **Envoi par e-mail** d'un journal local : champ « Envoi par e-mail » dans
+  Journaux → Ce poste ; après chaque génération, les dailys neuves partent par
+  SMTP (un message HTML + texte par destinataire). Compte expéditeur :
+  `SMTP_*` (`.env.example`). Un échec d'envoi garde les dailys et s'affiche
+  dans le bandeau de statut, accueil compris.
+- Portes : type-check 3/3, lint 0, 784 tests agent (+32), 58 desktop (+4).
+  **Pas encore vérifié de bout en bout** : il faut le mot de passe
+  d'application Gmail de l'utilisateur. L'exe installé (0.1.3) n'a pas la
+  fonctionnalité : `pnpm dev` d'ici la prochaine version.
+- **Brief sans PC allumé** (contrainte : pas de PC qui tourne la nuit) :
+  workflow GitHub Actions `ai-recap.yml`, chaque matin vers 6 h 23 (été) /
+  5 h 23 (hiver), fenêtre « depuis le dernier envoi planifié réussi ».
+  Premier essai avec un petit modèle sur le processeur du serveur
+  (`qwen3:4b-instruct-2507`, ~7 tokens/s, 14 min) : lisible mais **pas au
+  niveau d'une veille de référent** (erreurs d'attribution, aucun jugement
+  éditorial). Remplacé le 2026-10-17 par **Claude Code sur l'abonnement**
+  (`claude setup-token`) : collecte sans IA (`recap:collect`), rédaction
+  `claude -p` en sortie JSON contrainte par `BriefSchema`, mise en page et
+  envoi (`recap:send`). En production depuis le 18/10 (secrets en place,
+  workflow sur `master`, code via `RECAP_CODE_REF`, profil pharma par
+  `RECAP_AUDIENCE` et `RECAP_EXTRA_SOURCES`).
+- **Brief v2 (2026-10-21)**, retour du lecteur : plus aucun visuel (les
+  illustrations, souvent générées par IA, n'apportaient rien), et **« un fait,
+  une place »** — le 17/10, un même sujet revenait six fois (objet,
+  essentiel, à la une, brèves, actions, à surveiller). Nouveau format :
+  sommaire cliquable, 1 à 3 sujets (faits, « pour nous », action, « à
+  confirmer », sources typées primaire / presse / analyse), brèves sans
+  redite, agenda daté. Consigne : remonter à la source primaire, vérifier
+  les statuts réglementaires du jour, priorités du lecteur par
+  `RECAP_FOCUS`. Sources revues en direct (analyse, primaires, pharma).
+- **Brief v3 (2026-10-28)**, retour après une semaine : trop maigre (2
+  sujets et 2 à 6 brèves par jour d'après les logs), « Pour nous » et
+  « Action » jamais utiles. Nouveau format : rubrique **« Tendances du
+  secteur »** en tête (rivalités, course, benchmarks avec qui a mesuré,
+  cherchés activement sur le web), puis **4 à 6 sujets développés**
+  (paragraphes courts, chiffres clés en gras, contexte factuel, « à
+  confirmer », jusqu'à 4 sources), **10 à 20 brèves**, aucune
+  recommandation au lecteur ; sommaire détaillé (chaque tendance, chaque
+  sujet, chaque rubrique de brèves avec son nombre). Sources
+  « pouls du secteur » ajoutées et vérifiées : Hacker News IA (≥ 100
+  points), Techmeme, TLDR AI, Zvi Mowshowitz (miroir WordPress), Guardian
+  IA, Wired IA, METR, L'Usine Digitale ; 160 candidats par défaut (148 sur
+  24 h). Essai local du 2026-10-29 (Opus, réglages pharma) : 6 tendances
+  (2 par nature), 6 sujets de 195 à 260 mots en 4-5 paragraphes, 20
+  brèves, 4 échéances ; 41 tours (< 60 de `--max-turns`), ~12 min.
+
 ## 2026-10-09 — Dans l'app réelle : VRAM, mémoire, préchauffage
 
 Tests pilotés dans la vraie fenêtre (WebView2 en débogage distant), avec les

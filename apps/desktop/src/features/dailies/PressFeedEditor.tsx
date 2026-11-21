@@ -1,4 +1,4 @@
-import { Filter, Plus, Settings2 } from 'lucide-react';
+import { Filter, Mail, Plus, Settings2 } from 'lucide-react';
 import {
   DAILY_CATEGORIES,
   DAILY_CATEGORY_LABEL,
@@ -20,6 +20,7 @@ export function PressFeedEditor({
   editingId,
   busy,
   err,
+  supportsEmail = false,
   onSave,
   onCancel,
 }: {
@@ -28,6 +29,8 @@ export function PressFeedEditor({
   editingId: string | null;
   busy: boolean;
   err: string | null;
+  /** Affiche la section « Envoi par e-mail » (journaux locaux seulement). */
+  supportsEmail?: boolean;
   onSave: () => Promise<void>;
   onCancel: () => void;
 }) {
@@ -168,6 +171,31 @@ export function PressFeedEditor({
             </label>
           </div>
         </OptSection>
+
+        {/* ─── Optionnel : envoi par e-mail (journaux locaux) ─── */}
+        {supportsEmail && (
+          <OptSection
+            title="Envoi par e-mail"
+            Icon={Mail}
+            activeCount={draft.emailTo.trim() !== '' ? 1 : 0}
+          >
+            <label className={LABEL}>
+              Envoyer la daily de ce journal à
+              <input
+                className={FIELD}
+                type="email"
+                value={draft.emailTo}
+                onChange={e => setDraft(d => ({ ...d, emailTo: e.target.value }))}
+                placeholder="prenom.nom@entreprise.fr"
+              />
+            </label>
+            <p className="text-[11px] text-white/40">
+              Envoyée après chaque génération (chaque matin, ou « Générer maintenant »).
+              L'expéditeur se configure dans les variables <code>SMTP_*</code> de l'agent — voir{' '}
+              <code>.env.example</code>.
+            </p>
+          </OptSection>
+        )}
 
         {/* ─── Interrupteur actif/inactif ─── */}
         <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-white/60 transition-colors hover:text-white/85">

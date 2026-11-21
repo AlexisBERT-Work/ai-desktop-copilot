@@ -256,6 +256,22 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   [dashboard.md](projects/dashboard.md) §5.
 - **Local-first nuancé** : bourse et news ajoutent des **flux réseau sortants en
   lecture seule** (allow-listés). L'inférence, elle, reste 100 % locale.
+- **Dailys par e-mail** : envoyées par le poste lui-même, donc **seulement si
+  CatDesk tourne** ce jour-là (rattrapage dès le démarrage suivant, comme la
+  génération). Un compte Gmail personnel suffit, avec ses quotas (~500 envois/jour,
+  très au-delà du besoin) ; une messagerie pro peut classer le premier envoi en
+  indésirable ou en quarantaine. Les résumés viennent de qwen3:14b sur les
+  extraits RSS : à vérifier dans l'article d'origine avant de citer.
+- **Brief dans le cloud** (GitHub Actions + Claude Code) : il consomme
+  l'usage de l'abonnement Claude comme une session interactive (un run par
+  jour) ; abonnement en pause ou quota atteint = pas de brief ce jour-là, et
+  le suivant rattrape la fenêtre (72 h au plus). Le jeton `claude setup-token`
+  **expire au bout d'un an**. GitHub peut retarder un déclenchement planifié
+  (souvent 10-30 min), et **désactive** les planifications d'un dépôt public
+  sans activité pendant 60 jours (un clic pour les réactiver). La planification
+  ne part que de `master`. Certains flux refusent les serveurs de GitHub
+  (403 : Substack en `*.substack.com`, Fierce, Healthcare IT News) : une
+  source se teste depuis le runner, pas seulement depuis un poste.
 - **Pas de partage de tableau de bord** : la disposition (canvas libre, tailles,
   styles, affichages enregistrés) vit dans le `localStorage` du poste. Rien ne
   l'exporte ni ne la synchronise entre machines.

@@ -74,6 +74,51 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   `scripts/fetch-kensaku.ps1` installs it, run by hand. "Find the file where…" sentences now
   reach the tool: 4/5 on the bench (was 0/5), and 5 of the 6 file tasks pass through the real
   model (temperature 0).
+- **Daily press review by e-mail** (branch `feat/recap-ia-email`). A local journal
+  (« Mes journaux ») can now carry a recipient address: after each generation its new
+  dailies are sent as one HTML + plain-text e-mail per recipient, through the user's own
+  SMTP account (`SMTP_*` in the agent `.env`, or `smtp.env` in the data directory for the
+  installed app). A restart sends nothing twice; « Générer maintenant » re-sends the
+  regenerated version; a failed send keeps the dailies and shows the error in the status
+  banner. Shared (Supabase) journals never send e-mail.
+- **« IA » source group**: 12 AI feeds checked live on 2026-10-16 (ActuIA, JDN IA, The
+  Verge AI, TechCrunch AI, Ars Technica AI, MIT Technology Review AI, The Decoder, OpenAI,
+  Google DeepMind, Google AI, Hugging Face, Simon Willison).
+- **Daily « Veille IA » brief, PC off** (`.github/workflows/ai-recap.yml`). Each morning a
+  GitHub Actions job collects the candidate articles since the last successful scheduled
+  send (`pnpm recap:collect`, no LLM), has **Claude Code** write the brief headless on the
+  user's Claude subscription (`claude -p` with a `CLAUDE_CODE_OAUTH_TOKEN` from
+  `claude setup-token`; read-only tools plus web fetch/search; output constrained to a JSON
+  schema derived from the zod `BriefSchema`), then lays it out and sends it
+  (`pnpm recap:send`), text only: a detailed clickable table of contents (every trend,
+  story and brief section with its count), a « Tendances du secteur » section first on
+  the industry's competition (rivalries, the race, benchmarks with who measured them,
+  actively searched on the web), 4-6 developed lead stories (short paragraphs with key
+  figures in bold, factual context, optional « À confirmer », sources tagged primary —
+  no recommendations to the reader, v3), 10-20 section briefs limited to facts not
+  already covered, and a dated agenda — each
+  fact appears once (v2, 2026-10-21, after the first briefs repeated a story up to six
+  times; v3, 2026-10-28, after two-story briefs proved too thin). Claude goes back to
+  the primary source an article cites and checks
+  regulatory statuses itself; the reader's priorities come from `RECAP_FOCUS`. A manual
+  run defaults to a dry run that uploads the HTML preview, and can override audience,
+  focus and extra sources for that run only. New sources: analysis (One Useful Thing,
+  Understanding AI, Normal Tech, Import AI, Interconnects, Latent Space), primary
+  (European Commission digital, EU AI Act Newsletter, CNIL, EMA), health and pharma
+  (STAT Health Tech, Endpoints News, Mind Health, Drug Discovery & Development, GEN),
+  French press (Next, Le Monde Pixels, Le Monde Informatique IA, L’Usine Digitale), and
+  the industry's pulse (Hacker News AI at 100+ points, Techmeme, TLDR AI, Zvi
+  Mowshowitz, The Guardian AI, Wired AI, METR).
+- **Daily GitHub watch by e-mail, PC off** (`.github/workflows/ai-veille.yml`, from
+  2026-11-06). Collects new repositories by topic, GitHub Trending and new releases of the
+  bricks CatDesk relies on, with no LLM (`pnpm veille:collect`); then one `claude -p` on
+  the subscription, with the `Read` tool only, judges them against what CatDesk already
+  does (`CAPACITES`, `AMELIORATIONS`, `LIMITES`) and writes a short report
+  (`pnpm veille:send`). Links are built by the code from collected repositories only;
+  the full report and what was seen are kept in the `veille-archive` artifact.
+- **« Le Fil »** (2026-11-08): the brief and the GitHub watch are also published as cards
+  for the `catdesk-fil` phone app (`pnpm fil:publish`, Supabase `catdesk-news`, RPC
+  `fil_publish` behind a publish token whose sha256 alone is stored).
 
 ### Performance
 

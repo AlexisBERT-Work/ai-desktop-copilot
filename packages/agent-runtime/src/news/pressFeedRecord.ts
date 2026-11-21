@@ -1,4 +1,4 @@
-import { isDailyCategory, type PressFeed } from '@catdesk/shared-types';
+import { isDailyCategory, isEmailAddress, type PressFeed } from '@catdesk/shared-types';
 
 // Lecture tolérante d'un journal personnalisé depuis un enregistrement non
 // fiable. Deux sources, même forme à la casse près : le fichier local
@@ -17,6 +17,11 @@ function asPositiveInt(x: unknown, fallback: number): number {
 
 function asOptionalPattern(x: unknown): string | null {
   return typeof x === 'string' && x.length > 0 ? x : null;
+}
+
+function asOptionalEmail(x: unknown): string | null {
+  const v = typeof x === 'string' ? x.trim() : '';
+  return isEmailAddress(v) ? v : null;
 }
 
 const SNAKE: Record<string, string> = {
@@ -56,5 +61,8 @@ export function pressFeedFromRecord(
     sinceHours: asPositiveInt(get('sinceHours'), 24),
     articleLimit: asPositiveInt(get('articleLimit'), 12),
     enabled: r['enabled'] !== false,
+    // Envoi par e-mail : journaux locaux seulement — la table `press_feeds`
+    // n'a pas de colonne pour ça, un journal partagé ne s'envoie jamais.
+    emailTo: casing === 'camel' ? asOptionalEmail(r['emailTo']) : null,
   };
 }

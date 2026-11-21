@@ -1,6 +1,7 @@
 import type { Daily, PressRunStatus } from '@catdesk/shared-types';
 import type { OllamaClient } from '../llm/OllamaClient';
 import { buildCustomJournalDailies } from './customJournalDigest';
+import { emailChangedDailies, type DailyMailer, type DailyEmailOutcome } from './dailyEmail';
 import { dayKey, isRunDue } from './PressDigestScheduler';
 import type { LocalPressFeedStore } from './LocalPressFeedStore';
 import type { LocalDailyStore } from './LocalDailyStore';
@@ -17,6 +18,10 @@ const CHECK_MS = 15 * 60 * 1000;
  *
  * Un jour sans journal actif n'est PAS marqué comme fait : ajouter un journal
  * dans la journée déclenche la génération au tick suivant.
+ *
+ * Un journal qui a un destinataire (`emailTo`) reçoit ses dailys NEUVES par
+ * e-mail à la fin du run : redémarrer CatDesk ne renvoie rien (`addNew` est
+ * idempotent par titre), « Générer maintenant » renvoie la version régénérée.
  */
 export class LocalPressScheduler {
   private interval: ReturnType<typeof setInterval> | null = null;
@@ -36,6 +41,8 @@ export class LocalPressScheduler {
     private readonly onUpdate?: (dailies: Daily[]) => void,
     /** Progression du run (notification `press.local.progress`), pour l'UI. */
     private readonly onStatus?: (status: PressRunStatus) => void,
+    /** Envoi par e-mail des dailys aux journaux qui ont un destinataire. */
+    private readonly mailer?: DailyMailer,
   ) {}
 
   /** Dernier statut émis (repoussé au sync de l'UI ; null = jamais couru). */
@@ -119,7 +126,18 @@ export class LocalPressScheduler {
         forced: force,
       });
       if (changed.length > 0) this.onUpdate?.(this.dailies.list());
-      this.pushStatus({ state: 'done', produced: changed.length, at: new Date().toISOString() });
+      // Après l'enregistrement : un envoi raté ne coûte jamais les dailys.
+      const mail: DailyEmailOutcome =
+        this.mailer !== undefined && changed.length > 0
+          ? await emailChangedDailies(changed, drafts, active, this.mailer)
+          : { emailed: 0 };
+      this.pushStatus({
+        state: 'done',
+        produced: changed.length,
+        ...(mail.emailed > 0 ? { emailed: mail.emailed } : {}),
+        ...(mail.error !== undefined ? { emailError: mail.error } : {}),
+        at: new Date().toISOString(),
+      });
       return true;
     } catch (err) {
       log.error('Local press run failed', { error: String(err) });

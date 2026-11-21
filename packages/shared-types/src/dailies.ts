@@ -60,6 +60,13 @@ export interface PressRunStatus {
   produced?: number;
   /** Message d'erreur (état 'error'). */
   error?: string;
+  /** Messages envoyés par e-mail à l'issue du run (état 'done'). */
+  emailed?: number;
+  /**
+   * Échec de l'envoi par e-mail (état 'done') : les dailys sont bien
+   * générées et enregistrées, seul l'envoi a raté.
+   */
+  emailError?: string;
   /** Horodatage ISO de l'événement. */
   at: string;
 }

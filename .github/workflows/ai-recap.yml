@@ -1,0 +1,183 @@
+# Brief « Veille IA » quotidien par e-mail, PC éteint.
+#
+# 1. Collecte (notre code, sans IA) : articles des sources IA depuis le dernier
+#    envoi → candidates.json + consigne + schéma (src/cli/recapCollect.ts).
+# 2. Rédaction par Claude Code en mode non interactif, sur l'ABONNEMENT Claude
+#    (jeton `claude setup-token`, pas de facturation API) : tri, lecture des
+#    articles et de leurs sources primaires, vérifications web, brief en JSON
+#    conforme au schéma.
+# 3. Mise en page et envoi (notre code) : HTML texte seul avec sommaire
+#    cliquable, SMTP (src/cli/recapSend.ts).
+# 4. Le Fil : à la une, tendances et brèves en cartes, lues sur le téléphone
+#    par l'app catdesk-fil (src/cli/filPublish.ts). Base catdesk-news, RPC
+#    fil_publish : clé anon + jeton de publication, aucun appel de LLM en plus.
+#
+# Réglages (Settings → Secrets and variables → Actions) :
+#   secrets   CLAUDE_CODE_OAUTH_TOKEN (sortie de `claude setup-token`),
+#             SMTP_USER, SMTP_PASSWORD (mot de passe d'application Gmail),
+#             RECAP_TO (adresse qui reçoit le brief)
+#   variables (optionnelles) RECAP_CLAUDE_MODEL (claude-opus-5-5), RECAP_AUDIENCE
+#             (lectorat visé), RECAP_FOCUS (thèmes prioritaires, un par ligne),
+#             RECAP_EXTRA_SOURCES (sources ajoutées aux défauts,
+#             ex. stat_healthtech,endpoints,mindhealth,ema), RECAP_SOURCES
+#             (remplace les défauts), RECAP_LIMIT (120 candidats),
+#             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465),
+#             RECAP_CODE_REF (branche du code lancée depuis master, défaut dev)
+#   le Fil    variables FIL_SUPABASE_URL, FIL_SUPABASE_ANON_KEY (publiques par
+#             nature), secret FIL_PUBLISH_TOKEN (seul son sha256 est en base)
+#
+# GitHub ne déclenche un `schedule` que depuis la branche par défaut (master) :
+# ce fichier doit y être. Le code exécuté, lui, vient de RECAP_CODE_REF.
+
+name: Récap Actu IA
+
+on:
+  schedule:
+    # 4 h 23 UTC = 6 h 23 à Paris en été, 5 h 23 en hiver. Minute impaire : les
+    # créneaux pile à l'heure sont les plus retardés par GitHub.
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Essai à blanc : rien n’est envoyé, aperçu HTML en artefact'
+        type: boolean
+        default: true
+      # Pour essayer un réglage sur UN run, sans toucher aux variables. Les
+      # entrées apparaissent dans les logs (publics) : rien de confidentiel.
+      audience:
+        description: 'Lectorat visé, pour ce run seulement (vide = variable RECAP_AUDIENCE)'
+        type: string
+        default: ''
+      extra_sources:
+        description: 'Sources ajoutées, pour ce run seulement (ex. stat_healthtech,ema)'
+        type: string
+        default: ''
+      focus:
+        description: 'Thèmes prioritaires, pour ce run seulement (vide = variable RECAP_FOCUS)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: read # date du dernier envoi réussi (gh run list)
+
+concurrency:
+  group: ai-recap
+  cancel-in-progress: false
+
+jobs:
+  recap:
+    # Jamais sur un fork (ni secrets ni raison d'envoyer quoi que ce soit).
+    if: github.repository == 'AlexisBERT-Work/ai-desktop-copilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Depuis master (le matin, ou « Run workflow » laissé sur master) :
+          # le code de RECAP_CODE_REF, car master ne bouge qu'aux sorties et
+          # n'a pas le script. Depuis une autre branche : cette branche.
+          ref: ${{ github.ref_name == github.event.repository.default_branch && (vars.RECAP_CODE_REF || 'dev') || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @catdesk/agent-runtime...
+
+      # « Depuis le dernier envoi » : début du dernier run PLANIFIÉ réussi. Les
+      # essais lancés à la main ne décalent pas la fenêtre.
+      - name: Date du dernier envoi
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          since=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ai-recap.yml \
+            --event schedule --status success --limit 1 \
+            --json createdAt --jq '.[0].createdAt // ""')
+          echo "Dernier envoi : ${since:-aucun (fenêtre de 24 h)}"
+          echo "since=$since" >> "$GITHUB_OUTPUT"
+
+      - name: Collecte
+        working-directory: packages/agent-runtime
+        env:
+          RECAP_WORKDIR: ${{ runner.temp }}/recap
+          RECAP_SINCE: ${{ steps.last.outputs.since }}
+          RECAP_SOURCES: ${{ vars.RECAP_SOURCES }}
+          RECAP_EXTRA_SOURCES: ${{ inputs.extra_sources || vars.RECAP_EXTRA_SOURCES }}
+          RECAP_LIMIT: ${{ vars.RECAP_LIMIT }}
+          RECAP_AUDIENCE: ${{ inputs.audience || vars.RECAP_AUDIENCE }}
+          RECAP_FOCUS: ${{ inputs.focus || vars.RECAP_FOCUS }}
+        run: pnpm recap:collect
+
+      - name: Installer Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Claude ne reçoit que lecture de fichiers + web : ni shell, ni écriture,
+      # ni jeton GitHub. Le contenu des articles ne peut donc agir que sur le
+      # texte du brief, que l'étape suivante valide contre le schéma.
+      - name: Rédaction (Claude)
+        id: claude
+        timeout-minutes: 30
+        working-directory: ${{ runner.temp }}/recap
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MODEL: ${{ vars.RECAP_CLAUDE_MODEL || 'claude-opus-5-5' }}
+        run: |
+          if [ "$(jq length candidates.json)" -eq 0 ]; then
+            echo "Aucun article dans la fenêtre : pas de brief aujourd'hui."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          claude -p --model "$MODEL" \
+            --permission-mode dontAsk \
+            --allowedTools "Read,WebFetch,WebSearch" \
+            --max-turns 60 \
+            --output-format json \
+            --json-schema "$(cat brief.schema.json)" \
+            < prompt.md > claude-result.json
+          jq '{subtype, is_error, num_turns, duration_ms}' claude-result.json
+          jq -e '.structured_output' claude-result.json > brief.json
+
+      - name: Mise en page et envoi
+        if: steps.claude.outputs.skip != '1'
+        working-directory: packages/agent-runtime
+        env:
+          RECAP_WORKDIR: ${{ runner.temp }}/recap
+          RECAP_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          RECAP_TO: ${{ secrets.RECAP_TO }}
+          RECAP_OUT: ${{ runner.temp }}/recap-preview.html
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '465' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        # stdout = le texte du brief en essai à blanc : il va dans l'artefact,
+        # pas dans les logs (publics). Les étapes restent visibles sur stderr.
+        run: pnpm recap:send > /dev/null
+
+      # Après l'envoi : un échec ici fait échouer le run (GitHub prévient par
+      # mail) sans priver du brief. Logs : des nombres seulement.
+      - name: Publier dans le fil
+        if: steps.claude.outputs.skip != '1' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        working-directory: packages/agent-runtime
+        env:
+          RECAP_WORKDIR: ${{ runner.temp }}/recap
+          FIL_SUPABASE_URL: ${{ vars.FIL_SUPABASE_URL }}
+          FIL_SUPABASE_ANON_KEY: ${{ vars.FIL_SUPABASE_ANON_KEY }}
+          FIL_PUBLISH_TOKEN: ${{ secrets.FIL_PUBLISH_TOKEN }}
+        run: pnpm fil:publish --from brief
+
+      - name: Aperçu (essai à blanc)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run && steps.claude.outputs.skip != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: recap-preview
+          path: |
+            ${{ runner.temp }}/recap-preview.html
+            ${{ runner.temp }}/recap/brief.json
+          retention-days: 3

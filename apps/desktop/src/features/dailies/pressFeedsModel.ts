@@ -1,6 +1,7 @@
 import {
   EMPTY_PRESS_FEED,
   PRESS_SOURCE_CATALOG,
+  isEmailAddress,
   type DailyCategory,
   type PressFeed,
   type PressFeedInput,
@@ -24,6 +25,7 @@ export interface Draft {
   sinceHours: number;
   articleLimit: number;
   enabled: boolean;
+  emailTo: string; // vide = pas d'envoi par e-mail
 }
 
 export const EMPTY_DRAFT: Draft = {
@@ -37,6 +39,7 @@ export const EMPTY_DRAFT: Draft = {
   sinceHours: EMPTY_PRESS_FEED.sinceHours,
   articleLimit: EMPTY_PRESS_FEED.articleLimit,
   enabled: true,
+  emailTo: '',
 };
 
 export const csv = (s: string): string[] =>
@@ -63,6 +66,7 @@ export function feedToDraft(f: PressFeed): Draft {
     sinceHours: f.sinceHours,
     articleLimit: f.articleLimit,
     enabled: f.enabled,
+    emailTo: f.emailTo ?? '',
   };
 }
 
@@ -78,6 +82,7 @@ export function draftToInput(d: Draft): PressFeedInput {
     sinceHours: d.sinceHours,
     articleLimit: d.articleLimit,
     enabled: d.enabled,
+    emailTo: d.emailTo.trim() === '' ? null : d.emailTo.trim(),
   };
 }
 
@@ -90,6 +95,13 @@ export function regexError(pattern: string): string | null {
   } catch (err) {
     return err instanceof Error ? err.message : 'motif invalide';
   }
+}
+
+/** Message d'erreur d'une adresse de destination, null si valide ou vide. */
+export function emailError(address: string): string | null {
+  const a = address.trim();
+  if (a === '' || isEmailAddress(a)) return null;
+  return `Adresse e-mail invalide : ${a}`;
 }
 
 /** Minuscules sans accents, pour une recherche tolérante (« libe » → Libération). */
