@@ -33,7 +33,10 @@ export function recoverToolCalls(
       const call = toToolCall(obj, knownToolNames);
       if (!call) continue;
       const dedupKey = `${call.name}:${JSON.stringify(call.args)}`;
-      if (seen.has(dedupKey)) { matchedAny = true; continue; }
+      if (seen.has(dedupKey)) {
+        matchedAny = true;
+        continue;
+      }
       seen.add(dedupKey);
       calls.push(call);
       matchedAny = true;
@@ -81,7 +84,9 @@ export function looksLikeToolCallStart(text: string): boolean {
  */
 export function looksLikePreamble(text: string): boolean {
   const head = text.slice(0, 80).toLowerCase();
-  return /\b(je vais (te |maintenant |d.?abord |tout de suite )?(captur|ouvr|lanc|lire|[ée]cri|cherch|envoy|ex[ée]cut|faire|pr[ée]par|regard|analys|prendre|r[ée]cup[ée]r|affich|montr|dire|t[ée]l[ée]charg|cr[ée]er|v[ée]rifi|consult)|laisse[- ]moi|un (petit )?instant|attends?[ -]?(toi)?|patiente|je m.?en occupe|je commence|je pr[ée]pare|c.?est parti)/.test(head);
+  return /\b(je vais (te |maintenant |d.?abord |tout de suite )?(captur|ouvr|lanc|lire|[ée]cri|cherch|envoy|ex[ée]cut|faire|pr[ée]par|regard|analys|prendre|r[ée]cup[ée]r|affich|montr|dire|t[ée]l[ée]charg|cr[ée]er|v[ée]rifi|consult)|laisse[- ]moi|un (petit )?instant|attends?[ -]?(toi)?|patiente|je m.?en occupe|je commence|je pr[ée]pare|c.?est parti)/.test(
+    head,
+  );
 }
 
 function safeParse(s: string): unknown {
@@ -98,9 +103,12 @@ function toToolCall(obj: unknown, knownToolNames: ReadonlySet<string>): ToolCall
   const rec = obj as Record<string, unknown>;
   // Accept {name, arguments} and the OpenAI-ish {function:{name, arguments}}.
   const fn = rec['function'] as Record<string, unknown> | undefined;
-  const name = typeof rec['name'] === 'string'
-    ? (rec['name'] as string)
-    : typeof fn?.['name'] === 'string' ? (fn['name'] as string) : undefined;
+  const name =
+    typeof rec['name'] === 'string'
+      ? (rec['name'] as string)
+      : typeof fn?.['name'] === 'string'
+        ? (fn['name'] as string)
+        : undefined;
   if (!name || !knownToolNames.has(name)) return null;
 
   let rawArgs: unknown = rec['arguments'] ?? rec['parameters'] ?? fn?.['arguments'] ?? {};

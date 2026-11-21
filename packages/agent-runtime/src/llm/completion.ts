@@ -2,15 +2,49 @@ import type { OllamaClient } from './OllamaClient';
 
 // Plomberie LLM générique : accumuler une complétion, et récupérer le JSON
 // d'une réponse de modèle. Vit sous llm/ et non sous news/ : rien ici ne
-// connaît la presse, et NewsSummarizer (llm/) en dépend aussi.
+// connaît la presse ; les planificateurs, résumés et extractions en dépendent.
 
-/** Accumule une complétion non-streamée. */
+export interface CompleteOptions {
+  numCtx?: number;
+  timeoutMs?: number;
+  temperature?: number;
+  think?: boolean;
+  signal?: AbortSignal | undefined;
+  /**
+   * Appel de FOND (extraction de faits, résumés, digests) : il attend que
+   * l'utilisateur soit inactif et cède le GPU dès qu'un run démarre, puis
+   * reprend (voir LlmScheduler). Sans ordonnanceur câblé, s'exécute tout de suite.
+   */
+  background?: boolean;
+}
+
+/**
+ * Accumule une complétion non-streamée. Lève si le signal l'interrompt : un
+ * résultat partiel passerait pour complet (un résumé tronqué enregistré, un
+ * JSON coupé…).
+ */
 export async function complete(
   llm: OllamaClient,
   model: string,
   system: string,
   user: string,
-  opts: { numCtx?: number; timeoutMs?: number; temperature?: number; think?: boolean } = {},
+  opts: CompleteOptions = {},
+): Promise<string> {
+  const scheduler = opts.background ? llm.scheduler : undefined;
+  if (scheduler === undefined) return completeOnce(llm, model, system, user, opts, opts.signal);
+  return scheduler.runPreemptible(
+    signal => completeOnce(llm, model, system, user, opts, signal),
+    opts.signal,
+  );
+}
+
+async function completeOnce(
+  llm: OllamaClient,
+  model: string,
+  system: string,
+  user: string,
+  opts: CompleteOptions,
+  signal: AbortSignal | undefined,
 ): Promise<string> {
   let text = '';
   const stream = llm.streamChat({
@@ -21,11 +55,15 @@ export async function complete(
     ...(opts.numCtx !== undefined ? { numCtx: opts.numCtx } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     ...(opts.think !== undefined ? { think: opts.think } : {}),
+    ...(signal !== undefined ? { signal } : {}),
   });
   for await (const chunk of stream) {
     if (chunk.type === 'token') text += chunk.content;
     else if (chunk.type === 'error') throw new Error(chunk.error);
   }
+  // streamChat se tait sur une interruption : sans ce contrôle, le texte
+  // partiel serait rendu comme une réponse complète.
+  if (signal?.aborted) throw new Error('Complétion interrompue');
   return text;
 }
 

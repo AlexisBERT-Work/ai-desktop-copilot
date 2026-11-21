@@ -26,9 +26,13 @@ import { TAURI_EVENTS } from '@catdesk/shared-types';
  * Called once at App root.
  */
 export function useTauriEvents() {
-  const { appendToken, setPlan, finalizeMessage, setToolActivity, setError } = useChatStore();
-  const { toggle } = useOverlayStore();
-  const { syncToRuntime } = useSettingsStore();
+  const appendToken = useChatStore(s => s.appendToken);
+  const setPlan = useChatStore(s => s.setPlan);
+  const finalizeMessage = useChatStore(s => s.finalizeMessage);
+  const setToolActivity = useChatStore(s => s.setToolActivity);
+  const setError = useChatStore(s => s.setError);
+  const toggle = useOverlayStore(s => s.toggle);
+  const syncToRuntime = useSettingsStore(s => s.syncToRuntime);
   const showSuggestion = useProactiveStore(s => s.show);
   const applyMarket = useMarketStore(s => s.apply);
   // Actions seulement (stables) — `useShallow` évite un objet neuf à chaque rendu.
@@ -45,8 +49,11 @@ export function useTauriEvents() {
   );
 
   useEffect(() => {
-    // Push persisted settings (e.g. safeMode) to the agent runtime once it's ready
-    const syncTimer = setTimeout(() => syncToRuntime(), 3_000);
+    // Réglages persistés (safe mode) → runtime. Tout de suite : le cœur les
+    // mémorise et les rejoue à chaque (re)démarrage de l'agent — plus besoin
+    // d'attendre « que l'agent soit prêt » (l'ancien délai de 3 s ratait un
+    // agent lent à démarrer, qui tournait alors sans safe mode).
+    syncToRuntime();
     // État des modèles voix + préchauffage (indépendant de l'agent).
     void voice.init();
 
@@ -130,7 +137,6 @@ export function useTauriEvents() {
     );
 
     return () => {
-      clearTimeout(syncTimer);
       unlisteners.forEach(p => p.then(fn => fn()));
     };
   }, [

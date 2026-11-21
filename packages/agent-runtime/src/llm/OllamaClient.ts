@@ -2,8 +2,17 @@ import type { OllamaMessage, OllamaToolSchema, StreamChunk } from '@catdesk/shar
 import { createLogger } from '../logger';
 import { CONFIG } from '../config';
 import { withRetry } from '../lib/retry';
+import type { LlmScheduler } from './LlmScheduler';
 
 const log = createLogger('llm:ollama');
+
+/**
+ * Embeddings sur CPU (`num_gpu: 0`). nomic-embed-text y répond en ~40 ms une
+ * fois chaud (mesuré sur Ryzen 5 5500), et toute la VRAM reste au modèle de
+ * chat : chargé sur GPU, il lui prend 0,3 Go — une couche de qwen3:14b de
+ * moins sur une carte de 10 Go déjà pleine — et peut l'en évincer.
+ */
+const EMBED_OPTIONS = { num_gpu: 0 } as const;
 
 /**
  * Ollama expects `tool_calls[].function.arguments` as an OBJECT in request
@@ -29,6 +38,54 @@ function normalizeToolCallArgs(m: OllamaMessage): OllamaMessage {
   };
 }
 
+/** Une ligne NDJSON de /api/chat, telle qu'Ollama la stream. */
+interface ChatLine {
+  message?: {
+    content?: string;
+    tool_calls?: Array<{ id?: string; function: { name: string; arguments: unknown } }>;
+  };
+  done?: boolean;
+  eval_count?: number;
+}
+
+/**
+ * Traduit une ligne NDJSON du flux /api/chat en chunks. Pur, exporté pour les
+ * tests : c'est le code le plus « parsing » du runtime. Une ligne illisible
+ * (coupée, bruit) ne produit rien plutôt que de casser le flux. Les arguments
+ * d'outil restent tels qu'Ollama les donne (un OBJET) — l'orchestrateur sait
+ * lire une chaîne JSON aussi, sans aller-retour inutile.
+ */
+export function parseChatLine(line: string): StreamChunk[] {
+  if (!line.trim()) return [];
+  let data: ChatLine;
+  try {
+    data = JSON.parse(line) as ChatLine;
+  } catch {
+    return [];
+  }
+  const chunks: StreamChunk[] = [];
+  if (data.message?.content) chunks.push({ type: 'token', content: data.message.content });
+  for (const tc of data.message?.tool_calls ?? []) {
+    const args = tc.function.arguments;
+    chunks.push({
+      type: 'tool_call',
+      toolCall: {
+        id: tc.id ?? crypto.randomUUID(),
+        type: 'function',
+        function: {
+          name: tc.function.name,
+          arguments:
+            typeof args === 'string' || (args !== null && typeof args === 'object')
+              ? (args as string | Record<string, unknown>)
+              : {},
+        },
+      },
+    });
+  }
+  if (data.done) chunks.push({ type: 'done', totalTokens: data.eval_count ?? 0 });
+  return chunks;
+}
+
 export interface OllamaConfig {
   baseUrl: string;
   defaultModel?: string;
@@ -39,6 +96,15 @@ export interface OllamaConfig {
    * Garder le modèle chaud évite un rechargement coûteux à chaque appel.
    */
   keepAlive?: string;
+  /**
+   * num_ctx appliqué à TOUT appel qui n'en précise pas. Ollama recharge le
+   * modèle entier dès que num_ctx change (mesuré : 12 s de chargement + relecture
+   * du prompt, à l'aller puis au retour) : un appel de fond oubliant num_ctx
+   * coûtait ainsi ~45 s à la question suivante. Une seule valeur pour tous.
+   */
+  numCtx?: number;
+  /** Priorité premier plan / fond (voir LlmScheduler) — lu par `complete({ background })`. */
+  scheduler?: LlmScheduler;
 }
 
 export interface ChatParams {
@@ -68,25 +134,20 @@ export interface ChatParams {
   signal?: AbortSignal;
 }
 
-export interface OllamaModel {
-  name: string;
-  modified_at: string;
-  size: number;
-  details: {
-    family: string;
-    parameter_size: string;
-    quantization_level: string;
-  };
-}
-
 export class OllamaClient {
   constructor(private config: OllamaConfig) {}
+
+  /** Ordonnanceur premier plan / fond partagé, s'il a été câblé. */
+  get scheduler(): LlmScheduler | undefined {
+    return this.config.scheduler;
+  }
 
   async *streamChat(params: ChatParams): AsyncGenerator<StreamChunk> {
     const url = `${this.config.baseUrl}/api/chat`;
 
     // keep_alive : garde le modèle chaud en RAM entre les requêtes (gain latence).
     const keepAlive = params.keepAlive ?? this.config.keepAlive ?? '10m';
+    const numCtx = params.numCtx ?? this.config.numCtx;
 
     const body = {
       model: params.model,
@@ -101,7 +162,7 @@ export class OllamaClient {
       options: {
         temperature: params.temperature ?? 0.7,
         ...(params.maxTokens ? { num_predict: params.maxTokens } : {}),
-        ...(params.numCtx ? { num_ctx: params.numCtx } : {}),
+        ...(numCtx ? { num_ctx: numCtx } : {}),
       },
     };
 
@@ -133,7 +194,7 @@ export class OllamaClient {
       log.error('Ollama connection failed', { error, url });
       yield {
         type: 'error',
-        error: `Ollama non disponible: ${error}. Assurez-vous qu'Ollama tourne sur le port 11434.`,
+        error: `Ollama non disponible: ${error}. Assurez-vous qu'Ollama tourne (${this.config.baseUrl}).`,
       };
       return;
     }
@@ -152,7 +213,6 @@ export class OllamaClient {
 
     const decoder = new TextDecoder();
     let buffer = '';
-    let totalTokens = 0;
 
     try {
       while (true) {
@@ -165,48 +225,9 @@ export class OllamaClient {
         buffer = lines.pop() ?? '';
 
         for (const line of lines) {
-          if (!line.trim()) continue;
-
-          try {
-            const data = JSON.parse(line) as {
-              message?: {
-                content?: string;
-                tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
-              };
-              done?: boolean;
-              eval_count?: number;
-            };
-
-            if (data.message?.content) {
-              yield { type: 'token', content: data.message.content };
-            }
-
-            if (data.message?.tool_calls) {
-              for (const tc of data.message.tool_calls) {
-                yield {
-                  type: 'tool_call',
-                  toolCall: {
-                    id: tc.id ?? crypto.randomUUID(),
-                    type: 'function',
-                    function: {
-                      name: tc.function.name,
-                      arguments:
-                        typeof tc.function.arguments === 'string'
-                          ? tc.function.arguments
-                          : JSON.stringify(tc.function.arguments),
-                    },
-                  },
-                };
-              }
-            }
-
-            if (data.done) {
-              totalTokens = data.eval_count ?? 0;
-              yield { type: 'done', totalTokens };
-              return;
-            }
-          } catch {
-            // Skip malformed lines
+          for (const chunk of parseChatLine(line)) {
+            yield chunk;
+            if (chunk.type === 'done') return;
           }
         }
       }
@@ -218,17 +239,6 @@ export class OllamaClient {
       }
     } finally {
       reader.releaseLock();
-    }
-  }
-
-  async listModels(): Promise<OllamaModel[]> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/api/tags`);
-      if (!response.ok) return [];
-      const data = (await response.json()) as { models: OllamaModel[] };
-      return data.models ?? [];
-    } catch {
-      return [];
     }
   }
 
@@ -276,7 +286,7 @@ export class OllamaClient {
         const response = await fetch(`${this.config.baseUrl}/api/embeddings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, prompt: text }),
+          body: JSON.stringify({ model, prompt: text, options: EMBED_OPTIONS }),
           signal: AbortSignal.timeout(30_000),
         });
 

@@ -8,12 +8,19 @@ function fakeStore() {
   const summaries = new Map<string, { summary: string; throughTs: number }>();
   return {
     seed(convId: string, n: number) {
-      const arr = Array.from({ length: n }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}`, createdAt: 1000 + i }));
+      const arr = Array.from({ length: n }, (_, i) => ({
+        role: i % 2 ? 'assistant' : 'user',
+        content: `m${i}`,
+        createdAt: 1000 + i,
+      }));
       msgs.set(convId, arr);
     },
     getSummary: (id: string) => summaries.get(id) ?? null,
-    setSummary: (id: string, summary: string, throughTs: number) => { summaries.set(id, { summary, throughTs }); },
-    getMessagesSince: (id: string, sinceTs: number) => (msgs.get(id) ?? []).filter(m => m.createdAt > sinceTs),
+    setSummary: (id: string, summary: string, throughTs: number) => {
+      summaries.set(id, { summary, throughTs });
+    },
+    getMessagesSince: (id: string, sinceTs: number) =>
+      (msgs.get(id) ?? []).filter(m => m.createdAt > sinceTs),
   };
 }
 
@@ -22,7 +29,10 @@ describe('Compactor', () => {
     const store = fakeStore();
     store.seed('c', 10);
     const summarizer = { summarize: vi.fn() };
-    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, { threshold: 16, keepRecent: 6 });
+    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, {
+      threshold: 16,
+      keepRecent: 6,
+    });
     const r = await c.maybeCompact('c');
     expect(r.compacted).toBe(false);
     expect(summarizer.summarize).not.toHaveBeenCalled();
@@ -32,7 +42,10 @@ describe('Compactor', () => {
     const store = fakeStore();
     store.seed('c', 20); // createdAt 1000..1019
     const summarizer = { summarize: vi.fn(async () => 'RÉSUMÉ') };
-    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, { threshold: 16, keepRecent: 6 });
+    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, {
+      threshold: 16,
+      keepRecent: 6,
+    });
 
     const r = await c.maybeCompact('c');
     expect(r).toEqual({ compacted: true, folded: 14 }); // 20 - 6
@@ -51,7 +64,10 @@ describe('Compactor', () => {
     store.seed('c', 20);
     store.setSummary('c', 'ANCIEN', 0);
     const summarizer = { summarize: vi.fn(async () => 'NOUVEAU') };
-    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, { threshold: 16, keepRecent: 6 });
+    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, {
+      threshold: 16,
+      keepRecent: 6,
+    });
 
     await c.maybeCompact('c');
     expect(summarizer.summarize).toHaveBeenCalledWith(expect.any(Array), 'ANCIEN');
@@ -61,7 +77,10 @@ describe('Compactor', () => {
     const store = fakeStore();
     store.seed('c', 20);
     const summarizer = { summarize: vi.fn(async () => '   ') };
-    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, { threshold: 16, keepRecent: 6 });
+    const c = new Compactor(store as unknown as ConversationStore, summarizer as never, {
+      threshold: 16,
+      keepRecent: 6,
+    });
     const r = await c.maybeCompact('c');
     expect(r.compacted).toBe(false);
     expect(store.getSummary('c')).toBeNull();

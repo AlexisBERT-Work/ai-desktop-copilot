@@ -1,4 +1,4 @@
-import { httpGet } from '../lib/httpGet';
+import { httpGet } from '../lib/http';
 import type { NewsItem } from './newsItem';
 import { parseDevto, parseFeed, parseHackerNews } from './parseFeed';
 import { DEFAULT_SOURCES, NEWS_SOURCES, feedLabelFromUrl } from './sources';

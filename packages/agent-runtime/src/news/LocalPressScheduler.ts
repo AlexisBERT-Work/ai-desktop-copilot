@@ -21,6 +21,8 @@ const CHECK_MS = 15 * 60 * 1000;
 export class LocalPressScheduler {
   private interval: ReturnType<typeof setInterval> | null = null;
   private running = false;
+  /** Arrêté (CatDesk quitte) : un run en cours n'enregistre plus rien. */
+  private stopped = false;
   private lastRunDay: string | null = null;
   private lastStatus: PressRunStatus | null = null;
 
@@ -57,6 +59,7 @@ export class LocalPressScheduler {
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.interval !== null) {
       clearInterval(this.interval);
       this.interval = null;
@@ -102,6 +105,12 @@ export class LocalPressScheduler {
           });
         },
       });
+      // Arrêt en cours : les appels LLM annulés ont produit des replis
+      // dégradés — ne pas les enregistrer à la place de vraies dailys.
+      if (this.stopped) {
+        log.info('Arrêt en cours — dailys locales non enregistrées');
+        return false;
+      }
       const changed = force ? this.dailies.upsert(drafts) : this.dailies.addNew(drafts);
       log.info('Local press run complete', {
         feeds: active.length,

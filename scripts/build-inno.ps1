@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Package the already-built CatDesk exe + staged resources into a full offline
   Inno Setup installer.

@@ -10,9 +10,7 @@ export interface AdminSession {
 /** Vrai si le claim `app_metadata.role` vaut 'admin' (posé côté serveur). */
 function metaIsAdmin(meta: unknown): boolean {
   return (
-    typeof meta === 'object' &&
-    meta !== null &&
-    (meta as Record<string, unknown>).role === 'admin'
+    typeof meta === 'object' && meta !== null && (meta as Record<string, unknown>).role === 'admin'
   );
 }
 
@@ -57,7 +55,10 @@ export function useAdminSession(): AdminSession {
 }
 
 /** Connexion admin par e-mail/mot de passe. */
-export async function signInAdmin(email: string, password: string): Promise<{ error: string | null }> {
+export async function signInAdmin(
+  email: string,
+  password: string,
+): Promise<{ error: string | null }> {
   if (supabase === null) return { error: 'Supabase non configuré.' };
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   return { error: error?.message ?? null };

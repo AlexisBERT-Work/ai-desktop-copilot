@@ -11,7 +11,11 @@ export function InputArea({ conversationId }: Props) {
   const [input, setInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { sendMessage, isStreaming, interrupt } = useChatStore();
+  const sendMessage = useChatStore(s => s.sendMessage);
+  const isStreaming = useChatStore(s => s.isStreaming);
+  const interrupt = useChatStore(s => s.interrupt);
+  // Préchauffage : le modèle se charge pendant que l'utilisateur tape.
+  const warmUp = useChatStore(s => s.warmUp);
 
   const handleSubmit = useCallback(async () => {
     const text = input.trim();
@@ -31,6 +35,7 @@ export function InputArea({ conversationId }: Props) {
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
+    warmUp();
     // Auto-resize
     const ta = e.target;
     ta.style.height = 'auto';
@@ -68,7 +73,7 @@ export function InputArea({ conversationId }: Props) {
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="mb-2 text-center text-xs text-brand-400 py-1">Drop files to attach</div>
+        <div className="mb-2 text-center text-xs text-brand-400 py-1">Déposez les fichiers ici</div>
       )}
 
       <div className="flex items-end gap-2">
@@ -79,7 +84,8 @@ export function InputArea({ conversationId }: Props) {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Message CatDesk... (Shift+Enter for newline)"
+            onFocus={warmUp}
+            placeholder="Écrire à CatDesk… (Maj+Entrée pour aller à la ligne)"
             rows={1}
             className="w-full bg-transparent text-sm text-white placeholder-white/30
                        outline-none resize-none leading-relaxed selectable"
@@ -92,7 +98,7 @@ export function InputArea({ conversationId }: Props) {
           <VoiceButton />
           <button
             onClick={captureScreen}
-            title="Capture screen"
+            title="Capturer l’écran"
             className="p-2 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
           >
             <Camera className="w-4 h-4" />
@@ -122,7 +128,7 @@ export function InputArea({ conversationId }: Props) {
       </div>
 
       <p className="text-center text-xs text-white/15 mt-2">
-        CatDesk uses local AI — your data never leaves this machine.
+        CatDesk tourne en local : vos données ne quittent jamais cette machine.
       </p>
     </div>
   );

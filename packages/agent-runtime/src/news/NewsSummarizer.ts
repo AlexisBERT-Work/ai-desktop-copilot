@@ -1,6 +1,6 @@
-import type { OllamaClient } from './OllamaClient';
-import type { NewsItem } from '../news/newsItem';
-import { complete, extractJsonObject } from './completion';
+import type { OllamaClient } from '../llm/OllamaClient';
+import type { NewsItem } from './newsItem';
+import { complete, extractJsonObject } from '../llm/completion';
 import { createLogger } from '../logger';
 
 const log = createLogger('llm:news-summary');
@@ -62,7 +62,8 @@ export async function summarizeDigest(
 
   let raw: string;
   try {
-    raw = await complete(llm, model, SYSTEM, buildSummaryPrompt(items));
+    // Sortie JSON stricte : sans think:false, le raisonnement de qwen3 la pollue.
+    raw = await complete(llm, model, SYSTEM, buildSummaryPrompt(items), { think: false });
   } catch (err) {
     log.warn('News summarization failed — falling back to excerpts', { error: String(err) });
     return fallback();

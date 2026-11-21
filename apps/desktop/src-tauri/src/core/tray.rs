@@ -5,10 +5,18 @@ use tauri::{
 };
 use tracing::info;
 
+use crate::ipc::protocol::EVENT_UI_OVERLAY_TOGGLE;
+
 pub fn setup_tray(app: &mut App) -> anyhow::Result<()> {
-    let toggle = MenuItem::with_id(app, "toggle", "Show/Hide CatDesk", true, None::<&str>)?;
+    let toggle = MenuItem::with_id(
+        app,
+        "toggle",
+        "Afficher / masquer CatDesk",
+        true,
+        None::<&str>,
+    )?;
     let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&toggle, &separator, &quit])?;
 
@@ -30,14 +38,14 @@ pub fn setup_tray(app: &mut App) -> anyhow::Result<()> {
             {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.emit("ui:overlay-toggle", ());
+                    let _ = window.emit(EVENT_UI_OVERLAY_TOGGLE, ());
                 }
             }
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
             "toggle" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.emit("ui:overlay-toggle", ());
+                    let _ = window.emit(EVENT_UI_OVERLAY_TOGGLE, ());
                 }
             }
             "quit" => {

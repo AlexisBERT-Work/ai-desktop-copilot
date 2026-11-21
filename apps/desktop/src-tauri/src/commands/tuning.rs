@@ -14,7 +14,7 @@ use tracing::info;
 use crate::commands::models::{detect_vram_bytes, heaviest_model};
 use crate::core::audit;
 use crate::core::error::CatdeskError;
-use crate::core::ollama;
+use crate::core::ollama::{self, http_client, DEFAULT_CHAT_MODEL, OLLAMA_URL};
 
 /// Heuristic: which KV-cache type suits a model of `model_bytes` on a GPU with
 /// `vram_bytes`. Returns "f16" (comfortable fit — don't pay the ~6% q4 cost) or
@@ -40,19 +40,14 @@ pub fn recommend_kv_cache(vram_bytes: Option<u64>, model_bytes: u64) -> &'static
     }
 }
 
-/// The single bundled chat model: `qwen3:14b`. Since the "one model, the
-/// strongest" cut (target machines have a real GPU, ~10 GiB VRAM), the 7B tier
-/// was dropped from the bundle — there is nothing left to route to, so this
-/// always returns the 14B. `_vram_bytes` is kept for call-site compatibility
-/// (the KV-cache tuner and UI still probe VRAM) but no longer drives the choice.
-pub fn recommend_default_model(_vram_bytes: Option<u64>) -> &'static str {
-    "qwen3:14b"
-}
-
-/// Detect VRAM and return the model CatDesk should default to on this machine.
+/// The model CatDesk defaults to. Since the "one model, the strongest" cut
+/// (target machines have a real GPU, ~10 GiB VRAM), only one chat model ships
+/// — the choice no longer depends on VRAM, so neither this command nor the
+/// agent launch probes it any more (nvidia-smi + a PowerShell registry query
+/// delayed every agent start for a result that was then ignored).
 #[tauri::command]
 pub async fn get_recommended_model() -> Result<String, String> {
-    Ok(recommend_default_model(detect_vram_bytes().await).to_string())
+    Ok(DEFAULT_CHAT_MODEL.to_string())
 }
 
 #[derive(Debug, Serialize)]
@@ -94,8 +89,11 @@ pub async fn get_kv_cache_status(app: AppHandle) -> Result<KvCacheStatus, String
 
 /// Poll Ollama until it answers or `max_secs` elapses. Returns readiness.
 async fn wait_until_ready(max_secs: u64) -> bool {
+    let client = http_client();
     for _ in 0..(max_secs * 2) {
-        let ok = reqwest::get("http://127.0.0.1:11434/api/tags")
+        let ok = client
+            .get(format!("{OLLAMA_URL}/api/tags"))
+            .send()
             .await
             .map(|r| r.status().is_success())
             .unwrap_or(false);
@@ -176,19 +174,9 @@ pub async fn set_kv_cache_type(app: AppHandle, value: String) -> Result<ApplyRes
 
 #[cfg(test)]
 mod tests {
-    use super::{recommend_default_model, recommend_kv_cache};
+    use super::recommend_kv_cache;
 
     const GIB: u64 = 1 << 30;
-
-    #[test]
-    fn always_picks_the_single_bundled_14b() {
-        // The 7B tier was removed from the bundle: only qwen3:14b ships now, so
-        // the choice no longer depends on VRAM.
-        assert_eq!(recommend_default_model(None), "qwen3:14b");
-        assert_eq!(recommend_default_model(Some(0)), "qwen3:14b");
-        assert_eq!(recommend_default_model(Some(8 * GIB)), "qwen3:14b");
-        assert_eq!(recommend_default_model(Some(12 * GIB)), "qwen3:14b");
-    }
 
     #[test]
     fn unknown_vram_defaults_to_f16() {

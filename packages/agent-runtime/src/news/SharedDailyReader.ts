@@ -1,10 +1,16 @@
 import type { Daily } from '@catdesk/shared-types';
 import { isDailyCategory } from '@catdesk/shared-types';
+import {
+  anonSignIn,
+  authHeaders,
+  supabaseUrl,
+  SUPABASE_TIMEOUT_MS,
+  type SupabaseOpenConfig,
+} from './supabaseRest';
 import { createLogger } from '../logger';
 
 const log = createLogger('news:shared-dailies');
 
-const FETCH_TIMEOUT_MS = 10_000;
 const CACHE_TTL_MS = 60_000;
 const FETCH_LIMIT = 100;
 
@@ -51,23 +57,22 @@ function rowToDaily(r: DailyRow): Daily {
  * Lecture ANONYME des dailys partagées (Supabase) depuis le runtime — le même
  * flux que le widget affiche, mais accessible à l'agent pour répondre aux
  * questions sur les articles. La RLS n'ouvre la lecture qu'aux sessions
- * authentifiées : on ouvre une session anonyme (comme le fait l'UI) puis on
- * interroge le REST. Sans SUPABASE_URL/SUPABASE_ANON_KEY dans l'env, la source
- * est simplement absente (les dailys locales restent disponibles).
+ * authentifiées : on ouvre une session anonyme (comme le fait l'UI), gardée
+ * entre deux appels, puis on interroge le REST.
+ *
+ * La config vient de `CONFIG.supabase` (projet par défaut, surchargeable par
+ * l'env). Elle était auparavant lue dans SUPABASE_URL/SUPABASE_ANON_KEY
+ * seulement — absents d'un poste installé : l'agent ne voyait alors QUE les
+ * dailys locales, alors que répondre sur les dailys est sa mission première.
  */
 export class SharedDailyReader {
-  private readonly url: string | undefined;
-  private readonly anonKey: string | undefined;
   private jwt: string | null = null;
   private cache: { items: Daily[]; at: number } | null = null;
 
-  constructor(url = process.env['SUPABASE_URL'], anonKey = process.env['SUPABASE_ANON_KEY']) {
-    this.url = url?.replace(/\/+$/, '');
-    this.anonKey = anonKey;
-  }
+  constructor(private readonly cfg: SupabaseOpenConfig | null) {}
 
   get configured(): boolean {
-    return this.url !== undefined && this.url.length > 0 && this.anonKey !== undefined;
+    return this.cfg !== null && this.cfg.url.length > 0 && this.cfg.anonKey.length > 0;
   }
 
   async fetch(): Promise<SharedDailiesResult> {
@@ -99,38 +104,17 @@ export class SharedDailyReader {
 
   /** GET REST des dailys, `null` si la session est rejetée (401/403 → re-login). */
   private async fetchRows(): Promise<Daily[] | null> {
-    const jwt = await this.ensureSession();
+    const cfg = this.cfg!; // garanti par `configured`
+    this.jwt ??= await anonSignIn(cfg);
     const q = `select=*&order=published_at.desc&limit=${FETCH_LIMIT}`;
-    const res = await fetch(`${this.url}/rest/v1/dailies?${q}`, {
-      headers: { apikey: this.anonKey ?? '', Authorization: `Bearer ${jwt}` },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    const res = await fetch(supabaseUrl(cfg, `/rest/v1/dailies?${q}`), {
+      headers: authHeaders(cfg, this.jwt),
+      signal: AbortSignal.timeout(SUPABASE_TIMEOUT_MS),
     });
     if (res.status === 401 || res.status === 403) return null;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rows: unknown = await res.json().catch(() => null);
     if (!Array.isArray(rows)) throw new Error('réponse inattendue');
     return rows.filter(isDailyRow).map(rowToDaily);
-  }
-
-  /** Session anonyme (POST /auth/v1/signup sans identifiants), JWT mémorisé. */
-  private async ensureSession(): Promise<string> {
-    if (this.jwt !== null) return this.jwt;
-    const res = await fetch(`${this.url}/auth/v1/signup`, {
-      method: 'POST',
-      headers: { apikey: this.anonKey ?? '', 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    const data: unknown = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(`connexion anonyme refusée (HTTP ${res.status})`);
-    const token =
-      data !== null && typeof data === 'object'
-        ? (data as Record<string, unknown>)['access_token']
-        : null;
-    if (typeof token !== 'string' || token.length === 0) {
-      throw new Error('connexion anonyme: access_token absent');
-    }
-    this.jwt = token;
-    return token;
   }
 }

@@ -2,10 +2,9 @@ import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import type { ActivityTracker } from './ActivityTracker';
 import { detectSpiral, type SpiralVerdict } from './spiral';
 import { createLogger } from './logger';
+import type { NotifyFn } from './ipc/Notifier';
 
 const log = createLogger('runtime:spiral');
-
-export type NotifyFn = (method: string, params: unknown) => void;
 
 export interface SpiralMonitorOptions {
   thresholdMinutes?: number; // minutes on the same signature before flagging

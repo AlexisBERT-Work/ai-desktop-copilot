@@ -6,7 +6,7 @@ import { fetchEnabledPressFeeds } from './PressFeedStore';
 import {
   publishDailies,
   publishDailiesOpen,
-  hasTodaysSharedDigest,
+  sharedDigestState,
   type SupabaseAdminConfig,
   type SupabaseOpenConfig,
 } from './SupabasePublisher';
@@ -82,6 +82,12 @@ export function isRunDue(hour: number, lastRunDay: string | null, now = new Date
 export class PressDigestScheduler {
   private interval: ReturnType<typeof setInterval> | null = null;
   private running = false;
+  /**
+   * Arrêté (CatDesk quitte) : un run en cours ne publie plus rien. À l'arrêt,
+   * ses appels LLM sont annulés et chaque étape bascule sur son repli dégradé
+   * (extraits bruts) — ce lot ne doit pas partir chez tous les postes.
+   */
+  private stopped = false;
   /** Jour local du dernier run réussi (null = aucun depuis le démarrage). */
   private lastRunDay: string | null = null;
 
@@ -106,6 +112,7 @@ export class PressDigestScheduler {
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.interval !== null) {
       clearInterval(this.interval);
       this.interval = null;
@@ -130,9 +137,16 @@ export class PressDigestScheduler {
       // Un autre poste a peut-être déjà publié le lot standard du jour (tri
       // modèles 2026-07-20 : n'importe quel poste peut désormais le faire).
       // On économise la génération LLM locale si c'est déjà fait ailleurs.
-      if (await hasTodaysSharedDigest(this.cfg.supabase)) {
+      const state = await sharedDigestState(this.cfg.supabase);
+      if (state === 'published') {
         log.info('Revue de presse du jour déjà publiée (autre poste) — rien à générer');
         return true;
+      }
+      if (state === 'unreachable') {
+        // Rien ne pourrait être publié : ne pas brûler le GPU pour rien.
+        // Nouvelle tentative au prochain tick (15 min).
+        log.warn('Supabase injoignable — revue de presse reportée, rien généré');
+        return false;
       }
 
       const { mode } = this.cfg;
@@ -164,6 +178,11 @@ export class PressDigestScheduler {
         );
       }
 
+      if (this.stopped) {
+        log.info('Arrêt en cours — revue de presse non publiée');
+        return false;
+      }
+
       // Lot standard : publication ouverte (session anonyme + RPC), sans
       // identifiants admin — c'est elle qui rend le run possible sur N'IMPORTE
       // QUEL poste. Idempotente : un titre déjà publié par un autre poste
@@ -179,7 +198,7 @@ export class PressDigestScheduler {
       // Extras réservés à l'admin — n'existent que sur le(s) poste(s) où les
       // identifiants admin sont configurés ; absents ⇒ le lot standard
       // ci-dessus a suffi, on s'arrête là.
-      if (this.cfg.admin) {
+      if (this.cfg.admin && !this.stopped) {
         const admin = this.cfg.admin;
         // Journaux personnalisés (press_feeds, réservés à l'admin). Échec
         // réseau → liste vide, sans faire échouer le run.

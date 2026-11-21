@@ -9,7 +9,9 @@ interface Props {
 }
 
 export function MessageList({ conversationId }: Props) {
-  const { messages, isStreaming, streamingMessageId } = useChatStore();
+  const messages = useChatStore(s => s.messages);
+  const isStreaming = useChatStore(s => s.isStreaming);
+  const streamingMessageId = useChatStore(s => s.streamingMessageId);
   const msgs = messages[conversationId] ?? [];
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -43,9 +45,9 @@ export function MessageList({ conversationId }: Props) {
           isStreaming={isStreaming && msg.id === streamingMessageId}
         />
       ))}
-      {isStreaming && streamingMessageId && msgs.find(m => m.id === streamingMessageId)?.content === '' && (
-        <StreamingIndicator />
-      )}
+      {isStreaming &&
+        streamingMessageId &&
+        msgs.find(m => m.id === streamingMessageId)?.content === '' && <StreamingIndicator />}
       <div ref={bottomRef} />
     </div>
   );

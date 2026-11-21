@@ -3,6 +3,7 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { extractBySelector, htmlToText } from '../../lib/readableText';
+import { BROWSER_USER_AGENT, httpRequest } from '../../lib/http';
 
 const argsSchema = z.object({
   url: z.string().min(1).describe('URL to fetch and extract text from'),
@@ -10,62 +11,6 @@ const argsSchema = z.object({
   max_chars: z.number().default(20000).describe('Max characters of extracted text to return'),
 });
 type Args = z.infer<typeof argsSchema>;
-
-async function fetchUrl(
-  url: string,
-  timeoutMs = 15_000,
-): Promise<{ body: string; statusCode: number; contentType: string }> {
-  const parsedUrl = new URL(url);
-  const isHttps = parsedUrl.protocol === 'https:';
-  const { default: transport } = await import(isHttps ? 'https' : 'http');
-
-  return new Promise((resolve, reject) => {
-    const req = (transport as typeof import('https')).get(
-      {
-        hostname: parsedUrl.hostname,
-        port: parsedUrl.port || (isHttps ? 443 : 80),
-        path: parsedUrl.pathname + parsedUrl.search,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; CatDesk-Agent/1.0)',
-          Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9',
-          'Accept-Language': 'fr,en;q=0.8',
-        },
-      },
-      res => {
-        // Follow one redirect
-        if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
-          req.destroy();
-          fetchUrl(res.headers.location, timeoutMs).then(resolve, reject);
-          return;
-        }
-
-        const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => {
-          chunks.push(c);
-          // Abort if body exceeds 4MB to avoid memory bloat
-          const total = chunks.reduce((s, b) => s + b.length, 0);
-          if (total > 4_000_000) {
-            req.destroy();
-            reject(new Error('Réponse trop volumineuse (>4MB)'));
-          }
-        });
-        res.on('end', () =>
-          resolve({
-            body: Buffer.concat(chunks).toString('utf-8'),
-            statusCode: res.statusCode ?? 0,
-            contentType: res.headers['content-type'] ?? '',
-          }),
-        );
-        res.on('error', reject);
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(timeoutMs, () => {
-      req.destroy();
-      reject(new Error('Timeout lors de la requête'));
-    });
-  });
-}
 
 export class ReadWebpageTool extends BaseTool<Args> {
   readonly name = 'read_webpage';
@@ -98,7 +43,18 @@ export class ReadWebpageTool extends BaseTool<Args> {
     let contentType: string;
 
     try {
-      ({ body, statusCode, contentType } = await fetchUrl(url));
+      const res = await httpRequest(url, {
+        timeoutMs: 15_000,
+        maxBytes: 4_000_000,
+        headers: {
+          'User-Agent': BROWSER_USER_AGENT,
+          Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9',
+          'Accept-Language': 'fr,en;q=0.8',
+        },
+      });
+      body = res.text;
+      statusCode = res.status;
+      contentType = res.headers.get('content-type') ?? '';
     } catch (err) {
       return this.fail(`Impossible de récupérer la page: ${String(err)}`);
     }

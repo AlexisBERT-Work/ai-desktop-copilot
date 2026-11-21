@@ -6,7 +6,9 @@ import { PlaybookStore, approachSignature } from './PlaybookStore';
 
 describe('approachSignature', () => {
   it('dedupes preserving first-use order', () => {
-    expect(approachSignature(['read_file', 'read_file', 'run_command', 'read_file'])).toBe('read_file>run_command');
+    expect(approachSignature(['read_file', 'read_file', 'run_command', 'read_file'])).toBe(
+      'read_file>run_command',
+    );
   });
   it('marks a toolless run', () => {
     expect(approachSignature([])).toBe('(réponse directe)');

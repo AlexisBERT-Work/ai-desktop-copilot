@@ -10,7 +10,7 @@ export function openExternal(url: string | undefined): void {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return;
   void import('@tauri-apps/plugin-shell')
     .then(({ open }) => open(url))
-    .catch((err) => {
+    .catch(err => {
       console.error('openExternal: échec ouverture du lien', err);
     });
 }

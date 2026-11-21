@@ -15,16 +15,17 @@ describe('analyzeEvolution', () => {
   it('proposes preferring a clear winner', () => {
     const p = analyzeEvolution([row('tests', 'generate_unit_tests', 5, 1)]);
     expect(p).toHaveLength(1);
-    expect(p[0]).toMatchObject({ kind: 'prefer', taskType: 'tests', approach: 'generate_unit_tests' });
+    expect(p[0]).toMatchObject({
+      kind: 'prefer',
+      taskType: 'tests',
+      approach: 'generate_unit_tests',
+    });
     expect(p[0]!.successRate).toBeCloseTo(5 / 6);
     expect(p[0]!.rationale).toContain('privilégier');
   });
 
   it('proposes avoiding a failing approach and points at the winner', () => {
-    const p = analyzeEvolution([
-      row('debug', 'good>flow', 8, 1),
-      row('debug', 'bad>flow', 1, 5),
-    ]);
+    const p = analyzeEvolution([row('debug', 'good>flow', 8, 1), row('debug', 'bad>flow', 1, 5)]);
     const prefer = p.find(x => x.kind === 'prefer');
     const avoid = p.find(x => x.kind === 'avoid');
     expect(prefer?.approach).toBe('good>flow');
@@ -34,10 +35,7 @@ describe('analyzeEvolution', () => {
 
   it('does not flag a middling approach as avoid', () => {
     // 50% is above badRate (0.4) and below goodRate (0.6): neither prefer nor avoid.
-    const p = analyzeEvolution([
-      row('search', 'winner', 9, 1),
-      row('search', 'middling', 3, 3),
-    ]);
+    const p = analyzeEvolution([row('search', 'winner', 9, 1), row('search', 'middling', 3, 3)]);
     expect(p.some(x => x.approach === 'middling')).toBe(false);
     expect(p.filter(x => x.kind === 'prefer')).toHaveLength(1);
   });
@@ -60,10 +58,7 @@ describe('analyzeEvolution', () => {
   });
 
   it('produces stable, task-type-sorted output across multiple types', () => {
-    const p = analyzeEvolution([
-      row('git', 'git_commit', 4, 0),
-      row('debug', 'trace>fix', 3, 1),
-    ]);
+    const p = analyzeEvolution([row('git', 'git_commit', 4, 0), row('debug', 'trace>fix', 3, 1)]);
     expect(p.map(x => x.taskType)).toEqual(['debug', 'git']);
   });
 

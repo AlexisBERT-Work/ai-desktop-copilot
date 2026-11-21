@@ -58,7 +58,7 @@ describe('parseConflicts', () => {
     expect(parseConflicts(content)).toHaveLength(2);
   });
 
-  it('ignore un marqueur d\'ouverture non fermé', () => {
+  it("ignore un marqueur d'ouverture non fermé", () => {
     const content = ['<<<<<<< HEAD', 'a', '======='].join('\n');
     expect(parseConflicts(content)).toHaveLength(0);
   });

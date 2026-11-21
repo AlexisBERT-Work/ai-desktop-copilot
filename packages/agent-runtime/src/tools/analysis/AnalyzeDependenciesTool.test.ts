@@ -9,7 +9,7 @@ describe('parsePackageJson', () => {
         devDependencies: { vitest: '~2.1.9', beta: '1.0.0-beta.1' },
       }),
     );
-    const byName = Object.fromEntries(deps.map((d) => [d.name, d]));
+    const byName = Object.fromEntries(deps.map(d => [d.name, d]));
     expect(byName['react']?.dev).toBe(false);
     expect(byName['vitest']?.dev).toBe(true);
     expect(byName['leftpad']?.flags).toContain('wildcard');
@@ -38,7 +38,7 @@ local = { path = "../local" }
 proptest = "1.4"
 `;
     const deps = parseCargoToml(toml);
-    const byName = Object.fromEntries(deps.map((d) => [d.name, d]));
+    const byName = Object.fromEntries(deps.map(d => [d.name, d]));
     expect(byName['serde']?.version).toBe('1.0');
     expect(byName['tokio']?.version).toBe('0.2');
     expect(byName['tokio']?.flags).toContain('pre-1.0');
@@ -60,12 +60,12 @@ numpy~=1.26
 pkg[extra]==1.0.0
 `;
     const deps = parseRequirements(reqs);
-    const byName = Object.fromEntries(deps.map((d) => [d.name, d]));
+    const byName = Object.fromEntries(deps.map(d => [d.name, d]));
     expect(byName['django']?.version).toBe('==4.2.1');
     expect(byName['requests']?.flags).toContain('floating');
     expect(byName['flask']?.flags).toContain('unpinned');
     expect(byName['pkg']?.version).toBe('==1.0.0');
     // pip flag lines are skipped
-    expect(deps.find((d) => d.name.startsWith('-'))).toBeUndefined();
+    expect(deps.find(d => d.name.startsWith('-'))).toBeUndefined();
   });
 });

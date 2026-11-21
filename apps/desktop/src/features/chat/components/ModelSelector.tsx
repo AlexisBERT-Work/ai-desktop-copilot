@@ -3,8 +3,12 @@ import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import { useChatStore, modelVramWarning } from '../store/chatStore';
 
 export function ModelSelector() {
-  const { selectedModel, availableModels, setModel, loadModels, modelSizes, vramBytes } =
-    useChatStore();
+  const selectedModel = useChatStore(s => s.selectedModel);
+  const availableModels = useChatStore(s => s.availableModels);
+  const chooseModel = useChatStore(s => s.chooseModel);
+  const loadModels = useChatStore(s => s.loadModels);
+  const modelSizes = useChatStore(s => s.modelSizes);
+  const vramBytes = useChatStore(s => s.vramBytes);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -54,7 +58,7 @@ export function ModelSelector() {
               <button
                 key={m}
                 onClick={() => {
-                  setModel(m);
+                  chooseModel(m);
                   setOpen(false);
                 }}
                 title={w ? tip(w) : undefined}

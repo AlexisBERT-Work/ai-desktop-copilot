@@ -28,9 +28,11 @@ function isField(x: unknown): x is QuoteField {
 /** Lit la config d'un widget métrique (kpi/stat) de façon défensive. */
 export function readMetricConfig(config: Record<string, unknown>): MetricConfig {
   const c: MetricConfig = {};
-  if (typeof config.symbol === 'string' && config.symbol.trim()) c.symbol = config.symbol.trim().toUpperCase();
+  if (typeof config.symbol === 'string' && config.symbol.trim())
+    c.symbol = config.symbol.trim().toUpperCase();
   if (isField(config.field)) c.field = config.field;
-  if (typeof config.formula === 'string' && config.formula.trim()) c.formula = config.formula.trim();
+  if (typeof config.formula === 'string' && config.formula.trim())
+    c.formula = config.formula.trim();
   if (typeof config.label === 'string' && config.label.trim()) c.label = config.label.trim();
   return c;
 }
@@ -45,7 +47,7 @@ export function resolveMetric(
   computed: ComputedValue[],
 ): MetricResult {
   if (config.formula !== undefined) {
-    const c = computed.find((v) => v.name === config.formula);
+    const c = computed.find(v => v.name === config.formula);
     const label = config.label ?? config.formula;
     if (c === undefined) return { value: null, label };
     return c.error !== undefined

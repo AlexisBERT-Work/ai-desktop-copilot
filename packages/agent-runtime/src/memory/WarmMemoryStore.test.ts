@@ -20,7 +20,11 @@ describe('WarmMemoryStore', () => {
   });
 
   it('inserts a new fact', () => {
-    const changed = store.upsert({ kind: 'preference', subject: 'editeur', value: 'préfère VS Code' });
+    const changed = store.upsert({
+      kind: 'preference',
+      subject: 'editeur',
+      value: 'préfère VS Code',
+    });
     expect(changed).toBe(true);
     expect(store.count()).toBe(1);
     expect(store.getActiveFacts()[0]?.value).toBe('préfère VS Code');
@@ -35,16 +39,32 @@ describe('WarmMemoryStore', () => {
 
   it('reaffirming the same subject+value does not add a row', () => {
     store.upsert({ kind: 'preference', subject: 'editeur', value: 'VS Code', confidence: 0.6 });
-    const changed = store.upsert({ kind: 'preference', subject: 'editeur', value: 'vs code', confidence: 0.9 });
+    const changed = store.upsert({
+      kind: 'preference',
+      subject: 'editeur',
+      value: 'vs code',
+      confidence: 0.9,
+    });
     expect(changed).toBe(false);
     expect(store.count()).toBe(1);
     // confidence is bumped to the higher value
     expect(store.getActiveFacts()[0]?.confidence).toBe(0.9);
   });
 
+  it('getActiveFacts(minConfidence) écarte les faits incertains (« Brésilien », 0,1)', () => {
+    store.upsert({ kind: 'fact', subject: 'capitale_bresil', value: 'Brésilien', confidence: 0.1 });
+    store.upsert({ kind: 'preference', subject: 'editeur', value: 'VS Code', confidence: 0.9 });
+    expect(store.getActiveFacts(20, 0.5).map(f => f.value)).toEqual(['VS Code']);
+    expect(store.getActiveFacts()).toHaveLength(2); // rien n'est supprimé
+  });
+
   it('supersedes the old value on contradiction (same subject, new value)', () => {
     store.upsert({ kind: 'fact', subject: 'employeur', value: 'travaille chez X' });
-    const changed = store.upsert({ kind: 'fact', subject: 'employeur', value: 'ne travaille plus chez X' });
+    const changed = store.upsert({
+      kind: 'fact',
+      subject: 'employeur',
+      value: 'ne travaille plus chez X',
+    });
     expect(changed).toBe(true);
     expect(store.count()).toBe(1); // old one retired, not piled up
     expect(store.getActiveFacts()[0]?.value).toBe('ne travaille plus chez X');

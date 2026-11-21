@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { isNewsConfigured as isSupabaseConfigured, supabase } from '../news/supabaseClient';
+import {
+  ensureSession,
+  isNewsConfigured as isSupabaseConfigured,
+  supabase,
+} from '../news/supabaseClient';
 import { useDailiesStore } from './dailiesStore';
 import { rowToDaily, type DailyRow } from './model';
 
@@ -68,10 +72,7 @@ export function useDailies(): void {
 
     void (async () => {
       setStatus('loading');
-      const { data: sessionData } = await client.auth.getSession();
-      if (sessionData.session === null) {
-        await client.auth.signInAnonymously();
-      }
+      await ensureSession(client).catch(() => {});
       await load();
     })();
 

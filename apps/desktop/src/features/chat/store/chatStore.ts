@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { Message, Conversation } from '@catdesk/shared-types';
-import { chatSend, chatCancel } from '../../../shared/api/chat';
+import { DEFAULT_CHAT_MODEL } from '@catdesk/shared-types';
+import { chatSend, chatCancel, chatWarmup } from '../../../shared/api/chat';
+import { useSettingsStore } from '../../settings/settingsStore';
 import {
   getOllamaModelsInfo,
   getGpuVramBytes,
@@ -25,9 +27,10 @@ interface ChatState {
   streamingMessageId: string | null;
   status: AgentStatus;
   activeTool: string | null;
+  /** Modèle des prochains messages : le choix persisté (Réglages), sinon le recommandé. */
   selectedModel: string;
-  /** True once the user manually picks a model — stops the adaptive default from overriding it. */
-  userPickedModel: boolean;
+  /** Modèle que CatDesk recommande pour cette machine (getRecommendedModel). */
+  recommendedModel: string;
   availableModels: string[];
   /** On-disk size (bytes) per installed model, from Ollama. Drives the VRAM warning. */
   modelSizes: Record<string, number>;
@@ -38,25 +41,51 @@ interface ChatState {
   sendMessage: (content: string, conversationId: string) => Promise<void>;
   newConversation: () => void;
   selectConversation: (id: string) => void;
-  setModel: (model: string) => void;
+  /**
+   * Choisit le modèle (null = revenir au recommandé). Persisté dans les
+   * réglages : le sélecteur du chat et Réglages › Modèle ne font plus qu'un.
+   */
+  chooseModel: (model: string | null) => void;
   loadModels: () => Promise<void>;
   appendToken: (conversationId: string, messageId: string, token: string) => void;
   setPlan: (conversationId: string, messageId: string, steps: string[]) => void;
   setToolActivity: (tool: string | null) => void;
   setError: () => void;
   interrupt: () => Promise<void>;
+  /**
+   * L'utilisateur s'apprête à écrire (champ focalisé, frappe) : préchauffe le
+   * modèle. Limité à un appel par WARMUP_THROTTLE_MS ; l'agent l'ignore de
+   * toute façon s'il vient de servir. Ne lève jamais.
+   */
+  warmUp: () => void;
   finalizeMessage: (conversationId: string, messageId: string) => void;
 }
 
+/**
+ * Un préchauffage par minute au plus : il coûte une requête IPC, et le modèle
+ * reste chaud plusieurs minutes une fois chargé.
+ */
+const WARMUP_THROTTLE_MS = 60_000;
+let lastWarmupAt = 0;
+let lastWarmupConversation: string | null = null;
+
 const DEFAULT_CONVERSATION_ID = crypto.randomUUID();
+const NEW_CONVERSATION_TITLE = 'Nouvelle conversation';
+
+/** Modèle à utiliser : le choix persisté s'il est installé, sinon le recommandé. */
+function resolveModel(preferred: string | null, recommended: string, available: string[]): string {
+  if (preferred !== null && available.includes(preferred)) return preferred;
+  if (available.includes(recommended)) return recommended;
+  return available[0] ?? recommended;
+}
 
 export const useChatStore = create<ChatState>()(
   immer((set, get) => ({
     conversations: [
       {
         id: DEFAULT_CONVERSATION_ID,
-        title: 'New conversation',
-        model: 'qwen3:14b',
+        title: NEW_CONVERSATION_TITLE,
+        model: DEFAULT_CHAT_MODEL,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messageCount: 0,
@@ -68,19 +97,17 @@ export const useChatStore = create<ChatState>()(
     streamingMessageId: null,
     status: 'idle',
     activeTool: null,
-    // Pre-load default; loadModels() confirms it via getRecommendedModel, which
-    // now always returns the single bundled model (the 7B tier was dropped).
-    selectedModel: 'qwen3:14b',
-    userPickedModel: false,
-    // Pre-load placeholder; loadModels() overwrites it with the real installed
-    // set. Mirrors the bundled lineup (a single chat model) so the UI isn't
-    // empty before Ollama answers.
-    availableModels: ['qwen3:14b'],
+    // Valeurs d'attente : loadModels() les remplace par l'inventaire réel
+    // d'Ollama et la recommandation du cœur.
+    selectedModel: useSettingsStore.getState().defaultModel ?? DEFAULT_CHAT_MODEL,
+    recommendedModel: DEFAULT_CHAT_MODEL,
+    availableModels: [DEFAULT_CHAT_MODEL],
     modelSizes: {},
     vramBytes: null,
 
     sendMessage: async (content, conversationId) => {
       const { selectedModel } = get();
+      const { temperature, maxIterations } = useSettingsStore.getState();
       const userMessageId = crypto.randomUUID();
       const assistantMessageId = crypto.randomUUID();
 
@@ -122,7 +149,8 @@ export const useChatStore = create<ChatState>()(
           message: content,
           messageId: assistantMessageId,
           modelId: selectedModel,
-          useTools: true,
+          temperature,
+          maxIterations,
         });
       } catch (err) {
         set(s => {
@@ -176,6 +204,19 @@ export const useChatStore = create<ChatState>()(
       });
     },
 
+    warmUp: () => {
+      const { isStreaming, selectedModel, activeConversationId } = get();
+      const now = Date.now();
+      // Une autre conversation ouverte : son historique est à relire, on passe
+      // outre la limite d'un appel par minute.
+      const sameConversation = activeConversationId === lastWarmupConversation;
+      if (isStreaming || (sameConversation && now - lastWarmupAt < WARMUP_THROTTLE_MS)) return;
+      lastWarmupAt = now;
+      lastWarmupConversation = activeConversationId;
+      // Best-effort : un agent pas encore prêt n'est pas une erreur à montrer.
+      chatWarmup(selectedModel, activeConversationId).catch(() => undefined);
+    },
+
     interrupt: async () => {
       const { isStreaming } = get();
       if (!isStreaming) return;
@@ -221,7 +262,7 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         s.conversations.unshift({
           id,
-          title: 'New conversation',
+          title: NEW_CONVERSATION_TITLE,
           model: s.selectedModel,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -236,12 +277,14 @@ export const useChatStore = create<ChatState>()(
       set(s => {
         s.activeConversationId = id;
       });
+      // Une question suit souvent : relire d'avance l'historique de celle-ci.
+      get().warmUp();
     },
 
-    setModel: model => {
+    chooseModel: model => {
+      useSettingsStore.getState().setDefaultModel(model);
       set(s => {
-        s.selectedModel = model;
-        s.userPickedModel = true;
+        s.selectedModel = resolveModel(model, s.recommendedModel, s.availableModels);
       });
     },
 
@@ -263,20 +306,23 @@ export const useChatStore = create<ChatState>()(
       } catch {
         // VRAM undetectable → leave null, warnings stay off.
       }
-      // Default model comes from getRecommendedModel — now always the single
-      // bundled qwen3:14b. Skipped once the user has manually chosen a model.
-      // Falls back to an installed model if the recommendation isn't present.
+      // Recommandation du cœur (un seul modèle de chat aujourd'hui), puis
+      // résolution : choix persisté s'il est installé, sinon le recommandé.
       try {
         const recommended = await getRecommendedModel();
         set(s => {
-          if (s.userPickedModel) return;
-          s.selectedModel = s.availableModels.includes(recommended)
-            ? recommended
-            : (s.availableModels[0] ?? s.selectedModel);
+          s.recommendedModel = recommended;
         });
       } catch {
-        // Recommendation unavailable (Ollama/GPU probe failed) → keep current.
+        // Recommandation indisponible → on garde la valeur courante.
       }
+      set(s => {
+        s.selectedModel = resolveModel(
+          useSettingsStore.getState().defaultModel,
+          s.recommendedModel,
+          s.availableModels,
+        );
+      });
     },
   })),
 );

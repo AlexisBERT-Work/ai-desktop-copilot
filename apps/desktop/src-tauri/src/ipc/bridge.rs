@@ -1,27 +1,110 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::ChildStdin;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tracing::{error, info, warn};
 
 use super::protocol;
 
-/// Shared stdin handle to the Node.js agent sidecar process.
-static AGENT_STDIN: tokio::sync::OnceCell<Arc<Mutex<ChildStdin>>> =
-    tokio::sync::OnceCell::const_new();
+/// stdin du processus agent EN COURS — `None` avant le démarrage et entre
+/// deux vies du processus. (Un `OnceCell` figeait le premier processus : s'il
+/// mourait, toutes les commandes échouaient jusqu'au redémarrage de l'app.)
+static AGENT_STDIN: RwLock<Option<Arc<Mutex<ChildStdin>>>> = RwLock::const_new(None);
 
-/// Spawn the Node.js agent runtime sidecar and wire its stdout to Tauri events.
-/// Launches an async task so this is safe to call from Tauri's setup hook.
+/// Levé à la fermeture de l'app : le superviseur ne relance plus l'agent.
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+/// Un run de chat attend sa fin (`done`/`error`). Si l'agent meurt pendant,
+/// l'UI doit en être avertie, sinon elle reste en « réfléchit… ».
+static RUN_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+/// Derniers réglages runtime poussés par l'UI (safe mode), REJOUÉS à chaque
+/// démarrage de l'agent : un agent relancé repartait sans mode sécurisé
+/// pendant que l'UI l'affichait actif.
+static RUNTIME_SETTINGS: std::sync::Mutex<Option<Value>> = std::sync::Mutex::new(None);
+
+/// Relances consécutives avant abandon (un agent qui plante en boucle).
+const MAX_RESTARTS: u32 = 5;
+/// Un processus qui a tenu plus longtemps que ça remet le compteur à zéro.
+const HEALTHY_UPTIME: Duration = Duration::from_secs(60);
+
+/// Lance le superviseur de l'agent Node.js (tâche de fond : sûr depuis le
+/// hook `setup` de Tauri). Il démarre l'agent, relaie ses messages, et le
+/// relance avec un délai croissant s'il s'arrête de lui-même.
 pub fn start_agent_sidecar(app: AppHandle) -> Result<()> {
-    tauri::async_runtime::spawn(async move {
-        if let Err(e) = launch_sidecar(app).await {
-            error!("Failed to start agent sidecar: {e}");
-        }
-    });
+    tauri::async_runtime::spawn(supervise(app));
     Ok(())
+}
+
+async fn supervise(app: AppHandle) {
+    let mut failures = 0u32;
+    loop {
+        let started = Instant::now();
+        match spawn_agent_process(&app).await {
+            Ok(child) => match run_agent(&app, child).await {
+                Ok(status) => warn!("Agent sidecar exited: {status}"),
+                Err(e) => error!("Agent sidecar error: {e}"),
+            },
+            Err(e) => error!("Failed to start agent sidecar: {e}"),
+        }
+        *AGENT_STDIN.write().await = None;
+        if SHUTTING_DOWN.load(Ordering::SeqCst) {
+            return;
+        }
+        notify_run_lost(&app);
+
+        if started.elapsed() >= HEALTHY_UPTIME {
+            failures = 0;
+        }
+        failures += 1;
+        if failures > MAX_RESTARTS {
+            error!("Agent sidecar keeps failing — giving up after {MAX_RESTARTS} restarts");
+            return;
+        }
+        let delay = Duration::from_secs(1 << failures.min(5)); // 2, 4, 8, 16, 32 s
+        warn!("Restarting agent sidecar in {delay:?} (attempt {failures})");
+        tokio::time::sleep(delay).await;
+    }
+}
+
+/// L'agent est mort pendant un run : on sort l'UI de son attente.
+fn notify_run_lost(app: &AppHandle) {
+    if !RUN_IN_FLIGHT.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit(
+            protocol::EVENT_CHAT_ERROR,
+            serde_json::json!({
+                "conversationId": "",
+                "code": "AGENT_EXITED",
+                "message": "L'agent s'est arrêté pendant la réponse — il redémarre.",
+            }),
+        );
+    }
+}
+
+/// Un run de chat vient d'être confié à l'agent (`chat_send`).
+pub fn mark_run_started() {
+    RUN_IN_FLIGHT.store(true, Ordering::SeqCst);
+}
+
+/// Mémorise les réglages runtime pour les rejouer à chaque (re)démarrage.
+pub fn remember_runtime_settings(settings: Value) {
+    *RUNTIME_SETTINGS.lock().unwrap_or_else(|e| e.into_inner()) = Some(settings);
+}
+
+/// Fermeture de l'app : ne plus relancer l'agent et fermer son stdin. L'agent
+/// y voit la fin de stdin et s'arrête PROPREMENT (OCR, navigateur, VRAM) de
+/// lui-même — un kill l'en empêcherait.
+pub async fn shutdown() {
+    SHUTTING_DOWN.store(true, Ordering::SeqCst);
+    AGENT_STDIN.write().await.take();
 }
 
 /// Resolved launch parameters for the Node.js agent runtime.
@@ -47,20 +130,16 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
     let bundled_agent = resource_subdir(app, "agent");
 
     // Per-user writable data dir (the resource dir lives in Program Files and is
-    // read-only). The agent persists conversations / vector store here.
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map(|d| d.join("agent-data"))
-        .unwrap_or_else(|_| std::path::PathBuf::from("data"));
-    let _ = std::fs::create_dir_all(&data_dir);
+    // read-only). The agent persists conversations / vector store here, and the
+    // Rust audit log writes next to the agent's.
+    let data_dir = crate::core::data_dir::init(app);
 
     let mut env: Vec<(String, String)> = vec![
         (
             "CATDESK_DATA_DIR".into(),
             data_dir.to_string_lossy().into_owned(),
         ),
-        ("OLLAMA_URL".into(), "http://127.0.0.1:11434".into()),
+        ("OLLAMA_URL".into(), crate::core::ollama::OLLAMA_URL.into()),
     ];
 
     // Point the agent at the bundled OCR sidecar exe when present.
@@ -115,29 +194,20 @@ fn resolve_agent_launch(app: &AppHandle) -> Result<AgentLaunch> {
     })
 }
 
-async fn launch_sidecar(app: AppHandle) -> Result<()> {
-    let child = spawn_agent_process(&app).await?;
-    wire_agent_streams(app, child)?;
-    Ok(())
-}
-
 /// Démarre le processus agent (résolution des paramètres + spawn), sans toucher
 /// à ses flux. Séparé de `wire_agent_streams` : « comment on lance » et
 /// « comment on écoute » n'ont aucune raison de changer ensemble.
 async fn spawn_agent_process(app: &AppHandle) -> Result<tokio::process::Child> {
     let mut launch = resolve_agent_launch(app)?;
 
-    // Default the agent's model to what this machine can run well — the same
-    // VRAM-based rule the chat UI uses. Without this the agent falls back to a
-    // hard-coded model that may not even be installed (tools, sub-agents, fact
-    // extraction). Un SEUL modèle de chat : plus de CATDESK_MODEL_SMALL — le
-    // 14b et le 7b ne cohabitent pas dans 10 Go de VRAM, chaque rétrogradation
-    // forçait un swap de modèle (10-20 s), plus lent que de répondre avec le
-    // modèle principal déjà chaud. (Opt-in possible via l'env pour tester.)
-    let model = crate::commands::tuning::recommend_default_model(
-        crate::commands::models::detect_vram_bytes().await,
-    );
-    launch.env.push(("CATDESK_MODEL".into(), model.into()));
+    // Un SEUL modèle de chat : plus de CATDESK_MODEL_SMALL — le 14b et le 7b
+    // ne cohabitent pas dans 10 Go de VRAM, chaque rétrogradation forçait un
+    // swap de modèle (10-20 s), plus lent que de répondre avec le modèle
+    // principal déjà chaud. (Opt-in possible via l'env pour tester.)
+    launch.env.push((
+        "CATDESK_MODEL".into(),
+        crate::core::ollama::DEFAULT_CHAT_MODEL.into(),
+    ));
 
     let mut cmd = tokio::process::Command::new(&launch.program);
     cmd.current_dir(&launch.work_dir)
@@ -162,10 +232,13 @@ async fn spawn_agent_process(app: &AppHandle) -> Result<tokio::process::Child> {
     cmd.spawn().context("Failed to start agent runtime")
 }
 
-/// Prend les trois tuyaux de l'enfant et lance les tâches de fond : lecture du
-/// stdout (JSON-RPC → événements Tauri), journalisation du stderr, et attente
-/// de sortie (évite un zombie).
-fn wire_agent_streams(app: AppHandle, mut child: tokio::process::Child) -> Result<()> {
+/// Branche les trois tuyaux de l'enfant — stdout (JSON-RPC → événements
+/// Tauri), stderr (journal) — publie son stdin, rejoue les réglages runtime,
+/// puis attend la fin du processus.
+async fn run_agent(
+    app: &AppHandle,
+    mut child: tokio::process::Child,
+) -> Result<std::process::ExitStatus> {
     let stdin = child
         .stdin
         .take()
@@ -179,9 +252,8 @@ fn wire_agent_streams(app: AppHandle, mut child: tokio::process::Child) -> Resul
         .take()
         .context("stderr de l'agent indisponible")?;
 
-    AGENT_STDIN
-        .set(Arc::new(Mutex::new(stdin)))
-        .map_err(|_| anyhow::anyhow!("Agent already started"))?;
+    *AGENT_STDIN.write().await = Some(Arc::new(Mutex::new(stdin)));
+    info!("Agent sidecar started");
 
     // Read stdout (JSON-RPC responses) in background task
     let app_clone = app.clone();
@@ -191,10 +263,7 @@ fn wire_agent_streams(app: AppHandle, mut child: tokio::process::Child) -> Resul
         loop {
             line.clear();
             match reader.read_line(&mut line).await {
-                Ok(0) => {
-                    warn!("Agent stdout closed");
-                    break;
-                }
+                Ok(0) => break,
                 Ok(_) => {
                     if let Err(e) = handle_agent_message(&app_clone, line.trim()).await {
                         error!("Agent message error: {e}");
@@ -223,16 +292,24 @@ fn wire_agent_streams(app: AppHandle, mut child: tokio::process::Child) -> Resul
         }
     });
 
-    // Wait for child exit in background (prevents zombie processes)
-    tauri::async_runtime::spawn(async move {
-        match child.wait().await {
-            Ok(status) => warn!("Agent sidecar exited: {status}"),
-            Err(e) => error!("Agent sidecar wait error: {e}"),
+    // Le stdin de l'agent est mis en tampon par l'OS jusqu'à ce qu'il le lise :
+    // les réglages arrivent donc même si l'agent n'a pas fini de démarrer.
+    let settings = RUNTIME_SETTINGS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    if let Some(settings) = settings {
+        if let Err(e) = send_to_agent(protocol::rpc_request(
+            protocol::RPC_SETTINGS_UPDATE,
+            settings,
+        ))
+        .await
+        {
+            warn!("Runtime settings not replayed to the agent: {e}");
         }
-    });
+    }
 
-    info!("Agent sidecar started");
-    Ok(())
+    child.wait().await.context("attente de l'agent")
 }
 
 /// Parse a JSON-RPC message from the agent and emit appropriate Tauri events.
@@ -309,6 +386,10 @@ async fn dispatch_agent_step(window: tauri::WebviewWindow, step: &Value) -> Resu
         warn!("agent.step sans ids de corrélation (type: {step_type})");
     }
 
+    if step_type == "done" || step_type == "error" {
+        RUN_IN_FLIGHT.store(false, Ordering::SeqCst);
+    }
+
     match step_type {
         "token" => {
             let token = step.get("content").and_then(Value::as_str).unwrap_or("");
@@ -362,7 +443,11 @@ async fn dispatch_agent_step(window: tauri::WebviewWindow, step: &Value) -> Resu
 
 /// Send a message to the agent runtime via stdin.
 pub async fn send_to_agent(payload: Value) -> Result<()> {
-    let stdin_lock = AGENT_STDIN.get().context("Agent not started")?;
+    let stdin_lock = AGENT_STDIN
+        .read()
+        .await
+        .clone()
+        .context("agent non démarré (ou en cours de redémarrage)")?;
 
     let mut line = serde_json::to_string(&payload)?;
     line.push('\n');

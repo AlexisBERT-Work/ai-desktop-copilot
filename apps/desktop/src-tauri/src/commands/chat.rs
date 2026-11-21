@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::forward_to_agent;
-use crate::ipc::protocol;
+use crate::core::error::CatdeskError;
+use crate::ipc::{bridge, protocol};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +16,11 @@ pub struct ChatSendArgs {
     pub message: String,
     pub message_id: String,
     pub model_id: String,
-    pub use_tools: bool,
+    /// Réglages › Modèle. Absents → défauts de l'agent (0,7 et 10).
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub max_iterations: Option<u32>,
     /// Mode de sélection du modèle : "auto" | "light" | "code". Défaut "auto".
     #[serde(default)]
     pub model_mode: Option<String>,
@@ -30,6 +35,32 @@ pub struct ChatSendArgs {
     pub use_planning: Option<bool>,
 }
 
+/// Config d'un run telle que l'agent l'attend (`AgentConfig`). Seuls les
+/// champs fournis sont transmis : l'agent applique ses défauts aux autres.
+fn agent_config(args: &ChatSendArgs) -> serde_json::Value {
+    let mut config = serde_json::json!({
+        "model": args.model_id,
+        "modelMode": args.model_mode.as_deref().unwrap_or("auto"),
+    });
+    if let Some(t) = args.temperature {
+        // Bornes du curseur des réglages ; une valeur hors bornes ne passe pas.
+        config["temperature"] = serde_json::json!(t.clamp(0.0, 2.0));
+    }
+    if let Some(n) = args.max_iterations {
+        config["maxIterations"] = serde_json::json!(n.clamp(1, 25));
+    }
+    if let Some(light) = &args.light_model {
+        config["lightModel"] = serde_json::json!(light);
+    }
+    if let Some(code) = &args.code_model {
+        config["codeModel"] = serde_json::json!(code);
+    }
+    if let Some(planning) = args.use_planning {
+        config["usePlanning"] = serde_json::json!(planning);
+    }
+    config
+}
+
 /// Send a chat message to the agent runtime.
 /// Streaming tokens are forwarded back as "chat:token" events.
 #[tauri::command]
@@ -40,33 +71,60 @@ pub async fn chat_send(args: ChatSendArgs) -> Result<(), String> {
         "chat_send"
     );
 
-    let mut config = serde_json::json!({
-        "model": args.model_id,
-        "useTools": args.use_tools,
-        "useMemory": true,
-        "useScreenContext": false,
-        "modelMode": args.model_mode.as_deref().unwrap_or("auto"),
-    });
-    if let Some(light) = &args.light_model {
-        config["lightModel"] = serde_json::json!(light);
-    }
-    if let Some(code) = &args.code_model {
-        config["codeModel"] = serde_json::json!(code);
-    }
-    if let Some(planning) = args.use_planning {
-        config["usePlanning"] = serde_json::json!(planning);
-    }
-
     forward_to_agent(
         protocol::RPC_AGENT_PROCESS,
         serde_json::json!({
             "input": args.message,
             "conversationId": args.conversation_id,
             "messageId": args.message_id,
-            "config": config
+            "config": agent_config(&args),
         }),
     )
-    .await
+    .await?;
+    bridge::mark_run_started();
+    Ok(())
+}
+
+/// Nom de modèle Ollama plausible (`qwen3:14b`, `hf.co/org/modele:q4`) : il
+/// part dans une requête JSON-RPC, on n'y laisse passer ni vide ni caractère
+/// de contrôle.
+fn is_valid_model_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 200
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '_' | '-' | '/'))
+}
+
+/// Identifiant de conversation tel que l'UI les crée (UUID) : il part lui aussi
+/// dans une requête JSON-RPC.
+fn is_valid_conversation_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 100
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+}
+
+/// Préchauffe le modèle quand l'utilisateur ouvre le chat ou commence à taper :
+/// l'agent le charge et lui fait lire le début des requêtes — prompt, outils
+/// et historique de la conversation ouverte — pendant la saisie. Sans effet de
+/// bord durable, donc sans audit ; l'agent l'ignore s'il vient déjà de servir.
+#[tauri::command]
+pub async fn chat_warmup(model: String, conversation_id: Option<String>) -> Result<(), String> {
+    if !is_valid_model_name(&model) {
+        return Err(CatdeskError::Refused("Nom de modèle invalide".into()).into());
+    }
+    let mut params = serde_json::json!({ "model": model });
+    if let Some(id) = conversation_id {
+        if !is_valid_conversation_id(&id) {
+            return Err(
+                CatdeskError::Refused("Identifiant de conversation invalide".into()).into(),
+            );
+        }
+        params["conversationId"] = serde_json::json!(id);
+    }
+    forward_to_agent(protocol::RPC_AGENT_WARMUP, params).await
 }
 
 /// Interrupt the run currently in progress (Stop button).
@@ -95,4 +153,58 @@ pub async fn set_market_watchlist(
         serde_json::json!({ "symbols": symbols, "formulas": formulas }),
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args() -> ChatSendArgs {
+        serde_json::from_value(serde_json::json!({
+            "conversationId": "c",
+            "message": "salut",
+            "messageId": "m",
+            "modelId": "qwen3:14b",
+        }))
+        .expect("arguments minimaux valides")
+    }
+
+    #[test]
+    fn sans_reglages_l_agent_garde_ses_defauts() {
+        let config = agent_config(&args());
+        assert_eq!(config["model"], "qwen3:14b");
+        assert_eq!(config["modelMode"], "auto");
+        assert!(config.get("temperature").is_none());
+        assert!(config.get("maxIterations").is_none());
+    }
+
+    #[test]
+    fn les_reglages_du_modele_sont_transmis_et_bornes() {
+        let mut a = args();
+        a.temperature = Some(5.0);
+        a.max_iterations = Some(0);
+        let config = agent_config(&a);
+        assert_eq!(config["temperature"], 2.0);
+        assert_eq!(config["maxIterations"], 1);
+    }
+
+    #[test]
+    fn prechauffage_n_accepte_que_des_noms_de_modele_plausibles() {
+        assert!(is_valid_model_name("qwen3:14b"));
+        assert!(is_valid_model_name("hf.co/org/modele-q4_K_M:latest"));
+        assert!(!is_valid_model_name(""));
+        assert!(!is_valid_model_name("qwen3 14b"));
+        assert!(!is_valid_model_name("x\"}\n{"));
+        assert!(!is_valid_model_name(&"a".repeat(201)));
+    }
+
+    #[test]
+    fn prechauffage_n_accepte_que_des_identifiants_de_conversation_sages() {
+        assert!(is_valid_conversation_id(
+            "31430cdc-1d0e-465b-9191-a8e4e25df187"
+        ));
+        assert!(!is_valid_conversation_id(""));
+        assert!(!is_valid_conversation_id("../../etc"));
+        assert!(!is_valid_conversation_id("a\"}"));
+    }
 }

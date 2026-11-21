@@ -12,7 +12,7 @@ type SettingsTab = 'model' | 'voice' | 'security' | 'hotkeys' | 'about';
 /** Fenêtre Paramètres : coquille (header + navigation) ; chaque onglet a son fichier. */
 export function SettingsWindow() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('model');
-  const { setMode } = useOverlayStore();
+  const setMode = useOverlayStore(s => s.setMode);
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode }> = [
     { id: 'model', label: 'Modèle', icon: <Cpu className="w-4 h-4" /> },

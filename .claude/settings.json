@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./pnpm-lock.yaml)",
+      "Read(./node_modules/**)",
+      "Read(./packages/ocr-vision/.venv/**)",
+      "Read(./packages/ocr-vision/build-dist/**)"
+    ]
+  }
+}

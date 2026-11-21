@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'fs';
+import { writeFileAtomic } from '../lib/persistence';
 import { dirname, join } from 'path';
 import type { PlaybookStore } from './PlaybookStore';
 import { analyzeEvolution, type EvolutionProposal, type AnalyzeOptions } from './analyzeEvolution';
@@ -11,6 +11,11 @@ const log = createLogger('playbook:evolution');
 export interface EvolutionDaemonOptions extends AnalyzeOptions, ProposeSkillsOptions {
   /** How often the nightly analysis runs. Default 24h. */
   intervalMs?: number;
+  /**
+   * Délai du premier passage après start(). Default 10 min — sans lui, une
+   * app jamais ouverte 24 h d'affilée n'analysait jamais rien.
+   */
+  initialDelayMs?: number;
   /** Where to write the proposals report. Default CATDESK_DATA_DIR. */
   dataDir?: string;
 }
@@ -34,7 +39,9 @@ export interface EvolutionReport {
  */
 export class EvolutionDaemon {
   private timer: ReturnType<typeof setInterval> | undefined;
+  private firstRun: ReturnType<typeof setTimeout> | undefined;
   private readonly intervalMs: number;
+  private readonly initialDelayMs: number;
   private readonly dir: string;
   private readonly reportPath: string;
   private readonly analyzeOpts: AnalyzeOptions;
@@ -45,6 +52,7 @@ export class EvolutionDaemon {
     opts: EvolutionDaemonOptions = {},
   ) {
     this.intervalMs = opts.intervalMs ?? 24 * 60 * 60 * 1000;
+    this.initialDelayMs = opts.initialDelayMs ?? 10 * 60 * 1000;
     this.reportPath = dataPath('evolution-proposals.json', opts.dataDir);
     this.dir = dirname(this.reportPath);
     this.analyzeOpts = {
@@ -60,13 +68,17 @@ export class EvolutionDaemon {
 
   start(): void {
     if (this.timer !== undefined) return;
+    this.firstRun = setTimeout(() => this.runOnce(), this.initialDelayMs);
     this.timer = setInterval(() => this.runOnce(), this.intervalMs);
     // Don't keep the process alive just for the nightly analysis.
-    (this.timer as { unref?: () => void }).unref?.();
+    this.firstRun.unref?.();
+    this.timer.unref?.();
     log.info('EvolutionDaemon started', { intervalMs: this.intervalMs });
   }
 
   stop(): void {
+    clearTimeout(this.firstRun);
+    this.firstRun = undefined;
     if (this.timer !== undefined) {
       clearInterval(this.timer);
       this.timer = undefined;
@@ -90,14 +102,13 @@ export class EvolutionDaemon {
       const drafts = proposeSkills(rows, this.skillOpts);
       if (drafts.length > 0) {
         const draftsDir = join(this.dir, 'skill-drafts');
-        mkdirSync(draftsDir, { recursive: true });
         for (const d of drafts) {
-          writeFileSync(join(draftsDir, `${d.slug}.md`), d.markdown, 'utf-8');
+          writeFileAtomic(join(draftsDir, `${d.slug}.md`), d.markdown);
           report.skillDrafts.push(d.slug);
         }
       }
 
-      writeFileSync(this.reportPath, JSON.stringify(report, null, 2), 'utf-8');
+      writeFileAtomic(this.reportPath, JSON.stringify(report, null, 2));
       if (report.proposals.length > 0 || report.skillDrafts.length > 0) {
         log.info('Evolution pass written', {
           proposals: report.proposals.length,
