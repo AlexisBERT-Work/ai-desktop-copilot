@@ -48,6 +48,7 @@ import { AnalyzeCodeStyleTool } from './productivity/AnalyzeCodeStyleTool';
 import { LoadProjectContextTool } from './productivity/LoadProjectContextTool';
 import { SemanticSearchTool } from './search/SemanticSearchTool';
 import { ReadWebpageTool } from './web/ReadWebpageTool';
+import { SearchWebTool } from './web/SearchWebTool';
 import { FetchTechNewsTool } from './web/FetchTechNewsTool';
 import { PostTechNewsDiscordTool } from './web/PostTechNewsDiscordTool';
 import { ObsidianNotesTool } from './connectors/ObsidianNotesTool';
@@ -212,6 +213,7 @@ export function registerCoreTools(
 
   // Web / presse / connecteurs
   register(new ReadWebpageTool());
+  register(new SearchWebTool());
   register(new FetchTechNewsTool());
   register(new SearchDailiesTool(localDailies, sharedDailies));
   register(new PostTechNewsDiscordTool(llm, defaultModel));

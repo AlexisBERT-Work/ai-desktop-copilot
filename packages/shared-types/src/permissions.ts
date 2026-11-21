@@ -288,6 +288,15 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: false,
     },
+    // Recherche web sans clé (veille du 13/11) : des GET vers quatre hôtes fixes,
+    // seule la requête sort (données personnelles masquées), comme read_webpage.
+    search_web: {
+      name: 'search_web',
+      description: 'Chercher sur le web sans clé (Wikipédia, Hacker News, GitHub, Stack Overflow)',
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
     fetch_tech_news: {
       name: 'fetch_tech_news',
       description: "Rassembler l'actu tech du jour (Hacker News, The Verge, TechCrunch, DEV.to…)",

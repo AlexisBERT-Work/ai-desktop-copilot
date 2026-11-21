@@ -301,8 +301,9 @@ rien à faire au milieu d'un journal.
     `.ics` absolu et n'a aucun défaut, donc « qu'est-ce que j'ai demain ? » ne
     peut pas aboutir, même bien sélectionné. Il faut un chemin d'agenda dans les
     réglages. Le banc garde ces tâches en rouge exprès.
-  - **Recherche web et recherche approfondie** : aucun outil ne cherche sur le
-    web, `read_webpage` exige une URL.
+  - 🟡 **Recherche web et recherche approfondie** : `search_web` cherche sans
+    clé depuis le 2026-11-21 (Plan E plus bas). Reste la recherche
+    approfondie : plusieurs requêtes, lecture des liens, synthèse.
   - **Client MCP** : brancher des outils tiers sans les écrire (rejoint le
     système de plugins ci-dessous).
   - **`load_skill` proposé sur le nom d'un skill installé** : la phrase doit dire
@@ -366,6 +367,15 @@ rien à faire au milieu d'un journal.
     système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
     Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
     (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
+- **Plan E — capacités tirées de la veille du 13 au 19/11** (2026-11-21) : une
+  branche et une PR vers `dev` par point, aucune fusionnée sans toi.
+  - ✅ **Recherche web sans clé** (veille du 13/11, `feat/recherche-web`) :
+    `search_web` interroge Wikipédia, Hacker News, GitHub et Stack Overflow,
+    10 résultats et ~1 500 tokens au plus, voir [CAPACITES.md](CAPACITES.md)
+    § 2. Restent : la mesure de la veille (15 questions d'actualité réelles,
+    au moins 3 sources datées de moins de 30 jours, premier token < 15 s) ;
+    un moteur généraliste sans clé, seulement si l'utilisateur en héberge un
+    (SearXNG en local, API JSON) ; Reddit si une voie sans OAuth revient.
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :

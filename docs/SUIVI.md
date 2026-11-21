@@ -26,8 +26,10 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20).
+**En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
+point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (#49),
+`feat/recherche-web` ; voir les entrées du 2026-11-21.
+`feat/garde-fous-reponse` est entrée dans `dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -52,6 +54,26 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-21 — Recherche web sans clé (Plan E, point 3)
+
+Veille du 13/11, sur `feat/recherche-web`, coupée de `dev`. Un outil (72 au
+catalogue), voir [CAPACITES.md](CAPACITES.md) § 2 : `search_web` (🟢)
+interroge en parallèle Wikipédia, Hacker News (Algolia), GitHub et Stack
+Overflow, quatre API publiques sans compte ni clé. Écrit en TypeScript dans
+l'agent (`search/webSearch.ts`, sur `lib/http`) plutôt que de reprendre le
+moteur Python de la veille : quatre appels GET n'avaient pas besoin du
+sidecar. Reddit, la quatrième source de la veille, est écarté : 403 sans OAuth.
+
+- **Sortie courte** : 10 résultats au plus, extraits de 160 caractères,
+  plafond de 4 500 caractères (~1 500 tokens). Essai réel sur trois requêtes :
+  330 à 460 ms pour les quatre sources, 1 683 à 2 836 caractères.
+- **La requête sort** : ses données personnelles sont masquées avant l'envoi
+  (`scanPersonalData`), et le résultat le signale.
+- **Banc de sélection** : 3 tâches `dev`, 2 `holdout` ; `dev` 47/47 sans raté,
+  `holdout` 38/44 (86 %), noyau seul sans outil 40/40 et 6/6.
+- **Non mesuré** : le banc complet avec `qwen3:14b` et la mesure de la veille
+  (15 questions d'actualité, premier token recherche comprise).
 
 ## 2026-11-20 — Garde-fous de réponse
 

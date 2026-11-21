@@ -112,6 +112,14 @@ aujourd'hui classé `critical`.
   (moins précis). La mémoire hiérarchique **warm est implémentée** (WarmMemoryStore
   - FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
     _episodic_ structurée reste à faire.
+- **`search_web` n'est pas un moteur généraliste** : quatre sources publiques
+  sans clé (Wikipédia, Hacker News, GitHub, Stack Overflow). Une question sur
+  un commerce, un horaire, un prix ou une actualité locale ne trouve rien :
+  Google, Bing et Brave demandent une clé, souvent payante, et DuckDuckGo n'a
+  pas d'API de résultats. Reddit refuse tout accès sans OAuth (403, vérifié le
+  2026-11-21). Sans jeton, GitHub tolère 10 recherches par minute et Stack
+  Overflow 300 par jour et par adresse IP ; au-delà, la source est notée en
+  échec et les autres répondent. Hacker News cherche en anglais.
 - **Sélecteur HTML de `read_webpage`** : naïf (le sélecteur `#id` s'arrête au
   premier `</`). Suffisant pour du texte simple, pas pour du parsing fin.
 - **Vision écran** : dépend de `minicpm-v` ; sans lui, `describe_screen` tombe en
