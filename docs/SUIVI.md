@@ -85,7 +85,7 @@ sélection. Doc : [CAPACITES.md](CAPACITES.md) § 1 ter,
 
 | Portes (branche)             | Résultat                    |
 | ---------------------------- | --------------------------- |
-| Agent : tests, types, lint   | 1 321 (+3 sautés), 0, 0     |
+| Agent : tests, types, lint   | 1 373 (+3 sautés), 0, 0     |
 | Desktop : tests, types, lint | 97, 0, 0                    |
 | Rust : tests, clippy, fmt    | 78 (+12 ignorés), 0, propre |
 
