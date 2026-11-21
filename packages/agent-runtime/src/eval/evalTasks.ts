@@ -175,6 +175,13 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     args: /rapport\.pdf/,
     answer: /12\s?%/,
   }),
+  // PowerPoint et OpenDocument (Plan E, 2026-11-21).
+  dev('documents', 'doc-pptx', 'résume la présentation C:/docs/bilan.pptx', ['parse_document'], {
+    args: /bilan\.pptx/,
+  }),
+  dev('documents', 'doc-odt', 'lis la lettre C:/docs/lettre.odt', ['parse_document'], {
+    args: /lettre\.odt/,
+  }),
   dev('documents', 'data-excel', 'analyse le fichier excel ventes.xlsx', ['analyze_data'], {
     args: /ventes\.xlsx/,
   }),
@@ -390,6 +397,13 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     'que dit le contrat.docx dans mes documents ?',
     ['parse_document'],
     { args: /contrat\.docx/ },
+  ),
+  holdout(
+    'documents',
+    'doc-diapos',
+    'que disent les diapos de C:/docs/kickoff.pptx ?',
+    ['parse_document'],
+    { args: /kickoff\.pptx/ },
   ),
   holdout(
     'documents',

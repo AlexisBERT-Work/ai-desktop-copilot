@@ -366,6 +366,21 @@ rien à faire au milieu d'un journal.
     système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
     Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
     (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
+- **Plan E — capacités tirées de la veille du 13 au 19/11** (2026-11-21) : une
+  branche et une PR vers `dev` par point, aucune fusionnée sans toi.
+  - ✅ **PowerPoint, Excel et OpenDocument dans `parse_document`** (veille du
+    17/11, `feat/parse-document-formats`), voir [CAPACITES.md](CAPACITES.md)
+    § 1. **OpenDocKit écarté** : licence MIT, mais dépôt de 10 jours au
+    2026-11-21, un seul auteur, 17 versions en 10 jours (API instable),
+    Python 3.12 au minimum et 12 dépendances, dont pypdfium2, pdfplumber et
+    pdfminer, pour un sidecar qui lit déjà PDF et DOCX. Remplacé par
+    `files/office_parser.py` : bibliothèque standard (zipfile, ElementTree)
+    pour PPTX et ODF, openpyxl, déjà là, pour XLSX ; aucune dépendance
+    ajoutée. Restent : la mesure de la veille (15 vrais fichiers, deux
+    questions par fichier, 80 % de bonnes réponses) ; un essai sur des
+    fichiers produits par PowerPoint et LibreOffice (les tests construisent
+    leurs fichiers) ; RTF et EPUB ; le même plafond `max_chars` pour PDF et
+    DOCX, qui n'en ont pas (rejoint la « Suite » des garde-fous plus haut).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :

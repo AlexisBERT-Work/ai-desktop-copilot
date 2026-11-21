@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-11-08**. Inventaire basé sur les **71 outils du catalogue**
+> À jour au **2026-11-21**. Inventaire basé sur les **71 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -69,7 +69,7 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 | Lire le **texte de l'écran (OCR)** Tesseract fra+eng                               | `ocr_region`       |   🟢   |
 | **Décrire visuellement** l'écran (modèle multimodal `minicpm-v`)                   | `describe_screen`  |   🟢   |
 | **Transcrire un audio → texte** (Whisper local, auto-langue, filtre VAD)           | `transcribe_audio` |   🟢   |
-| **Parser un document** PDF / DOCX / CSV → texte + métadonnées                      | `parse_document`   |   🟢   |
+| **Parser un document** PDF / DOCX / PPTX / XLSX / ODF / CSV → texte + métadonnées  | `parse_document`   |   🟢   |
 | **Analyser un tableau** (CSV/XLSX : agrégats, group-by, stats)                     | `analyze_data`     |   🟢   |
 | **Exporter un document** Markdown → PDF / DOCX / HTML                              | `export_document`  |   🟡   |
 | Lire un **calendrier** `.ics` (occurrences récurrentes développées)                | `read_calendar`    |   🟢   |
@@ -77,6 +77,19 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
 Les quatre outils « documents » passent par le sidecar Python (`files/`), lancé
 à la demande.
+
+**PowerPoint, Excel et OpenDocument** (veille du 17/11, Plan E point 4,
+2026-11-21) : `parse_document` lit aussi `.pptx`, `.xlsx`/`.xlsm`, `.odt`,
+`.ods` et `.odp` (`files/office_parser.py`). Chaque diapo ou feuille porte un
+repère pour citer (« ## Diapo 3 (masquée) », « ## Feuille « Budget » ») ; les
+notes de l'orateur suivent leur diapo, dans l'ordre de la présentation. Les
+commentaires et le suivi des modifications d'un ODT ne sont pas mêlés au
+texte. L'extraction **s'arrête** à 12 000 caractères (~4 000 tokens) et à 200
+lignes par feuille, et `warnings` dit ce qui a été sauté. Aucune dépendance
+ajoutée : bibliothèque standard pour PPTX et ODF, openpyxl (déjà là) pour
+XLSX. OpenDocKit, proposé par la veille, est écarté : voir
+[AMELIORATIONS.md](AMELIORATIONS.md) § 4. Non lus : les anciens `.ppt`, `.xls`
+et `.doc`, RTF, EPUB, et le texte des images (pas d'OCR dans ces fichiers).
 
 ### 1 bis. Lui parler, l'entendre répondre (mode « Jarvis », 2026-09-11)
 
