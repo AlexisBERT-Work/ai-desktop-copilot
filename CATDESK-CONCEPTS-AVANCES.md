@@ -16,14 +16,14 @@
 
 ## Sommaire
 
-1. [Le harness : le vrai cœur de CatDesk](#1-le-harness) — 🟡 (boucle + outils + audit oui ; skills non)
+1. [Le harness : le vrai cœur de CatDesk](#1-le-harness) — 🟡 (boucle + outils + audit oui ; skills à la demande via `load_skill`, sans index dans le prompt)
 2. [Context engineering : pourquoi plus de tokens = pire](#2-context-engineering) — 🟡 (ContextManager, selectTools, Compactor)
 3. [Mémoire hiérarchique multi-couches](#3-mémoire-hiérarchique) — ✅ warm (WarmMemoryStore + FactExtractor + MemoryConsolidator + SemanticCache) ; ⬜ episodic
 4. [RAG local moderne : hybrid search + reranking + GraphRAG](#4-rag-local-moderne) — 🟡 hybride dense+BM25 (VectorStore) ; ⬜ reranking, GraphRAG
 5. [Optimisation d'inférence : 2-3x de vitesse gratuite](#5-optimisation-dinférence) — 🟡 (keep_alive, num_ctx, IdleUnloader, routeur de modèles)
 6. [Architecture multi-agents : orchestrateur + sous-agents](#6-multi-agents) — ✅ (SubAgentRunner, run_subagent, run_parallel_agents)
 7. [Sécurité défense en profondeur](#7-sécurité) — 🟡 post-scan sorties (sanitizeToolOutput : secrets + spotlighting) ; ⬜ pre-check inputs, PII, isolation réseau
-8. [Auto-amélioration : l'agent qui apprend de ses traces](#8-auto-amélioration) — ✅ (PlaybookStore + EvolutionDaemon, propositions human-in-the-loop) ; ⬜ skills
+8. [Auto-amélioration : l'agent qui apprend de ses traces](#8-auto-amélioration) — ✅ (PlaybookStore + EvolutionDaemon, propositions human-in-the-loop) ; ✅ brouillons de skills relus par `SkillStore`
 9. [Roadmap d'intégration suggérée](#9-roadmap)
 
 ---
