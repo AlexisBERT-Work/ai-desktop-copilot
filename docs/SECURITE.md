@@ -604,3 +604,25 @@ que Parakeet a entendu, pour la bulle comme pour la dictée
   est récrit partout avec sa majuscule, y compris dans une dictée tapée
   ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
   sans effacer le fichier.
+
+## Mise à jour 2026-11-21 — recherche web sans clé (veille du 13/11)
+
+`search_web` (`low`, comme `read_webpage`) envoie la requête du modèle à
+quatre services publics : Wikipédia, Hacker News (Algolia), GitHub et
+Stack Overflow (`agent-runtime/src/search/webSearch.ts`).
+
+- **Hôtes fixes** : les URL sont construites dans le code, la requête n'est
+  qu'un paramètre encodé (`encodeURIComponent`). Le modèle ne choisit ni
+  l'hôte ni le chemin. Requêtes GET, sans cookie ni jeton, User-Agent
+  `catdesk-agent/1.0`.
+- **Ce qui sort** : la requête seule. Elle est passée par `scanPersonalData`
+  avant l'envoi : carte, IBAN, numéro de sécurité sociale, e-mail et téléphone
+  sont remplacés, et le résultat porte `requete_masquee`. Un nom, une adresse
+  ou un sujet sensible passent tels quels ([LIMITES.md](LIMITES.md) § 5).
+- **Ce qui entre** : 10 résultats au plus, 4 500 caractères, réponse d'API de
+  1,5 Mo au plus et 8 s par source. Le texte tiers (titres, extraits) est
+  débarrassé de son HTML, puis passe par `sanitizeToolOutput` comme toute
+  sortie d'outil : une consigne glissée dans un titre est cadrée.
+- **Risque résiduel** : chacun des quatre services voit la requête et
+  l'adresse IP du poste. Le résultat oriente le modèle vers des liens qu'il
+  peut ensuite ouvrir avec `read_webpage`.

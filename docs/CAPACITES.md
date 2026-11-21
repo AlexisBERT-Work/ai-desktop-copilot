@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-11-08**. Inventaire basé sur les **71 outils du catalogue**
+> À jour au **2026-11-21**. Inventaire basé sur les **72 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 71 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 72 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -133,6 +133,7 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 | Capacité                                                                                                         | Outil(s)             | Risque  |
 | ---------------------------------------------------------------------------------------------------------------- | -------------------- | :-----: |
 | Récupérer une page web (HTTP simple, détecte les SPA)                                                            | `read_webpage`       |   🟢    |
+| **Chercher sur le web sans clé** (Wikipédia, Hacker News, GitHub, Stack Overflow)                                | `search_web`         |   🟢    |
 | Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   | 🟠 → 🟡 |
 | Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢    |
 | Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢    |
@@ -144,6 +145,21 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 
 `read_webpage` détecte une SPA (HTML lourd, texte quasi nul) et oriente
 automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
+
+**Recherche web sans clé** (veille du 13/11, Plan E point 3, 2026-11-21).
+`search_web` interroge en parallèle quatre API publiques et gratuites, sans
+compte ni clé : Wikipédia (français, repli anglais), Hacker News (Algolia,
+avec votes et commentaires : « qu'en pensent les gens »), GitHub (dépôts, sans
+jeton : 10 requêtes par minute) et Stack Overflow (300 requêtes par jour).
+`source` en choisit une, `days` garde les N derniers jours. Le modèle reçoit
+au plus 10 résultats (titre, lien, date, votes ou étoiles, extrait de 160
+caractères), plafonnés à 4 500 caractères (~1 500 tokens) ; il ouvre ensuite le
+lien utile avec `read_webpage`. Essai réel : 330 à 460 ms pour les quatre
+sources, 2 836 caractères au plus. La requête part chez ces quatre services :
+une carte, un IBAN, un numéro de sécurité sociale, un e-mail ou un téléphone y
+sont masqués avant l'envoi. Pas de moteur généraliste (Google, Bing, Brave
+demandent une clé, souvent payante) ; Reddit refuse tout accès sans OAuth
+(403), voir [LIMITES.md](LIMITES.md) § 4.
 
 **Navigateur en lecture seule** (par défaut, Réglages › Sécurité) : le navigateur
 de l'agent lit mais n'envoie rien — toute requête autre que GET/HEAD/OPTIONS est

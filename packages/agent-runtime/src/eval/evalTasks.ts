@@ -293,6 +293,17 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('recherche', 'rech-page', 'lis https://exemple.fr/article et résume-le', ['read_webpage'], {
     answer: /tramway|lyon/i,
   }),
+  // Recherche web sans clé (search_web) : définitions, avis, bibliothèques.
+  dev('recherche', 'web-def', "cherche sur le web ce qu'est le protocole MCP", ['search_web'], {
+    args: /mcp/i,
+    answer: /anthropic|2024/i,
+  }),
+  dev('recherche', 'web-avis', "qu'en pensent les gens sur Hacker News, de Tauri 2 ?", [
+    'search_web',
+  ]),
+  dev('recherche', 'web-lib', 'trouve-moi une bibliothèque pour lire des PDF en Rust', [
+    'search_web',
+  ]),
   dev('planification', 'plan-liste', 'quelles sont mes tâches planifiées ?', [
     'list_scheduled_tasks',
   ]),
@@ -532,6 +543,10 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     { answer: /tramway|lyon/i },
   ),
   holdout('recherche', 'rech-tech', 'quoi de neuf dans la tech ?', ['fetch_tech_news']),
+  holdout('recherche', 'web-mistral', 'cherche sur internet qui a fondé Mistral AI', [
+    'search_web',
+  ]),
+  holdout('recherche', 'web-wiki', 'regarde sur Wikipédia la population de Lyon', ['search_web']),
   holdout('planification', 'plan-tournent', 'quelles tâches tournent en ce moment ?', [
     'list_scheduled_tasks',
   ]),

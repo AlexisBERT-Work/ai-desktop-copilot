@@ -202,6 +202,36 @@ export function simulatedWorld(now: Date): SimulatedWorld {
       title: 'Lyon : le tramway T9 ouvre en mars',
       text: 'La nouvelle ligne de tramway T9 relie Vaulx-en-Velin à La Doua.',
     }),
+    search_web: args => ({
+      success: true,
+      data: {
+        requete: String(args['query'] ?? ''),
+        resultats: [
+          {
+            source: 'wikipedia',
+            titre: 'Model Context Protocol',
+            url: 'https://fr.wikipedia.org/wiki/Model_Context_Protocol',
+            extrait:
+              'Protocole ouvert publié par Anthropic en novembre 2024 pour relier les modèles à des outils.',
+          },
+          {
+            source: 'hackernews',
+            titre: 'Tauri 2.0 Stable Release',
+            url: 'https://news.ycombinator.com/item?id=41141962',
+            date: '2024-10-02',
+            info: '1 204 points, 389 commentaires',
+          },
+          {
+            source: 'github',
+            titre: 'pdf-rs/pdf',
+            url: 'https://github.com/pdf-rs/pdf',
+            date: '2026-10-30',
+            info: '1 512 étoiles, Rust',
+            extrait: 'Lecture de fichiers PDF en Rust pur.',
+          },
+        ],
+      },
+    }),
     fetch_tech_news: ok({
       items: [{ source: 'Hacker News', title: 'Rust 2.0 est annoncé pour 2027' }],
     }),
