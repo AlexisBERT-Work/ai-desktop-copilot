@@ -1,9 +1,24 @@
 import { z } from 'zod';
 import { readdir, readFile, stat } from 'fs/promises';
-import { join, extname, relative } from 'path';
+import { extname, join, relative } from 'path';
 import type { ToolResult } from '@catdesk/shared-types';
+import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
+import { createLogger } from '../../logger';
+import {
+  KENSAKU_MAX_RESULTS,
+  KensakuBackend,
+  type KensakuSearch,
+} from '../../search/kensakuBackend';
+import {
+  createScopeCheck,
+  defaultSearchRoots,
+  keepInScope,
+  type ScopeCheck,
+} from '../../search/scope';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
+
+const log = createLogger('tools:semantic_search');
 
 const DEFAULT_EXTENSIONS = new Set([
   '.ts',
@@ -37,6 +52,42 @@ const DEFAULT_EXTENSIONS = new Set([
   '.env.example',
 ]);
 
+/**
+ * Ce que le moteur par mots-clés lirait en octets bruts : seul Kensaku
+ * (extraction de texte, OCR) sait y chercher. Demandées sans lui, elles sont
+ * écartées (et signalées) plutôt que lues comme du texte.
+ */
+const BINARY_EXTENSIONS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.odt',
+  '.ods',
+  '.odp',
+  '.epub',
+  '.msg',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.tif',
+  '.tiff',
+  '.webp',
+  '.heic',
+  '.zip',
+  '.7z',
+  '.rar',
+  '.mp3',
+  '.mp4',
+  '.wav',
+  '.mov',
+]);
+
 // Directories that are never searched
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -61,7 +112,9 @@ const argsSchema = z.object({
   paths: z
     .array(z.string())
     .optional()
-    .describe('Directories to search (defaults to current working directory)'),
+    .describe(
+      'Only folders the user named. Omit otherwise: Documents, Desktop and Downloads are searched. Never guess a path.',
+    ),
   extensions: z
     .array(z.string())
     .optional()
@@ -73,16 +126,25 @@ const argsSchema = z.object({
 });
 type Args = z.infer<typeof argsSchema>;
 
-interface SearchResult {
-  file: string;
-  score: number;
-  snippet: string;
-  matchCount: number;
-  sizeBytes: number;
-}
+/**
+ * Mots grammaticaux d'une demande en français : ils sont dans presque tous les
+ * fichiers, et noyaient le score des mots qui comptent.
+ */
+const QUERY_STOPWORDS = new Set(
+  (
+    'les des une aux dans pour par sur sous avec sans qui que quoi dont est sont ' +
+    'mon mes ton tes son ses notre nos votre vos leur leurs ces cet cette pas plus ' +
+    'tout tous toute toutes the and for with'
+  ).split(' '),
+);
 
-function tokenize(text: string): string[] {
-  return text.toLowerCase().match(/\b[a-z_][a-z0-9_]{2,}\b/g) ?? [];
+/**
+ * Termes d'une requête, lettres de toutes les langues : avant, `[a-z]` seul
+ * coupait « réunion » en « union » et perdait « été ».
+ */
+export function tokenize(text: string): string[] {
+  const words = text.toLowerCase().match(/[\p{L}_][\p{L}\p{N}_]{2,}/gu) ?? [];
+  return [...new Set(words.filter(w => !QUERY_STOPWORDS.has(w)))];
 }
 
 function scoreDocument(
@@ -149,15 +211,28 @@ function extractSnippet(content: string, pos: number, radius: number): string {
  */
 const MAX_FILES = 5_000;
 
+/** `extensions` du modèle : minuscules, point en tête, sans doublon ni vide. */
+function normalizeExtensions(list: readonly string[] | undefined): string[] {
+  const exts = (list ?? [])
+    .map(e => e.trim().toLowerCase())
+    .filter(e => e.length > 0 && e !== '.')
+    .map(e => (e.startsWith('.') ? e : `.${e}`));
+  return [...new Set(exts)];
+}
+
 /** Extension utile : `extname('.env.example')` vaut '.example', pas '.env.example'. */
 function fileExtension(name: string): string {
   return name === '.env.example' ? '.env.example' : extname(name).toLowerCase();
 }
 
+/**
+ * Fichiers candidats, par leur nom seulement : la taille est lue avec le
+ * contenu, en parallèle (`scoreFiles`). Une jonction ou un lien n'est pas un
+ * dossier pour `readdir` : il n'est pas suivi.
+ */
 async function walkDir(
   dir: string,
   exts: Set<string>,
-  maxSize: number,
   results: string[] = [],
   depth = 0,
 ): Promise<string[]> {
@@ -174,74 +249,53 @@ async function walkDir(
     if (entry.name.startsWith('.') && entry.name !== '.env.example') continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) await walkDir(full, exts, maxSize, results, depth + 1);
+      if (!SKIP_DIRS.has(entry.name)) await walkDir(full, exts, results, depth + 1);
     } else if (entry.isFile() && exts.has(fileExtension(entry.name))) {
-      try {
-        const s = await stat(full);
-        if (s.size <= maxSize) results.push(full);
-      } catch {
-        // inaccessible — skip
-      }
+      results.push(full);
     }
   }
   return results;
 }
 
-export class SemanticSearchTool extends BaseTool<Args> {
-  readonly name = 'semantic_search';
-  readonly description =
-    'Cherche dans les fichiers locaux par similarité de contenu (keyword scoring). Retourne les fichiers les plus pertinents avec un extrait du passage correspondant.';
-  readonly category = 'filesystem' as const;
-  readonly riskLevel = 'low' as const;
-  readonly requiresConfirmation = false;
-  override readonly argsSchema = argsSchema;
-  override readonly pathArgs = ['paths'] as const;
-  readonly schema = jsonSchemaFrom(argsSchema);
+interface SearchHit {
+  path: string;
+  score: number;
+  snippet: string;
+  matchCount: number;
+  sizeBytes: number | null;
+  matchType?: string | null;
+}
 
-  async execute(rawArgs: Args): Promise<ToolResult> {
-    const args = rawArgs;
-    const { query, limit = 10, max_file_size = 500_000 } = args;
+/**
+ * Lectures simultanées. Sans paralléliser, lire 5 000 fichiers des dossiers par
+ * défaut prenait ~3,2 s sur le poste de référence, ~0,7 s à 16.
+ */
+const READ_CONCURRENCY = 16;
 
-    if (!query?.trim()) return this.fail('query est requis');
-
-    const searchPaths = (args.paths?.length ?? 0) > 0 ? (args.paths as string[]) : [process.cwd()];
-
-    const exts =
-      (args.extensions?.length ?? 0) > 0
-        ? new Set((args.extensions as string[]).map(e => (e.startsWith('.') ? e : `.${e}`)))
-        : DEFAULT_EXTENSIONS;
-
-    const queryTerms = tokenize(query);
-    if (queryTerms.length === 0) return this.fail('La requête ne contient aucun terme exploitable');
-
-    // Collect all candidate files
-    const allFiles: string[] = [];
-    for (const dir of searchPaths) {
-      await walkDir(dir, exts, max_file_size, allFiles);
-    }
-
-    if (allFiles.length === 0) {
-      return this.ok({
-        query,
-        results: [],
-        totalScanned: 0,
-        message: 'Aucun fichier trouvé dans les chemins spécifiés',
-      });
-    }
-
-    // Score each file
-    const scored: SearchResult[] = [];
-    for (const file of allFiles) {
+/** Lit et note chaque fichier d'au plus `maxSize` octets ; `read` : fichiers lus. */
+async function scoreFiles(
+  files: readonly string[],
+  queryTerms: string[],
+  maxSize: number,
+): Promise<{ hits: SearchHit[]; read: number }> {
+  const hits: SearchHit[] = [];
+  let read = 0;
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < files.length) {
+      const file = files[next++] as string;
       let content: string;
       try {
+        if ((await stat(file)).size > maxSize) continue;
         content = await readFile(file, 'utf-8');
       } catch {
-        continue;
+        continue; // inaccessible
       }
+      read++;
       const { score, bestPos, matchCount } = scoreDocument(content, queryTerms);
       if (score > 0) {
-        scored.push({
-          file,
+        hits.push({
+          path: file,
           score,
           snippet: extractSnippet(content, bestPos, SNIPPET_RADIUS),
           matchCount,
@@ -249,33 +303,191 @@ export class SemanticSearchTool extends BaseTool<Args> {
         });
       }
     }
+  };
+  await Promise.all(Array.from({ length: READ_CONCURRENCY }, worker));
+  // Ordre d'arrivée variable : on départage par chemin, pour un résultat stable.
+  hits.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+  return { hits, read };
+}
 
-    scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, limit);
+export interface SemanticSearchOptions {
+  /** Moteur Kensaku ; `null` : mots-clés seulement (tests). */
+  kensaku?: KensakuSearch | null;
+  /**
+   * Liste blanche des chemins. Celle par défaut, faute de réglage : aucun écran
+   * ne la modifie aujourd'hui (`settings.update` ne porte que `safeMode`).
+   */
+  pathWhitelist?: () => readonly string[];
+}
 
-    // Make paths relative for readability
-    const cwd = process.cwd();
-    const results = top.map(r => ({
-      file: (() => {
-        try {
-          return relative(cwd, r.file);
-        } catch {
-          return r.file;
-        }
-      })(),
-      absolutePath: r.file,
-      score: Math.round(r.score * 1000) / 1000,
-      matchCount: r.matchCount,
-      snippet: r.snippet,
-      sizeBytes: r.sizeBytes,
-    }));
+/** Chemin lisible (relatif au dossier courant, comme avant), plus le chemin absolu. */
+function presentHit(hit: SearchHit, realPath: string): Record<string, unknown> {
+  let file = realPath;
+  try {
+    file = relative(process.cwd(), realPath);
+  } catch {
+    // lecteur différent : on garde le chemin absolu
+  }
+  return {
+    file,
+    absolutePath: realPath,
+    score: Math.round(hit.score * 1000) / 1000,
+    matchCount: hit.matchCount,
+    snippet: hit.snippet,
+    sizeBytes: hit.sizeBytes,
+    ...(hit.matchType ? { matchType: hit.matchType } : {}),
+  };
+}
+
+/** Termes de la requête présents dans l'extrait (Kensaku ne compte pas). */
+function countTerms(text: string, terms: readonly string[]): number {
+  const lower = text.toLowerCase();
+  return terms.filter(term => lower.includes(term)).length;
+}
+
+export class SemanticSearchTool extends BaseTool<Args> {
+  readonly name = 'semantic_search';
+  readonly description =
+    'Retrouve un fichier local d’après ce qu’il contient, PDF et captures d’écran compris. Renvoie les plus pertinents avec un extrait.';
+  readonly category = 'filesystem' as const;
+  readonly riskLevel = 'low' as const;
+  readonly requiresConfirmation = false;
+  override readonly argsSchema = argsSchema;
+  override readonly pathArgs = ['paths'] as const;
+  readonly schema = jsonSchemaFrom(argsSchema);
+
+  private readonly kensaku: KensakuSearch | null;
+  private readonly whitelist: () => readonly string[];
+
+  constructor(options: SemanticSearchOptions = {}) {
+    super();
+    this.kensaku = options.kensaku === undefined ? new KensakuBackend() : options.kensaku;
+    this.whitelist = options.pathWhitelist ?? (() => DEFAULT_PERMISSION_CONFIG.pathWhitelist);
+  }
+
+  async execute(args: Args): Promise<ToolResult> {
+    const { query, limit = 10, max_file_size = 500_000 } = args;
+    if (!query?.trim()) return this.fail('query est requis');
+
+    const whitelist = this.whitelist();
+    const requested = args.paths ?? [];
+    // Sans chemin : les dossiers de la liste blanche (avant : `process.cwd()`,
+    // le dossier de l'agent, hors liste blanche).
+    const roots = requested.length > 0 ? requested : defaultSearchRoots(whitelist);
+    // Le modèle devine `extensions` à presque chaque appel ([".pdf",".docx",
+    // ".txt"], [".png",".jpg"…]), et la description n'y change rien (mesuré au
+    // banc). Elles ÉLARGISSENT donc la recherche sans jamais la restreindre :
+    // restreindre faisait perdre les `.md`, ou une capture `.webp` sous Kensaku.
+    const asked = normalizeExtensions(args.extensions);
+    const queryTerms = tokenize(query);
+    // Chaque résultat, des deux moteurs, est résolu (jonctions) puis revérifié.
+    const inScope = await createScopeCheck(roots, whitelist);
+
+    const viaKensaku = await this.searchKensaku(query, queryTerms, roots, limit, inScope);
+    if (viaKensaku !== null) return viaKensaku;
+
+    if (queryTerms.length === 0) return this.fail('La requête ne contient aucun terme exploitable');
+    // Ce moteur ne lit que du texte : il ajoute aux types par défaut ceux qu'on
+    // lui demande, sauf PDF, Office ou images, écartés et signalés, jamais lus
+    // en octets bruts.
+    const ignored = asked.filter(e => BINARY_EXTENSIONS.has(e));
+    const exts = new Set([...DEFAULT_EXTENSIONS, ...asked.filter(e => !BINARY_EXTENSIONS.has(e))]);
+    return this.searchKeywords(
+      query,
+      queryTerms,
+      roots,
+      exts,
+      max_file_size,
+      limit,
+      inScope,
+      ignored,
+    );
+  }
+
+  /**
+   * Kensaku d'abord. `null` : il n'a pas servi (absent, refusé, en échec), ou
+   * rien de ce qu'il a trouvé n'est dans le périmètre (un dossier qu'il
+   * n'indexe pas, par exemple) : l'ancien moteur prend alors le relais.
+   *
+   * `max_file_size` ne s'applique pas : il borne ce que l'ancien moteur LIT, et
+   * ici rien n'est lu ; il écarterait les PDF, la raison d'être de Kensaku. Les
+   * extensions ne filtrent pas non plus : Kensaku couvre déjà tous les types.
+   */
+  private async searchKensaku(
+    query: string,
+    queryTerms: readonly string[],
+    roots: readonly string[],
+    limit: number,
+    inScope: ScopeCheck,
+  ): Promise<ToolResult | null> {
+    if (this.kensaku === null) return null;
+    const onlyRoot = roots.length === 1 ? roots[0] : undefined;
+    const outcome = await this.kensaku.search(query, {
+      limit: KENSAKU_MAX_RESULTS,
+      ...(onlyRoot !== undefined ? { scope: onlyRoot } : {}),
+    });
+    if (!outcome.ok) return null;
+
+    const { kept, dropped } = await keepInScope(outcome.hits, h => h.path, inScope, limit);
+    if (kept.length === 0) {
+      if (outcome.hits.length > 0) {
+        log.info('Kensaku : rien dans le périmètre, moteur par mots-clés', {
+          found: outcome.hits.length,
+        });
+      }
+      return null;
+    }
 
     return this.ok({
       query,
+      engine: 'kensaku',
+      results: kept.map(({ item, realPath }) =>
+        presentHit({ ...item, matchCount: countTerms(item.snippet, queryTerms) }, realPath),
+      ),
+      totalMatched: outcome.total ?? outcome.hits.length,
+      ...(dropped > 0 ? { outOfScope: dropped } : {}),
+    });
+  }
+
+  private async searchKeywords(
+    query: string,
+    queryTerms: string[],
+    roots: readonly string[],
+    exts: Set<string>,
+    maxFileSize: number,
+    limit: number,
+    inScope: ScopeCheck,
+    ignored: readonly string[],
+  ): Promise<ToolResult> {
+    const ignoredField = ignored.length > 0 ? { ignoredExtensions: ignored } : {};
+    const allFiles: string[] = [];
+    for (const dir of roots) {
+      await walkDir(dir, exts, allFiles);
+    }
+
+    if (allFiles.length === 0) {
+      return this.ok({
+        query,
+        engine: 'keywords',
+        results: [],
+        totalScanned: 0,
+        ...ignoredField,
+        message: 'Aucun fichier trouvé dans les chemins spécifiés',
+      });
+    }
+
+    const { hits: scored, read } = await scoreFiles(allFiles, queryTerms, maxFileSize);
+    const { kept, dropped } = await keepInScope(scored, h => h.path, inScope, limit);
+
+    return this.ok({
+      query,
+      engine: 'keywords',
       queryTerms,
-      results,
-      totalScanned: allFiles.length,
+      results: kept.map(({ item, realPath }) => presentHit(item, realPath)),
+      totalScanned: read,
       totalMatched: scored.length,
+      ...(dropped > 0 ? { outOfScope: dropped } : {}),
+      ...ignoredField,
     });
   }
 }

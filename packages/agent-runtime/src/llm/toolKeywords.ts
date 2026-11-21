@@ -73,6 +73,18 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'stocke',
     "n'oublie pas",
   ],
+  // « compétence » seul tirerait l'outil sur « quelles compétences pour devenir
+  // pilote ? », et « procédure » sur toute démarche administrative.
+  load_skill: [
+    'skill',
+    'la compétence',
+    'ta compétence',
+    'tes compétences',
+    'quelles compétences as',
+    'compétences installées',
+    'charge la procédure',
+    'applique la procédure',
+  ],
   semantic_search: [
     'documents locaux',
     'mes documents',
@@ -83,6 +95,13 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'qui abordent',
     'fichiers qui',
     'documents qui',
+    // On se souvient du contenu, pas du nom : « retrouve le fichier où… ».
+    'retrouve',
+    'fichier où',
+    'document où',
+    'quel fichier',
+    'quel document',
+    "capture d'écran où",
   ],
 
   // Connecteurs

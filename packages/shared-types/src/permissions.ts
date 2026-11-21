@@ -13,6 +13,8 @@ export interface PermissionRequest {
   args: Record<string, unknown>;
   /** Chemins du disque visés, à vérifier contre la liste blanche (BaseTool.pathArgs). */
   paths?: string[];
+  /** Ce que le masquage des données personnelles a fait (outils qui sortent du poste). */
+  preview?: string;
   context?: {
     conversationId?: string;
     activeWindow?: string;
@@ -42,6 +44,12 @@ export interface ToolPermissionConfig {
   name: string;
   description: string;
   riskLevel: RiskLevel;
+  /**
+   * Risque quand le navigateur est en lecture seule (il ne peut alors rien
+   * envoyer : ni formulaire, ni POST, ni WebSocket). `riskLevel` reste le
+   * risque déclaré, celui de l'outil (registerTools.test le vérifie).
+   */
+  riskLevelWhenReadOnly?: RiskLevel;
   enabled: boolean;
   requiresConfirmation: boolean;
 }
@@ -128,6 +136,13 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       riskLevel: 'high',
       enabled: true,
       requiresConfirmation: true,
+    },
+    load_skill: {
+      name: 'load_skill',
+      description: "Charger la procédure d'un skill installé (lecture locale)",
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
     },
     store_memory: {
       name: 'store_memory',
@@ -534,6 +549,10 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       name: 'browser_navigate',
       description: 'Naviguer vers une URL dans le navigateur headless',
       riskLevel: 'high',
+      // Lecture seule : ouvrir une page ne peut plus rien envoyer → une
+      // confirmation par session. Clic et saisie restent `high` : ils agissent
+      // sur la page, même si rien ne part.
+      riskLevelWhenReadOnly: 'medium',
       enabled: true,
       requiresConfirmation: true,
     },

@@ -29,6 +29,7 @@ export type EvalCategory =
   | 'recherche'
   | 'planification'
   | 'presse-papier'
+  | 'skills'
   | 'sans-outil';
 
 export interface EvalTask {
@@ -103,6 +104,8 @@ const QUIET_QUESTIONS: readonly (readonly [id: string, input: string])[] = [
   ['conjugaison', 'comment on conjugue le verbe résoudre au présent ?'],
   ['accord', 'on écrit ils se sont parlé ou parlés ?'],
   ['definition', 'que veut dire le mot éphémère ?'],
+  ['pilote', 'quelles compétences faut-il pour devenir pilote de ligne ?'],
+  ['passeport', 'quelle est la procédure pour refaire un passeport ?'],
   ['crepes', 'comment réussir une pâte à crêpes sans grumeaux ?'],
   ['oeuf', 'combien de temps faire cuire un œuf mollet ?'],
   ['pourcent', 'combien font 15 % de 240 ?'],
@@ -249,6 +252,29 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('recherche', 'docs-locaux', 'cherche dans mes documents locaux le contrat de bail', [
     'semantic_search',
   ]),
+  // « Retrouve le fichier où… » : on se souvient du contenu, pas du nom
+  // (`semantic_search`, servi par Kensaku quand il est installé).
+  dev(
+    'recherche',
+    'fichier-devis',
+    'retrouve le fichier où je parle du devis de la cuisine',
+    ['semantic_search'],
+    { answer: /7[\s\u202f]?450|devis-cuisine/i },
+  ),
+  dev(
+    'recherche',
+    'fichier-portail',
+    "dans quel document j'ai noté le code du portail ?",
+    ['semantic_search'],
+    { answer: /4821/ },
+  ),
+  dev(
+    'recherche',
+    'fichier-capture',
+    "retrouve la capture d'écran où il y avait l'erreur CUDA",
+    ['semantic_search'],
+    { answer: /capture-2026-11-02|out of memory/i },
+  ),
   dev(
     'recherche',
     'rech-dailys',
@@ -272,6 +298,18 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('presse-papier', 'clip-lire', 'lis mon presse-papier', ['read_clipboard'], {
     answer: /lyon/i,
   }),
+  dev('skills', 'skill-charge', 'charge le skill revue-comparee', ['load_skill'], {
+    args: /revue-comparee/,
+  }),
+  dev('skills', 'skill-catalogue', 'quels skills as-tu ?', ['load_skill']),
+  dev('skills', 'skill-competence', 'quelles compétences as-tu installées ?', ['load_skill']),
+  dev(
+    'skills',
+    'skill-applique',
+    'avec le skill revue-comparee, que disent les journaux sur Nvidia ?',
+    ['load_skill'],
+    { args: /revue-comparee/, answer: /nvidia|blackwell/i },
+  ),
   dev('sans-outil', 'none-capitale', "quelle est la capitale de l'Italie ?", [], {
     answer: /rome/i,
   }),
@@ -429,6 +467,22 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   ),
   holdout(
     'recherche',
+    'fichier-pdf',
+    "où est passé le PDF sur l'indexation des bases de données ?",
+    ['semantic_search'],
+    { answer: /b-tree|indexation-bdd/i },
+  ),
+  holdout(
+    'recherche',
+    'fichier-loyer',
+    "j'ai un fichier quelque part qui parle du loyer de mars, tu le retrouves ?",
+    ['semantic_search'],
+    // Le nom du fichier suffit, comme pour les autres tâches « fichier » (corrigé
+    // le 2026-11-13 : l'oracle exigeait le montant, la réponse juste était refusée).
+    { answer: /870|bail-appartement/i },
+  ),
+  holdout(
+    'recherche',
     'rech-page',
     'résume cette page : https://exemple.fr/article',
     ['read_webpage'],
@@ -454,6 +508,14 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     ['write_clipboard'],
     { args: /bient/i },
   ),
+  holdout(
+    'skills',
+    'skill-nomme',
+    'avec le skill verifier-source, contrôle ce chiffre : 12 % de chômage',
+    ['load_skill'],
+    { args: /verifier-source/ },
+  ),
+  holdout('skills', 'skill-liste', 'montre-moi tes compétences', ['load_skill']),
   holdout('sans-outil', 'none-germinal', 'qui a écrit Germinal ?', [], { answer: /zola/i }),
   holdout('sans-outil', 'none-calcul', 'combien font 17 fois 6 ?', [], { answer: /102/ }),
   holdout('sans-outil', 'none-trad', 'traduis « bonne année » en espagnol', [], {

@@ -3,6 +3,8 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { postJson } from '../../lib/http';
+import { maskTextFields, toOutbound } from '../../security/personalData';
+import type { OutboundArgs } from '../../ToolRegistry';
 
 type Platform = 'discord' | 'slack';
 
@@ -52,6 +54,16 @@ export class SendWebhookMessageTool extends BaseTool<Args> {
   readonly requiresConfirmation = true;
   override readonly argsSchema = argsSchema;
   readonly schema = jsonSchemaFrom(argsSchema);
+
+  /**
+   * Données personnelles masquées avant le dialogue de confirmation (et donc
+   * avant le `slice(2000)` de Discord, qui pourrait couper un IBAN en deux).
+   * E-mails et téléphones : masqués sur Discord, signalés sur Slack.
+   */
+  prepareOutboundArgs(args: Record<string, unknown>): OutboundArgs {
+    const maskContacts = args['platform'] !== 'slack';
+    return toOutbound(maskTextFields(args, ['message', 'username'], { maskContacts }));
+  }
 
   async execute(args: Args): Promise<ToolResult> {
     const { message, platform, username } = args;
