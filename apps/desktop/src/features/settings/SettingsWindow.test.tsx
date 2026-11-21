@@ -27,6 +27,16 @@ describe('SettingsWindow', () => {
     expect(screen.queryByText('→ moyen en lecture seule')).not.toBeInTheDocument();
   });
 
+  it("l'onglet Raccourcis propose « transformer la sélection », désactivé par défaut", () => {
+    render(<SettingsWindow />);
+    fireEvent.click(screen.getByText('Raccourcis'));
+    const toggle = screen.getByRole('switch', {
+      name: 'Transformer le texte sélectionné (Ctrl+Alt+T)',
+    });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText('Transformer le texte sélectionné')).not.toBeInTheDocument();
+  });
+
   it("l'onglet À propos décrit la stack réelle (sans LanceDB)", () => {
     render(<SettingsWindow />);
     fireEvent.click(screen.getByText('À propos'));

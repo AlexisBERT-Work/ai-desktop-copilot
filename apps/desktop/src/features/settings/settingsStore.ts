@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { updateRuntimeSettings } from '../../shared/api/settings';
+import { selectionSetEnabled } from '../../shared/api/selection';
 
 /**
  * Réglages persistés de l'utilisateur. Seuls ceux qui ont un effet réel
@@ -15,12 +16,19 @@ interface SettingsState {
   safeMode: boolean;
   /** Navigateur de l'agent en lecture seule (défaut : oui). */
   browserReadOnly: boolean;
+  /** Raccourci Ctrl+Alt+T « transformer la sélection » (défaut : non). */
+  selectionTransform: boolean;
+  /** Pourquoi le raccourci n'a pas pu être activé (pris par une autre appli…). */
+  selectionHint: string | null;
 
   setDefaultModel: (model: string | null) => void;
   setTemperature: (value: number) => void;
   setMaxIterations: (value: number) => void;
   setSafeMode: (enabled: boolean) => void;
   setBrowserReadOnly: (enabled: boolean) => void;
+  setSelectionTransform: (enabled: boolean) => Promise<void>;
+  /** (Ré)applique le raccourci Ctrl+Alt+T au cœur (démarrage de l'UI). */
+  syncSelectionHotkey: () => Promise<void>;
   /** Pousse au runtime les réglages qui le concernent (le cœur les rejoue à chaque démarrage de l'agent). */
   syncToRuntime: () => void;
 }
@@ -36,14 +44,16 @@ interface PersistedV0 {
 type PersistedSettings = Pick<
   SettingsState,
   'defaultModel' | 'temperature' | 'maxIterations' | 'safeMode' | 'browserReadOnly'
->;
+> &
+  Partial<Pick<SettingsState, 'selectionTransform'>>;
 
 /**
  * Migration des réglages persistés. v0 → v1 : `defaultModel` valait toujours
  * 'qwen3:14b' (le défaut, jamais un vrai choix) → null ; `streamingEnabled`
  * (sans effet) disparaît. Pur, exporté pour les tests. `browserReadOnly`,
  * ajouté sans changer de version, manque aux réglages déjà enregistrés : la
- * fusion de `persist` garde alors le défaut (lecture seule).
+ * fusion de `persist` garde alors le défaut (lecture seule). Idem pour
+ * `selectionTransform` (défaut : désactivé).
  */
 export function migrateSettings(persisted: unknown, version: number): PersistedSettings {
   const old = (persisted ?? {}) as PersistedV0;
@@ -65,6 +75,8 @@ export const useSettingsStore = create<SettingsState>()(
       maxIterations: 10,
       safeMode: false,
       browserReadOnly: true,
+      selectionTransform: false,
+      selectionHint: null,
 
       setDefaultModel: model => set({ defaultModel: model }),
       setTemperature: value => set({ temperature: Math.min(2, Math.max(0, value)) }),
@@ -78,6 +90,24 @@ export const useSettingsStore = create<SettingsState>()(
       setBrowserReadOnly: enabled => {
         set({ browserReadOnly: enabled });
         get().syncToRuntime();
+      },
+
+      setSelectionTransform: async enabled => {
+        set({ selectionTransform: enabled, selectionHint: null });
+        await get().syncSelectionHotkey();
+      },
+
+      // Le cœur ne garde pas ce réglage d'un lancement à l'autre : l'UI le
+      // réapplique au démarrage. Un raccourci pris ailleurs recoche « non ».
+      syncSelectionHotkey: async () => {
+        try {
+          await selectionSetEnabled(get().selectionTransform);
+        } catch (err) {
+          set({
+            selectionTransform: false,
+            selectionHint: err instanceof Error ? err.message : String(err),
+          });
+        }
       },
 
       // Les deux réglages partent TOUJOURS ensemble : le cœur rejoue le dernier
@@ -98,6 +128,7 @@ export const useSettingsStore = create<SettingsState>()(
         maxIterations: s.maxIterations,
         safeMode: s.safeMode,
         browserReadOnly: s.browserReadOnly,
+        selectionTransform: s.selectionTransform,
       }),
       migrate: (persisted, version) => migrateSettings(persisted, version) as SettingsState,
     },

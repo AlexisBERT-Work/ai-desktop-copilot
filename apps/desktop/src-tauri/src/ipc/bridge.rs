@@ -357,6 +357,11 @@ async fn handle_agent_message(app: &AppHandle, line: &str) -> Result<()> {
                 // Dailys générées localement par les journaux personnalisés.
                 app.emit(protocol::EVENT_DAILIES_LOCAL, params)?;
             }
+            protocol::NOTIF_SELECTION_RESULT => {
+                // Texte sélectionné transformé : le cœur le garde (c'est lui
+                // qui le collera) et le montre à la bulle pour validation.
+                crate::core::selection::on_agent_result(app, &params);
+            }
             protocol::NOTIF_PRESS_LOCAL_PROGRESS => {
                 // Progression de la génération des dailys locales (bandeau de
                 // statut du panneau « Mes journaux », fenêtre dashboard).

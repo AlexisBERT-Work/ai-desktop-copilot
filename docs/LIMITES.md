@@ -77,6 +77,21 @@ aujourd'hui classé `critical`.
   - la pastille est une seconde fenêtre WebView2 (quelques dizaines de Mo de
     RAM) tant que la dictée est activée, et elle s'affiche sur l'écran principal
     seulement.
+- **Transformer la sélection (`Ctrl+Alt+T`) a ses angles morts** :
+  - pas dans une application lancée **en administrateur** (UIPI), comme la
+    dictée ; ni sans sélection : certaines applications (VS Code) copient
+    alors la ligne entière, qui serait transformée ;
+  - le `Ctrl+C` est fait par l'application elle-même : la sélection entre dans
+    l'historique `Win+V`, comme une copie à la main. Le texte collé par
+    CatDesk, lui, en est exclu ;
+  - 8 000 caractères au plus ; ~40 s pour récrire 270 mots sur la RX 6700 (le
+    modèle écrit ~8 mots par seconde) ;
+  - la mise en forme (gras, listes Word, liens) est perdue : c'est du texte
+    brut qui revient ;
+  - si l'application ne colle pas (champ en lecture seule, focus parti dans un
+    autre champ de la même fenêtre), rien ne le détecte : la bulle annonce le
+    remplacement et se ferme. Le texte d'origine est intact ; refaire
+    `Ctrl+Alt+T`, ou « Copier » avant de remplacer en cas de doute.
 - **Le vocabulaire ne corrige que ce qui ressemble au nom** (Paramètres ›
   Voix ; mesuré au banc avec deux voix de synthèse Piper, pas encore avec une
   vraie voix) :

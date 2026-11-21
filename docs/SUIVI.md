@@ -53,6 +53,42 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
 
+## 2026-11-21 — Transformer le texte sélectionné (Plan D, point 2)
+
+Branche `feat/transformer-selection`, coupée de `dev`, PR vers `dev` (veille du
+16/11). Sélectionner du texte dans n'importe quelle application, `Ctrl+Alt+T`,
+choisir une consigne, valider l'avant/après : le résultat remplace la
+sélection. Doc : [CAPACITES.md](CAPACITES.md) § 1 ter,
+[SECURITE.md](SECURITE.md) (2026-11-21), [LIMITES.md](LIMITES.md) § 3.
+
+- **Choix par défaut** (notés dans la PR) : `Ctrl+Alt+T`, coché à la main dans
+  Paramètres › Raccourcis ; consigne dans la bulle, cinq consignes prêtes et un
+  champ libre ; jamais de collage sans validation (Entrée).
+- **Côté Rust** (`core/selection.rs`) : `Ctrl+C` / `Ctrl+V` seulement, les
+  gardes de la dictée réutilisées (fenêtre figée, intégrité, touches tenues),
+  presse-papier sauvegardé et remis, texte gardé dans le cœur. Le collage passe
+  par `Ctrl+V` et non par la frappe Unicode de la dictée : le résultat peut
+  faire plusieurs lignes.
+- **Côté agent** (`selection/transform.ts`) : hors de la boucle ReAct, sans
+  outil, avec le même prompt système et le même `num_ctx` que le chat (aucun
+  rechargement), puis le cache du chat est réamorcé.
+- **Mesuré** (`scripts/selection-bench.mjs`, `qwen3:14b`, réglages de prod) :
+  17/17 sorties sans défaut visible, premier token médian 1,6 s (4,7 s pour le
+  texte long), 270 mots corrigés en 40,8 s. Raccourcir la consigne de cadrage
+  a fait passer la médiane de 2,2 s à 1,6 s : tout le dernier message est relu
+  à ~120 tokens/s.
+- **Non vérifié ici** : le test du vrai presse-papier
+  (`cargo test -- --ignored selection_win --nocapture`) répond « non
+  concluant » depuis l'app Claude, dont les processus n'ont pas accès au
+  presse-papier ; il est à lancer depuis un terminal ordinaire, avec l'essai
+  dans Word, Edge et Teams.
+
+| Portes (branche)             | Résultat                    |
+| ---------------------------- | --------------------------- |
+| Agent : tests, types, lint   | 1 373 (+3 sautés), 0, 0     |
+| Desktop : tests, types, lint | 97, 0, 0                    |
+| Rust : tests, clippy, fmt    | 78 (+12 ignorés), 0, propre |
+
 ## 2026-11-20 — Garde-fous de réponse
 
 Plan A de l'analyse des rapports de veille du 6 au 20/11, sur la branche

@@ -128,6 +128,37 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
   voix en parlant par-dessus (barge-in), réponses volontairement orales du
   modèle — voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 
+### 1 ter. Transformer le texte sélectionné, dans n'importe quelle application (2026-11-21)
+
+Pas un outil de l'agent non plus : un raccourci de l'app (`core/selection.rs`),
+**désactivé par défaut**, à cocher dans **Paramètres › Raccourcis**.
+
+1. Sélectionner du texte dans n'importe quelle application (Word, navigateur,
+   Teams, Bloc-notes), puis **`Ctrl+Alt+T`**.
+2. La bulle s'ouvre avec le texte copié et cinq consignes prêtes : **Corriger**,
+   **Reformuler**, **Raccourcir**, **Plus formel**, **En anglais**. Ou une
+   consigne libre (« traduis en espagnol », « mets au tutoiement »), 300
+   caractères au plus.
+3. Le résultat s'affiche **avant/après**. **Entrée** remplace la sélection
+   dans l'application d'origine ; « Copier » le met au presse-papier ;
+   « Autre consigne » repart du même texte. Rien n'est collé sans cette
+   validation.
+
+| Mesuré (`qwen3:14b`, RX 6700, `scripts/selection-bench.mjs`)  | Résultat                    |
+| ------------------------------------------------------------- | --------------------------- |
+| 4 extraits × 4 consignes + un texte long, sorties sans défaut | 17/17                       |
+| Premier token (modèle chaud), médiane / pire                  | 1,6 s / 4,7 s (texte long)  |
+| 270 mots corrigés de bout en bout                             | 40,8 s                      |
+| Consigne glissée dans le texte (« ignore tes consignes… »)    | traitée comme du texte, 4/4 |
+
+- **8 000 caractères** au plus par sélection. Le modèle n'a aucun outil pendant
+  la transformation, et rien n'entre dans l'historique, la mémoire ni le cache.
+- Copie et remplacement passent par `Ctrl+C` / `Ctrl+V` envoyés à
+  l'application, et **seulement ces deux-là**. Le presse-papier de
+  l'utilisateur est sauvegardé puis remis, et le texte collé par CatDesk est
+  exclu de l'historique `Win+V`.
+- `Ctrl+Z` dans l'application annule le remplacement.
+
 ## 2. Web & navigateur
 
 | Capacité                                                                                                         | Outil(s)             | Risque  |

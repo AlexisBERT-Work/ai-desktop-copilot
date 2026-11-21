@@ -100,6 +100,15 @@ export class LlmScheduler {
     return this.foregroundContext.run(true, fn);
   }
 
+  /**
+   * Un appel de premier plan HORS chat (transformation de texte sélectionné)
+   * vient de remplacer la conversation dans le cache d'Ollama : même
+   * re-préchauffage qu'après du travail de fond, au prochain créneau calme.
+   */
+  cacheDisturbed(): void {
+    if (!this.priming) this.armPrime();
+  }
+
   /** Vrai si rien ne tourne au premier plan depuis `quietMs`. */
   isQuiet(): boolean {
     if (this.foreground > 0) return false;

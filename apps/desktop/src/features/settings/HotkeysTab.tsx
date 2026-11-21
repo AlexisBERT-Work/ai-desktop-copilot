@@ -1,6 +1,18 @@
-/** Onglet Raccourcis : liste en lecture seule des raccourcis globaux et locaux. */
+import { Toggle } from '../../shared/ui/Toggle';
+import { useSettingsStore } from './settingsStore';
+
+/**
+ * Onglet Raccourcis : les raccourcis globaux et locaux, et l'interrupteur de
+ * « transformer la sélection » (Ctrl+Alt+T), désactivé par défaut.
+ */
 export function HotkeysTab() {
-  const global = [{ keys: 'Ctrl+Space', action: 'Ouvrir / fermer CatDesk' }];
+  const selection = useSettingsStore(s => s.selectionTransform);
+  const selectionHint = useSettingsStore(s => s.selectionHint);
+  const setSelection = useSettingsStore(s => s.setSelectionTransform);
+  const global = [
+    { keys: 'Ctrl+Space', action: 'Ouvrir / fermer CatDesk' },
+    ...(selection ? [{ keys: 'Ctrl+Alt+T', action: 'Transformer le texte sélectionné' }] : []),
+  ];
   const local = [
     { keys: 'Ctrl+K', action: 'Palette de commandes' },
     { keys: 'Ctrl+,', action: 'Ouvrir les paramètres' },
@@ -10,6 +22,20 @@ export function HotkeysTab() {
 
   return (
     <div className="space-y-6">
+      <div className="space-y-2">
+        <Toggle
+          label="Transformer le texte sélectionné (Ctrl+Alt+T)"
+          description="Sélectionnez du texte dans n'importe quelle application, Ctrl+Alt+T, puis une consigne (corriger, traduire, raccourcir…) : CatDesk montre l'avant/après, et Entrée remplace la sélection. Le presse-papiers est remis tel quel ; rien n'est collé sans votre validation."
+          checked={selection}
+          onChange={on => void setSelection(on)}
+        />
+        {selectionHint !== null && (
+          <p role="alert" className="text-xs text-amber-300/90 px-1">
+            {selectionHint}
+          </p>
+        )}
+      </div>
+
       <div>
         <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-3">
           Global (OS)

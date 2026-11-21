@@ -99,6 +99,31 @@ export function parseAgentProcessParams(params: unknown): AgentProcessParams | n
   };
 }
 
+interface SelectionTransformParams {
+  requestId: string;
+  text: string;
+  instruction: string;
+  model: string;
+}
+
+/** Valide les paramètres de `selection.transform` (ils viennent de l'extérieur). Pur. */
+export function parseSelectionTransformParams(params: unknown): SelectionTransformParams | null {
+  if (params === null || typeof params !== 'object') return null;
+  const p = params as Record<string, unknown>;
+  const { requestId, text, instruction, model } = p;
+  if (
+    typeof requestId !== 'string' ||
+    requestId === '' ||
+    typeof text !== 'string' ||
+    typeof instruction !== 'string' ||
+    typeof model !== 'string' ||
+    model.trim() === ''
+  ) {
+    return null;
+  }
+  return { requestId, text, instruction, model };
+}
+
 /**
  * JSON-RPC 2.0 bridge over stdin/stdout
  * Handles communication between Tauri Rust core and Node.js agent runtime
@@ -107,6 +132,8 @@ export class StdinBridge {
   private buffer = '';
   /** Abort controller for the run in progress, used by the Stop button. */
   private currentAbort: AbortController | null = null;
+  /** Transformation de sélection en cours (une seule à la fois). */
+  private selectionAbort: AbortController | null = null;
   private readonly notify: NotifyFn;
 
   constructor(private readonly deps: StdinBridgeDeps) {
@@ -292,6 +319,42 @@ export class StdinBridge {
           this.sendResponse(request.id, { ok: true });
           return;
         }
+
+        // Texte sélectionné à transformer : réponse immédiate, résultat en
+        // notification `selection.result` (le cœur Rust ignore les réponses
+        // JSON-RPC, il n'écoute que les notifications).
+        case RPC_METHODS.selectionTransform: {
+          const params = parseSelectionTransformParams(request.params);
+          if (params === null) {
+            this.sendError(request.id, -32602, 'selection.transform: paramètres invalides');
+            return;
+          }
+          this.sendResponse(request.id, { ok: true });
+          // Une nouvelle demande remplace la précédente (le cœur n'en garde qu'une).
+          this.selectionAbort?.abort();
+          const abort = new AbortController();
+          this.selectionAbort = abort;
+          try {
+            const result = await orchestrator.transformSelection(
+              params.text,
+              params.instruction,
+              params.model,
+              abort.signal,
+            );
+            this.notify(RPC_NOTIFICATIONS.selectionResult, {
+              requestId: params.requestId,
+              ...result,
+            });
+          } finally {
+            if (this.selectionAbort === abort) this.selectionAbort = null;
+          }
+          return;
+        }
+
+        case RPC_METHODS.selectionCancel:
+          this.selectionAbort?.abort();
+          this.sendResponse(request.id, { ok: true });
+          return;
 
         // Réponse de l'utilisateur au dialogue de permission. Envoyée par Rust
         // en NOTIFICATION (pas d'`id`, donc pas de réponse à renvoyer) —

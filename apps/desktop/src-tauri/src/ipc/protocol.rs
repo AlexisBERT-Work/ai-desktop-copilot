@@ -21,6 +21,7 @@ pub const EVENT_VOICE_STATE: &str = "voice:state";
 pub const EVENT_VOICE_TRANSCRIPT: &str = "voice:transcript";
 pub const EVENT_VOICE_LEVEL: &str = "voice:level";
 pub const EVENT_VOICE_DICTATION: &str = "voice:dictation";
+pub const EVENT_SELECTION_UPDATE: &str = "selection:update";
 
 // ─── Méthodes JSON-RPC hôte → agent ────────────────────────────
 pub const RPC_AGENT_PROCESS: &str = "agent.process";
@@ -34,6 +35,8 @@ pub const RPC_PRESS_FEEDS_DELETE: &str = "press.feeds.delete";
 pub const RPC_PRESS_LOCAL_RUN_NOW: &str = "press.local.run_now";
 pub const RPC_PRESS_LOCAL_SYNC: &str = "press.local.sync";
 pub const RPC_SETTINGS_UPDATE: &str = "settings.update";
+pub const RPC_SELECTION_TRANSFORM: &str = "selection.transform";
+pub const RPC_SELECTION_CANCEL: &str = "selection.cancel";
 
 // ─── Notifications JSON-RPC agent → hôte ───────────────────────
 pub const NOTIF_AGENT_STEP: &str = "agent.step";
@@ -43,6 +46,7 @@ pub const NOTIF_MARKET_UPDATE: &str = "market.update";
 pub const NOTIF_PRESS_FEEDS: &str = "press.feeds";
 pub const NOTIF_DAILIES_LOCAL: &str = "dailies.local";
 pub const NOTIF_PRESS_LOCAL_PROGRESS: &str = "press.local.progress";
+pub const NOTIF_SELECTION_RESULT: &str = "selection.result";
 
 /// Enveloppe JSON-RPC 2.0 d'une requête vers l'agent (id aléatoire).
 pub fn rpc_request(method: &str, params: serde_json::Value) -> serde_json::Value {
@@ -87,6 +91,7 @@ mod tests {
         EVENT_VOICE_TRANSCRIPT,
         EVENT_VOICE_LEVEL,
         EVENT_VOICE_DICTATION,
+        EVENT_SELECTION_UPDATE,
         RPC_AGENT_PROCESS,
         RPC_AGENT_CANCEL,
         RPC_AGENT_WARMUP,
@@ -98,6 +103,8 @@ mod tests {
         RPC_PRESS_LOCAL_RUN_NOW,
         RPC_PRESS_LOCAL_SYNC,
         RPC_SETTINGS_UPDATE,
+        RPC_SELECTION_TRANSFORM,
+        RPC_SELECTION_CANCEL,
         NOTIF_AGENT_STEP,
         NOTIF_PERMISSION_REQUEST,
         NOTIF_PROACTIVE_SUGGESTION,
@@ -105,6 +112,7 @@ mod tests {
         NOTIF_PRESS_FEEDS,
         NOTIF_DAILIES_LOCAL,
         NOTIF_PRESS_LOCAL_PROGRESS,
+        NOTIF_SELECTION_RESULT,
     ];
 
     /// Chaque constante Rust doit apparaître comme littéral `'…'` dans le TS.

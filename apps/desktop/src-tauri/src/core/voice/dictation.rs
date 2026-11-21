@@ -165,10 +165,6 @@ pub fn key_strokes(text: &str) -> Vec<KeyStroke> {
 }
 
 /// Décision pure : peut-on taper `text` dans `foreground` ?
-///
-/// `target_integrity` / `own_integrity` : RID du niveau d'intégrité (0x2000
-/// moyen, 0x3000 élevé…). `None` = illisible — le jeton d'un programme
-/// élevé refuse justement de se laisser lire : on refuse aussi.
 pub fn decide(
     text: &str,
     target: Target,
@@ -179,6 +175,22 @@ pub fn decide(
     if text.is_empty() {
         return Err(Outcome::Empty);
     }
+    window_allowed(target, foreground, target_integrity, own_integrity)
+}
+
+/// Décision pure sur la fenêtre seule : celle de l'appui, toujours au premier
+/// plan, et pas plus élevée que CatDesk. Partagée avec la transformation de
+/// sélection (`core::selection`), qui envoie Ctrl+C / Ctrl+V à la même cible.
+///
+/// `target_integrity` / `own_integrity` : RID du niveau d'intégrité (0x2000
+/// moyen, 0x3000 élevé…). `None` = illisible — le jeton d'un programme
+/// élevé refuse justement de se laisser lire : on refuse aussi.
+pub fn window_allowed(
+    target: Target,
+    foreground: Target,
+    target_integrity: Option<u32>,
+    own_integrity: Option<u32>,
+) -> Result<(), Outcome> {
     if target.0 == 0 || foreground != target {
         return Err(Outcome::FocusChanged);
     }
@@ -186,6 +198,31 @@ pub fn decide(
         (Some(t), Some(own)) if t <= own => Ok(()),
         _ => Err(Outcome::Elevated),
     }
+}
+
+/// [`window_allowed`] sur l'état réel : fenêtre au premier plan et niveaux
+/// d'intégrité lus maintenant.
+pub fn check_target(target: Target) -> Result<(), Outcome> {
+    window_allowed(
+        target,
+        win::foreground(),
+        win::window_integrity(target),
+        win::own_integrity(),
+    )
+}
+
+/// Attend que Ctrl, Alt, Maj et Windows soient physiquement relâchés : sinon
+/// toute touche envoyée deviendrait un raccourci. `Ok(ms attendues)`, ou
+/// `Err(ms)` après [`MODIFIERS_TIMEOUT`].
+pub fn wait_modifiers_released() -> Result<u128, u128> {
+    let waiting = Instant::now();
+    while win::modifiers_down() {
+        if waiting.elapsed() >= MODIFIERS_TIMEOUT {
+            return Err(waiting.elapsed().as_millis());
+        }
+        std::thread::sleep(MODIFIERS_POLL);
+    }
+    Ok(waiting.elapsed().as_millis())
 }
 
 /// Fenêtre au premier plan, à figer à l'appui du raccourci.
@@ -213,20 +250,14 @@ pub fn insert(text: &str, target: Target) -> Report {
         return report(Outcome::Empty, 0);
     }
 
-    let waiting = Instant::now();
-    while win::modifiers_down() {
-        if waiting.elapsed() >= MODIFIERS_TIMEOUT {
-            return report(Outcome::KeysHeld, waiting.elapsed().as_millis());
-        }
-        std::thread::sleep(MODIFIERS_POLL);
-    }
-    let wait_ms = waiting.elapsed().as_millis();
-
-    let foreground = win::foreground();
+    let wait_ms = match wait_modifiers_released() {
+        Ok(ms) => ms,
+        Err(ms) => return report(Outcome::KeysHeld, ms),
+    };
     if let Err(outcome) = decide(
         &text,
         target,
-        foreground,
+        win::foreground(),
         win::window_integrity(target),
         win::own_integrity(),
     ) {

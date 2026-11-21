@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { JsonRpcRequest } from '@catdesk/shared-types';
-import { RPC_METHODS } from '@catdesk/shared-types';
-import { StdinBridge, buildStepNotification } from './StdinBridge';
+import { RPC_METHODS, RPC_NOTIFICATIONS } from '@catdesk/shared-types';
+import { StdinBridge, buildStepNotification, parseSelectionTransformParams } from './StdinBridge';
 import type { AgentOrchestrator } from '../AgentOrchestrator';
 
 /**
@@ -142,5 +142,120 @@ describe('settings.update — sécurité', () => {
     const { updatePermissions, setBrowserReadOnly } = await run({ browserReadOnly: 'non' });
     expect(updatePermissions).toHaveBeenCalledWith({});
     expect(setBrowserReadOnly).not.toHaveBeenCalled();
+  });
+});
+
+describe('selection.transform — texte sélectionné', () => {
+  const params = {
+    requestId: 'sel-1',
+    text: 'Je suis la.',
+    instruction: 'corrige',
+    model: 'qwen3:14b',
+  };
+
+  const run = async (
+    transformSelection: (...args: unknown[]) => Promise<unknown>,
+    sent: Record<string, unknown> = params,
+  ) => {
+    const notify = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      const bridge = new StdinBridge({
+        orchestrator: { transformSelection } as unknown as AgentOrchestrator,
+        notify,
+      });
+      await dispatch(bridge, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: RPC_METHODS.selectionTransform,
+        params: sent,
+      });
+    } finally {
+      write.mockRestore();
+    }
+    return notify;
+  };
+
+  it('rend le résultat en notification, corrélé par requestId', async () => {
+    const transform = vi.fn(async () => ({ ok: true, text: 'Je suis là.' }));
+    const notify = await run(transform);
+    expect(transform).toHaveBeenCalledWith(
+      'Je suis la.',
+      'corrige',
+      'qwen3:14b',
+      expect.any(AbortSignal),
+    );
+    expect(notify).toHaveBeenCalledWith(RPC_NOTIFICATIONS.selectionResult, {
+      requestId: 'sel-1',
+      ok: true,
+      text: 'Je suis là.',
+    });
+  });
+
+  it("relaie l'échec tel quel", async () => {
+    const notify = await run(async () => ({ ok: false, error: 'Consigne vide.' }));
+    expect(notify).toHaveBeenCalledWith(RPC_NOTIFICATIONS.selectionResult, {
+      requestId: 'sel-1',
+      ok: false,
+      error: 'Consigne vide.',
+    });
+  });
+
+  it('des paramètres invalides ne lancent rien', async () => {
+    const transform = vi.fn();
+    const notify = await run(transform, { ...params, model: ' ' });
+    expect(transform).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('selection.cancel interrompt la transformation en cours', async () => {
+    let seen: AbortSignal | undefined;
+    const notify = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      const bridge = new StdinBridge({
+        orchestrator: {
+          transformSelection: (_t: string, _i: string, _m: string, signal: AbortSignal) =>
+            new Promise(resolve => {
+              seen = signal;
+              signal.addEventListener('abort', () =>
+                resolve({ ok: false, error: 'Transformation annulée.' }),
+              );
+            }),
+        } as unknown as AgentOrchestrator,
+        notify,
+      });
+      const pending = dispatch(bridge, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: RPC_METHODS.selectionTransform,
+        params,
+      });
+      await dispatch(bridge, {
+        jsonrpc: '2.0',
+        id: 2,
+        method: RPC_METHODS.selectionCancel,
+        params: {},
+      });
+      await pending;
+    } finally {
+      write.mockRestore();
+    }
+    expect(seen?.aborted).toBe(true);
+    expect(notify).toHaveBeenCalledWith(RPC_NOTIFICATIONS.selectionResult, {
+      requestId: 'sel-1',
+      ok: false,
+      error: 'Transformation annulée.',
+    });
+  });
+});
+
+describe('parseSelectionTransformParams', () => {
+  it('exige les quatre champs en chaînes, requestId et modèle non vides', () => {
+    const ok = { requestId: 'r', text: '', instruction: '', model: 'm' };
+    expect(parseSelectionTransformParams(ok)).toEqual(ok);
+    expect(parseSelectionTransformParams({ ...ok, requestId: '' })).toBeNull();
+    expect(parseSelectionTransformParams({ ...ok, text: 3 })).toBeNull();
+    expect(parseSelectionTransformParams(null)).toBeNull();
   });
 });
