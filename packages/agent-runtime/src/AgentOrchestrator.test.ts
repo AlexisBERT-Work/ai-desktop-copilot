@@ -682,3 +682,150 @@ describe('AgentOrchestrator — préchauffage de la conversation ouverte', () =>
     expect(warm?.messages.slice(0, -1)).toEqual(priorMessages);
   });
 });
+
+// ─── Contrôles d'après réponse (veille 17/11 et 19/11) ──────────────────────
+
+describe("AgentOrchestrator — contrôles d'après réponse", () => {
+  const done = (promptTokens?: number): StreamChunk => ({
+    type: 'done',
+    totalTokens: 10,
+    ...(promptTokens !== undefined ? { promptTokens } : {}),
+  });
+  const memoryTools = [
+    { name: 'store_memory', description: 'Mémorise un fait durable' },
+    { name: 'echo', description: 'Renvoie ses arguments' },
+  ];
+
+  it('relance une fois une réponse vide, et la seconde réponse est servie', async () => {
+    const h = makeHarness({ turns: [[], [token('Rome.')]] });
+    const steps = await collect(h.orchestrator.process('capitale ?', 'conv-1', CONFIG));
+
+    expect(steps.at(-1)).toEqual({ type: 'done', content: 'Rome.' });
+    expect(h.llmCalls).toHaveLength(2);
+    // `messages` est le même tableau d'un appel à l'autre : on y cherche la relance.
+    const retry = (h.llmCalls[1]?.messages ?? []).find(m => m.content.startsWith('[Vérification'));
+    expect(retry?.content).toContain('réponse est arrivée vide');
+  });
+
+  it("deux réponses vides : message d'échec visible et étape d'erreur, jamais un silence", async () => {
+    const h = makeHarness({ withCache: true, turns: [[], [token('  ')]] });
+    const steps = await collect(h.orchestrator.process('capitale ?', 'conv-1', CONFIG));
+
+    expect(steps).toContainEqual({
+      type: 'token',
+      content: expect.stringContaining('réponse vide'),
+    });
+    expect(steps.at(-1)).toMatchObject({ type: 'error', code: 'EMPTY_ANSWER' });
+    expect(h.completeRun).toHaveBeenCalledWith(expect.any(String), 'error', expect.any(String));
+    expect(h.recordTurn).not.toHaveBeenCalled();
+    expect(h.cachePut).not.toHaveBeenCalled();
+    expect(h.playbookRecord).toHaveBeenCalledWith(expect.any(String), expect.any(String), false);
+  });
+
+  it('« c’est noté » sans store_memory : relance, le modèle appelle l’outil, réponse propre', async () => {
+    const h = makeHarness({
+      toolDefs: memoryTools,
+      turns: [
+        [token("C'est noté !")],
+        [nativeCall('store_memory', { content: 'réponses courtes' })],
+        [token('Enregistré dans ma mémoire.')],
+      ],
+    });
+    const steps = await collect(
+      h.orchestrator.process('souviens-toi que je préfère les réponses courtes', 'conv-1', CONFIG),
+    );
+
+    expect(h.executeTool).toHaveBeenCalledWith('store_memory', { content: 'réponses courtes' });
+    const retry = (h.llmCalls[1]?.messages ?? []).find(m => m.content.startsWith('[Vérification'));
+    expect(retry?.content).toContain('store_memory');
+    // La réponse fautive était affichée : la suite repart à la ligne.
+    expect(steps).toContainEqual({ type: 'token', content: '\n\n' });
+    expect(steps.at(-1)).toEqual({ type: 'done', content: 'Enregistré dans ma mémoire.' });
+    expect(h.playbookRecord).toHaveBeenCalledWith(expect.any(String), 'store_memory', true);
+  });
+
+  it('annonce maintenue après la relance : mention visible, ni cache ni succès au playbook', async () => {
+    const h = makeHarness({
+      withCache: true,
+      toolDefs: memoryTools,
+      turns: [[token("C'est noté !")], [token("D'accord, c'est noté.")]],
+    });
+    const steps = await collect(
+      h.orchestrator.process('retiens que mon vol part le 12', 'conv-1', CONFIG),
+    );
+
+    const last = steps.at(-1);
+    expect(last?.type).toBe('done');
+    expect(last?.type === 'done' && last.content).toContain("(Vérification : rien n'a été fait");
+    expect(h.llmCalls).toHaveLength(2); // une seule relance par run
+    expect(h.cachePut).not.toHaveBeenCalled();
+    expect(h.playbookRecord).toHaveBeenCalledWith(expect.any(String), expect.any(String), false);
+  });
+
+  it('un store_memory refusé ne couvre pas « c’est noté »', async () => {
+    const h = makeHarness({
+      granted: false,
+      toolDefs: memoryTools,
+      turns: [
+        [nativeCall('store_memory', { content: 'x' })],
+        [token("C'est noté.")],
+        [token("Je n'ai rien pu enregistrer : l'accès a été refusé.")],
+      ],
+    });
+    const steps = await collect(h.orchestrator.process('retiens ça', 'conv-1', CONFIG));
+
+    expect(h.llmCalls).toHaveLength(3);
+    expect(steps.at(-1)).toEqual({
+      type: 'done',
+      content: "Je n'ai rien pu enregistrer : l'accès a été refusé.",
+    });
+  });
+
+  it('chiffre absent des sources après get_market : réponse annotée, pas bloquée', async () => {
+    const h = makeHarness({
+      toolDefs: [{ name: 'get_market', description: 'Cours de bourse' }],
+      toolResult: {
+        success: true,
+        data: { symbol: 'AAPL', price: 187.4523, changePercent: -1.21 },
+      },
+      turns: [
+        [nativeCall('get_market', { symbol: 'AAPL' })],
+        [token('Apple vaut 187,45 $, en baisse de 1,2 %, soit 192 $ hier.')],
+      ],
+    });
+    const steps = await collect(
+      h.orchestrator.process("combien vaut l'action Apple ?", 'conv-1', CONFIG),
+    );
+
+    const last = steps.at(-1);
+    expect(last?.type === 'done' && last.content).toContain('« 192 $ » ne figure pas');
+    const notice = last?.type === 'done' ? (last.content.split('(Vérification')[1] ?? '') : '';
+    expect(notice).not.toContain('187,45');
+    expect(notice).not.toContain('1,2 %');
+    expect(h.llmCalls).toHaveLength(2); // aucune relance pour un chiffre
+  });
+
+  it('ne vérifie pas les chiffres quand aucun outil source n’a tourné', async () => {
+    const h = makeHarness({
+      turns: [[token('La racine carrée de 144 vaut 12, et 2,5 × 4 = 10.')]],
+    });
+    const steps = await collect(h.orchestrator.process('calcule', 'conv-1', CONFIG));
+    expect(steps.at(-1)).toEqual({
+      type: 'done',
+      content: 'La racine carrée de 144 vaut 12, et 2,5 × 4 = 10.',
+    });
+  });
+
+  it('prévient quand Ollama a lu plus de tokens que num_ctx', async () => {
+    const h = makeHarness({ turns: [[token('Résumé.'), done(999_999)]] });
+    const steps = await collect(h.orchestrator.process('résume ce document', 'conv-1', CONFIG));
+    const last = steps.at(-1);
+    expect(last?.type === 'done' && last.content).toContain('dépassait la mémoire de travail');
+  });
+
+  it('ne dit rien quand le prompt tient dans la fenêtre', async () => {
+    const h = makeHarness({ turns: [[token('Résumé.'), done(1200)]] });
+    const steps = await collect(h.orchestrator.process('résume', 'conv-1', CONFIG));
+    expect(steps.at(-1)).toEqual({ type: 'done', content: 'Résumé.' });
+  });
+});

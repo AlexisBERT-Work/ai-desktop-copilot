@@ -230,6 +230,13 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     args: /config\.json/,
   }),
   dev('memoire', 'mem-note', 'souviens-toi que je préfère les réponses courtes', ['store_memory']),
+  // Annonces sans outil (« c'est noté » sans store_memory) : voir checks/claimCheck.ts.
+  dev('memoire', 'mem-portail', 'retiens que le code du portail est 4521', ['store_memory'], {
+    args: /4521/,
+  }),
+  dev('memoire', 'mem-anniv', "note que l'anniversaire de Léa est le 3 mars", ['store_memory'], {
+    args: /mars/i,
+  }),
   dev('systeme', 'sys-ipconfig', 'exécute la commande ipconfig', ['run_command'], {
     args: /ipconfig/i,
   }),
@@ -318,6 +325,19 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('sans-outil', 'none-joconde', 'qui a peint la Joconde ?', [], { answer: /vinci/i }),
   dev('sans-outil', 'none-racine', 'quelle est la racine carrée de 144 ?', [], { answer: /12/ }),
   dev('sans-outil', 'none-repas', 'donne-moi une idée de repas rapide', []),
+  // Témoins des contrôles d'après réponse : parler de mémoire n'est pas en demander.
+  dev(
+    'sans-outil',
+    'trap-retenir',
+    "tu peux retenir des choses d'une conversation à l'autre ?",
+    [],
+    {
+      trap: true,
+    },
+  ),
+  dev('sans-outil', 'trap-adresse', 'si je te donne mon adresse, tu la garderas ?', [], {
+    trap: true,
+  }),
   ...QUIET_QUESTIONS.map(([id, input]) =>
     dev('sans-outil', `quiet-${id}`, input, [], { selectionOnly: true }),
   ),
@@ -449,6 +469,29 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   }),
   holdout(
     'memoire',
+    'mem-allergie',
+    "n'oublie pas que je suis allergique aux arachides",
+    ['store_memory'],
+    {
+      args: /arachide/i,
+    },
+  ),
+  holdout(
+    'memoire',
+    'mem-teletravail',
+    'garde en tête que je travaille de chez moi le vendredi',
+    ['store_memory'],
+    { args: /vendredi/i },
+  ),
+  holdout(
+    'fichiers',
+    'fic-taches',
+    'écris ma liste de tâches dans taches.txt : appeler le garage, payer la cantine',
+    ['write_file'],
+    { args: /taches\.txt/ },
+  ),
+  holdout(
+    'memoire',
     'mem-comptable',
     'tu te souviens du nom de mon comptable ?',
     ['search_memory'],
@@ -527,6 +570,15 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   }),
   holdout('sans-outil', 'none-synonyme', 'donne-moi un synonyme de rapide', []),
   holdout('sans-outil', 'trap-action', "c'est quoi une action en bourse ?", [], { trap: true }),
+  holdout(
+    'sans-outil',
+    'trap-oubli',
+    "est-ce que tu oublies ce que je te dis quand je ferme l'appli ?",
+    [],
+    {
+      trap: true,
+    },
+  ),
   holdout('sans-outil', 'trap-pdf', 'comment on ouvre un fichier PDF sous Windows ?', [], {
     trap: true,
   }),
