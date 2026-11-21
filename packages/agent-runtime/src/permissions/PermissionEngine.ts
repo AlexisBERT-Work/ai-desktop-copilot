@@ -13,7 +13,7 @@ import {
 } from '@catdesk/shared-types';
 import { stdoutNotifier, type NotifyFn } from '../ipc/Notifier';
 import { createLogger } from '../logger';
-import { isPathAllowed } from './pathPolicy';
+import { createPathGuard } from './realPath';
 
 const log = createLogger('security:permissions');
 
@@ -83,10 +83,14 @@ export class PermissionEngine {
     // Liste blanche des chemins : appliquée aux chemins que l'outil DÉCLARE
     // (BaseTool.pathArgs → request.paths), quel que soit son niveau de risque
     // — sinon un outil `low` lirait n'importe quel fichier (ex. la base de
-    // cookies de Chrome), ce qui ruinerait la liste blanche.
+    // cookies de Chrome), ce qui ruinerait la liste blanche. Chaque chemin est
+    // vérifié tel qu'écrit PUIS résolu (`realPath.ts`) : une jonction posée
+    // dans Documents ne mène plus hors de la liste.
+    const pathGuard = createPathGuard(this.config.pathWhitelist);
     for (const candidate of request.paths ?? []) {
-      if (!this.isPathAllowed(candidate)) {
-        return { granted: false, reason: `Chemin non autorisé: ${candidate}` };
+      const verdict = await pathGuard(candidate);
+      if (!verdict.allowed) {
+        return { granted: false, reason: verdict.reason };
       }
     }
 
@@ -165,10 +169,6 @@ export class PermissionEngine {
         ...(request.preview !== undefined ? { preview: request.preview } : {}),
       });
     });
-  }
-
-  private isPathAllowed(path: string): boolean {
-    return isPathAllowed(path, this.config.pathWhitelist);
   }
 
   clearSessionGrants(): void {

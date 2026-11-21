@@ -1,7 +1,8 @@
 /**
  * Liste blanche des chemins : fonctions pures, partagées par le moteur de
  * permissions (les chemins qu'un outil DÉCLARE, avant exécution) et par
- * `semantic_search` (les chemins qu'un moteur externe RENVOIE, après).
+ * `semantic_search` (les chemins qu'un moteur externe RENVOIE, après). La
+ * résolution sur le disque (jonctions, liens) est dans `realPath.ts`.
  */
 
 export interface PathEnv {
@@ -32,8 +33,10 @@ const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();
 /**
  * `path` est-il sous une entrée de la liste ? Une liste vide autorise tout.
  *
- * Contrôle LEXICAL : il ne suit ni jonction ni lien symbolique. Pour un chemin
- * venu d'un moteur externe, résoudre d'abord (`search/scope.ts`).
+ * Contrôle LEXICAL : il ne suit ni jonction ni lien symbolique. Le moteur de
+ * permissions l'applique au chemin écrit puis au chemin résolu
+ * (`realPath.ts::createPathGuard`) ; `semantic_search`, à chaque résultat
+ * résolu (`search/scope.ts`).
  */
 export function isPathAllowed(
   path: string,

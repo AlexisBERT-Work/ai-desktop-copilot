@@ -176,11 +176,6 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
   n'est donc pas une garantie : ce qui protège reste le `PermissionEngine`, et les
   skills gardent leur propre cadre systématique (voir [SECURITE.md](SECURITE.md)).
 - **Isolation réseau** pour l'exécution de code généré.
-- **Liste blanche lexicale** : `PermissionEngine` compare le chemin écrit, sans
-  suivre les jonctions. Une jonction posée dans Documents vers un autre dossier
-  laisse `read_file` lire au travers. Seul `semantic_search` résout ses
-  résultats avant de les vérifier (2026-11-13). Créer une jonction demande déjà
-  un accès au disque (ou `run_command`, 🟠 confirmé).
 
 ## 6. Tests & qualité
 
