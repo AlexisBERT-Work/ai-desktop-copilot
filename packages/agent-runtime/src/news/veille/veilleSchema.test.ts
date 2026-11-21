@@ -3,6 +3,7 @@ import { PAST_PISTES_FILE, buildVeillePrompt, formatPastPistes } from './veilleP
 import {
   EMPTY_REPORT,
   MAX_PISTES,
+  REJECT_CAUSES,
   VeilleReportSchema,
   keepCollected,
   veilleJsonSchema,
@@ -44,8 +45,8 @@ describe('keepCollected', () => {
           { repo: 'evil/phish', version: 'v9', impact: 'x' },
         ],
         rejected: [
-          { repo: 'c/d', reason: 'x' },
-          { repo: 'evil/phish', reason: 'x' },
+          { repo: 'c/d', cause: 'licence', reason: 'x' },
+          { repo: 'evil/phish', cause: 'suspect', reason: 'x' },
         ],
       }),
       candidates,
@@ -90,6 +91,21 @@ describe('VeilleReportSchema', () => {
   it('refuse un verdict hors liste', () => {
     const bad = report({ pistes: [{ ...piste('a/b'), verdict: 'peut_etre' as 'a_faire' }] });
     expect(VeilleReportSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('exige une cause connue pour chaque écarté', () => {
+    const ok = report({ rejected: [{ repo: 'a/b', cause: 'trop_jeune', reason: 'x' }] });
+    expect(VeilleReportSchema.safeParse(ok).success).toBe(true);
+    const missing = { ...EMPTY_REPORT, rejected: [{ repo: 'a/b', reason: 'x' }] };
+    expect(VeilleReportSchema.safeParse(missing).success).toBe(false);
+    const unknown = { ...EMPTY_REPORT, rejected: [{ repo: 'a/b', cause: 'bof', reason: 'x' }] };
+    expect(VeilleReportSchema.safeParse(unknown).success).toBe(false);
+  });
+
+  it('le JSON Schema donné à Claude liste les causes et dit laquelle peut revenir', () => {
+    const text = JSON.stringify(veilleJsonSchema());
+    for (const cause of REJECT_CAUSES) expect(text).toContain(`"${cause}"`);
+    expect(text).toContain('Seul trop_jeune');
   });
 
   it('produit un JSON Schema sans $schema, comme l’attend la CLI', () => {
@@ -139,6 +155,41 @@ describe('buildVeillePrompt', () => {
 
   it('les backticks sont rendus, pas échappés', () => {
     expect(prompt).not.toContain('\\`');
+  });
+
+  describe('pistes déjà faites (AMELIORATIONS § 4)', () => {
+    const withRoadmap = {
+      ...base,
+      contextFiles: ['contexte/CAPACITES.md', 'contexte/AMELIORATIONS.md'],
+    };
+
+    it('le document est désigné, et une piste ✅ ne se repropose ni ne se dit ouverte', () => {
+      const p = buildVeillePrompt({ ...withRoadmap, pastPistesCount: 0 });
+      expect(p).toContain('## Pistes déjà faites');
+      expect(p).toContain('`contexte/AMELIORATIONS.md`, § 4');
+      expect(p).toContain('✅');
+      expect(p).toContain('Ne la repropose jamais');
+      expect(p).toContain('ne la présente jamais comme ouverte');
+      expect(p).toContain('cause `deja_couvert`');
+    });
+
+    it('les exceptions de « Déjà proposé » ne valent pas pour une piste faite', () => {
+      const p = buildVeillePrompt({ ...withRoadmap, pastPistesCount: 5 });
+      expect(p).toContain('jamais pour une piste faite');
+      expect(p).toContain("c'est `contexte/AMELIORATIONS.md` qui le dit");
+    });
+
+    it('sans le document, pas de règle qui le cite', () => {
+      expect(prompt).not.toContain('## Pistes déjà faites');
+      expect(buildVeillePrompt({ ...base, pastPistesCount: 5 })).not.toContain('AMELIORATIONS');
+    });
+  });
+
+  it('les signaux de spam et la cause définitive des écartés sont expliqués', () => {
+    expect(prompt).toContain('`clones` non vide');
+    expect(prompt).toContain('`installBait`');
+    expect(prompt).toContain('irm … | iex');
+    expect(prompt).toContain('Seule `trop_jeune` le laisse revenir');
   });
 });
 

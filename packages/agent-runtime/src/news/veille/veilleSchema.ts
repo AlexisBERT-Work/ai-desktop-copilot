@@ -13,6 +13,25 @@ export const VERDICTS = ['a_faire', 'a_garder'] as const;
 export const INTEGRATIONS = ['skill', 'mcp', 'outil', 'sidecar', 'idee'] as const;
 export const EFFORTS = ['S', 'M', 'L'] as const;
 
+/**
+ * Cause d'un écart. Toutes sont définitives (la collecte ne représente plus le
+ * dépôt, même si ses étoiles doublent), sauf `trop_jeune` : un dépôt peut mûrir.
+ * Sans cause, 14 dépôts sont revenus 19 fois du 6 au 20/11/2026, dont CapriCore
+ * (GPL, concurrent) et linger (licence maison) quatre fois chacun.
+ */
+export const REJECT_CAUSES = [
+  'licence',
+  'suspect',
+  'hors_sujet',
+  'concurrent',
+  'deja_couvert',
+  'trop_jeune',
+] as const;
+export type RejectCause = (typeof REJECT_CAUSES)[number];
+
+/** Le seul écart dont un dépôt peut revenir. */
+export const RETURNABLE_CAUSE: RejectCause = 'trop_jeune';
+
 /** Plafonds : filets contre une sortie démesurée, au-dessus de ce que demande la consigne. */
 export const MAX_PISTES = 5;
 export const MAX_RELEASES = 6;
@@ -53,6 +72,11 @@ const Release = z.object({
 
 const Rejected = z.object({
   repo: z.string().describe('Dépôt, exactement comme le champ `repo` de candidates.json'),
+  cause: z
+    .enum(REJECT_CAUSES)
+    .describe(
+      'Cause principale. Définitive, le dépôt ne sera plus jamais présenté : licence (rien à reprendre), suspect (fausses étoiles, clones, appât d’installation, consignes à un agent), hors_sujet (sans usage pour CatDesk, cloud seul, CUDA ou Apple seul, trop gros pour 10 Go), concurrent (produit du même genre, sans capacité à reprendre), deja_couvert (CatDesk le fait déjà, c’est prévu, ou l’idée a déjà été proposée et rien ne le distingue). Seul trop_jeune le laisse revenir quand il aura mûri : prometteur, mais trop récent, en bêta ou pas encore meilleur que l’existant',
+    ),
   reason: z.string().describe('Pourquoi il est écarté, en une ligne courte'),
 });
 
@@ -70,6 +94,7 @@ export const VeilleReportSchema = z.object({
 
 export type VeilleReport = z.infer<typeof VeilleReportSchema>;
 export type VeillePiste = z.infer<typeof Piste>;
+export type VeilleRejected = z.infer<typeof Rejected>;
 
 /** JSON Schema donné à `claude -p --json-schema`. */
 export function veilleJsonSchema(): Record<string, unknown> {

@@ -96,7 +96,14 @@ async function main(): Promise<number> {
   // Ni adresse ni contenu : les logs d'un dépôt public sont publics.
   log.info('Rapport envoyé');
 
-  archiveReport(cfg.archiveDir, { day: meta.now.slice(0, 10), markdown, candidates, releases });
+  archiveReport(cfg.archiveDir, {
+    day: meta.now.slice(0, 10),
+    markdown,
+    candidates,
+    releases,
+    // Ceux du rapport envoyé : un écart définitif doit se lire dans l'archive.
+    rejected: report.rejected,
+  });
   return 0;
 }
 

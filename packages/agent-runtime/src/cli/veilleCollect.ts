@@ -15,6 +15,8 @@ import {
   githubSource,
 } from '../news/veille/collectRepos';
 import {
+  CONTEXT_FILES,
+  ROADMAP_FILE,
   loadPastPistes,
   loadVeilleState,
   readVeilleCollectConfig,
@@ -30,14 +32,6 @@ import { createLogger } from '../logger';
 
 const log = createLogger('cli:veille-collect');
 
-/** Ce que CatDesk sait déjà faire et ce qui est prévu : sans ça, Claude proposerait l'existant. */
-const CONTEXT_FILES = [
-  'docs/CAPACITES.md',
-  'docs/AMELIORATIONS.md',
-  'docs/LIMITES.md',
-  'packages/agent-runtime/src/tools/registerTools.ts',
-];
-
 /** Une recherche toutes les 2 s : sous le plafond de 30 par minute. */
 const SEARCH_PAUSE_MS = 2_100;
 
@@ -48,6 +42,10 @@ function copyContext(contextDir: string, workdir: string): string[] {
     const source = join(contextDir, file);
     if (!existsSync(source)) {
       log.warn('Fichier de contexte absent', { file });
+      // Annotation visible sur la page du run : sans AMELIORATIONS, Claude
+      // repropose des pistes déjà faites.
+      const why = file === ROADMAP_FILE ? ' : les pistes déjà faites seront reproposées' : '';
+      process.stdout.write(`::warning title=Veille::Contexte absent, ${file}${why}\n`);
       continue;
     }
     const target = join('contexte', basename(file));

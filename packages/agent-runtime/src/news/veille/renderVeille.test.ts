@@ -30,7 +30,7 @@ const REPORT: VeilleReport = {
   summary: 'Une piste forte aujourd’hui.',
   pistes: [OCR],
   releases: [{ repo: 'ollama/ollama', version: 'v0.40.15', impact: 'Corrige Vulkan.' }],
-  rejected: [{ repo: 'x/noise', reason: 'Clone de produit.' }],
+  rejected: [{ repo: 'x/noise', cause: 'hors_sujet', reason: 'Clone de produit.' }],
 };
 
 const LICENSES = new Map<string, string | null>([
@@ -85,7 +85,7 @@ describe('renderVeilleHtml', () => {
   it('un écarté tient sur une ligne', () => {
     const long = `${'Une raison détaillée. '.repeat(3)}${'x'.repeat(200)}`;
     const html = renderVeilleHtml(
-      input({ ...REPORT, rejected: [{ repo: 'x/noise', reason: long }] }),
+      input({ ...REPORT, rejected: [{ repo: 'x/noise', cause: 'hors_sujet', reason: long }] }),
     );
     expect(html).toContain('Une raison détaillée. Une raison détaillée.');
     expect(html).not.toContain('xxxxx');
@@ -133,6 +133,25 @@ describe('renderVeilleMarkdown', () => {
     expect(md).toContain('**Comment le mesurer** : Comparer sur dix scans.');
     expect(md).toContain('## Nouvelles versions');
     expect(md).toContain('## Écartés');
+  });
+
+  it('chaque écarté porte sa cause, et l’archive dit ce qui peut revenir', () => {
+    const md = renderVeilleMarkdown(
+      input({
+        ...REPORT,
+        rejected: [
+          { repo: 'x/noise', cause: 'concurrent', reason: 'Compagnon de bureau en GPL.' },
+          { repo: 'x/young', cause: 'trop_jeune', reason: 'Deux jours.' },
+        ],
+      }),
+    );
+    expect(md).toContain('- [x/noise](https://github.com/x/noise) · concurrent : Compagnon');
+    expect(md).toContain('- [x/young](https://github.com/x/young) · trop jeune : Deux jours.');
+    expect(md).toContain('sauf « trop jeune »');
+  });
+
+  it('le mail, lui, ne change pas : pas de cause dans la ligne d’un écarté', () => {
+    expect(renderVeilleText(input(REPORT))).toContain('- x/noise : Clone de produit.');
   });
 
   it('jour calme : deux lignes utiles, sans rubrique vide', () => {
