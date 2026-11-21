@@ -14,6 +14,12 @@ describe('parseChatLine — flux NDJSON de /api/chat', () => {
     ]);
   });
 
+  it('la ligne finale porte aussi les tokens de prompt lus (prompt_eval_count)', () => {
+    expect(parseChatLine('{"done":true,"eval_count":42,"prompt_eval_count":5321}')).toEqual([
+      { type: 'done', totalTokens: 42, promptTokens: 5321 },
+    ]);
+  });
+
   it('un tool call garde ses arguments en OBJET (pas d’aller-retour en chaîne)', () => {
     const [chunk] = parseChatLine(
       '{"message":{"content":"","tool_calls":[{"function":{"name":"echo","arguments":{"x":1}}}]}}',

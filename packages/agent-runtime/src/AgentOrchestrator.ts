@@ -36,6 +36,17 @@ import {
   totalRemoved,
   type InvisibleCounts,
 } from './security/invisibleChars';
+import {
+  claimCorrection,
+  claimNotice,
+  EMPTY_ANSWER_CORRECTION,
+  EMPTY_ANSWER_MESSAGE,
+  findUnbackedClaim,
+  isEmptyAnswer,
+  type ToolOutcome,
+} from './checks/claimCheck';
+import { figuresNotice, findUnsourcedFigures, SOURCE_TOOLS } from './checks/numberCheck';
+import { contextUsage, messagesTokens, overflowNotice, textTokens } from './llm/contextBudget';
 import { looksGarbled } from './lib/readableText';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
@@ -388,6 +399,14 @@ export class AgentOrchestrator {
       : undefined;
     // Tools actually executed this run → the "approach" we record at the end.
     const usedTools: string[] = [];
+    // Résultat réel de chaque appel (refus et échecs compris) : les contrôles
+    // d'après réponse y vérifient qu'une action annoncée a bien eu lieu.
+    const toolOutcomes: ToolOutcome[] = [];
+    // Une seule relance corrective par run (réponse vide ou annonce sans outil) :
+    // chacune coûte un tour de modèle, 2 à 5 s.
+    let correctionUsed = false;
+    // Plus gros prompt du run quand il a dépassé num_ctx (sinon undefined).
+    let overflowTokens: number | undefined;
 
     // L'échange tel qu'il s'est dit (sans le contexte injecté) : c'est lui
     // qu'on mémorise et dont on extrait des faits.
@@ -432,6 +451,9 @@ export class AgentOrchestrator {
         ...ctx.messages,
         { role: 'user', content: withTurnContext(input, turnContext) },
       ];
+      const toolSchemas = availableTools.map(t => t.toOllamaSchema());
+      // Partie fixe de l'estimation de taille (voir llm/contextBudget.ts).
+      const fixedTokens = textTokens(systemPrompt) + textTokens(JSON.stringify(toolSchemas));
 
       const maxIterations = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
       for (let iteration = 1; iteration <= maxIterations; iteration++) {
@@ -440,10 +462,11 @@ export class AgentOrchestrator {
         log.debug('Iteration', { runId, iteration });
 
         // ─── LLM Call ───────────────────────────────────────────
+        const estimated = fixedTokens + messagesTokens(messages);
         const stream = llm.streamChat({
           model,
           messages,
-          tools: availableTools.map(t => t.toOllamaSchema()),
+          tools: toolSchemas,
           system: systemPrompt,
           temperature: config.temperature ?? 0.7,
           numCtx: NUM_CTX,
@@ -468,6 +491,29 @@ export class AgentOrchestrator {
         // cache sémantique, qui la resservirait plus tard comme complète.
         if (interrupted(iteration)) return;
 
+        // Débordement de num_ctx : Ollama coupe sans erreur, on le dira à la fin.
+        const usage = contextUsage({
+          estimated,
+          promptEvalCount: turn.promptTokens,
+          numCtx: NUM_CTX,
+        });
+        log.debug('Prompt size', {
+          runId,
+          iteration,
+          estimated,
+          promptEvalCount: turn.promptTokens,
+        });
+        if (usage.overflow) {
+          overflowTokens = Math.max(overflowTokens ?? 0, usage.tokens);
+          log.warn('Prompt larger than num_ctx', {
+            runId,
+            iteration,
+            estimated,
+            promptEvalCount: turn.promptTokens,
+            numCtx: NUM_CTX,
+          });
+        }
+
         let fullResponse = turn.text;
         const toolCalls = turn.toolCalls;
 
@@ -489,23 +535,88 @@ export class AgentOrchestrator {
 
         // ─── No tool calls → final answer ─────────────────────
         if (toolCalls.length === 0) {
+          const canRetry = !correctionUsed && iteration < maxIterations;
+
+          // Réponse vide (sans doute un appel d'outil mal formé, avalé par
+          // Ollama) : une relance qui le dit au modèle, puis un message d'échec.
+          // Jamais un silence, que l'utilisateur prendrait pour une réponse.
+          if (isEmptyAnswer(fullResponse)) {
+            if (canRetry) {
+              correctionUsed = true;
+              log.warn('Empty answer, corrective retry', { runId, iteration });
+              messages.push(
+                { role: 'assistant', content: fullResponse },
+                { role: 'user', content: EMPTY_ANSWER_CORRECTION },
+              );
+              continue;
+            }
+            log.warn('Empty answer after retry', { runId, iteration });
+            yield { type: 'token', content: EMPTY_ANSWER_MESSAGE };
+            audit.completeRun(runId, 'error', EMPTY_ANSWER_MESSAGE);
+            playbook?.record(taskType, approachSignature(usedTools), false);
+            yield { type: 'error', content: EMPTY_ANSWER_MESSAGE, code: 'EMPTY_ANSWER' };
+            return;
+          }
+
+          // Action annoncée qu'aucun outil n'a faite (« c'est noté » sans
+          // store_memory) : une relance, puis une mention visible.
+          const claim = findUnbackedClaim(input, fullResponse, toolOutcomes);
+          if (claim && canRetry) {
+            correctionUsed = true;
+            log.warn('Unbacked claim, corrective retry', {
+              runId,
+              iteration,
+              action: claim.action,
+            });
+            messages.push(
+              { role: 'assistant', content: fullResponse },
+              { role: 'user', content: claimCorrection(claim) },
+            );
+            // La réponse fautive est déjà affichée : la suite s'écrit à la ligne.
+            if (turn.streamedToUser) yield { type: 'token', content: '\n\n' };
+            continue;
+          }
+
           // False alarm: we withheld content that turned out to be a genuine
           // answer, not a tool call. Surface it now so the UI isn't left blank.
           if (!turn.streamedToUser && fullResponse.trim().length > 0) {
             yield { type: 'token', content: fullResponse };
+          }
+
+          const notices: string[] = [];
+          if (claim) notices.push(claimNotice(claim));
+          if (toolOutcomes.some(o => o.success && SOURCE_TOOLS.has(o.name))) {
+            const figures = findUnsourcedFigures(fullResponse, [
+              input,
+              turnContext,
+              ...toolOutcomes.filter(o => o.success).map(o => o.content),
+            ]);
+            if (figures.length > 0) {
+              log.info('Unsourced figures', { runId, count: figures.length });
+              notices.push(figuresNotice(figures));
+            }
+          }
+          if (overflowTokens !== undefined) notices.push(overflowNotice(overflowTokens, NUM_CTX));
+
+          let answer = fullResponse;
+          if (notices.length > 0) {
+            const tail = `\n\n${notices.join('\n')}`;
+            yield { type: 'token', content: tail };
+            answer += tail;
           }
           this.finalizeAnswer({
             runId,
             conversationId,
             model,
             input,
-            answer: fullResponse,
+            answer,
             transcript,
             standalone,
             taskType,
             usedTools,
+            verified: claim === null,
           });
-          yield { type: 'done', content: fullResponse };
+          yield { type: 'done', content: answer };
           return;
         }
 
@@ -529,6 +640,7 @@ export class AgentOrchestrator {
               conversationId,
               ...(ctx.activeWindow !== undefined ? { activeWindow: ctx.activeWindow } : {}),
               usedTools,
+              outcomes: toolOutcomes,
               signal,
             }),
           );
@@ -583,16 +695,29 @@ export class AgentOrchestrator {
    * collecte les tool calls natifs de fin de stream. Sur un chunk d'erreur,
    * yield l'étape d'erreur et rend `errored: true` (l'appelant clôt le run).
    */
-  private async *streamAssistantTurn(
-    stream: AsyncIterable<StreamChunk>,
-  ): AsyncGenerator<
+  private async *streamAssistantTurn(stream: AsyncIterable<StreamChunk>): AsyncGenerator<
     AgentStep,
-    { text: string; streamedToUser: boolean; toolCalls: ToolCall[]; errored: boolean }
+    {
+      text: string;
+      streamedToUser: boolean;
+      toolCalls: ToolCall[];
+      errored: boolean;
+      /** `prompt_eval_count` d'Ollama, s'il l'a donné. */
+      promptTokens?: number;
+    }
   > {
     let text = '';
     let streamedToUser = false;
     let withholding = false;
+    let promptTokens: number | undefined;
     const toolCalls: ToolCall[] = [];
+    const result = (errored: boolean) => ({
+      text,
+      streamedToUser,
+      toolCalls,
+      errored,
+      ...(promptTokens !== undefined ? { promptTokens } : {}),
+    });
 
     for await (const chunk of stream) {
       if (chunk.type === 'token') {
@@ -621,12 +746,14 @@ export class AgentOrchestrator {
           name: chunk.toolCall.function.name,
           args: parseToolArgs(chunk.toolCall.function.arguments),
         });
+      } else if (chunk.type === 'done') {
+        promptTokens = chunk.promptTokens;
       } else if (chunk.type === 'error') {
         yield { type: 'error', content: chunk.error };
-        return { text, streamedToUser, toolCalls, errored: true };
+        return result(true);
       }
     }
-    return { text, streamedToUser, toolCalls, errored: false };
+    return result(false);
   }
 
   /**
@@ -641,6 +768,7 @@ export class AgentOrchestrator {
       conversationId: string;
       activeWindow?: string;
       usedTools: string[];
+      outcomes: ToolOutcome[];
       signal: AbortSignal | undefined;
     },
   ): AsyncGenerator<AgentStep, OllamaMessage> {
@@ -687,6 +815,7 @@ export class AgentOrchestrator {
 
       if (!permission.granted) {
         const reason = permission.reason ?? 'refusé';
+        opts.outcomes.push({ name: toolCall.name, success: false, content: '' });
         yield { type: 'tool_blocked', toolName: toolCall.name, reason };
         return {
           role: 'tool',
@@ -723,10 +852,12 @@ export class AgentOrchestrator {
           injection: scan.injectionFlags,
         });
       }
+      opts.outcomes.push({ name: toolCall.name, success: result.success, content: scan.text });
       return { role: 'tool', content: scan.text, tool_call_id: toolCall.id };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       log.error('Tool execution failed', { tool: toolCall.name, error });
+      opts.outcomes.push({ name: toolCall.name, success: false, content: '' });
       activity?.recordToolCall(toolCall.name, args, false);
       yield { type: 'tool_error', toolName: toolCall.name, error };
       // Un message d'exception peut recopier un contenu externe : même nettoyage.
@@ -752,9 +883,15 @@ export class AgentOrchestrator {
     standalone: boolean;
     taskType: TaskType;
     usedTools: string[];
+    /**
+     * Faux quand la réponse annonce une action qu'aucun outil n'a faite, même
+     * après relance : ni mise en cache, ni succès compté au playbook.
+     */
+    verified?: boolean;
   }): void {
     const { audit, context, cache, playbook, compactor, factExtractor, scheduler } = this.deps;
     const { runId, conversationId, model, input, answer } = opts;
+    const verified = opts.verified ?? true;
     audit.completeRun(runId, 'success', answer);
     // Persist the exchange so the next turn has conversational memory.
     context.recordTurn(conversationId, model, input, answer);
@@ -766,13 +903,20 @@ export class AgentOrchestrator {
     // query — a tool result reflects mutable world state, and a follow-up
     // answer depends on context that won't be present next time.
     // Jamais une réponse corrompue : le cache la resservirait telle quelle.
-    if (cache && opts.standalone && opts.usedTools.length === 0 && !looksGarbled(answer)) {
+    if (
+      cache &&
+      verified &&
+      opts.standalone &&
+      opts.usedTools.length === 0 &&
+      !looksGarbled(answer)
+    ) {
       void cache
         .put(input, answer)
         .catch(err => log.debug('Semantic cache put failed', { error: String(err) }));
     }
-    // Playbook (§8): this approach worked for this task type.
-    playbook?.record(opts.taskType, approachSignature(opts.usedTools), true);
+    // Playbook (§8): this approach worked for this task type — unless the
+    // answer claimed an action that never happened.
+    playbook?.record(opts.taskType, approachSignature(opts.usedTools), verified);
 
     // Compaction et extraction de faits appellent le LLM : c'est du travail de
     // FOND. Lancé ici, juste après la réponse, il faisait attendre la question

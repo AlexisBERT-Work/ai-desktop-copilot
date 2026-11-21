@@ -26,6 +26,9 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
+**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
+réponse, voir l'entrée du 2026-11-20).
+
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
 publiée avant la coupure : 2026-08-31 ; la revue reprend au prochain lancement.
@@ -49,6 +52,44 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-20 — Garde-fous de réponse
+
+Plan A de l'analyse des rapports de veille du 6 au 20/11, sur la branche
+`feat/garde-fous-reponse`, rebasée sur `dev` le 2026-11-21. Quatre
+contrôles déterministes avant de servir la réponse, sans modèle et sans rien
+ajouter au prompt système (`checks/`, `llm/contextBudget.ts`, détail dans
+[CAPACITES.md](CAPACITES.md) § 9) :
+
+- **Réponse vide** : une relance, puis un message d'échec visible.
+- **Action annoncée sans outil** (veille du 17/11) : « c'est noté » sans
+  `store_memory` réussi déclenche une relance, puis une mention. L'orchestrateur
+  garde le résultat réel de chaque appel (`ToolOutcome`) ; une annonce restée
+  fausse ne va ni dans le cache ni au playbook comme un succès.
+- **Chiffres, liens et e-mails absents des sources** (veille du 19/11) :
+  annotés, jamais bloqués.
+- **Prompt plus long que `num_ctx`** (veille du 19/11). Mesuré sur la machine
+  cible (Ollama 0.32.14) : tout prompt qui déborde est ramené **sans erreur** à
+  4 098 tokens, et le modèle répond avec aplomb sur ce qui reste. L'estimation
+  de taille est calibrée sur 14 textes et croisée avec `prompt_eval_count`.
+
+| `qwen3:14b`, température 0, un essai   | 2026-11-05 | 2026-11-20 |
+| -------------------------------------- | ---------- | ---------- |
+| Réussite stricte, 90 tâches d'origine  | 74 (82 %)  | 77 (86 %)  |
+| dont `dev`                             | 31/39      | 34/39      |
+| dont `holdout`                         | 43/51      | 43/51      |
+| 8 nouvelles tâches (mémoire, fichier…) | —          | 8/8        |
+| Appels à risque non demandés           | 3          | 2          |
+| Réponses vides                         | 1          | 0          |
+
+**Relances : 4 sur 98 tâches.** Deux justes (`mem-note`, `h-mem-allergie` :
+le modèle appelle `store_memory` après la relance) et deux à tort
+(`plan-annule`, `plan-liste` : « la tâche planifiée » lu comme une annonce).
+Les 3 mentions de chiffres étaient toutes à tort (années anciennes,
+« 1,2 Md€ »). Corrigés, puis 20 tâches rejouées : 18/20, plus aucune relance
+ni mention à tort. Les deux échecs restants sont le défaut connu de
+`search_dailies` sur la culture générale. `latency-bench` n'a pas été rejoué :
+rien n'entre dans le prompt, une seule relance au plus par tour.
 
 ## 2026-11-06 — Skills : `load_skill` (#17)
 
