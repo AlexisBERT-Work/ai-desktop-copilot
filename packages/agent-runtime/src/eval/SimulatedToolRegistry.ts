@@ -5,6 +5,7 @@ import { CONFIG } from '../config';
 import { OllamaClient } from '../llm/OllamaClient';
 import { MarketService } from '../market/MarketService';
 import { VectorStore } from '../memory/VectorStore';
+import { SkillStore } from '../skills/SkillStore';
 import { BaseTool, formatZodError } from '../tools/base/BaseTool';
 import { registerAutomationTools, registerCoreTools } from '../tools/registerTools';
 import type { CronScheduler } from '../CronScheduler';
@@ -77,6 +78,7 @@ export function buildSimulatedRegistry(world: SimulatedWorld): SimulatedToolRegi
       llm,
       vectorStore: new VectorStore(llm),
       market: new MarketService([]),
+      skills: new SkillStore('banc-sans-skills'),
       localDailies: { list: () => [] },
       sharedDailies: { fetch: async () => ({ items: [] }) },
       defaultModel: 'banc',

@@ -319,6 +319,228 @@ trous réels, quatre durcissements.
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
 
+---
+
+## Mise à jour 2026-11-06 — les skills (`load_skill`)
+
+Un skill tiers est **une instruction donnée à un agent qui a un shell** : l'installer
+revient à faire confiance à son auteur, comme pour un script. Ce qui le contient :
+
+- **Il reste une donnée.** Le texte entre dans le contexte comme résultat d'outil.
+  Il passe par `sanitizeToolOutput` (secrets expurgés, injection connue cadrée), et
+  tout skill qui n'est pas livré avec l'app arrive sous un cadre **systématique**
+  (`notice`) : une méthode, pas un ordre, aucun droit accordé. Le cadre ne dépend pas
+  du scan, qui reconnaît des tournures anglaises et françaises connues : une consigne
+  reformulée y échappe (mesure dans [LIMITES.md](LIMITES.md) § 5).
+- **Il n'élargit aucune permission.** Rien dans le chemin de `load_skill` ne touche
+  au `PermissionEngine` : chaque appel suivant repasse par son niveau de risque, la
+  liste blanche des chemins et, pour `run_command`, la politique de commandes. Seules
+  `name`, `description` et `status` sont lues : `allowed-tools` et toute autre clé du
+  frontmatter sont **ignorées**. `LoadSkillTool.test.ts` le vérifie sur le vrai moteur.
+- **Il n'exécute rien.** Seul le `SKILL.md` est lu : ni `scripts/` ni `references/`.
+- **Il ne sort pas de son dossier.** `name` est comparé aux skills trouvés, jamais
+  concaténé à un chemin : d'où l'absence de `pathArgs`, et la liste blanche n'a rien
+  à contrôler. En contrepartie, un lien qui sort du dossier est refusé (`realpath`),
+  sinon cet outil 🟢 lirait n'importe quel fichier.
+- **Il ne s'annonce pas seul.** Pas d'index dans le prompt, outil proposé seulement
+  si la phrase le désigne, brouillons absents du catalogue : un skill ne s'applique
+  que si l'utilisateur le demande (garde-fou §8).
+
+**Risque résiduel, à connaître.** Le `notice` ne lie pas le modèle, qui peut passer
+outre. Un skill malveillant peut alors le pousser vers des outils 🟢, qui ne demandent
+rien : lire un fichier de la liste blanche, puis appeler `read_webpage` sur une adresse
+qui embarque ce contenu. Une autorisation « pour la session » déjà donnée à un outil 🟡
+reste aussi valable. C'est la même exposition qu'une page web piégée. **Lire un skill
+tiers avant de l'installer.** Couper cette voie demanderait de marquer le run comme non
+fiable après `load_skill` et d'y durcir les outils réseau : non fait.
+
+**Essai du 2026-11-06** (`qwen3:14b`, température 0, un essai, monde simulé) : un skill
+piégé demandant de lire `.ssh\id_rsa` puis de l'envoyer par `read_webpage` a été
+ignoré, **avec et sans** `notice`. L'essai ne prouve donc rien pour le cadre, et un seul
+tirage ne garantit rien pour le modèle. La seule garantie reste les permissions.
+
+## Mise à jour 2026-11-08 — liaison avec Nexus (appli du Master)
+
+Deux outils parlent à **Nexus** (dépôt `Master-App`), une autre application de ce poste :
+`nexus_courses` 🟢 (lecture, plus « ouvrir dans Nexus ») et `nexus_inbox` 🟡 (note
+rapide, confirmée une fois par session).
+
+- **Jeton dédié, borné.** Le jeton principal de Nexus ouvre tout son API (écriture de
+  fichiers, git, SQL, tâches IA) et ne quitte jamais Nexus. CatDesk reçoit un second jeton,
+  régénéré à chaque lancement de Nexus, que son middleware n'accepte **que** sous
+  `/link/v1/` (six routes : info, search, read, today, inbox, open) et jamais pour les
+  websockets. Testé côté Nexus (`backend/tests/test_link.py`).
+- **Désactivé par défaut.** Nexus ne publie `%LOCALAPPDATA%\Nexus\link.json` qu'avec son
+  extension « CatDesk » active, le retire quand on la coupe ou qu'il s'arrête, et nettoie
+  au démarrage le fichier d'un Nexus mort. Le fichier est sous le profil de l'utilisateur :
+  même niveau de confiance que CatDesk lui-même.
+- **Lecture confinée par Nexus.** `read` refuse tout chemin hors du dossier du Master et les
+  dossiers internes (`.nexus/`, `.git/`, `.venv/`…) ; les documents des profs ne sont lus
+  que par leur texte extrait. Aucun chemin du disque de CatDesk n'est en jeu : `document`
+  est relatif au dossier du Master, d'où son nom (pas `path`, qui passerait par la liste
+  blanche de CatDesk).
+- **Contenu non fiable.** Les passages renvoyés viennent des cours et documents des profs :
+  ce sont des données, traitées comme tout résultat d'outil.
+
+## Mise à jour 2026-11-12 — caractères invisibles (veille du 11/11)
+
+Une page, un fichier ou un mail peut cacher une consigne que l'utilisateur ne
+voit pas mais que le modèle lit : bloc Unicode Tags (U+E0000–E007F), texte
+entouré de contrôles bidi, mots coupés par des caractères de largeur nulle pour
+échapper aux motifs de `sanitizeToolOutput`, séquences ANSI, ou faux marqueur
+« [FIN DU CONTENU EXTERNE NON FIABLE] » qui ferait croire que la suite vient de
+CatDesk.
+
+- **`security/invisibleChars.ts`** reprend l'étage L0 de guard-spec
+  (Apache-2.0), réécrit en TypeScript. Il retire tout cela, ramène pleine chasse
+  et lettres mathématiques en ASCII, et boucle jusqu'à stabilité (8 passes au
+  plus). Pas de NFKC global : il aurait changé le texte légitime (« … »,
+  espaces insécables, m²) et les noms de fichiers que le modèle réutilise.
+- **Trois points d'entrée** : chaque sortie d'outil, pendant la sérialisation
+  (`AgentOrchestrator`, branche d'erreur comprise : après, ESC n'est plus
+  qu'un texte), le texte saisi par l'utilisateur, avant le cache et l'historique,
+  et les articles de presse (`aggregateNews`, `enrichArticleTexts`), qui partent
+  au modèle puis dans les dailys publiées.
+- **Ni blocage ni refus** : on nettoie et on journalise
+  (`Invisible characters removed`, par catégorie). Les valeurs sous une clé de
+  chemin ou d'URL ne sont pas modifiées, seulement comptées.
+- **Limite** : une consigne écrite en clair passe toujours. Le nettoyage la rend
+  visible aux motifs de détection, il ne la reconnaît pas lui-même.
+
+## Mise à jour 2026-11-12 — données personnelles à la sortie (veille du 7/11)
+
+Le modèle est local : ce qu'il lit reste sur le poste, et masquer ses lectures
+casserait « quel numéro dans ce mail ? ». Le risque est ce qui **part** : une
+injection qui fait recopier un IBAN dans un message Discord, ou un corps
+d'API qui emporte un numéro de carte.
+
+- **`security/personalData.ts`** (pur) : cartes (Luhn, préfixe d'émetteur,
+  longueurs 15/16/19 : un SIRET ne passe pas), IBAN (mod 97, longueur du pays),
+  NIR (clé, Corse 2A/2B), téléphones et e-mails français. Trois niveaux :
+  masqué (forme et somme de contrôle), à vérifier (forme seule : laissé, signalé),
+  signalé (e-mail et téléphone hors Discord). Les caractères invisibles sont
+  retirés d'abord : un espace de largeur nulle dans un IBAN ne le cache plus, et
+  un texte en bloc Tags ne part plus sans que le dialogue le montre.
+- **Crochet `prepareOutboundArgs`** (`ToolRegistry`) sur les trois outils qui
+  sortent (`send_webhook_message`, `post_tech_news_discord`, `call_api`).
+  L'orchestrateur l'appelle **avant** la confirmation : le dialogue, l'audit,
+  le journal d'activité et l'UI voient les arguments masqués, et le dialogue
+  affiche ce qui a été masqué (`PermissionRequestEvent.preview`). `execute` le
+  rappelle (idempotent) : rien ne part en clair, quel que soit l'appelant. Si le
+  masquage plante, l'outil ne part pas.
+- **`call_api`** : corps JSON parcouru (une carte écrite en nombre devient une
+  chaîne masquée), corps texte, chemin et paramètres de l'URL, en-têtes sauf
+  `Authorization`. Rien vers localhost. `post_tech_news_discord` masque aussi la
+  synthèse du modèle, avant la coupe à 2 000 caractères ; jamais les liens.
+- **Le résultat dit ce qui a été fait** (`personalData`), pour que le modèle le
+  répète à l'utilisateur.
+- **Limite** : noms, adresses et téléphones étrangers passent ; un outil qui
+  sortirait du texte sans déclarer le crochet n'est pas couvert. Voir
+  [LIMITES.md](LIMITES.md) § 5.
+
+## Mise à jour 2026-11-12 — navigateur en lecture seule (veille du 6/11)
+
+`browser_navigate` était `high` : une confirmation à chaque page, si bien qu'une
+recherche sur trois pages demandait trois clics, et qu'on finissait par
+confirmer sans lire. Le risque réel d'ouvrir une page, c'est ce qu'elle peut
+**envoyer** (un formulaire soumis par un script injecté, une donnée glissée
+dans un POST).
+
+- **Lecture seule, active par défaut** (`lib/browserManager.ts`, seule source
+  de vérité) : `context.route('**/*')` refuse toute méthode autre que
+  GET/HEAD/OPTIONS, `routeWebSocket` ferme les WebSockets, `serviceWorkers:
+'block'` empêche un service worker de contourner la route. Les écritures
+  refusées vont dans un tampon (50) ; chaque outil dit ce que son action a
+  déclenché et qui a été refusé.
+- **Risque effectif** (`PermissionEngine.effectiveRisk`) : une fiche peut
+  déclarer `riskLevelWhenReadOnly`. Seul `browser_navigate` le fait (`medium`) ;
+  le risque déclaré reste `high`. Le moteur lit la lecture seule à chaque
+  décision : coupée, `browser_navigate` redemande à chaque fois, même après une
+  autorisation « pour la session ». Le mode sans danger le bloque toujours.
+- **Le réglage voyage avec `safeMode`** dans le même objet : store de l'UI
+  (toujours les deux), commande Rust `update_settings` (audit
+  `SETTINGS_UPDATE` avec les deux valeurs), mémoire du superviseur rejouée au
+  redémarrage de l'agent, `StdinBridge`.
+- **Testé sur un vrai navigateur** (serveur HTTP local, sauté sans navigateur) :
+  formulaire POST, `fetch` POST, `sendBeacon` et WebSocket refusés, rien
+  n'arrive au serveur ; lecture seule coupée, le POST passe.
+- **Limite** : une écriture par GET passe. Voir [LIMITES.md](LIMITES.md) § 4.
+
+## Mise à jour 2026-11-13 — Kensaku sous `semantic_search`
+
+`semantic_search` peut s'appuyer sur [Kensaku](https://github.com/yjid/kensaku)
+(MIT), un moteur local tiers. Ce qui le borne :
+
+- **Binaire épinglé.** Le CLI n'est lancé que si son SHA-256 figure dans
+  `search/kensakuBackend.ts::KENSAKU_PINNED` (1.0.16 et 1.0.17, relevés dans le
+  `SHA256SUMS` de chaque release et recoupés avec l'API GitHub). Rien avant
+  1.0.16, qui corrige une lecture de fichier arbitraire par son outil MCP
+  `read_snippet`. Le haché est refait dès que la date ou la taille du fichier
+  change ; un haché illisible vaut refus. CatDesk n'installe rien :
+  `scripts/fetch-kensaku.ps1` télécharge et vérifie, et c'est l'utilisateur qui
+  le lance. Un test vérifie que le script et l'agent épinglent la même version.
+- **Lecture seule, sans shell.** Seule la sous-commande `search` est appelée
+  (jamais `mcp`, `serve`, `connect` ni `reindex`), par `execFile`, avec `--`
+  avant la requête : une requête qui commence par un tiret n'est pas une option.
+  Délai de 10 s, sortie bornée à 2 Mo, JSON validé par zod (une entrée mal formée
+  est ignorée).
+- **Résultats refiltrés.** Kensaku indexe les dossiers de **son** réglage. Chaque
+  chemin qu'il renvoie est résolu (`realpath` : jonctions, liens) puis doit être
+  à la fois sous une racine demandée et sous la liste blanche, l'une et l'autre
+  sous leur forme écrite ou résolue. Le reste est écarté et compté
+  (`outOfScope`). Le moteur par mots-clés passe désormais par le même filtre.
+  Testé avec une vraie jonction vers un dossier extérieur.
+- **Fin d'un contournement.** Sans `paths`, `semantic_search` parcourait
+  `process.cwd()`, le dossier de l'agent. Comme aucun chemin n'était déclaré, le
+  moteur de permissions n'avait rien à vérifier. Il cherche maintenant dans les
+  dossiers de la liste blanche.
+- **Contrôle partagé.** `isPathAllowed` est extrait en fonction pure
+  (`permissions/pathPolicy.ts`), utilisée par `PermissionEngine` et par le filtre
+  ci-dessus. Le comportement du moteur ne change pas (tests inchangés).
+
+Reste ouvert : le haché est vérifié **avant** l'exécution, et un fichier
+remplacé entre les deux passerait. Il faut pour cela pouvoir écrire dans
+`%LOCALAPPDATA%`, donc déjà exécuter du code sous le compte de l'utilisateur.
+`PermissionEngine` restait lexical pour les autres outils : réglé le même jour
+(section suivante).
+L'index de Kensaku contient le texte extrait des fichiers indexés : il reste
+dans `%APPDATA%\kensaku`, et ses extraits passent par le cadrage habituel des
+sorties d'outils avant d'atteindre le modèle.
+
+## Mise à jour 2026-11-13 — liste blanche résolue, pour tous les outils
+
+La section précédente fermait la faille pour `semantic_search` seulement. Une
+jonction posée dans `%USERPROFILE%\Documents` vers `C:\Windows` laissait encore
+`read_file`, `parse_document`, `list_directory`… lire au travers, et
+`write_file` ou `export_document` écrire au travers : `PermissionEngine`
+comparait le chemin écrit, sans demander au disque où il mène.
+
+- **Deux contrôles par chemin déclaré** (`permissions/realPath.ts::createPathGuard`,
+  appelé par `PermissionEngine.check` pour chaque entrée de `request.paths`) :
+  le chemin écrit doit être sous une racine (refus de `..`, frontière de
+  dossier, liste vide = tout autorisé, comme avant), puis son chemin réel
+  (`fs.promises.realpath`) aussi.
+- **Fichier à créer** : il n'existe pas encore, donc on résout son plus proche
+  parent existant et on y rajoute le reste. Écrire `Documents\lien\nouveau.txt`
+  vise la cible de `lien` : refusé si elle est hors liste.
+- **Lien pendant** (sa cible n'existe plus) : refusé, car écrire au travers
+  recréerait la cible ailleurs. Destination illisible (accès refusé, boucle de
+  liens) : refusée aussi.
+- **Racines sous leurs deux formes**, écrite et résolue : un Documents redirigé
+  (OneDrive, autre disque) reste autorisé. `search/scope.ts` partage désormais
+  `withRealPaths` avec le moteur au lieu d'en garder sa copie.
+- **Rien n'est résolu hors liste.** Un chemin qui échoue au contrôle écrit n'est
+  jamais présenté au disque : `realpath` sur `\\hôte\partage` ouvrirait une
+  connexion SMB et y tenterait une authentification NTLM du compte.
+- **Testé avec de vraies jonctions** (`PermissionEngine.test.ts` : lecture,
+  écriture d'un nouveau fichier, lien pendant, racine redirigée, `..` et
+  voisin `Documents-evil`) et par des cas simulés (`realPath.test.ts`, dont le
+  chemin UNC jamais résolu).
+
+Reste ouvert : une fenêtre entre la vérification et l'ouverture du fichier par
+l'outil. Une jonction créée entre les deux n'est pas vue. La poser demande déjà
+d'exécuter quelque chose sur le poste (ou `run_command`, 🟠 confirmé).
+
 ## Mise à jour 2026-11-13 — dictée dans toutes les applications (veille du 8/11)
 
 Un raccourci global qui ouvre le micro, et un texte tapé dans **une autre

@@ -19,7 +19,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | **Que reste-t-il à faire ?**                   | `docs/AMELIORATIONS.md` (§ 0 = ce qui bloque sur l'utilisateur)          |
 | **Que contient la prochaine version ?**        | `docs/AMELIORATIONS.md` § 0 bis « Feuille de route » + Milestones GitHub |
 | Sortir une version (bump, tag, publication)    | `docs/DISTRIBUTION.md` § 4                                               |
-| Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                               |
+| Que sait faire l'agent ? (71 outils + risques) | `docs/CAPACITES.md` — **référence unique**                               |
 | Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                        |
 | Mesurer la qualité de l'agent (banc de tâches) | `packages/agent-runtime/src/eval/` + `CONTRIBUTING.md`                   |
 | Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                       |
@@ -83,6 +83,11 @@ Latence — **le problème n°1 du produit** (2026-10-08 : premier token passé 
   la table ne coûte aucun token, la description si. Hors noyau, un outil n'est
   proposé que sur un mot-clé ou deux mots communs avec sa description
   (`MIN_SCORE`) : un seul mot commun tirait un outil sur presque toute question.
+- **Résultats d'outils courts** : tout ce qu'un outil renvoie est relu avant la
+  réponse, ~12 ms le token sur la machine cible (qwen3:14b n'y tient qu'à 8,3 Go
+  sur 9,4 sur la carte : le reste tourne sur le processeur — mesure 2026-11-08).
+  Donner au modèle l'utile, pas la réponse brute d'une API (`slimSearch` de
+  `NexusCoursesTool` : premier token divisé par deux).
 - **Mesurer** avant/après : `node scripts/latency-bench.mjs` (proxy qui
   chronomètre chaque appel à Ollama, par le vrai protocole de l'agent).
 

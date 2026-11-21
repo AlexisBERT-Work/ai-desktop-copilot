@@ -73,6 +73,18 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'stocke',
     "n'oublie pas",
   ],
+  // « compétence » seul tirerait l'outil sur « quelles compétences pour devenir
+  // pilote ? », et « procédure » sur toute démarche administrative.
+  load_skill: [
+    'skill',
+    'la compétence',
+    'ta compétence',
+    'tes compétences',
+    'quelles compétences as',
+    'compétences installées',
+    'charge la procédure',
+    'applique la procédure',
+  ],
   semantic_search: [
     'documents locaux',
     'mes documents',
@@ -83,6 +95,13 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'qui abordent',
     'fichiers qui',
     'documents qui',
+    // On se souvient du contenu, pas du nom : « retrouve le fichier où… ».
+    'retrouve',
+    'fichier où',
+    'document où',
+    'quel fichier',
+    'quel document',
+    "capture d'écran où",
   ],
 
   // Connecteurs
@@ -109,6 +128,35 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'note intitulée',
     'note nommée',
   ],
+  // Nexus, l'application du Master. Jamais « cours » seul (cours de Bourse : « cours de »,
+  // « cours du » sont à get_market), ni « devoir » (« je vais devoir »), ni « master »
+  // seul (la branche git).
+  nexus_courses: [
+    'nexus',
+    'mon master',
+    'du master',
+    'au master',
+    'sup de vinci',
+    'mes cours',
+    'mon cours',
+    'ce cours',
+    'devoirs',
+    'à rendre',
+    'mon partiel',
+    'mes partiels',
+    'le partiel',
+    'examen',
+    'mes évaluations',
+    'ma moyenne',
+    'mes moyennes',
+    'réviser',
+    'révisions',
+    'notebook',
+    'chapitre du cours',
+    'le prof',
+    'la prof',
+  ],
+  nexus_inbox: ['note rapide', 'notes rapides', 'inbox', 'prends note', 'note dans nexus'],
   notion_search: ['notion'],
   send_webhook_message: ['slack', 'discord', 'webhook', 'envoie sur', 'poste sur'],
   post_tech_news_discord: ['discord', 'publie', 'revue de presse'],
