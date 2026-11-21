@@ -359,8 +359,6 @@ piégé demandant de lire `.ssh\id_rsa` puis de l'envoyer par `read_webpage` a �
 ignoré, **avec et sans** `notice`. L'essai ne prouve donc rien pour le cadre, et un seul
 tirage ne garantit rien pour le modèle. La seule garantie reste les permissions.
 
----
-
 ## Mise à jour 2026-11-12 — caractères invisibles (veille du 11/11)
 
 Une page, un fichier ou un mail peut cacher une consigne que l'utilisateur ne
