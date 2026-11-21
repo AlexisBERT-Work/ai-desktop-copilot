@@ -595,3 +595,28 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     // agent-runtime — registerTools.test.ts refuse toute entrée orpheline.
   },
 };
+
+// ─── Outils MCP (serveurs locaux déclarés par l'utilisateur) ───
+
+/** Préfixe des outils MCP : `mcp__<serveur>__<outil>`. */
+export const MCP_TOOL_PREFIX = 'mcp__';
+
+/**
+ * Risques qu'un serveur MCP peut demander dans sa déclaration. Jamais `low` :
+ * c'est du code tiers, il n'est jamais auto-approuvé.
+ */
+export type McpRiskLevel = 'medium' | 'high';
+
+/**
+ * Permission d'un outil MCP : `high` par défaut, donc confirmation à chaque
+ * appel. Ces outils ne figurent pas dans DEFAULT_PERMISSION_CONFIG, leurs noms
+ * dépendent de la déclaration de l'utilisateur : le moteur de permissions les
+ * inscrit au chargement (`PermissionEngine.registerDynamicTool`).
+ */
+export function mcpToolPermission(
+  name: string,
+  description: string,
+  riskLevel: McpRiskLevel = 'high',
+): ToolPermissionConfig {
+  return { name, description, riskLevel, enabled: true, requiresConfirmation: true };
+}

@@ -177,6 +177,74 @@ cite par leur `path`. Le modèle n'en reçoit que 5, coupés à 800 caractères 
 `read`) : chaque token renvoyé retarde sa réponse. La note rapide se coupe dans Nexus
 (« Autoriser les notes rapides »).
 
+### 3 bis. Serveurs MCP locaux (client borné, 2026-11-21)
+
+CatDesk appelle les outils d'un **serveur MCP local que tu as déclaré**, sans
+qu'on écrive de TypeScript. Sans déclaration, rien ne change : aucun serveur
+n'est lancé, aucun outil n'est ajouté (les 71 outils du catalogue restent les
+mêmes).
+
+**Déclarer un serveur** : `mcp-servers.json` dans le dossier de données de
+l'agent (`CATDESK_DATA_DIR`, ou un autre chemin par `CATDESK_MCP_CONFIG`) :
+
+```json
+{
+  "servers": {
+    "meteo": {
+      "command": "node",
+      "args": ["C:/outils/meteo-mcp/index.js"],
+      "tools": ["get_forecast"],
+      "descriptions": { "get_forecast": "Prévisions météo pour une ville" },
+      "keywords": ["météo", "quel temps", "pleuvoir"]
+    }
+  }
+}
+```
+
+| Champ                                              | Rôle                                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `command`, `args`, `cwd`, `env`                    | La commande lancée en stdio. Un exécutable (`node`, `python`, `uvx`…), pas un `.cmd`/`.bat`                  |
+| `tools`                                            | **Liste blanche** obligatoire, noms exacts, 8 au plus. Un outil absent de la liste n'existe pas pour l'agent |
+| `descriptions`                                     | Description en français par outil, à la place de celle du serveur                                            |
+| `keywords`                                         | Les mots qui font proposer ces outils (comme `toolKeywords.ts`, jamais envoyés au modèle)                    |
+| `risk`                                             | `high` par défaut (confirmation à chaque appel), `medium` au mieux, jamais `low`                             |
+| `timeoutMs`, `maxOutputChars`, `maxCallsPerMinute` | Plafonds : 30 s (120 s max), 4 000 caractères (20 000 max), 10 appels/min (60 max)                           |
+
+Ce que fait CatDesk de chaque outil retenu :
+
+- **Nom** `mcp__<serveur>__<outil>` ; proposé au modèle seulement quand la phrase
+  contient un de ses mots-clés (ou « mcp »), comme les autres outils hors noyau.
+- **Permissions** : inscrit au moteur en `high` ; les arguments qui nomment un chemin
+  (`path`, `file`, `directory`…) passent par la liste blanche des chemins.
+- **Audit** de chaque appel, et sortie nettoyée par `sanitizeToolOutput` comme tout
+  résultat d'outil. La description et le schéma venus du serveur sont aussi relus :
+  une description qui contient une consigne est remplacée par le nom de l'outil.
+- **Bornes** : sortie coupée au plafond (et la coupure est dite au modèle), message de
+  plus de 1 Mo = serveur arrêté, délai dépassé = échec rendu au modèle (jamais un tour
+  planté), pas de relance d'un serveur en échec avant 30 s.
+- **Environnement minimal** : le serveur ne reçoit que `PATH`, les dossiers système et
+  du profil, et le `env` de sa déclaration — pas les jetons du `.env` de CatDesk.
+- **Aucun serveur distant** : pas de `url`, seule une commande locale est acceptée.
+
+`npx` est un `.cmd` sous Windows : lancer `node` avec le script du paquet installé
+(`npm install -g`, puis `node <dossier npm>/node_modules/<paquet>/dist/index.js`).
+
+**Brancher ensuite** (rien n'est fait, c'est la marche à suivre) :
+
+- **Home Assistant** : son intégration « Model Context Protocol Server » parle en HTTP
+  (`/api/mcp`), donc un serveur distant au sens de CatDesk. Il faudrait un pont stdio
+  (par ex. `mcp-proxy` en `uvx`) avec le jeton HA dans son `env`, ce qui revient à lever
+  la règle « aucun serveur distant » pour ce serveur-là : décision à prendre d'abord.
+  N'exposer que 2 ou 3 outils (allumer, éteindre, état), en `high`.
+- **cua** (pilotage d'applis natives, MIT) : installer depuis les sources, sans le
+  script `irm | iex` ni `cua auth login`, puis déclarer son serveur MCP stdio avec 3 ou
+  4 outils au plus (le support Windows reste à vérifier, voir la veille du 19/11).
+- **ffmpeg** : ffmpeg n'est pas embarqué (poids, licence selon la compilation). Un
+  serveur MCP qui l'enveloppe se déclare comme les autres, avec un `maxOutputChars` bas
+  et un `timeoutMs` long. Un argument nommé `input` n'est pas reconnu comme un chemin
+  (seuls `path`, `file`, `directory`, `source`, `destination`, `output`… le sont) :
+  regarder son schéma avant de le déclarer, la liste blanche ne le verrait pas.
+
 ## 4. Développement & analyse de code
 
 | Capacité                                                                    | Outil(s)               | Risque |

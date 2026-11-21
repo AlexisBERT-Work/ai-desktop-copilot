@@ -210,6 +210,22 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   dev('connecteurs', 'webhook-slack', 'envoie ce résumé sur Slack', ['send_webhook_message'], {
     selectionOnly: true,
   }),
+  // Outil d'un serveur MCP déclaré (voir EXAMPLE_MCP_DECLARATION) : proposé sur
+  // les mots de sa déclaration, sans entrée dans toolKeywords.ts.
+  dev(
+    'connecteurs',
+    'mcp-meteo',
+    'quel temps fera-t-il demain à Lyon ?',
+    ['mcp__meteo__get_forecast'],
+    { args: /lyon/i, answer: /12|averse/i },
+  ),
+  dev(
+    'connecteurs',
+    'mcp-pluie',
+    "est-ce qu'il va pleuvoir ce week-end ?",
+    ['mcp__meteo__get_forecast'],
+    { selectionOnly: true },
+  ),
   dev(
     'navigateur',
     'nav-lemonde',
@@ -429,6 +445,13 @@ export const EVAL_TASKS: readonly EvalTask[] = [
   holdout('connecteurs', 'notion-lancement', 'as-tu quelque chose dans Notion sur le lancement ?', [
     'notion_search',
   ]),
+  holdout(
+    'connecteurs',
+    'mcp-meteo',
+    'tu peux me donner la météo de Bordeaux pour jeudi ?',
+    ['mcp__meteo__get_forecast'],
+    { args: /bordeaux/i },
+  ),
   holdout(
     'connecteurs',
     'webhook-equipe',

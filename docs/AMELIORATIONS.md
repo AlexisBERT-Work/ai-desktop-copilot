@@ -274,8 +274,13 @@ rien à faire au milieu d'un journal.
     réglages. Le banc garde ces tâches en rouge exprès.
   - **Recherche web et recherche approfondie** : aucun outil ne cherche sur le
     web, `read_webpage` exige une URL.
-  - **Client MCP** : brancher des outils tiers sans les écrire (rejoint le
-    système de plugins ci-dessous).
+  - ✅ **Client MCP borné** (veille du 15/11, Plan E point 1, 2026-11-21) :
+    serveurs stdio locaux déclarés dans `mcp-servers.json`, liste blanche
+    d'outils, plafonds, `high` par défaut, voir [CAPACITES.md](CAPACITES.md)
+    § 3 bis. Restent : Home Assistant (pont HTTP = serveur distant, à
+    décider), cua et ffmpeg (marche à suivre au même endroit) ; une
+    déclaration depuis les réglages de l'UI plutôt qu'un fichier ; la mesure
+    de la veille (un serveur, 2 outils, premier token +4 s au plus).
   - **`load_skill` proposé sur le nom d'un skill installé** : la phrase doit dire
     « skill » ou « compétence » ([LIMITES.md](LIMITES.md) § 4 bis). Passer les noms
     installés à `selectTools` lèverait ça sans coûter de token, mais il faut d'abord
@@ -335,7 +340,7 @@ rien à faire au milieu d'un journal.
     la lecture seule), reclassement des passages (lifeboat), citations vérifiées
     d'un compte rendu (tingo), leçons tirées des corrections, capture du son
     système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
-    Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
+    Assistant (client MCP prêt, pont HTTP à décider), moteur Kinetic, réponses orales courtes
     (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui

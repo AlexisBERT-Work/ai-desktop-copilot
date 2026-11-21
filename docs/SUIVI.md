@@ -50,6 +50,29 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
 
+## 2026-11-21 — Client MCP borné (Plan E, point 1)
+
+Veille du 15/11, branche `feat/client-mcp` coupée de `dev`. L'agent appelle les
+outils de serveurs MCP **locaux** déclarés dans `mcp-servers.json` ; sans ce
+fichier, rien ne change (71 outils). Doc : [CAPACITES.md](CAPACITES.md) § 3 bis.
+
+- **Client stdio écrit à la main** (`agent-runtime/src/mcp/`), sans le SDK
+  officiel, qui embarque un serveur HTTP complet. Quatre messages seulement ;
+  aucune capacité client annoncée (ni sampling, ni roots).
+- **Bornes** : liste blanche d'outils (8 par serveur), durée, sortie coupée et
+  signalée, appels par minute, message de 1 Mo au plus, pas de relance avant
+  30 s, environnement sans les jetons du `.env`, aucun serveur distant.
+- **Permissions** : `high` par défaut, `medium` au mieux, inscrits au moteur
+  (`registerDynamicTool`, qui refuse `low` et les noms d'outils intégrés).
+  Audit et `sanitizeToolOutput` comme tout outil ; description et schéma du
+  serveur relus avant d'entrer dans le prompt.
+- **Sélection** : un outil MCP porte ses mots-clés (`SelectableTool.keywords`)
+  et n'est proposé que sur eux. Banc : un serveur déclaré d'exemple (météo),
+  3 tâches. `eval --selection` : `dev` 44/44 et 40/40, `holdout` 34/40 (85 %).
+- **Non mesuré** : aucun vrai serveur MCP n'a été branché (le protocole est
+  testé de bout en bout contre un faux serveur Node), donc ni le premier token
+  (seuil de la veille : +4 s au plus pour 2 outils) ni le banc complet.
+
 ## 2026-11-06 — Skills : `load_skill` (#17)
 
 Report à la main de `8c72f82` (tag `archive/feat-veille`), sur `feat/load-skill`,

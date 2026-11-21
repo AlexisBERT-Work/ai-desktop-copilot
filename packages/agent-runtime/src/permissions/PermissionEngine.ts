@@ -8,6 +8,7 @@ import type {
 } from '@catdesk/shared-types';
 import {
   DEFAULT_PERMISSION_CONFIG,
+  MCP_TOOL_PREFIX,
   PERMISSION_TIMEOUT_MS,
   RPC_NOTIFICATIONS,
 } from '@catdesk/shared-types';
@@ -20,6 +21,11 @@ const log = createLogger('security:permissions');
 export class PermissionEngine {
   private sessionGrants = new Map<string, PermissionGrant>();
   private config: PermissionConfig = DEFAULT_PERMISSION_CONFIG;
+  /**
+   * Outils chargés à l'exécution (MCP). À part de `config.tools` : une mise à
+   * jour de la config par l'UI (`updateConfig`) ne doit pas les effacer.
+   */
+  private dynamicTools = new Map<string, ToolPermissionConfig>();
 
   /** Demandes de confirmation en attente d'une réponse de l'UI, par requestId. */
   private pendingRequests = new Map<string, (result: PermissionResult) => void>();
@@ -45,12 +51,31 @@ export class PermissionEngine {
   }
 
   /**
+   * Inscrit la permission d'un outil chargé à l'exécution. Seuls les outils MCP
+   * (`mcp__…`) sont acceptés, jamais en risque `low` et toujours avec
+   * confirmation : un serveur déclaré ne peut ni se faire auto-approuver, ni
+   * prendre le nom d'un outil intégré.
+   */
+  registerDynamicTool(entry: ToolPermissionConfig): boolean {
+    const refused =
+      !entry.name.startsWith(MCP_TOOL_PREFIX) ||
+      entry.riskLevel === 'low' ||
+      entry.name in this.config.tools;
+    if (refused) {
+      log.warn('Dynamic tool permission refused', { tool: entry.name, risk: entry.riskLevel });
+      return false;
+    }
+    this.dynamicTools.set(entry.name, { ...entry, requiresConfirmation: true });
+    return true;
+  }
+
+  /**
    * Décide si un outil peut s'exécuter. Ne lève jamais : un délai de réponse
    * dépassé ou un run interrompu (`signal`) valent refus — avant, le délai
    * REJETAIT, et l'exception remontait jusqu'à faire échouer le run entier.
    */
   async check(request: PermissionRequest, signal?: AbortSignal): Promise<PermissionResult> {
-    const toolConfig = this.config.tools[request.tool];
+    const toolConfig = this.config.tools[request.tool] ?? this.dynamicTools.get(request.tool);
 
     if (!toolConfig) {
       log.warn('Unknown tool permission check', { tool: request.tool });

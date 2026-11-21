@@ -51,6 +51,7 @@ import { LocalPressScheduler } from './news/LocalPressScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
 import { SkillStore } from './skills/SkillStore';
+import { McpManager } from './mcp/McpManager';
 
 const log = createLogger('runtime:main');
 
@@ -161,13 +162,14 @@ async function main(): Promise<void> {
   lifecycle.onShutdown('unload-model', () => idleUnloader.unloadNow());
 
   const activity = new ActivityTracker();
+  // Lecture seule du navigateur : lue à chaque décision, BrowserManager fait foi.
+  const permissions = new PermissionEngine(undefined, undefined, () =>
+    BrowserManager.get().isReadOnly(),
+  );
   const orchestrator = new AgentOrchestrator({
     llm,
     tools,
-    // Lecture seule du navigateur : lue à chaque décision, BrowserManager fait foi.
-    permissions: new PermissionEngine(undefined, undefined, () =>
-      BrowserManager.get().isReadOnly(),
-    ),
+    permissions,
     context: new ContextManager(db, vectorStore, warmStore),
     audit: new AuditLogger(),
     // Palier léger optionnel (CATDESK_MODEL_SMALL) : rétrogradation des tâches triviales.
@@ -195,6 +197,22 @@ async function main(): Promise<void> {
   lifecycle.onShutdown('cron', () => cron.shutdown());
   registerAutomationTools(tools, subAgentRunner, cron);
   log.info('Tools registered', { profile: CONFIG.toolProfile, tools: tools.listNames() });
+
+  // Serveurs MCP déclarés dans mcp-servers.json (aucun par défaut) : lancés en
+  // fond, leurs outils de la liste blanche arrivent en fin de registre.
+  const mcp = new McpManager({
+    register: tool => tools.register(tool),
+    permit: entry => permissions.registerDynamicTool(entry),
+  });
+  lifecycle.onShutdown('mcp', () => mcp.close());
+  void mcp
+    .load()
+    .then(report => {
+      if (report.servers.length > 0 || report.errors.length > 0) {
+        log.info('MCP loaded', { servers: report.servers, errors: report.errors });
+      }
+    })
+    .catch(err => log.warn('MCP loading failed', { error: String(err) }));
 
   // ─── Démons de fond ────────────────────────────────────────
   const marketPoller = new MarketPoller(market, CONFIG.marketIntervalMs);
