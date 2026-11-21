@@ -26,9 +26,9 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20), puis `feat/budget-sorties-outils`,
-coupée d'elle (sorties d'outils à la taille de la fenêtre, 2026-11-21).
+**Contrôles d'après réponse** (`feat/garde-fous-reponse`, entrée du
+2026-11-20) : dans `dev` depuis le 2026-11-21 (#43). **En PR vers `dev`** :
+`feat/budget-sorties-outils` (#46, sorties d'outils à la taille de la fenêtre).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
