@@ -67,6 +67,9 @@ pub fn run() {
             commands::voice::voice_configure,
             commands::voice::voice_warmup,
             commands::voice::voice_set_dictation,
+            commands::voice::voice_vocabulary_get,
+            commands::voice::voice_vocabulary_set,
+            commands::voice::voice_set_vocabulary_enabled,
         ])
         .setup(|app| {
             info!("CatDesk starting up");

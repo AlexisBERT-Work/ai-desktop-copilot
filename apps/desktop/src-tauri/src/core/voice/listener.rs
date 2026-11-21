@@ -150,22 +150,19 @@ fn ensure_engines(
     if engines.is_some() {
         return Ok(());
     }
-    let paths = shared
-        .lock()
-        .expect("voice shared lock")
-        .models
-        .stt()
-        .ok_or_else(|| {
-            CatdeskError::Refused(
-                "Modèles de reconnaissance vocale absents (dossier voice/)".into(),
-            )
-        })?;
+    let (paths, vocabulary) = {
+        let s = shared.lock().expect("voice shared lock");
+        (s.models.stt(), s.vocabulary.clone())
+    };
+    let paths = paths.ok_or_else(|| {
+        CatdeskError::Refused("Modèles de reconnaissance vocale absents (dossier voice/)".into())
+    })?;
     let started = Instant::now();
     let vad = vad::create(&paths)
         .ok_or_else(|| CatdeskError::Audio("chargement du VAD Silero".into()))?;
     let dictation_vad = vad::create_for_dictation(&paths)
         .ok_or_else(|| CatdeskError::Audio("chargement du VAD de dictée".into()))?;
-    let stt = Recognizer::create(&paths)
+    let stt = Recognizer::create(&paths, vocabulary)
         .ok_or_else(|| CatdeskError::Audio("chargement de Parakeet".into()))?;
     info!(
         "voice: VAD + Parakeet chargés en {:.1} s",
