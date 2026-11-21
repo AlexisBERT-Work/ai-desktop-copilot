@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-11-08**. Inventaire basé sur les **71 outils du catalogue**
+> À jour au **2026-11-08**. Inventaire basé sur les **73 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 71 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 73 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---

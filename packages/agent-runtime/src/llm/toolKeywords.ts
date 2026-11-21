@@ -167,6 +167,26 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   capture_screen: ['capture', 'screenshot', 'écran'],
   ocr_region: ['ocr', 'écran', 'texte affiché', 'ce qui est affiché'],
   describe_screen: ['écran', 'fenêtre', 'que vois', 'tu vois', 'interface', 'est affiché'],
+  read_window: [
+    'fenêtre',
+    'applications ouvertes',
+    'applis ouvertes',
+    'programmes ouverts',
+    'boîte de dialogue',
+    'bloc-notes',
+  ],
+  window_action: [
+    'ferme la',
+    'ferme le',
+    'fermer la',
+    'premier plan',
+    'bascule sur',
+    'bascule vers',
+    'réduis la fenêtre',
+    'agrandis la fenêtre',
+    'minimise',
+    'maximise',
+  ],
 
   // Documents
   parse_document: ['pdf', 'docx', 'word', 'document', 'rapport', 'contrat'],

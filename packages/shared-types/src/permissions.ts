@@ -102,6 +102,20 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: false,
     },
+    read_window: {
+      name: 'read_window',
+      description: "Lire une fenêtre par l'accessibilité Windows",
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
+    window_action: {
+      name: 'window_action',
+      description: 'Agir sur une fenêtre (premier plan, réduire, fermer…)',
+      riskLevel: 'high',
+      enabled: true,
+      requiresConfirmation: true,
+    },
     read_clipboard: {
       name: 'read_clipboard',
       description: 'Lire le presse-papier',
