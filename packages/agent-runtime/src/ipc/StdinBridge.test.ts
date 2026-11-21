@@ -111,3 +111,36 @@ describe('buildStepNotification — invariant de corrélation UI', () => {
     expect(out.step['messageId']).toBe('msg-B');
   });
 });
+
+describe('settings.update — sécurité', () => {
+  const run = async (params: Record<string, unknown>) => {
+    const updatePermissions = vi.fn();
+    const setBrowserReadOnly = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    try {
+      const bridge = new StdinBridge({
+        orchestrator: { updatePermissions } as unknown as AgentOrchestrator,
+        setBrowserReadOnly,
+      });
+      await dispatch(bridge, { jsonrpc: '2.0', id: 1, method: RPC_METHODS.settingsUpdate, params });
+    } finally {
+      write.mockRestore();
+    }
+    return { updatePermissions, setBrowserReadOnly };
+  };
+
+  it('applique les deux réglages, qui voyagent ensemble', async () => {
+    const { updatePermissions, setBrowserReadOnly } = await run({
+      safeMode: true,
+      browserReadOnly: false,
+    });
+    expect(updatePermissions).toHaveBeenCalledWith({ safeMode: true });
+    expect(setBrowserReadOnly).toHaveBeenCalledWith(false);
+  });
+
+  it('une valeur absente ou mal typée ne change rien', async () => {
+    const { updatePermissions, setBrowserReadOnly } = await run({ browserReadOnly: 'non' });
+    expect(updatePermissions).toHaveBeenCalledWith({});
+    expect(setBrowserReadOnly).not.toHaveBeenCalled();
+  });
+});

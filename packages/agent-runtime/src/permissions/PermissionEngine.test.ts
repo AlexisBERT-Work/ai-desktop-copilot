@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'path';
 import { PermissionEngine } from './PermissionEngine';
+import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
 import { ParseDocumentTool } from '../tools/files/ParseDocumentTool';
 import { RunSqliteTool } from '../tools/infra/RunSqliteTool';
 import { ObsidianNotesTool } from '../tools/connectors/ObsidianNotesTool';
@@ -130,6 +133,88 @@ describe('PermissionEngine path whitelist', () => {
   });
 });
 
+describe('PermissionEngine — liste blanche à travers jonctions et liens', () => {
+  // Vraies jonctions : `junction` sous Windows (sans droits d'administrateur),
+  // lien symbolique ailleurs. Liste blanche propre au test : `autorise` et
+  // `documents`, ce dernier étant lui-même une jonction vers `vrais-documents`.
+  let base = '';
+  let allowed = '';
+  let engine: PermissionEngine;
+
+  beforeAll(() => {
+    base = mkdtempSync(join(tmpdir(), 'catdesk-perm-'));
+    allowed = join(base, 'autorise');
+    const outside = join(base, 'dehors');
+    const realDocs = join(base, 'vrais-documents');
+    const gone = join(base, 'disparu');
+    for (const dir of [allowed, outside, realDocs, gone]) mkdirSync(dir);
+    writeFileSync(join(allowed, 'doc.txt'), 'ok');
+    writeFileSync(join(outside, 'secret.txt'), 'non');
+    writeFileSync(join(realDocs, 'note.txt'), 'ok');
+    symlinkSync(outside, join(allowed, 'lien'), 'junction');
+    symlinkSync(realDocs, join(base, 'documents'), 'junction');
+    // Lien pendant : sa cible a disparu après sa création.
+    symlinkSync(gone, join(allowed, 'pendant'), 'junction');
+    rmSync(gone, { recursive: true });
+  });
+  afterAll(() => rmSync(base, { recursive: true, force: true }));
+
+  beforeEach(() => {
+    // Approuve tout dialogue : un outil `medium` qui atteint la confirmation a
+    // passé la liste blanche.
+    engine = new PermissionEngine((_method, params) => {
+      engine.resolvePermissionRequest(String((params as { requestId: string }).requestId), true);
+    });
+    engine.updateConfig({ pathWhitelist: [allowed, join(base, 'documents')] });
+  });
+
+  const check = (tool: string, path: string) =>
+    engine.check({ tool, args: { path }, paths: [path], context: { conversationId: 'c' } });
+
+  it('refuse la lecture au travers d’une jonction, par tous les outils', async () => {
+    for (const tool of ['read_file', 'parse_document']) {
+      const r = await check(tool, join(allowed, 'lien', 'secret.txt'));
+      expect(r.granted).toBe(false);
+      expect(r.reason).toContain('Chemin non autorisé');
+      expect(r.reason).toContain('mène à');
+    }
+    // La jonction elle-même, listée comme un dossier.
+    expect((await check('list_directory', join(allowed, 'lien'))).granted).toBe(false);
+  });
+
+  it('refuse l’écriture d’un nouveau fichier sous une jonction', async () => {
+    for (const tool of ['write_file', 'export_document']) {
+      const r = await check(tool, join(allowed, 'lien', 'nouveau', 'rapport.pdf'));
+      expect(r.granted).toBe(false);
+      expect(r.reason).toContain('mène à');
+    }
+  });
+
+  it('refuse l’écriture au travers d’un lien dont la cible a disparu', async () => {
+    const r = await check('write_file', join(allowed, 'pendant', 'x.txt'));
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('cible est absente');
+  });
+
+  it('accepte toujours un chemin normal, existant ou à créer', async () => {
+    expect((await check('read_file', join(allowed, 'doc.txt'))).granted).toBe(true);
+    expect((await check('list_directory', allowed)).granted).toBe(true);
+    expect((await check('write_file', join(allowed, 'neuf', 'sous', 'x.txt'))).granted).toBe(true);
+  });
+
+  it('une racine de la liste qui est une jonction reste autorisée, sous ses deux formes', async () => {
+    expect((await check('read_file', join(base, 'documents', 'note.txt'))).granted).toBe(true);
+    expect((await check('read_file', join(base, 'vrais-documents', 'note.txt'))).granted).toBe(
+      true,
+    );
+  });
+
+  it('garde le refus de `..` et la frontière de dossier', async () => {
+    expect((await check('read_file', `${allowed}/../dehors/secret.txt`)).granted).toBe(false);
+    expect((await check('read_file', `${allowed}-evil/x.txt`)).granted).toBe(false);
+  });
+});
+
 describe('PermissionEngine — confirmation utilisateur', () => {
   const highRequest = {
     tool: 'run_command',
@@ -150,6 +235,24 @@ describe('PermissionEngine — confirmation utilisateur', () => {
 
     engine.resolvePermissionRequest(String(sent[0]?.params['requestId']), true);
     expect((await pending).granted).toBe(true);
+    expect(sent[0]?.params).not.toHaveProperty('preview');
+  });
+
+  it('transmet au dialogue ce que le masquage des données personnelles a fait', async () => {
+    const sent: Array<Record<string, unknown>> = [];
+    const engine = new PermissionEngine((_m, params) =>
+      sent.push(params as Record<string, unknown>),
+    );
+    const pending = engine.check({
+      tool: 'send_webhook_message',
+      args: { message: 'IBAN [IBAN masqué]' },
+      preview: 'Masqué avant envoi : 1 IBAN.',
+    });
+    await Promise.resolve();
+    expect(sent[0]?.['preview']).toBe('Masqué avant envoi : 1 IBAN.');
+    expect(sent[0]?.['args']).toEqual({ message: 'IBAN [IBAN masqué]' });
+    engine.resolvePermissionRequest(String(sent[0]?.['requestId']), false);
+    expect((await pending).granted).toBe(false);
   });
 
   it('un délai dépassé vaut REFUS — il ne fait plus échouer le run', async () => {
@@ -177,5 +280,66 @@ describe('PermissionEngine — confirmation utilisateur', () => {
     const r = await engine.check(highRequest);
     expect(() => engine.resolvePermissionRequest(requestId, true)).not.toThrow();
     expect(r.granted).toBe(false);
+  });
+});
+
+describe('PermissionEngine — navigateur en lecture seule', () => {
+  const navigate = { tool: 'browser_navigate', args: { url: 'https://exemple.fr' } };
+  const click = { tool: 'browser_click', args: { selector: '#ok' } };
+
+  /** Moteur dont la lecture seule se pilote, et qui répond lui-même au dialogue. */
+  function engineWith(readOnly: { on: boolean }, answer = { granted: true, remember: true }) {
+    const asked: Array<Record<string, unknown>> = [];
+    const engine: PermissionEngine = new PermissionEngine(
+      (_m, params) => {
+        const p = params as Record<string, unknown>;
+        asked.push(p);
+        queueMicrotask(() =>
+          engine.resolvePermissionRequest(String(p['requestId']), answer.granted, answer.remember),
+        );
+      },
+      60_000,
+      () => readOnly.on,
+    );
+    return { engine, asked };
+  }
+
+  it('lecture seule : browser_navigate passe à moyen, une confirmation par session', async () => {
+    const { engine, asked } = engineWith({ on: true });
+    expect((await engine.check(navigate)).granted).toBe(true);
+    expect(asked[0]?.['riskLevel']).toBe('medium');
+    const second = await engine.check(navigate);
+    expect(second).toEqual({ granted: true, reason: 'Autorisé (session)' });
+    expect(asked).toHaveLength(1);
+  });
+
+  it('lecture seule coupée : élevé, confirmation à chaque fois malgré la session', async () => {
+    const readOnly = { on: true };
+    const { engine, asked } = engineWith(readOnly);
+    await engine.check(navigate); // autorisé « pour la session » en lecture seule
+    readOnly.on = false;
+    await engine.check(navigate);
+    await engine.check(navigate);
+    expect(asked.map(a => a['riskLevel'])).toEqual(['medium', 'high', 'high']);
+  });
+
+  it('clic et saisie restent élevés, même en lecture seule', async () => {
+    const { engine, asked } = engineWith({ on: true });
+    await engine.check(click);
+    await engine.check(click);
+    expect(asked.map(a => a['riskLevel'])).toEqual(['high', 'high']);
+  });
+
+  it('le mode sans danger bloque toujours browser_navigate (moyen n’est pas faible)', async () => {
+    const { engine } = engineWith({ on: true });
+    engine.updateConfig({ safeMode: true });
+    expect((await engine.check(navigate)).granted).toBe(false);
+  });
+
+  it('sans lecteur de lecture seule : le risque déclaré s’applique', () => {
+    const engine = new PermissionEngine(() => {});
+    const config = DEFAULT_PERMISSION_CONFIG.tools['browser_navigate'];
+    expect(config?.riskLevelWhenReadOnly).toBe('medium');
+    expect(config && engine.effectiveRisk(config)).toBe('high');
   });
 });

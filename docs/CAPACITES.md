@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-09-11**. Inventaire basé sur les **68 outils du catalogue**
+> À jour au **2026-11-08**. Inventaire basé sur les **71 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 68 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 71 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -118,34 +118,52 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 
 ## 2. Web & navigateur
 
-| Capacité                                                                                                         | Outil(s)             | Risque |
-| ---------------------------------------------------------------------------------------------------------------- | -------------------- | :----: |
-| Récupérer une page web (HTTP simple, détecte les SPA)                                                            | `read_webpage`       |   🟢   |
-| Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   |   🟠   |
-| Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢   |
-| Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢   |
-| Cliquer sur un élément                                                                                           | `browser_click`      |   🟠   |
-| Saisir du texte dans un champ                                                                                    | `browser_type`       |   🟠   |
-| Fermer le navigateur                                                                                             | `browser_close`      |   🟢   |
-| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…)                                                         | `fetch_tech_news`    |   🟢   |
-| **Chercher/lire les dailys** (revues de presse locales + partagées) pour répondre aux questions sur les articles | `search_dailies`     |   🟢   |
+| Capacité                                                                                                         | Outil(s)             | Risque  |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------- | :-----: |
+| Récupérer une page web (HTTP simple, détecte les SPA)                                                            | `read_webpage`       |   🟢    |
+| Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   | 🟠 → 🟡 |
+| Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢    |
+| Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢    |
+| Cliquer sur un élément                                                                                           | `browser_click`      |   🟠    |
+| Saisir du texte dans un champ                                                                                    | `browser_type`       |   🟠    |
+| Fermer le navigateur                                                                                             | `browser_close`      |   🟢    |
+| Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…)                                                         | `fetch_tech_news`    |   🟢    |
+| **Chercher/lire les dailys** (revues de presse locales + partagées) pour répondre aux questions sur les articles | `search_dailies`     |   🟢    |
 
 `read_webpage` détecte une SPA (HTML lourd, texte quasi nul) et oriente
 automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 
+**Navigateur en lecture seule** (par défaut, Réglages › Sécurité) : le navigateur
+de l'agent lit mais n'envoie rien — toute requête autre que GET/HEAD/OPTIONS est
+refusée, les WebSockets fermées, les service workers bloqués. `browser_navigate`
+passe alors de 🟠 à 🟡 (une confirmation par session) ; clic et saisie restent 🟠.
+Un formulaire refusé est signalé dans le résultat (« formulaire non envoyé »).
+Pour remplir un formulaire en ligne, couper la lecture seule.
+
 ## 3. Connecteurs externes
 
-| Capacité                                                  | Outil(s)                 | Risque |
-| --------------------------------------------------------- | ------------------------ | :----: |
-| Chercher/lire des notes dans un vault **Obsidian** local  | `obsidian_notes`         |   🟢   |
-| Chercher/lire des pages **Notion** (API)                  | `notion_search`          |   🟢   |
-| Appeler une **API REST** (GET auto ; écriture confirmée)  | `call_api`               |   🟠   |
-| Poster sur un **webhook Discord/Slack**                   | `send_webhook_message`   |   🟠   |
-| Publier l'actu tech sur un webhook Discord (embeds)¹      | `post_tech_news_discord` |   🟡   |
-| Lire une **boîte mail IMAP** (recherche, en-têtes, corps) | `read_email`             |   🟠   |
+| Capacité                                                                                   | Outil(s)                 | Risque |
+| ------------------------------------------------------------------------------------------ | ------------------------ | :----: |
+| Chercher/lire des notes dans un vault **Obsidian** local                                   | `obsidian_notes`         |   🟢   |
+| Chercher/lire des pages **Notion** (API)                                                   | `notion_search`          |   🟢   |
+| Appeler une **API REST** (GET auto ; écriture confirmée)                                   | `call_api`               |   🟠   |
+| Poster sur un **webhook Discord/Slack**                                                    | `send_webhook_message`   |   🟠   |
+| Publier l'actu tech sur un webhook Discord (embeds)¹                                       | `post_tech_news_discord` |   🟡   |
+| Lire une **boîte mail IMAP** (recherche, en-têtes, corps)                                  | `read_email`             |   🟠   |
+| **Nexus** (appli du Master) : chercher/lire les cours, devoirs, moyennes, ouvrir un cours² | `nexus_courses`          |   🟢   |
+| **Nexus** : ajouter une note rapide (`notes/inbox.md`)²                                    | `nexus_inbox`            |   🟡   |
 
 ¹ URL limitée aux webhooks Discord (`discord.com/api/webhooks/…`). `obsidian_notes`
 ne lit un vault que s'il est dans la liste blanche des chemins.
+
+² Nexus (dépôt `Master-App`) doit être lancé, avec son extension « CatDesk » activée
+(Outils › Extensions). Il publie alors `%LOCALAPPDATA%\Nexus\link.json` : port et jeton
+**propre à CatDesk**, accepté seulement sous `/link/v1/` (le jeton principal de Nexus ne
+sort jamais). CatDesk relit ce fichier à chaque appel (`nexus/link.ts`). Nexus ne fait
+tourner aucun modèle pour CatDesk : `search` renvoie des passages, que le modèle de CatDesk
+cite par leur `path`. Le modèle n'en reçoit que 5, coupés à 800 caractères (la suite par
+`read`) : chaque token renvoyé retarde sa réponse. La note rapide se coupe dans Nexus
+(« Autoriser les notes rapides »).
 
 ## 4. Développement & analyse de code
 
@@ -160,7 +178,35 @@ ne lit un vault que s'il est dans la liste blanche des chemins.
 | Inférer les **conventions de style** du projet                              | `analyze_code_style`   |   🟢   |
 | **Profiler un projet** à l'ouverture (stack, scripts, structure, README)    | `load_project_context` |   🟢   |
 | Auditer un `.env` vs `.env.example` (clés manquantes, secrets)              | `audit_env`            |   🟢   |
-| Recherche locale par mots-clés/sémantique                                   | `semantic_search`      |   🟢   |
+| **Retrouver un fichier par son contenu** (« le fichier où je parle de… »)   | `semantic_search`      |   🟢   |
+
+- **`semantic_search` a deux moteurs** (2026-11-13). Avec
+  [Kensaku](https://github.com/yjid/kensaku) installé
+  (`scripts/fetch-kensaku.ps1`, c'est toi qui le lances) : noms, texte des PDF
+  et des documents Office, texte des captures d'écran (OCR) et sens, depuis
+  l'index local de l'application Kensaku, en lecture seule. Sans lui, ou s'il
+  ne trouve rien dans les dossiers autorisés : l'ancien moteur, par mots-clés,
+  sur les fichiers texte et code de 500 Ko au plus. Le résultat dit lequel a
+  répondu (`engine`).
+- **`extensions` élargit, ne restreint jamais** : le modèle en devine presque à
+  chaque appel (`[".pdf",".docx",".txt"]`), et la description n'y change rien
+  (mesuré au banc). Kensaku couvre déjà tous les types ; l'ancien moteur ajoute
+  les types texte demandés aux siens. Un PDF, un document Office ou une image y
+  sont écartés, jamais lus en octets bruts, et listés (`ignoredExtensions`).
+- **Où il cherche** : les dossiers demandés, sinon Documents, Bureau et
+  Téléchargements (la liste blanche, sans le dossier temporaire). Avant, sans
+  dossier, il fouillait celui de l'agent. Chaque résultat est **résolu**
+  (jonctions, liens) puis revérifié contre la liste blanche ; un résultat
+  écarté est compté dans `outOfScope`.
+- **Kensaku n'est lancé que si son empreinte SHA-256 est épinglée**
+  (`search/kensakuBackend.ts::KENSAKU_PINNED` : 1.0.16 et 1.0.17), sans shell,
+  borné à 10 s. Absent, inconnu, sans index ou en échec : l'ancien moteur prend
+  le relais, et le journal le dit une fois.
+- Les mots « retrouve », « quel fichier », « le fichier où »… le font proposer
+  (`llm/toolKeywords.ts`) : 4 des 5 phrases « retrouve le fichier où… » du banc,
+  contre 0 avant. Sa description dit qu'il trouve aussi les PDF et les captures
+  d'écran, sans quoi le modèle cherchait une capture dans sa mémoire. Au banc
+  complet (température 0), 5 des 6 tâches « fichier » réussissent.
 
 ## 5. Git & GitHub
 
@@ -217,6 +263,31 @@ permettaient d'exécuter une commande système.
   messages plus anciens et les faits durables de la mémoire tiède. Les tâches de
   fond (consolidation 6 h, évolution 24 h) font désormais leur première passe
   peu après le démarrage — elles n'atteignaient jamais leur premier tick.
+
+### 8 bis. Skills : ajouter une procédure par un simple fichier
+
+| Capacité                                                                       | Outil(s)     | Risque |
+| ------------------------------------------------------------------------------ | ------------ | :----: |
+| **Charger un skill** par son nom, ou **lister** ceux installés (sans argument) | `load_skill` |   🟢   |
+
+- **Format `SKILL.md` standard** : frontmatter `name` / `description`, puis corps
+  Markdown. Pour en ajouter un, déposer
+  `%APPDATA%\com.catdesk.app\agent-data\skills\<nom>\SKILL.md` (ou `<nom>.md`).
+  Il prend effet aussitôt, sans redémarrer.
+- **Deux skills livrés** (`packages/agent-runtime/skills/`) : `revue-comparee`
+  (comparer le traitement d'un sujet par plusieurs journaux) et `verifier-source`
+  (remonter à la source primaire d'un chiffre). Un skill de l'utilisateur de même
+  nom prime : une mise à jour n'écrase pas une personnalisation.
+- **Brouillons** : ceux que l'EvolutionDaemon écrit dans `skill-drafts/`
+  (`proposeSkills`) se chargent en les nommant, marqués non validés, et ne figurent
+  jamais au catalogue. Pour en valider un : le déplacer dans `skills/` et retirer
+  `status: draft`.
+- **Comment on s'en sert** : en le disant, « charge le skill revue-comparee » ou
+  « quels skills as-tu ? ». L'agent ne les découvre pas seul, voir
+  [LIMITES.md](LIMITES.md) § 4 bis. Le contenu d'un skill ne donne aucun droit, voir
+  [SECURITE.md](SECURITE.md).
+
+---
 
 ## 9. Orchestration & autonomie
 
@@ -309,6 +380,21 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
   Sans réponse en 60 s, la demande vaut refus : l'agent continue sans l'outil.
 - **Safe mode** : un toggle bloque tous les outils medium+ (rejoué à l'agent à
   chaque (re)démarrage).
+- **Caractères invisibles retirés avant le modèle** (`security/invisibleChars.ts`) :
+  bloc Unicode Tags, contrôles bidi, largeur nulle, sélecteurs de variante,
+  séquences ANSI et imitations des marqueurs « contenu externe non fiable »
+  sortent de chaque sortie d'outil, du texte saisi et des articles de presse.
+  Pleine chasse et lettres mathématiques sont ramenées en ASCII. Rien n'est
+  bloqué : ce qui est retiré est journalisé. Les chemins et URL restent intacts.
+- **Données personnelles masquées à la sortie** (`security/personalData.ts`) :
+  dans ce que `send_webhook_message`, `post_tech_news_discord` et `call_api`
+  envoient, les cartes (Luhn), IBAN (mod 97) et numéros de sécurité sociale
+  (clé) deviennent « [IBAN masqué] ». E-mails et téléphones sont masqués sur
+  Discord, signalés ailleurs. Un numéro qui a la forme sans la somme de contrôle
+  part tel quel, signalé « à vérifier ». Le masquage a lieu **avant** le dialogue
+  de confirmation, qui montre ce qui part vraiment et ce qui a été masqué. Rien
+  vers un serveur local. Ce que l'agent **lit** n'est pas masqué : le modèle est
+  local.
 - **Audit** : chaque appel d'outil journalisé (horodatage, args **expurgés** —
   mots de passe, tokens, webhooks masqués —, résultat) et chaque
   ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).

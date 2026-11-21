@@ -24,6 +24,10 @@ describe('buildSystemPrompt', () => {
     expect(buildSystemPrompt()).not.toMatch(/\d{1,2}:\d{2}/);
   });
 
+  it('ne parle pas des skills : mesuré nuisible sur qwen3:14b (voir SkillStore)', () => {
+    expect(buildSystemPrompt()).not.toMatch(/skill|load_skill/i);
+  });
+
   it('place la mémoire long terme en DERNIER (le début reste en cache)', () => {
     const base = buildSystemPrompt();
     const withFacts = buildSystemPrompt(['- préfère TypeScript']);

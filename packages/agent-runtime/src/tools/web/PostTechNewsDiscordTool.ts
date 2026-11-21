@@ -9,6 +9,13 @@ import { isDiscordWebhookUrl, postToDiscord } from '../../lib/discord';
 import type { OllamaClient } from '../../llm/OllamaClient';
 import { summarizeDigest } from '../../news/NewsSummarizer';
 import { createLogger } from '../../logger';
+import {
+  describePersonalData,
+  maskTextFields,
+  scanPersonalData,
+  toOutbound,
+} from '../../security/personalData';
+import type { OutboundArgs } from '../../ToolRegistry';
 
 const log = createLogger('tool:tech-news-discord');
 
@@ -68,6 +75,11 @@ export class PostTechNewsDiscordTool extends BaseTool<Args> {
     super();
   }
 
+  /** Le texte libre qui part sur Discord ; jamais les URL ni les sources. */
+  prepareOutboundArgs(args: Record<string, unknown>): OutboundArgs {
+    return toOutbound(maskTextFields(args, ['intro', 'username'], { maskContacts: true }));
+  }
+
   async execute(args: Args): Promise<ToolResult> {
     const {
       sources,
@@ -125,10 +137,13 @@ export class PostTechNewsDiscordTool extends BaseTool<Args> {
       typeof intro === 'string' && intro.trim().length > 0
         ? intro.trim()
         : `📰 **Revue de presse tech** — ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · ${embeds.length} articles`;
-    const content = truncate(
-      synthesis.length > 0 ? `${header}\n\n${synthesis}` : header,
-      MAX_CONTENT,
-    );
+    // La synthèse vient du modèle : masquée elle aussi, avant la coupe à
+    // MAX_CONTENT (un numéro coupé en deux ne se reconnaîtrait plus).
+    const digest = scanPersonalData(synthesis.length > 0 ? `${header}\n\n${synthesis}` : header, {
+      maskContacts: true,
+    });
+    const content = truncate(digest.text, MAX_CONTENT);
+    const digestNotice = describePersonalData(digest);
 
     const payload: Record<string, unknown> = {
       content,
@@ -155,6 +170,7 @@ export class PostTechNewsDiscordTool extends BaseTool<Args> {
         hadSynthesis: synthesis.length > 0,
         sources: result.sourceLabels,
         ...(result.failed.length > 0 ? { partialErrors: result.failed } : {}),
+        ...(digestNotice !== undefined ? { personalData: digestNotice } : {}),
       });
     }
     return this.fail(`Discord a répondu ${res.status}: ${res.text.slice(0, 300)}`);

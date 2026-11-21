@@ -15,20 +15,20 @@
 
 Huit choses restent ouvertes, et **aucune ne peut être faite sans toi** :
 
-| #   | Action                                                                                                                                          | Pourquoi c'est à toi                                                                                                                                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0   | **Relire et fusionner la [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)** (`refactor/audit-complet` → `dev`).          | Audit, latence et correctifs du 2026-10-07 au 2026-10-09 : ~30 commits. Tout est testé, mais c'est ta branche de travail qui change. Le Supabase coupé le 2026-10-08 est **rétabli** (vérifié le 2026-10-09 : session anonyme, tables, RPC de publication).                |
-| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                             | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe. |
-| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`. | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                |
-| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                  | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                      |
-| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                        | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                            |
-| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                        |
-| 6   | **Appliquer les migrations Supabase** — `pnpm exec supabase db push` (#27 et #29 sont dans `dev`).                                              | Le Supabase de prod est partagé par tous les postes : aucune session n'y a touché. Sans `20261029170000`, le titre de l'an dernier bloquera en silence chaque daily du jour dès l'été 2027.                                                                                |
-
-| 7 | **Mesurer la dictée au micro** (branche `feat/dictee-vocale`) — `node scripts/dictation-wer.mjs --sheet`, 20 phrases dans Bloc-notes, Word et Edge, puis le script sur chaque fichier et `--audit`. | Seuls ta voix et ton micro donnent le taux d'erreur (cible < 8 %) et la latence réelle (cible < 800 ms pour 5 s). Cas limites à essayer : focus changé pendant la transcription, champ mot de passe, appli en administrateur, bulle déjà en écoute, CatDesk en train de parler. |
+| #   | Action                                                                                                                                                                                              | Pourquoi c'est à toi                                                                                                                                                                                                                                                                                  |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | **Relire et fusionner la [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)** (`refactor/audit-complet` → `dev`).                                                              | Audit, latence et correctifs du 2026-10-07 au 2026-10-09 : ~30 commits. Tout est testé, mais c'est ta branche de travail qui change. Le Supabase coupé le 2026-10-08 est **rétabli** (vérifié le 2026-10-09 : session anonyme, tables, RPC de publication).                                           |
+| 1   | **Créer le dépôt public `catdesk-releases-voice`** — une commande, dans [DISTRIBUTION.md](DISTRIBUTION.md) § 0 bis.                                                                                 | C'est le canal d'auto-update de la ligne 0.2.x (voix), cuit dans `tauri.release.conf.json`. Tant qu'il n'existe pas, un exe 0.2.x logue un 404 au lancement. La ligne 0.1.x reste sur `catdesk-releases`, **figée** — un push là-bas mettrait à jour tous les anciens exe.                            |
+| 2   | **Construire l'installeur 0.2.0** — `build-release.ps1` puis `build-inno.ps1` ; si bootstrap, ajuster `PartCount` dans `catdesk-bootstrap.iss`.                                                     | ~800 Mo de modèles voix en plus : le nombre de tranches de 2 Go peut changer, et seul un build réel le dit.                                                                                                                                                                                           |
+| 3   | **Un essai au micro** — `Ctrl+Espace`, parler, puis « Tester la voix » dans Paramètres › Voix.                                                                                                      | Toute la chaîne est vérifiée (modèles chargés, VAD, transcription d'un wav, audit) sauf **ta** voix et **ton** micro.                                                                                                                                                                                 |
+| 4   | **Lancer `pnpm dev` et regarder l'app.**                                                                                                                                                            | Le correctif Tailwind (§1.3) **change l'apparence**. C'est le rendu prévu depuis le début, mais pas celui que tu avais sous les yeux. Personne d'autre ne peut dire s'il te va.                                                                                                                       |
+| 5   | **Trancher le KV-cache `q4_0`** — 30 min, § 1.1.                                                                                                                                                    | La doc et le code se contredisent ; le code n'a **volontairement pas** été modifié. Il faut une mesure sur ta machine, pas un arbitrage sur pièces.                                                                                                                                                   |
+| 6   | **Appliquer les migrations Supabase** — `pnpm exec supabase db push` (#27 et #29 sont dans `dev`).                                                                                                  | Le Supabase de prod est partagé par tous les postes : aucune session n'y a touché. Sans `20261029170000`, le titre de l'an dernier bloquera en silence chaque daily du jour dès l'été 2027.                                                                                                           |
+| 7   | **Installer Kensaku, si tu le veux** — `powershell -File scripts/fetch-kensaku.ps1`, puis l'application Kensaku 1.0.17 (même release).                                                              | Installer un binaire tiers est ta décision, pas celle d'une session. Ensuite : indexer Documents, Bureau et Téléchargements, la lancer une fois, puis `pnpm --filter @catdesk/agent-runtime test` (le test du vrai CLI ne tourne qu'une fois le CLI posé) et un œil sur la VRAM pendant l'indexation. |
+| 8   | **Mesurer la dictée au micro** (branche `feat/dictee-vocale`) — `node scripts/dictation-wer.mjs --sheet`, 20 phrases dans Bloc-notes, Word et Edge, puis le script sur chaque fichier et `--audit`. | Seuls ta voix et ton micro donnent le taux d'erreur (cible < 8 %) et la latence réelle (cible < 800 ms pour 5 s). Cas limites à essayer : focus changé pendant la transcription, champ mot de passe, appli en administrateur, bulle déjà en écoute, CatDesk en train de parler.                       |
 
 Les points 1 à 5 forment le jalon **0.2.0** ci-dessous ; le point 0 passe avant tout,
-les points 6 et 7 ne dépendent d'aucune version.
+les points 6 à 8 ne dépendent d'aucune version.
 
 ---
 
@@ -63,7 +63,7 @@ et chaque morceau est reporté dans le jalon ci-dessus. `git show <commit>` suff
 à le retrouver.
 
 **Hors jalon, à trancher d'abord** : Supabase depuis le webview (§ 1.2),
-friction `browser_navigate`, système de plugins, Linux/macOS, Pocket TTS (§ 4).
+système de plugins, Linux/macOS, Pocket TTS (§ 4).
 
 ---
 
@@ -246,6 +246,14 @@ Le premier token est passé de 19-47 s à 1-2,5 s (mesures dans
 Reprises de l'ancienne section « Prochaines pistes » de `SUIVI.md`, qui n'avait
 rien à faire au milieu d'un journal.
 
+- ✅ **Kensaku comme moteur de `semantic_search`** (veille du 6/11, 2026-11-13).
+  Aucun outil ajouté. Binaire épinglé par SHA-256, résultats résolus et
+  refiltrés par la liste blanche, ancien moteur en repli. Au passage :
+  dossiers par défaut (c'était le dossier de l'agent), termes accentués, et
+  lecture en parallèle (4,1 s → 1,0 s sans dossier). Sélection : 4/5 phrases
+  « retrouve le fichier où… » (0/5 avant) ; banc : 5/6 tâches « fichier ».
+  Reste chez toi : § 0, point 7.
+
 - **Trouvé par le banc de qualité** (2026-11-05), par ordre de gêne :
   - **Réponses vides** : 1 à 2 tâches sur 90. Ollama renvoie `content` vide et
     aucun `tool_calls` alors que le modèle a généré des tokens (41 sur
@@ -276,7 +284,10 @@ rien à faire au milieu d'un journal.
     web, `read_webpage` exige une URL.
   - **Client MCP** : brancher des outils tiers sans les écrire (rejoint le
     système de plugins ci-dessous).
-  - **Format `SKILL.md`** pour `load_skill` (#17), au lieu d'un format maison.
+  - **`load_skill` proposé sur le nom d'un skill installé** : la phrase doit dire
+    « skill » ou « compétence » ([LIMITES.md](LIMITES.md) § 4 bis). Passer les noms
+    installés à `selectTools` lèverait ça sans coûter de token, mais il faut d'abord
+    voir si la limite gêne à l'usage.
   - **Réglage guidé**, à la OpenJarvis : diagnostic, plan, essai, validation par
     `claude -p`, une modification n'étant gardée que si le jeu `holdout` du banc
     ne baisse pas. Possible maintenant que le banc existe.
@@ -285,11 +296,29 @@ rien à faire au milieu d'un journal.
     réutilisation du cache de préfixe sous Ollama (`scripts/latency-bench.mjs`) :
     les rapports se contredisent selon les versions, et tout le gain de latence
     du 2026-10-08 en dépend.
-- ✅ **Dictée dans toutes les applications** — 2026-11-13 (veille du 8/11,
-  branche `feat/dictee-vocale`) : `Ctrl+Alt+Espace` maintenu, texte tapé dans
-  le champ actif, voir [CAPACITES.md](CAPACITES.md) § 1 bis. Reste : la mesure
-  au micro (§ 0, point 7) ; un repli par le presse-papier seulement si une
-  application courante refuse la frappe Unicode.
+- **Pistes de la veille GitHub** (rapports du 6 au 12/11, workflow `ai-veille.yml`).
+  Les cinq « 🟢 À faire ensemble » sont développées une par une, une branche et
+  une PR chacune, validées à chaque étape :
+  - ✅ **Caractères invisibles retirés avant le modèle** (11/11, d'après guard-spec) :
+    branche `feat/nettoyage-unicode`. Voir [LIMITES.md](LIMITES.md) § 5.
+  - ✅ **Données personnelles masquées à la sortie** (7/11) : branche
+    `feat/masquage-donnees-perso`. Reste : noms et adresses, téléphones
+    étrangers. Voir [LIMITES.md](LIMITES.md) § 5.
+  - **Navigateur en lecture seule imposée** (6/11) : tranche la friction de
+    `browser_navigate` (plus bas).
+  - ✅ **Dictée dans le champ actif de n'importe quelle appli** (8/11) : branche
+    `feat/dictee-vocale`, `Ctrl+Alt+Espace` maintenu, texte tapé dans le champ
+    actif, voir [CAPACITES.md](CAPACITES.md) § 1 bis. Reste : la mesure au micro
+    (§ 0, point 8) ; un repli par le presse-papier seulement si une application
+    courante refuse la frappe Unicode.
+  - **Kensaku comme moteur de `semantic_search`** (6/11) : PDF, DOCX et captures,
+    sans outil ajouté ; binaire épinglé, installé par l'utilisateur.
+  - À garder (🟡), sans date : arbre d'accessibilité avec `ref` cliquables (après
+    la lecture seule), reclassement des passages (lifeboat), citations vérifiées
+    d'un compte rendu (tingo), leçons tirées des corrections, capture du son
+    système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
+    Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
+    (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :
@@ -324,10 +353,11 @@ rien à faire au milieu d'un journal.
   par Supabase Studio (Authentication → Users). Chantier à part.
 - **Système de plugins** — la voie est ouverte (`BaseTool` + `registerTools` +
   `DEFAULT_PERMISSION_CONFIG`), mais rien ne charge de tool tiers à l'exécution.
-- **Friction de `browser_navigate`** — classé `high`, donc confirmation à chaque
-  appel, ce qui casse un enchaînement navigateur en plusieurs étapes. Reclasser
-  en `medium` (une fois par session) serait cohérent avec `browser_click` /
-  `browser_type`… qui sont eux aussi `high`. À trancher ensemble.
+- ✅ **Friction de `browser_navigate`** — tranchée le 2026-11-12 par la
+  lecture seule du navigateur (veille du 6/11, branche
+  `feat/navigateur-lecture-seule`) : `medium` tant que rien ne peut partir,
+  `high` sinon. Clic et saisie restent `high`. Suite possible : l'arbre
+  d'accessibilité avec `ref` cliquables (🟡 de la veille).
 - **Linux / macOS** — `sandbox.rs`, les scripts PowerShell et les outils
   presse-papiers/OpenApp sont écrits pour Windows.
 

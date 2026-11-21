@@ -2,6 +2,7 @@ import { httpGet } from '../lib/http';
 import type { NewsItem } from './newsItem';
 import { parseDevto, parseFeed, parseHackerNews } from './parseFeed';
 import { DEFAULT_SOURCES, NEWS_SOURCES, feedLabelFromUrl } from './sources';
+import { cleanNewsItem } from './newsText';
 
 // ─── Aggregation helpers (pure, exported for tests) ───────────
 
@@ -182,7 +183,8 @@ export async function aggregateNews(opts: AggregateOptions): Promise<AggregateRe
   const collected: NewsItem[] = [];
   const failed: string[] = [];
   results.forEach((r, idx) => {
-    if (r.status === 'fulfilled') collected.push(...r.value);
+    // Nettoyé dès la collecte : le dédoublonnage compare alors les vrais titres.
+    if (r.status === 'fulfilled') collected.push(...r.value.map(cleanNewsItem));
     else
       failed.push(
         `${tasks[idx]!.label}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,

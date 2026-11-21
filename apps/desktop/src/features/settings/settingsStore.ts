@@ -13,11 +13,14 @@ interface SettingsState {
   temperature: number;
   maxIterations: number;
   safeMode: boolean;
+  /** Navigateur de l'agent en lecture seule (défaut : oui). */
+  browserReadOnly: boolean;
 
   setDefaultModel: (model: string | null) => void;
   setTemperature: (value: number) => void;
   setMaxIterations: (value: number) => void;
   setSafeMode: (enabled: boolean) => void;
+  setBrowserReadOnly: (enabled: boolean) => void;
   /** Pousse au runtime les réglages qui le concernent (le cœur les rejoue à chaque démarrage de l'agent). */
   syncToRuntime: () => void;
 }
@@ -32,13 +35,15 @@ interface PersistedV0 {
 
 type PersistedSettings = Pick<
   SettingsState,
-  'defaultModel' | 'temperature' | 'maxIterations' | 'safeMode'
+  'defaultModel' | 'temperature' | 'maxIterations' | 'safeMode' | 'browserReadOnly'
 >;
 
 /**
  * Migration des réglages persistés. v0 → v1 : `defaultModel` valait toujours
  * 'qwen3:14b' (le défaut, jamais un vrai choix) → null ; `streamingEnabled`
- * (sans effet) disparaît. Pur, exporté pour les tests.
+ * (sans effet) disparaît. Pur, exporté pour les tests. `browserReadOnly`,
+ * ajouté sans changer de version, manque aux réglages déjà enregistrés : la
+ * fusion de `persist` garde alors le défaut (lecture seule).
  */
 export function migrateSettings(persisted: unknown, version: number): PersistedSettings {
   const old = (persisted ?? {}) as PersistedV0;
@@ -48,6 +53,7 @@ export function migrateSettings(persisted: unknown, version: number): PersistedS
     temperature: typeof old.temperature === 'number' ? old.temperature : 0.7,
     maxIterations: typeof old.maxIterations === 'number' ? old.maxIterations : 10,
     safeMode: old.safeMode === true,
+    browserReadOnly: true,
   };
 }
 
@@ -58,6 +64,7 @@ export const useSettingsStore = create<SettingsState>()(
       temperature: 0.7,
       maxIterations: 10,
       safeMode: false,
+      browserReadOnly: true,
 
       setDefaultModel: model => set({ defaultModel: model }),
       setTemperature: value => set({ temperature: Math.min(2, Math.max(0, value)) }),
@@ -65,14 +72,21 @@ export const useSettingsStore = create<SettingsState>()(
 
       setSafeMode: enabled => {
         set({ safeMode: enabled });
-        void updateRuntimeSettings({ safeMode: enabled }).catch(() => {
-          // Agent pas (encore) là : le cœur a mémorisé le réglage et le rejouera.
-        });
+        get().syncToRuntime();
       },
 
+      setBrowserReadOnly: enabled => {
+        set({ browserReadOnly: enabled });
+        get().syncToRuntime();
+      },
+
+      // Les deux réglages partent TOUJOURS ensemble : le cœur rejoue le dernier
+      // envoi tel quel au redémarrage de l'agent, un réglage absent y serait perdu.
       syncToRuntime: () => {
-        const { safeMode } = get();
-        void updateRuntimeSettings({ safeMode }).catch(() => {});
+        const { safeMode, browserReadOnly } = get();
+        void updateRuntimeSettings({ safeMode, browserReadOnly }).catch(() => {
+          // Agent pas (encore) là : le cœur a mémorisé le réglage et le rejouera.
+        });
       },
     }),
     {
@@ -83,6 +97,7 @@ export const useSettingsStore = create<SettingsState>()(
         temperature: s.temperature,
         maxIterations: s.maxIterations,
         safeMode: s.safeMode,
+        browserReadOnly: s.browserReadOnly,
       }),
       migrate: (persisted, version) => migrateSettings(persisted, version) as SettingsState,
     },
