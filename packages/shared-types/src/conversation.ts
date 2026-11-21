@@ -68,5 +68,13 @@ export interface OllamaToolCall {
 export type StreamChunk =
   | { type: 'token'; content: string }
   | { type: 'tool_call'; toolCall: OllamaToolCall }
-  | { type: 'done'; totalTokens?: number }
+  | {
+      type: 'done';
+      totalTokens?: number;
+      /**
+       * Tokens du prompt qu'Ollama a lus pour cet appel (`prompt_eval_count`).
+       * Avec le cache de préfixe, peut ne compter que la partie relue.
+       */
+      promptTokens?: number;
+    }
   | { type: 'error'; error: string };

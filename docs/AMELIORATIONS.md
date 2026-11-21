@@ -247,15 +247,25 @@ Reprises de l'ancienne section « Prochaines pistes » de `SUIVI.md`, qui n'avai
 rien à faire au milieu d'un journal.
 
 - **Trouvé par le banc de qualité** (2026-11-05), par ordre de gêne :
-  - **Réponses vides** : 1 à 2 tâches sur 90. Ollama renvoie `content` vide et
+  - 🟡 **Réponses vides** : 1 à 2 tâches sur 90. Ollama renvoie `content` vide et
     aucun `tool_calls` alors que le modèle a généré des tokens (41 sur
     `rech-dailys`, `done_reason: stop`) : probablement un appel d'outil mal formé,
-    avalé par son analyseur. L'orchestrateur le prend pour une réponse finale,
-    et l'utilisateur ne voit rien. À température 0, relancer à l'identique
-    redonne la même chose, il faut au moins un message d'échec.
-  - **`store_memory` promis mais pas appelé** : sur « souviens-toi que… », le modèle
-    répond « D'accord, je me souviens » sans rien enregistrer. Faux, et
-    invisible pour l'utilisateur.
+    avalé par son analyseur. L'orchestrateur le prenait pour une réponse finale,
+    et l'utilisateur ne voyait rien. **Traité** sur `feat/garde-fous-reponse`
+    (2026-11-20) : une relance qui dit au modèle que sa réponse est vide, puis un
+    message d'échec visible (`EMPTY_ANSWER`). Banc complet du 2026-11-20 :
+    aucune réponse vide sur 98 tâches, la relance n'a donc pas encore servi en
+    vrai.
+  - 🟡 **`store_memory` promis mais pas appelé** : sur « souviens-toi que… », le modèle
+    répondait « D'accord, je me souviens » sans rien enregistrer. **Traité** sur
+    `feat/garde-fous-reponse` (veille du 17/11, `checks/claimCheck.ts`) : une
+    action annoncée sans outil réussi déclenche une relance, puis une mention
+    visible. Couvre aussi fichiers, rappels, presse-papiers, messages et liste
+    de suivi. Banc complet du 2026-11-20 : les 8 nouvelles tâches (5 actions,
+    3 témoins sans action) passent, et les 2 relances justes aboutissent (le
+    modèle appelle `store_memory`, puis le confirme). Le même banc a trouvé 2
+    relances à tort (« la tâche planifiée » lu comme une annonce) et une
+    relance mal formulée, recopiée telle quelle : corrigées et rejouées.
   - **`search_dailies` sur des questions de culture générale** : 4 des 14 tâches
     sans outil échouent, dont 3 ainsi (« qui a peint la Joconde ? »). La réponse
     arrive quand même, un aller-retour plus tard.
@@ -266,6 +276,25 @@ rien à faire au milieu d'un journal.
     alors que l'audit montre `describe_screen` en échec 3 fois sur 4. « Réussi »
     y veut dire « terminé ». Il manque le résultat réel des outils et un 👍/👎
     dans le chat. `evolution-proposals.json` n'a par ailleurs aucun lecteur.
+    Premier pas sur `feat/garde-fous-reponse` : l'orchestrateur garde le résultat
+    réel de chaque appel (`ToolOutcome`), et une annonce restée fausse compte
+    comme un échec au playbook.
+  - **Garde-fous de réponse, suite** (veille du 19/11, sur
+    `feat/garde-fous-reponse`) : les chiffres, liens et e-mails absents des
+    sources sont annotés (`checks/numberCheck.ts` ; au banc, 3 mentions sur 98
+    tâches, toutes à tort : années anciennes, « 1,2 Md€ », corrigées), et un
+    prompt plus long que
+    `num_ctx` est signalé (`llm/contextBudget.ts`). Mesuré le 2026-11-20
+    (Ollama 0.32.14) : tout prompt qui déborde est ramené **sans erreur** à
+    4 098 tokens, et le modèle répond avec aplomb sur ce qui reste (trois codes
+    faux sur un document coupé). Le `prompt_eval_count` seul ne le voit pas,
+    puisqu'il compte après la coupe. L'agent estime donc la taille à partir du
+    texte envoyé : un token par chiffre, les blancs gratuits, le reste à 2,7
+    caractères par token. Calibré sur 14 textes, il tombe entre 0,86 et 1,5
+    fois le réel. Un compteur bien en dessous de l'estimation trahit la coupe.
+    **Suite** (Plan B de la veille) : découper `parse_document`,
+    `read_webpage` et `search_dailies` sur ce budget, avant d'envoyer le
+    prompt, plutôt que prévenir après.
   - **Tâches planifiées fiables** : `CronScheduler` tourne en premier plan, sans
     heure fixe ni notification.
   - **Brief du matin à la voix**. Prérequis : `read_calendar` exige un chemin

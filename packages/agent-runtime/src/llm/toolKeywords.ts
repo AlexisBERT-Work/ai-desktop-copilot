@@ -72,6 +72,7 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
     'pour plus tard',
     'stocke',
     "n'oublie pas",
+    'note que',
   ],
   // « compétence » seul tirerait l'outil sur « quelles compétences pour devenir
   // pilote ? », et « procédure » sur toute démarche administrative.

@@ -46,6 +46,7 @@ interface ChatLine {
   };
   done?: boolean;
   eval_count?: number;
+  prompt_eval_count?: number;
 }
 
 /**
@@ -82,7 +83,15 @@ export function parseChatLine(line: string): StreamChunk[] {
       },
     });
   }
-  if (data.done) chunks.push({ type: 'done', totalTokens: data.eval_count ?? 0 });
+  if (data.done) {
+    chunks.push({
+      type: 'done',
+      totalTokens: data.eval_count ?? 0,
+      ...(typeof data.prompt_eval_count === 'number'
+        ? { promptTokens: data.prompt_eval_count }
+        : {}),
+    });
+  }
   return chunks;
 }
 

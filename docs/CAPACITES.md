@@ -385,6 +385,27 @@ Formats cron supportés : `"every 5m"`, `"hourly"`, `"daily"`, `"weekly"`.
 établir un plan (visible dans l'UI sous un encart « 📋 Plan ») puis le suivre
 (`usePlanning: true`).
 
+**Contrôles d'après réponse** (`checks/`, `llm/contextBudget.ts`, 2026-11) :
+déterministes, sans modèle, rien dans le prompt système. Avant de servir la
+réponse finale, l'orchestrateur vérifie que :
+
+- la réponse **n'est pas vide** : sinon une relance, puis un message d'échec
+  visible au lieu d'un silence ;
+- une **action annoncée a vraiment eu lieu** (« c'est noté », « j'ai créé le
+  fichier », « j'ai programmé un rappel »…) : sinon une relance qui le dit au
+  modèle, puis une mention « (Vérification : rien n'a été fait…) ». Un outil
+  refusé ou en échec ne couvre aucune annonce ;
+- les **chiffres, liens et e-mails** cités figurent dans les sources du tour,
+  après `search_dailies`, `get_market`, `read_webpage`, `browser_get_text`,
+  `parse_document`, `analyze_data` ou `read_email`. Sinon la réponse est
+  **annotée**, jamais bloquée (un calcul du modèle n'est pas dans les sources) ;
+- le prompt **tenait dans `num_ctx`** : au-delà, Ollama coupe sans erreur, et
+  l'utilisateur en est prévenu.
+
+Une seule relance par run (2 à 5 s, seulement quand un contrôle échoue). Une
+réponse dont l'annonce reste fausse n'entre pas dans le cache sémantique et
+compte comme un échec au playbook.
+
 ---
 
 ## 10. Tableau de bord & Bourse
