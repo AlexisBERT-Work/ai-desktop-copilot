@@ -75,7 +75,8 @@ qu'une ligne. Essayé en vrai sur le poste (test `#[ignore]`
 `lit_les_fenetres_du_poste`) : liste des fenêtres, Bloc-notes lu en 0,13 s
 (27 éléments, texte du document compris), fermeture par `WM_CLOSE`, audit
 écrit. Banc de sélection : 3 tâches `dev` et 2 `holdout` ajoutées, `dev` sans
-raté (45/45), `holdout` 85 % comme avant. `h-ecran-fenetre` (« regarde ma
+raté (47/47 après rebase sur `dev`), `holdout` 38/44 (86 %). Une tâche
+existante élargie : `h-ecran-fenetre` (« regarde ma
 fenêtre… ») accepte désormais `read_window`, qui y répond aussi.
 
 ## 2026-11-20 — Garde-fous de réponse
