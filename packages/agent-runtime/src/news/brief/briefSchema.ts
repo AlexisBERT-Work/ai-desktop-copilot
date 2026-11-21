@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Forme du brief quotidien « Veille IA » rédigé par Claude (sortie structurée
 // de `claude -p --json-schema`). Ce schéma zod est la source UNIQUE : il produit
@@ -141,7 +140,9 @@ export type BriefTrend = z.infer<typeof Trend>;
 
 /** JSON Schema à passer à `claude --json-schema`. Pur. */
 export function briefJsonSchema(): Record<string, unknown> {
-  const schema = zodToJsonSchema(BriefSchema, { $refStrategy: 'none' }) as Record<string, unknown>;
+  // Natif depuis zod 4, qui a remplacé zod-to-json-schema : draft-07, tout en
+  // ligne, `additionalProperties: false` sur chaque objet, comme avant.
+  const schema = z.toJSONSchema(BriefSchema, { target: 'draft-07' }) as Record<string, unknown>;
   delete schema['$schema'];
   return schema;
 }

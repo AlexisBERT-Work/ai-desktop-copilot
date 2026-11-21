@@ -12,6 +12,9 @@
 #    au run suivant. Aucun commit : le workflow reste en lecture sur le dépôt.
 #    Pour relire les rapports :
 #      gh run download -R AlexisBERT-Work/ai-desktop-copilot -n veille-archive
+# 5. Le Fil : pistes et versions du jour en cartes, lues sur le téléphone par
+#    l'app catdesk-fil (src/cli/filPublish.ts). Base catdesk-news, RPC
+#    fil_publish : clé anon + jeton de publication, aucun appel de LLM en plus.
 #
 # Réglages (Settings → Secrets and variables → Actions) :
 #   secrets   VEILLE_TO (adresse qui reçoit le rapport), et ceux du récap :
@@ -20,6 +23,8 @@
 #             VEILLE_CODE_REF (branche du code, défaut dev), VEILLE_DOCS_REF
 #             (branche dont on lit CAPACITES, AMELIORATIONS et LIMITES, défaut dev),
 #             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465)
+#   le Fil    variables FIL_SUPABASE_URL, FIL_SUPABASE_ANON_KEY (publiques par
+#             nature), secret FIL_PUBLISH_TOKEN (seul son sha256 est en base)
 #
 # Ce dépôt est public, ses logs et ses artefacts aussi : ils ne contiennent que
 # des dépôts publics et le backlog déjà public. La veille ne lit ni RECAP_AUDIENCE
@@ -181,6 +186,18 @@ jobs:
           path: ${{ runner.temp }}/veille-archive
           retention-days: 90
           if-no-files-found: error
+
+      # Après le mail et l'archive : un échec ici fait échouer le run (GitHub
+      # prévient par mail) sans priver de rien. Logs : des nombres seulement.
+      - name: Publier dans le fil
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        working-directory: packages/agent-runtime
+        env:
+          VEILLE_WORKDIR: ${{ runner.temp }}/veille
+          FIL_SUPABASE_URL: ${{ vars.FIL_SUPABASE_URL }}
+          FIL_SUPABASE_ANON_KEY: ${{ vars.FIL_SUPABASE_ANON_KEY }}
+          FIL_PUBLISH_TOKEN: ${{ secrets.FIL_PUBLISH_TOKEN }}
+        run: pnpm fil:publish --from veille
 
       - name: Aperçu (essai à blanc)
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run

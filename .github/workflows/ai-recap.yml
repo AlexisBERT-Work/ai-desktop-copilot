@@ -8,6 +8,9 @@
 #    conforme au schéma.
 # 3. Mise en page et envoi (notre code) : HTML texte seul avec sommaire
 #    cliquable, SMTP (src/cli/recapSend.ts).
+# 4. Le Fil : à la une, tendances et brèves en cartes, lues sur le téléphone
+#    par l'app catdesk-fil (src/cli/filPublish.ts). Base catdesk-news, RPC
+#    fil_publish : clé anon + jeton de publication, aucun appel de LLM en plus.
 #
 # Réglages (Settings → Secrets and variables → Actions) :
 #   secrets   CLAUDE_CODE_OAUTH_TOKEN (sortie de `claude setup-token`),
@@ -20,6 +23,8 @@
 #             (remplace les défauts), RECAP_LIMIT (120 candidats),
 #             SMTP_HOST (smtp.gmail.com), SMTP_PORT (465),
 #             RECAP_CODE_REF (branche du code lancée depuis master, défaut dev)
+#   le Fil    variables FIL_SUPABASE_URL, FIL_SUPABASE_ANON_KEY (publiques par
+#             nature), secret FIL_PUBLISH_TOKEN (seul son sha256 est en base)
 #
 # GitHub ne déclenche un `schedule` que depuis la branche par défaut (master) :
 # ce fichier doit y être. Le code exécuté, lui, vient de RECAP_CODE_REF.
@@ -154,6 +159,18 @@ jobs:
         # stdout = le texte du brief en essai à blanc : il va dans l'artefact,
         # pas dans les logs (publics). Les étapes restent visibles sur stderr.
         run: pnpm recap:send > /dev/null
+
+      # Après l'envoi : un échec ici fait échouer le run (GitHub prévient par
+      # mail) sans priver du brief. Logs : des nombres seulement.
+      - name: Publier dans le fil
+        if: steps.claude.outputs.skip != '1' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        working-directory: packages/agent-runtime
+        env:
+          RECAP_WORKDIR: ${{ runner.temp }}/recap
+          FIL_SUPABASE_URL: ${{ vars.FIL_SUPABASE_URL }}
+          FIL_SUPABASE_ANON_KEY: ${{ vars.FIL_SUPABASE_ANON_KEY }}
+          FIL_PUBLISH_TOKEN: ${{ secrets.FIL_PUBLISH_TOKEN }}
+        run: pnpm fil:publish --from brief
 
       - name: Aperçu (essai à blanc)
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run && steps.claude.outputs.skip != '1'

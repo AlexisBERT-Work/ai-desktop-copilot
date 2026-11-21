@@ -20,6 +20,7 @@ pub const EVENT_PRESS_PROGRESS: &str = "press:progress";
 pub const EVENT_VOICE_STATE: &str = "voice:state";
 pub const EVENT_VOICE_TRANSCRIPT: &str = "voice:transcript";
 pub const EVENT_VOICE_LEVEL: &str = "voice:level";
+pub const EVENT_VOICE_DICTATION: &str = "voice:dictation";
 
 // ─── Méthodes JSON-RPC hôte → agent ────────────────────────────
 pub const RPC_AGENT_PROCESS: &str = "agent.process";
@@ -85,6 +86,7 @@ mod tests {
         EVENT_VOICE_STATE,
         EVENT_VOICE_TRANSCRIPT,
         EVENT_VOICE_LEVEL,
+        EVENT_VOICE_DICTATION,
         RPC_AGENT_PROCESS,
         RPC_AGENT_CANCEL,
         RPC_AGENT_WARMUP,

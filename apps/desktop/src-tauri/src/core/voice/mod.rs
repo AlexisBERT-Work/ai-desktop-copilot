@@ -13,20 +13,34 @@
 //! - [`listener`] : micro → VAD → STT → événement `voice:transcript` ;
 //! - [`speaker`] : file de phrases → TTS → haut-parleurs.
 //!
+//! La dictée (`Ctrl+Alt+Espace` maintenu, désactivée par défaut) passe par
+//! le même thread d'écoute, mais tape le texte dans l'application active
+//! ([`dictation`]) au lieu de l'envoyer au modèle ; [`pill`] montre qu'elle
+//! enregistre.
+//!
+//! Les deux chemins passent par [`stt::Recognizer::transcribe`], qui applique
+//! le vocabulaire personnel ([`vocabulary`]) : les noms propres s'écrivent
+//! comme l'utilisateur les écrit.
+//!
 //! L'UI ne voit que des commandes (`commands/voice.rs`) et des événements ;
 //! elle découpe les réponses du modèle en phrases et les envoie une à une,
 //! ce qui permet de parler avant la fin de la génération.
 
 pub mod capture;
+pub mod dictation;
 pub mod listener;
 pub mod machine;
 pub mod models;
+pub mod pill;
 pub mod playback;
 pub mod speaker;
 pub mod stt;
 pub mod tts;
 pub mod vad;
+pub mod vocabulary;
 
+#[cfg(test)]
+mod smoke_hotwords;
 #[cfg(test)]
 mod smoke_tests;
 
@@ -86,6 +100,10 @@ pub enum ListenerCommand {
     /// Charge les modèles sans écouter, pour que le premier Ctrl+Espace ne
     /// paie pas les ~3 s de chargement de Parakeet.
     Warmup,
+    /// Raccourci de dictée enfoncé, avec la fenêtre qui avait le focus.
+    DictateStart(dictation::Target),
+    /// Raccourci relâché, à cet instant (la latence se mesure d'ici).
+    DictateEnd(std::time::Instant),
 }
 
 pub enum SpeakerCommand {
@@ -104,6 +122,9 @@ pub struct Shared {
     pub state: VoiceState,
     pub config: VoiceConfig,
     pub models: models::VoiceModels,
+    /// Vocabulaire en service : les commandes le remplacent, la
+    /// reconnaissance le lit à chaque transcription.
+    pub vocabulary: vocabulary::VocabularyCell,
 }
 
 /// Poignée stockée dans `tauri::State` : les commandes ne font qu'envoyer des
@@ -141,10 +162,13 @@ impl VoiceHandle {
 /// Démarre les deux threads et renvoie la poignée à enregistrer dans Tauri.
 /// Ne charge aucun modèle : c'est `Warmup` (ou le premier usage) qui le fait.
 pub fn spawn(app: AppHandle) -> VoiceHandle {
+    // `data_dir::init` est idempotent : le pont agent l'appelle aussi, plus tard.
+    let vocabulary_path = vocabulary::file_path(&crate::core::data_dir::init(&app));
     let shared = Arc::new(Mutex::new(Shared {
         state: VoiceState::Idle,
         config: VoiceConfig::default(),
         models: models::VoiceModels::discover(&app),
+        vocabulary: vocabulary::VocabularyCell::load(Some(vocabulary_path)),
     }));
 
     let stop_flag = Arc::new(AtomicBool::new(false));

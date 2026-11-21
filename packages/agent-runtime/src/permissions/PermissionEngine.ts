@@ -4,6 +4,7 @@ import type {
   PermissionConfig,
   PermissionGrant,
   RiskLevel,
+  ToolPermissionConfig,
 } from '@catdesk/shared-types';
 import {
   DEFAULT_PERMISSION_CONFIG,
@@ -12,6 +13,7 @@ import {
 } from '@catdesk/shared-types';
 import { stdoutNotifier, type NotifyFn } from '../ipc/Notifier';
 import { createLogger } from '../logger';
+import { createPathGuard } from './realPath';
 
 const log = createLogger('security:permissions');
 
@@ -22,10 +24,21 @@ export class PermissionEngine {
   /** Demandes de confirmation en attente d'une réponse de l'UI, par requestId. */
   private pendingRequests = new Map<string, (result: PermissionResult) => void>();
 
+  /**
+   * @param browserReadOnly lit la lecture seule du navigateur (BrowserManager,
+   *   seule source de vérité). Par défaut : jamais — le risque déclaré s'applique.
+   */
   constructor(
     private readonly notify: NotifyFn = stdoutNotifier,
     private readonly timeoutMs: number = PERMISSION_TIMEOUT_MS,
+    private readonly browserReadOnly: () => boolean = () => false,
   ) {}
+
+  /** Risque appliqué maintenant : abaissé si l'outil le prévoit et que le navigateur est en lecture seule. */
+  effectiveRisk(toolConfig: ToolPermissionConfig): RiskLevel {
+    const lowered = toolConfig.riskLevelWhenReadOnly;
+    return lowered !== undefined && this.browserReadOnly() ? lowered : toolConfig.riskLevel;
+  }
 
   updateConfig(config: Partial<PermissionConfig>): void {
     this.config = { ...this.config, ...config };
@@ -48,9 +61,11 @@ export class PermissionEngine {
       return { granted: false, reason: `Tool désactivé: ${request.tool}` };
     }
 
+    const risk = this.effectiveRisk(toolConfig);
+
     // Safe mode: block everything above low
-    if (this.config.safeMode && toolConfig.riskLevel !== 'low') {
-      log.info('Blocked by safe mode', { tool: request.tool, risk: toolConfig.riskLevel });
+    if (this.config.safeMode && risk !== 'low') {
+      log.info('Blocked by safe mode', { tool: request.tool, risk });
       return {
         granted: false,
         reason: 'Mode sécurisé actif — seules les opérations de lecture sont autorisées',
@@ -58,10 +73,7 @@ export class PermissionEngine {
     }
 
     // Critical tools require explicit enablement
-    if (
-      toolConfig.riskLevel === 'critical' &&
-      !this.config.enabledCritical.includes(request.tool)
-    ) {
+    if (risk === 'critical' && !this.config.enabledCritical.includes(request.tool)) {
       return {
         granted: false,
         reason: `Outil critique non activé dans les paramètres de sécurité`,
@@ -71,20 +83,26 @@ export class PermissionEngine {
     // Liste blanche des chemins : appliquée aux chemins que l'outil DÉCLARE
     // (BaseTool.pathArgs → request.paths), quel que soit son niveau de risque
     // — sinon un outil `low` lirait n'importe quel fichier (ex. la base de
-    // cookies de Chrome), ce qui ruinerait la liste blanche.
+    // cookies de Chrome), ce qui ruinerait la liste blanche. Chaque chemin est
+    // vérifié tel qu'écrit PUIS résolu (`realPath.ts`) : une jonction posée
+    // dans Documents ne mène plus hors de la liste.
+    const pathGuard = createPathGuard(this.config.pathWhitelist);
     for (const candidate of request.paths ?? []) {
-      if (!this.isPathAllowed(candidate)) {
-        return { granted: false, reason: `Chemin non autorisé: ${candidate}` };
+      const verdict = await pathGuard(candidate);
+      if (!verdict.allowed) {
+        return { granted: false, reason: verdict.reason };
       }
     }
 
     // LOW risk: auto-approve
-    if (toolConfig.riskLevel === 'low') {
+    if (risk === 'low') {
       return { granted: true, reason: 'Auto-approuvé (risque faible)' };
     }
 
-    // MEDIUM risk: check session cache
-    if (toolConfig.riskLevel === 'medium' && this.sessionGrants.get(request.tool)?.granted) {
+    // MEDIUM risk: check session cache. Une autorisation donnée en lecture
+    // seule ne vaut que tant que le risque est `medium` : lecture seule coupée,
+    // `browser_navigate` redevient `high` et redemande à chaque fois.
+    if (risk === 'medium' && this.sessionGrants.get(request.tool)?.granted) {
       return { granted: true, reason: 'Autorisé (session)' };
     }
 
@@ -95,12 +113,12 @@ export class PermissionEngine {
     // Request user confirmation via UI
     const result = await this.requestUserConfirmation(
       request,
-      toolConfig.riskLevel,
+      risk,
       toolConfig.description,
       signal,
     );
 
-    if (result.granted && toolConfig.riskLevel === 'medium' && result.remember) {
+    if (result.granted && risk === 'medium' && result.remember) {
       this.sessionGrants.set(request.tool, { granted: true, timestamp: Date.now() });
     }
 
@@ -148,43 +166,8 @@ export class PermissionEngine {
         description,
         args: request.args,
         riskLevel,
+        ...(request.preview !== undefined ? { preview: request.preview } : {}),
       });
-    });
-  }
-
-  private isPathAllowed(path: string): boolean {
-    if (this.config.pathWhitelist.length === 0) return true;
-
-    // Normalize the same way on both sides: lowercase + forward slashes. This
-    // MUST be applied AFTER env-var expansion so the expanded values (which keep
-    // their original casing and backslashes) are normalized too — otherwise a
-    // whitelist entry like "%USERPROFILE%\Documents" expands to
-    // "C:/Users/Name\Documents" and never matches a lowercased "/documents/…".
-    const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();
-
-    const userProfile = process.env['USERPROFILE'] ?? 'C:/Users/user';
-    const temp = process.env['TEMP'] ?? process.env['TMP'] ?? 'C:/Temp';
-
-    const normalized = norm(path);
-
-    // Reject path traversal outright: no legitimate whitelisted path needs a
-    // `..` segment. Without this, `…/Downloads/../.ssh/id_rsa` slips through the
-    // startsWith() check below (it starts with the whitelisted `…/Downloads`)
-    // and Node's fs then resolves the `..` to read outside the allowed roots.
-    if (normalized.split('/').some(seg => seg === '..')) return false;
-
-    const expandedWhitelist = this.config.pathWhitelist.map(p =>
-      norm(p.replace(/%userprofile%/gi, userProfile).replace(/%temp%/gi, temp)),
-    );
-
-    // Require a directory-boundary match so an allowed root like `…/documents`
-    // does not also authorize a sibling `…/documents-evil`. Accept an exact
-    // match or the root followed by a separator.
-    return expandedWhitelist.some(allowed => {
-      if (allowed.length === 0) return false;
-      if (normalized === allowed) return true;
-      const withSep = allowed.endsWith('/') ? allowed : `${allowed}/`;
-      return normalized.startsWith(withSep);
     });
   }
 

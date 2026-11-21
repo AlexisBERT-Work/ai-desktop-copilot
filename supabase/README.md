@@ -7,7 +7,9 @@ Backend de la **news** (alertes globales/ciblées) et des **dailys** (flux
   [`migrations/20260628000000_news.sql`](migrations/20260628000000_news.sql) ·
   [`migrations/20260629000000_dailies.sql`](migrations/20260629000000_dailies.sql) ·
   [`migrations/20260702000000_press_feeds.sql`](migrations/20260702000000_press_feeds.sql) ·
-  [`migrations/20260720000000_press_digest_open_publish.sql`](migrations/20260720000000_press_digest_open_publish.sql)
+  [`migrations/20260720000000_press_digest_open_publish.sql`](migrations/20260720000000_press_digest_open_publish.sql) ·
+  [`migrations/20261029143431_publish_daily_harden.sql`](migrations/20261029143431_publish_daily_harden.sql) ·
+  [`migrations/20261029170000_dailies_unique_per_day.sql`](migrations/20261029170000_dailies_unique_per_day.sql)
 - **Déploiement (CLI), pas à pas** : [`DEPLOY.md`](DEPLOY.md) (un seul `db push`
   applique toutes les migrations)
 - Contexte & modèle de données :
@@ -28,11 +30,24 @@ elle **valide elle-même** ce qu'elle accepte avant d'insérer :
 
 - le **titre** doit correspondre à un des 3 gabarits attendus (journal fixe,
   sujet fixe, ou synthèse du jour) — rejette tout titre arbitraire ;
+- depuis la migration `20261029143431`, la **date du titre** doit être celle du
+  jour à un jour près (les postes datent dans leur fuseau) : 14 titres valides
+  par date, pas un de plus ;
+- une **session** est obligatoire, et une même session publie au plus
+  **20 dailys/jour** (migration `20261029143431`) ;
 - la **catégorie** doit être une des 6 valeurs autorisées (repli `misc`) ;
 - le **corps** est plafonné à 20 000 caractères ;
 - au plus **60 lignes/jour** au total (le lot réel en compte ~14).
-- **idempotente** : contrainte unique sur `title`, `on conflict do nothing` —
-  si deux postes publient la même daily au même moment, un seul insert passe.
+- **idempotente** : contrainte unique sur le **titre et le jour de Paris**
+  (`dailies_title_day_key`, migration `20261029170000`) et
+  `on conflict do nothing` — si deux postes publient la même daily le même
+  jour, un seul insert passe. L'unicité n'est plus sur `title` seul : les
+  titres ne portent pas l'année, et rien ne purge la table, donc le titre de
+  l'an dernier aurait bloqué en silence celui du jour.
+
+Risque restant, assumé : le premier qui publie un titre du jour l'emporte. Un
+appel direct avec la clé anon peut donc devancer le vrai pipeline avec un faux
+contenu ; seul l'admin peut alors supprimer la ligne.
 
 Restent réservés à l'admin, **inchangés** : les journaux personnalisés
 (`press_feeds`, lecture ET écriture admin-only) et les dailys manuelles

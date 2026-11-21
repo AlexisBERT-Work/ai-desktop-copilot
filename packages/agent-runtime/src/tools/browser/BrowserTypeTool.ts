@@ -3,6 +3,7 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { BrowserManager } from '../../lib/browserManager';
+import { blockedWritesReport } from './blockedWrites';
 
 const argsSchema = z.object({
   selector: z.string().min(1).describe('CSS selector of the input/textarea to fill'),
@@ -32,7 +33,7 @@ export class BrowserTypeTool extends BaseTool<Args> {
     }
 
     try {
-      await BrowserManager.get().fill(selector.trim(), text, {
+      const blocked = await BrowserManager.get().fill(selector.trim(), text, {
         ...(clear_first !== undefined ? { clearFirst: clear_first } : {}),
         ...(timeout_ms !== undefined ? { timeoutMs: timeout_ms } : {}),
       });
@@ -40,6 +41,7 @@ export class BrowserTypeTool extends BaseTool<Args> {
         selector,
         charsTyped: text.length,
         url: BrowserManager.get().getCurrentUrl(),
+        ...blockedWritesReport(blocked, 'interact'),
       });
     } catch (err) {
       return this.fail(

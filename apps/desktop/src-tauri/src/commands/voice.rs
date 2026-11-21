@@ -7,14 +7,19 @@
 
 use std::time::Duration;
 
+use serde::Serialize;
 use serde_json::json;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::oneshot;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::core::audit;
 use crate::core::error::CatdeskError;
-use crate::core::voice::{ListenerCommand, SpeakerCommand, VoiceConfig, VoiceHandle, VoiceStatus};
+use crate::core::hotkeys;
+use crate::core::voice::vocabulary::{Summary, VocabularyCell};
+use crate::core::voice::{
+    pill, ListenerCommand, SpeakerCommand, VoiceConfig, VoiceHandle, VoiceStatus,
+};
 
 /// Chargement de Parakeet (~640 Mo int8) compris : au-delà, quelque chose cloche.
 const START_TIMEOUT: Duration = Duration::from_secs(20);
@@ -125,5 +130,109 @@ pub async fn voice_configure(
 pub async fn voice_warmup(voice: State<'_, VoiceHandle>) -> Result<(), String> {
     let _ = voice.listener.send(ListenerCommand::Warmup);
     let _ = voice.speaker.send(SpeakerCommand::Warmup);
+    Ok(())
+}
+
+/// Active ou coupe la dictée (`Ctrl+Alt+Espace` maintenu → texte tapé dans
+/// l'application active). Commande à part : `VoiceConfig` n'a pas de valeurs
+/// par défaut côté serde, un champ de plus casserait les appels existants.
+///
+/// Activer exige les modèles de reconnaissance ; un raccourci déjà pris par
+/// une autre application est renvoyé tel quel à l'UI, qui recoche « off ».
+#[tauri::command]
+pub async fn voice_set_dictation(
+    app: AppHandle,
+    voice: State<'_, VoiceHandle>,
+    enabled: bool,
+) -> Result<(), String> {
+    if enabled && !voice.status().stt_available {
+        return Err(CatdeskError::Refused(
+            "La dictée a besoin des modèles de reconnaissance (Paramètres › Voix)".into(),
+        )
+        .into());
+    }
+    let changed = hotkeys::set_dictation_hotkey(&app, enabled)?;
+    if enabled {
+        // Sans pastille la dictée marche quand même : on le signale, sans bloquer.
+        if let Err(e) = pill::ensure(&app) {
+            warn!("voice: {e}");
+        }
+    } else {
+        pill::close(&app);
+    }
+    // Un raccourci global qui ouvre le micro : son activation laisse une trace.
+    if changed {
+        audit::log("VOICE_DICTATION_SETTING", json!({ "enabled": enabled }));
+    }
+    Ok(())
+}
+
+/// Le vocabulaire tel qu'il est enregistré, et ce qui en a été retenu.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VocabularyInfo {
+    pub text: String,
+    /// Fichier sur le disque, pour que l'utilisateur sache où il vit.
+    pub path: Option<String>,
+    pub terms: usize,
+    pub aliases: usize,
+    /// Lignes ignorées et pourquoi, en français.
+    pub problems: Vec<String>,
+}
+
+fn vocabulary_info(cell: &VocabularyCell, text: String, summary: Summary) -> VocabularyInfo {
+    VocabularyInfo {
+        text,
+        path: cell.path().map(|p| p.display().to_string()),
+        terms: summary.terms,
+        aliases: summary.aliases,
+        problems: summary.problems,
+    }
+}
+
+fn vocabulary_cell(voice: &VoiceHandle) -> VocabularyCell {
+    voice
+        .shared
+        .lock()
+        .expect("voice shared lock")
+        .vocabulary
+        .clone()
+}
+
+/// Vocabulaire personnel de la reconnaissance vocale (Paramètres › Voix).
+#[tauri::command]
+pub async fn voice_vocabulary_get(voice: State<'_, VoiceHandle>) -> Result<VocabularyInfo, String> {
+    let cell = vocabulary_cell(&voice);
+    let text = cell.read_text()?;
+    let summary = cell.summary();
+    Ok(vocabulary_info(&cell, text, summary))
+}
+
+/// Enregistre le vocabulaire et le met en service tout de suite, pour le chat
+/// vocal comme pour la dictée. Taille et caractères vérifiés ici
+/// (`vocabulary::validate`) : l'UI ne fait qu'afficher.
+#[tauri::command]
+pub async fn voice_vocabulary_set(
+    voice: State<'_, VoiceHandle>,
+    text: String,
+) -> Result<VocabularyInfo, String> {
+    let cell = vocabulary_cell(&voice);
+    let summary = cell.save(&text)?;
+    // Des comptes seulement : les noms (des personnes, parfois) restent hors du journal.
+    audit::log(
+        "VOICE_VOCABULARY",
+        json!({ "terms": summary.terms, "aliases": summary.aliases }),
+    );
+    Ok(vocabulary_info(&cell, text, summary))
+}
+
+/// Coupe ou rétablit la correction, sans toucher au fichier.
+#[tauri::command]
+pub async fn voice_set_vocabulary_enabled(
+    voice: State<'_, VoiceHandle>,
+    enabled: bool,
+) -> Result<(), String> {
+    vocabulary_cell(&voice).set_enabled(enabled);
+    info!(enabled, "voice_set_vocabulary_enabled");
     Ok(())
 }

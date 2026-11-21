@@ -8,7 +8,7 @@ import type { RiskLevel } from '@catdesk/shared-types';
 import type { z } from 'zod';
 import type { RegisteredTool } from '../../ToolRegistry';
 
-function formatZodError(error: z.ZodError): string {
+export function formatZodError(error: z.ZodError): string {
   return error.issues
     .map(i => (i.path.length > 0 ? `${i.path.join('.')}: ${i.message}` : i.message))
     .join(' ; ');
@@ -26,9 +26,9 @@ export abstract class BaseTool<A = unknown> implements RegisteredTool {
    * Schéma zod des arguments — source unique : le tool en dérive aussi son
    * JSON Schema via `schema = jsonSchemaFrom(argsSchema)` (plus d'interface
    * Args ni d'entrée TOOL_SCHEMAS à part). Obligatoire : la migration est
-   * terminée, les 68 outils enregistrés en déclarent un.
+   * terminée, les 71 outils enregistrés en déclarent un.
    */
-  abstract readonly argsSchema: z.ZodType<A, z.ZodTypeDef, unknown>;
+  abstract readonly argsSchema: z.ZodType<A, unknown>;
 
   /**
    * Arguments qui désignent un chemin du disque à LIRE ou ÉCRIRE (chaîne ou

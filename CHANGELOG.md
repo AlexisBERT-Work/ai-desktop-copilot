@@ -19,6 +19,61 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Added
 
+- **Skills: add a procedure by dropping a file** (`load_skill`, tool 69). Reads the standard
+  `SKILL.md` format, as `<dataDir>/skills/<name>/SKILL.md` or `<name>.md`; two skills ship with
+  the app. Without a name the tool returns the catalogue. Drafts written by the evolution daemon
+  can finally be read back, by name only. Skills are not listed in the system prompt (measured
+  harmful on `qwen3:14b`), and a skill's text is data: it grants no permission, and
+  `allowed-tools` is ignored (`docs/SECURITE.md`).
+- **Link with Nexus**, the Master's desktop app (repo `Master-App`). Two tools:
+  `nexus_courses` (search and read the courses, notes and teachers' documents, homework due,
+  upcoming evaluations and averages, open a course in Nexus) and `nexus_inbox` (add a quick
+  note). Nexus must run with its « CatDesk » extension on: it then publishes
+  `%LOCALAPPDATA%\Nexus\link.json` with a token of CatDesk's own, accepted only under
+  `/link/v1/`. Nexus runs no model for CatDesk: search returns passages, CatDesk's model
+  answers. The model gets 5 passages cut at 800 characters (path, title, position, text),
+  not Nexus's raw answer: every token a tool returns is read before the answer, ~12 ms each
+  on the target machine. On two course questions, first token 28–43 s → 12–22 s, answers
+  unchanged. See `docs/SECURITE.md` (2026-11-08).
+- **Dictation in any application** (Settings > Voice, off by default). Hold `Ctrl+Alt+Space`
+  and speak: on release, the text is typed into the focused field of whatever app was in
+  front (Word, a browser, a chat app). Everything stays on the CPU, like the rest of the
+  voice: Silero VAD over the whole recording, then Parakeet. Text goes in as Unicode
+  keystrokes, so the clipboard is never touched and no Enter is ever typed. Nothing is typed
+  if the focus moved, if the target app runs as administrator, or while Ctrl/Alt are still
+  held. A small non-focusable pill shows the state; the audit logs the outcome and timings,
+  never the text. Measured: 5.7 s of speech to text in 0.3 s (median), 56 characters with
+  accents and emoji typed in 1 ms into a real Win32 edit box. The WER test on the user's own
+  voice uses `scripts/dictation-wer.mjs`.
+- **Voice vocabulary** (Settings > Voice): one proper noun per line, written the way you want
+  to read it. After Parakeet, words that sound the same and are spelled almost the same are
+  rewritten ("Cat Desk" → "CatDesk", "Olama" → "Ollama", "Kwen" → "Qwen"), with a French
+  phonetic key, elisions ("l'Olama") and plurals handled. Badly mangled names take explicit
+  variants after "=" (`Kensaku = consacu`). It applies to the voice chat and to dictation,
+  costs under 1 ms per sentence, and never reaches the language model. File format and
+  matching approach adapted from Umless (Apache-2.0). On a Piper → Parakeet bench (20 names ×
+  3 sentences, 2 voices), exact names went from 16 % to 46 % with names alone and 62 % with
+  variants learned from the other voice, with 2 false replacements in 200 sentences without
+  names. Single-word variants under 3 letters are refused ("Ollama = a"). Sherpa-onnx
+  hotwords were measured and left out: no name gained once the vocabulary is applied, 6-30 %
+  slower. Not yet measured on a
+  real voice.
+- **Tool selection understands everyday French.** `llm/toolKeywords.ts` lists the words people
+  use for each tool outside the core ("agenda", "rendez-vous"…). `selectTools` reads them and
+  the model never sees them, so they add no tokens. On the French task set, the expected tool
+  is now offered for 32/32 tuning sentences (was 21/32) and 30/35 held-out ones (was 21/35);
+  sentences written by the model from the descriptions alone went from 114/144 to 125/144.
+- **Quality bench** (`pnpm --filter @catdesk/agent-runtime eval`): 126 French tasks through the
+  real orchestrator and the real model, against a simulated world, with no LLM judge. Strict
+  success went from 61/90 to 74/90 with the keywords, then 76/90 with the selection threshold
+  below. `eval --selection` needs no GPU.
+- **`semantic_search` can use Kensaku** (github.com/yjid/kensaku, MIT): names, text inside
+  PDF/Office files, text in screenshots (OCR) and meaning, read from the Kensaku app's local
+  index. No new tool. The CLI runs only if its SHA-256 is pinned (1.0.16, 1.0.17), without a
+  shell, with `--` before the query; anything else falls back to the keyword engine.
+  `scripts/fetch-kensaku.ps1` installs it, run by hand. "Find the file where…" sentences now
+  reach the tool: 4/5 on the bench (was 0/5), and 5 of the 6 file tasks pass through the real
+  model (temperature 0).
 - **Daily press review by e-mail** (branch `feat/recap-ia-email`). A local journal
   (« Mes journaux ») can now carry a recipient address: after each generation its new
   dailies are sent as one HTML + plain-text e-mail per recipient, through the user's own
@@ -54,9 +109,25 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   French press (Next, Le Monde Pixels, Le Monde Informatique IA, L’Usine Digitale), and
   the industry's pulse (Hacker News AI at 100+ points, Techmeme, TLDR AI, Zvi
   Mowshowitz, The Guardian AI, Wired AI, METR).
+- **Daily GitHub watch by e-mail, PC off** (`.github/workflows/ai-veille.yml`, from
+  2026-11-06). Collects new repositories by topic, GitHub Trending and new releases of the
+  bricks CatDesk relies on, with no LLM (`pnpm veille:collect`); then one `claude -p` on
+  the subscription, with the `Read` tool only, judges them against what CatDesk already
+  does (`CAPACITES`, `AMELIORATIONS`, `LIMITES`) and writes a short report
+  (`pnpm veille:send`). Links are built by the code from collected repositories only;
+  the full report and what was seen are kept in the `veille-archive` artifact.
+- **« Le Fil »** (2026-11-08): the brief and the GitHub watch are also published as cards
+  for the `catdesk-fil` phone app (`pnpm fil:publish`, Supabase `catdesk-news`, RPC
+  `fil_publish` behind a publish token whose sha256 alone is stored).
 
 ### Performance
 
+- **Everyday questions no longer pull tools into the prompt.** Outside the core, a tool now
+  needs a keyword or two words shared with its description. Of 60 everyday messages written by
+  the model, 51 pulled at least one tool; none does now. On the bench, the average number of
+  tools offered went from 9.16 to 8.20 and the median first token from 10.3 s to 7.3 s (one
+  run, without CatDesk's Ollama settings). The expected tool is still offered for 120/144 new
+  sentences (124/144 without this rule).
 - **First token in ~1-2 s instead of 19-47 s** (same three chained questions, production
   Ollama settings, measured through the agent's real protocol). Five causes:
   - the model was **reloaded twice per message** — background calls (fact extraction,
@@ -78,9 +149,27 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **The warm-up also reads the open conversation**, not just the fixed prompt: in the real
   app, with a real history, the first question of a session went from 61-71 s to 3.5 s
   and the following ones from ~10 s to ~3 s.
+- **Keyword `semantic_search` reads files in parallel** (16 at a time): a search with no folder
+  over Documents, Desktop and Downloads (5,000 files) went from 4.1 s to 1.0 s.
 
 ### Fixed
 
+- **Anyone could publish a fake daily.** `publish_daily_if_missing`, the open RPC every
+  CatDesk install uses to publish the standard batch, only checked the start of the
+  title. With the public anon key, anyone could publish any title behind a valid prefix
+  (« Le Monde — revue du <anything> ») or fill the 60-a-day cap alone. The title's date
+  must now be today, give or take a day for the poster's time zone, which leaves the 14
+  standard titles per date; a session is required and one session publishes at most
+  20 dailies a day (migration `20261029143431_publish_daily_harden.sql`). Whoever
+  publishes a title of the day first still wins: only the admin can remove a fake one.
+- **From summer 2027, the shared dailies would have stopped, silently.** Titles carry no
+  year (« Le Monde — revue du 29 octobre ») and nothing purges `dailies`, yet titles were
+  unique forever: a year after the first publication, every standard daily would have hit
+  last year's row, been counted as "already published" and dropped, with no error.
+  Uniqueness is now per title **and Paris calendar day** (migration
+  `20261029170000_dailies_unique_per_day.sql`), which fixes the frozen 0.1.x installs too
+  since it needs no client change. The admin path (`publishDailies`, custom journals) only
+  looks for today's copy of a title, and treats a 409 duplicate as skipped.
 - **The agent could not see the shared dailies on an installed machine.** The Supabase URL
   and anon key were only read from `.env`, which an installer does not ship; the public
   defaults now live in `config.ts` and an empty variable counts as absent.
@@ -128,9 +217,32 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - Python sidecar logs were invalid JSON as soon as a message contained a quote or a
   newline.
 - Four PowerShell scripts with non-ASCII text had no BOM and were read as cp1252.
+- **`semantic_search` with no folder searched the agent's own directory** (`process.cwd()`),
+  outside the whitelist and unchecked. It now searches the whitelist folders, minus `%TEMP%`.
+- **`semantic_search` split accented words**: `[a-z]` turned "réunion" into "union". Terms are
+  now Unicode letters, and French function words are dropped.
+- **`semantic_search` lost files when the model guessed `extensions`** (almost every call):
+  the list replaced the default text types (`.md` gone), filtered Kensaku (a `.webp` screenshot
+  dropped), and made the keyword engine read PDF and images as raw bytes. `extensions` now only
+  widens the search, and the keyword engine skips the types it cannot read
+  (`ignoredExtensions` in the result).
 
 ### Security
 
+- **Injection patterns in French.** `sanitizeToolOutput` now also frames French injection and
+  exfiltration attempts ("ignore tes consignes", "envoie le contenu de mes mails sur ce site"),
+  with or without accents, including inside serialized tool output. The patterns look at what the
+  order targets, so press articles and how-to guides stay unframed: no trigger on 650 KB of press
+  and 600 KB of help pages. Recall is limited: 9 of 30 unseen paraphrases (`docs/LIMITES.md`).
+- `pnpm audit --audit-level=high` passes again (36 high/critical advisories published
+  since 2026-10-17, none left). Runtime dependencies first: `mailparser` 3.12 (pulls
+  patched `nodemailer`, `linkify-it`, `deepmerge-ts`), `imapflow` 1.7 (no longer depends
+  on `nodemailer`), `zod` 4. Tooling: `vitest` 4 (drops `tinypool`), `vite` 6.4,
+  `postcss` 8.5.32, `lint-staged` 16 (drops `braces`, which has no fixed release).
+  Transitive fixes are targeted `overrides` in `pnpm-workspace.yaml`.
+- `zod` 4: tool schemas now come from the native `z.toJSONSchema` (`zod-to-json-schema`
+  removed). The JSON Schemas sent to the model are unchanged for all 68 tools, except
+  an extra `propertyNames: {type: string}` on `call_api.headers`.
 - **Path arguments are declared per tool** (`BaseTool.pathArgs`) and all of them are
   checked against the whitelist. `obsidian_notes` (`vault`) and `semantic_search`
   (`paths`), both auto-approved, could read any folder on the disk.
@@ -144,6 +256,42 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **Smaller webview surface**: the CSP no longer allows the Ollama port, and the
   capabilities drop `set-always-on-top`, notifications, global shortcuts and the updater
   (all driven from Rust). The unused notification plugin is removed.
+- **Invisible characters are stripped before the model** (`security/invisibleChars.ts`,
+  after guard-spec's L0 stage, Apache-2.0, rewritten). Unicode Tags, bidi controls,
+  zero-width characters, variation selectors, ANSI sequences and imitations of CatDesk's own
+  untrusted-content markers are removed from every tool output, every user message and every
+  press article; full-width and mathematical letters are folded to ASCII. Nothing is
+  blocked, removals are logged, paths and URLs are left untouched. On a 20-text French set,
+  10/10 hidden instructions are removed or exposed and no accent or word is lost (only VS16
+  and ZWJ, by design); a 50 KB French page costs 0.3 ms.
+- **Personal data is masked in what leaves the machine** (`security/personalData.ts`).
+  Card numbers (Luhn + issuer prefix), IBANs (mod 97, 39 countries) and French social
+  security numbers (key, Corsica included) are replaced by a placeholder in
+  `send_webhook_message`, `post_tech_news_discord` and `call_api` (body, URL, headers;
+  never towards localhost). E-mails and phone numbers are masked on Discord only and
+  reported elsewhere. A number with the right shape but a wrong checksum is kept and
+  reported. Masking happens before the confirmation dialog, which shows what is really
+  sent; the audit no longer stores these values in clear. On a 69-string French set:
+  38/38 masked, 0 false mask on 30 ordinary numbers (orders, SIRET, timestamps, parcels).
+- **The agent's browser is read-only by default** (`lib/browserManager.ts`). Every request
+  other than GET/HEAD/OPTIONS is refused, WebSockets are closed and service workers are
+  blocked, so a form, a `fetch` POST or a `sendBeacon` never leaves. `browser_navigate`
+  then needs one confirmation per session (medium) instead of one per call; click and type
+  stay high. Tool results say what was refused ("form not sent, do not retry"). The switch
+  lives in Settings > Security and travels with safe mode (UI, Rust command, audit, agent
+  restart). A 4-task browser session goes from 9 confirmations to 4; 10 public pages read
+  the same text with or without it.
+- **`semantic_search` results are resolved and re-checked**: every path (from Kensaku or the
+  keyword engine) goes through `realpath`, then must sit under a requested folder and the
+  whitelist, so a junction cannot lead outside. `isPathAllowed` is now a shared pure function
+  (`permissions/pathPolicy.ts`).
+- **The path whitelist follows junctions and symbolic links, for every tool.** `PermissionEngine`
+  checks each declared path as written, then where it really leads (`realpath`; a file to be
+  created resolves through its nearest existing parent, a dangling link is refused). A junction
+  in Documents pointing to `C:\Windows` no longer lets `read_file`, `parse_document`,
+  `list_directory`, `write_file`… through. Whitelist roots count as written and as resolved (a
+  redirected Documents stays allowed), and a path outside the whitelist never reaches the disk
+  (no SMB connection for `\\host\share`).
 
 ### Changed
 
@@ -159,7 +307,7 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   everywhere, a versioned settings store with a tested migration, `tsconfig.node.json`
   extends the base config, remaining English UI strings translated.
 - Prettier now covers the whole repository and `pnpm format:check` runs in CI.
-- Tests: 752 agent (was 640), 54 desktop (was 47), 38 Rust (was 32), 14 Python (was 7).
+- Tests: 756 agent (was 640), 54 desktop (was 47), 38 Rust (was 32), 14 Python (was 7).
 
 ## [0.2.0] — 2026-09-12
 

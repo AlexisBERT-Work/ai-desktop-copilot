@@ -94,8 +94,8 @@ export interface WatchedRelease {
 
 /** Ce qui survit d'un run à l'autre, dans l'artefact `veille-archive`. */
 export const VeilleStateSchema = z.object({
-  repos: z.record(z.object({ firstSeen: z.string(), stars: z.number() })),
-  releases: z.record(z.string()),
+  repos: z.record(z.string(), z.object({ firstSeen: z.string(), stars: z.number() })),
+  releases: z.record(z.string(), z.string()),
 });
 
 export type VeilleState = z.infer<typeof VeilleStateSchema>;

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { validateRepo } from '../../lib/githubApi';
 import { VEILLE_DOMAINS } from './veilleSources';
 
@@ -73,7 +72,9 @@ export type VeillePiste = z.infer<typeof Piste>;
 
 /** JSON Schema donné à `claude -p --json-schema`. */
 export function veilleJsonSchema(): Record<string, unknown> {
-  const schema = zodToJsonSchema(VeilleReportSchema, { $refStrategy: 'none' }) as Record<
+  // Natif depuis zod 4, qui a remplacé zod-to-json-schema : draft-07, tout en
+  // ligne, `additionalProperties: false` sur chaque objet, comme avant.
+  const schema = z.toJSONSchema(VeilleReportSchema, { target: 'draft-07' }) as Record<
     string,
     unknown
   >;
