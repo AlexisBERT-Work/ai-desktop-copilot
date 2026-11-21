@@ -33,7 +33,9 @@ export function VoiceButton({ size = 'md' }: Props) {
           ? 'Je transcris…'
           : state === 'speaking'
             ? 'Cliquer pour me couper'
-            : (hint ?? 'Parler à CatDesk (Ctrl+Espace)');
+            : state === 'dictating'
+              ? 'Dictée en cours (Ctrl+Alt+Espace)'
+              : (hint ?? 'Parler à CatDesk (Ctrl+Espace)');
 
   // Halo proportionnel au niveau : 0 → rien, 1 → 14 px.
   const halo =
@@ -42,7 +44,7 @@ export function VoiceButton({ size = 'md' }: Props) {
       : undefined;
 
   const tone =
-    state === 'listening'
+    state === 'listening' || state === 'dictating'
       ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
       : state === 'speaking'
         ? 'bg-brand-500/20 text-brand-300 hover:bg-brand-500/30'
@@ -54,14 +56,14 @@ export function VoiceButton({ size = 'md' }: Props) {
     <button
       type="button"
       onClick={() => void toggleListening()}
-      disabled={!usable && state === 'idle'}
+      disabled={(!usable && state === 'idle') || state === 'dictating'}
       title={title}
       aria-label={title}
       aria-pressed={state === 'listening'}
       className={`${pad} rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${tone}`}
       style={halo ? { boxShadow: halo } : undefined}
     >
-      {state === 'listening' ? (
+      {state === 'listening' || state === 'dictating' ? (
         <Mic className={icon} />
       ) : state === 'transcribing' ? (
         <Loader2 className={`${icon} animate-spin`} />
