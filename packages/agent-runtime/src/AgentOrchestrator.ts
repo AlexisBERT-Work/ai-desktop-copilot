@@ -29,12 +29,29 @@ import type { PlaybookStore } from './playbook/PlaybookStore';
 import { approachSignature } from './playbook/PlaybookStore';
 import { classifyTask, type TaskType } from './playbook/classifyTask';
 import { sanitizeToolOutput } from './security/sanitizeToolOutput';
+import {
+  cleanInvisible,
+  createToolDataCleaner,
+  totalRemoved,
+  type InvisibleCounts,
+} from './security/invisibleChars';
 import { looksGarbled } from './lib/readableText';
 import { createLogger } from './logger';
 import { CONFIG } from './config';
 import { buildSystemPrompt, buildTurnContext, withTurnContext } from './prompts/systemPrompt';
 
 const log = createLogger('agent:orchestrator');
+
+/** Journalise ce que le nettoyage a retiré (rien n'est bloqué). Muet si rien. */
+function logInvisible(
+  runId: string,
+  source: string,
+  removed: InvisibleCounts,
+  keptVerbatim = 0,
+): void {
+  if (totalRemoved(removed) === 0 && keptVerbatim === 0) return;
+  log.warn('Invisible characters removed', { runId, source, removed, keptVerbatim });
+}
 
 // Avec ~50 outils exposés, le prompt (schémas + system + historique) dépasse
 // largement 4096 tokens. Sans une fenêtre assez grande, Ollama tronque le
@@ -196,13 +213,18 @@ export class AgentOrchestrator {
    * sinon l'UI, qui n'attend que des étapes, resterait en « réfléchit… ».
    */
   async *process(
-    input: string,
+    rawInput: string,
     conversationId: string,
     config: AgentConfig,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStep> {
     const runId = crypto.randomUUID();
     log.info('Run started', { runId, conversationId, model: config.model });
+    // Un texte collé peut porter une consigne invisible (bloc Tags) : on la
+    // retire avant tout, cache, historique et mémoire compris.
+    const cleaned = cleanInvisible(rawInput);
+    logInvisible(runId, 'user_input', cleaned.removed);
+    const input = cleaned.text;
     this.deps.audit.startRun(runId, conversationId, input);
     const { scheduler } = this.deps;
     // Premier plan : le travail de fond en cours cède le GPU tout de suite, et
@@ -643,9 +665,14 @@ export class AgentOrchestrator {
       // so redact secrets and neutralize injection BEFORE it gets there.
       // Applied to BOTH success and error branches — an error message can
       // echo file contents, injected text, or secrets just as easily.
+      // L'invisible (bloc Tags, bidi, largeur nulle, ANSI) est retiré PENDANT la
+      // sérialisation : après, ESC n'est plus qu'un texte « \u001b ».
       // `?? 'null'` : JSON.stringify(undefined) vaut undefined, pas une chaîne.
+      const cleaner = createToolDataCleaner();
       const rawContent =
-        JSON.stringify(result.success ? result.data : { error: result.error }) ?? 'null';
+        JSON.stringify(result.success ? result.data : { error: result.error }, cleaner.replacer) ??
+        'null';
+      logInvisible(opts.runId, toolCall.name, cleaner.removed, cleaner.keptVerbatim);
       const scan = sanitizeToolOutput(rawContent);
       if (scan.redactions.length > 0 || scan.injectionFlags.length > 0) {
         log.warn('Tool output sanitized', {
@@ -661,11 +688,11 @@ export class AgentOrchestrator {
       log.error('Tool execution failed', { tool: toolCall.name, error });
       activity?.recordToolCall(toolCall.name, toolCall.args, false);
       yield { type: 'tool_error', toolName: toolCall.name, error };
-      return {
-        role: 'tool',
-        content: JSON.stringify({ error }),
-        tool_call_id: toolCall.id,
-      };
+      // Un message d'exception peut recopier un contenu externe : même nettoyage.
+      const cleaner = createToolDataCleaner();
+      const content = JSON.stringify({ error }, cleaner.replacer);
+      logInvisible(opts.runId, toolCall.name, cleaner.removed, cleaner.keptVerbatim);
+      return { role: 'tool', content, tool_call_id: toolCall.id };
     }
   }
 

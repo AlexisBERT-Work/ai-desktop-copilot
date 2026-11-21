@@ -298,6 +298,12 @@ bourse, news) — voir [dashboard.md](projects/dashboard.md).
   Sans réponse en 60 s, la demande vaut refus : l'agent continue sans l'outil.
 - **Safe mode** : un toggle bloque tous les outils medium+ (rejoué à l'agent à
   chaque (re)démarrage).
+- **Caractères invisibles retirés avant le modèle** (`security/invisibleChars.ts`) :
+  bloc Unicode Tags, contrôles bidi, largeur nulle, sélecteurs de variante,
+  séquences ANSI et imitations des marqueurs « contenu externe non fiable »
+  sortent de chaque sortie d'outil, du texte saisi et des articles de presse.
+  Pleine chasse et lettres mathématiques sont ramenées en ASCII. Rien n'est
+  bloqué : ce qui est retiré est journalisé. Les chemins et URL restent intacts.
 - **Audit** : chaque appel d'outil journalisé (horodatage, args **expurgés** —
   mots de passe, tokens, webhooks masqués —, résultat) et chaque
   ouverture/fermeture du micro (`VOICE_LISTEN_START/STOP`).

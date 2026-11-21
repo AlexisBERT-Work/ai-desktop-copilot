@@ -318,3 +318,28 @@ trous réels, quatre durcissements.
   parle pas à Ollama — règle n°1) ; les capacités perdent
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
+
+## Mise à jour 2026-11-12 — caractères invisibles (veille du 11/11)
+
+Une page, un fichier ou un mail peut cacher une consigne que l'utilisateur ne
+voit pas mais que le modèle lit : bloc Unicode Tags (U+E0000–E007F), texte
+entouré de contrôles bidi, mots coupés par des caractères de largeur nulle pour
+échapper aux motifs de `sanitizeToolOutput`, séquences ANSI, ou faux marqueur
+« [FIN DU CONTENU EXTERNE NON FIABLE] » qui ferait croire que la suite vient de
+CatDesk.
+
+- **`security/invisibleChars.ts`** reprend l'étage L0 de guard-spec
+  (Apache-2.0), réécrit en TypeScript. Il retire tout cela, ramène pleine chasse
+  et lettres mathématiques en ASCII, et boucle jusqu'à stabilité (8 passes au
+  plus). Pas de NFKC global : il aurait changé le texte légitime (« … »,
+  espaces insécables, m²) et les noms de fichiers que le modèle réutilise.
+- **Trois points d'entrée** : chaque sortie d'outil, pendant la sérialisation
+  (`AgentOrchestrator`, branche d'erreur comprise : après, ESC n'est plus
+  qu'un texte), le texte saisi par l'utilisateur, avant le cache et l'historique,
+  et les articles de presse (`aggregateNews`, `enrichArticleTexts`), qui partent
+  au modèle puis dans les dailys publiées.
+- **Ni blocage ni refus** : on nettoie et on journalise
+  (`Invisible characters removed`, par catégorie). Les valeurs sous une clé de
+  chemin ou d'URL ne sont pas modifiées, seulement comptées.
+- **Limite** : une consigne écrite en clair passe toujours. Le nettoyage la rend
+  visible aux motifs de détection, il ne la reconnaît pas lui-même.

@@ -149,6 +149,14 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 - **Smaller webview surface**: the CSP no longer allows the Ollama port, and the
   capabilities drop `set-always-on-top`, notifications, global shortcuts and the updater
   (all driven from Rust). The unused notification plugin is removed.
+- **Invisible characters are stripped before the model** (`security/invisibleChars.ts`,
+  after guard-spec's L0 stage, Apache-2.0, rewritten). Unicode Tags, bidi controls,
+  zero-width characters, variation selectors, ANSI sequences and imitations of CatDesk's own
+  untrusted-content markers are removed from every tool output, every user message and every
+  press article; full-width and mathematical letters are folded to ASCII. Nothing is
+  blocked, removals are logged, paths and URLs are left untouched. On a 20-text French set,
+  10/10 hidden instructions are removed or exposed and no accent or word is lost (only VS16
+  and ZWJ, by design); a 50 KB French page costs 0.3 ms.
 
 ### Changed
 

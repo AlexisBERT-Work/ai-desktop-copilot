@@ -1,6 +1,9 @@
 // Helpers de texte des flux : décodage d'entités, extraction de balise, coupe
 // propre. Purs, exportés pour les tests.
 
+import { cleanInvisible } from '../security/invisibleChars';
+import type { NewsItem } from './newsItem';
+
 export function decodeEntities(s: string): string {
   return s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -45,4 +48,20 @@ export function toExcerpt(raw: string, max = 500): string {
     .replace(/\s+/g, ' ')
     .trim();
   return cutAtSentence(text, max);
+}
+
+/**
+ * Retire l'invisible (bloc Tags, bidi, largeur nulle) du texte d'un article : il
+ * part dans quatre appels de fond au modèle, puis il est publié dans les dailys.
+ * L'URL n'est pas touchée : c'est une adresse, pas un texte lu.
+ */
+export function cleanNewsItem(item: NewsItem): NewsItem {
+  const clean = (s: string): string => cleanInvisible(s).text;
+  return {
+    ...item,
+    title: clean(item.title),
+    source: clean(item.source),
+    ...(item.excerpt !== undefined ? { excerpt: clean(item.excerpt) } : {}),
+    ...(item.fullText !== undefined ? { fullText: clean(item.fullText) } : {}),
+  };
 }

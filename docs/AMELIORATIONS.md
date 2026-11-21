@@ -283,6 +283,27 @@ rien à faire au milieu d'un journal.
     réutilisation du cache de préfixe sous Ollama (`scripts/latency-bench.mjs`) :
     les rapports se contredisent selon les versions, et tout le gain de latence
     du 2026-10-08 en dépend.
+- **Pistes de la veille GitHub** (rapports du 6 au 12/11, workflow `ai-veille.yml`).
+  Les cinq « 🟢 À faire ensemble » sont développées une par une, une branche et
+  une PR chacune, validées à chaque étape :
+  - ✅ **Caractères invisibles retirés avant le modèle** (11/11, d'après guard-spec) :
+    branche `feat/nettoyage-unicode`. Voir [LIMITES.md](LIMITES.md) § 5.
+  - **Données personnelles masquées à la sortie** (7/11) : cartes, IBAN et NIR
+    validés par somme de contrôle masqués dans `send_webhook_message`,
+    `post_tech_news_discord` et `call_api` ; e-mails et téléphones masqués sur
+    Discord seulement, signalés ailleurs.
+  - **Navigateur en lecture seule imposée** (6/11) : tranche la friction de
+    `browser_navigate` (plus bas).
+  - **Dictée dans le champ actif de n'importe quelle appli** (8/11) : raccourci
+    appuyer-pour-parler, frappe Unicode, 100 % CPU.
+  - **Kensaku comme moteur de `semantic_search`** (6/11) : PDF, DOCX et captures,
+    sans outil ajouté ; binaire épinglé, installé par l'utilisateur.
+  - À garder (🟡), sans date : arbre d'accessibilité avec `ref` cliquables (après
+    la lecture seule), reclassement des passages (lifeboat), citations vérifiées
+    d'un compte rendu (tingo), leçons tirées des corrections, capture du son
+    système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
+    Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
+    (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :
