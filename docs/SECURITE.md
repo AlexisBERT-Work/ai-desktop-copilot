@@ -414,3 +414,31 @@ d'API qui emporte un numéro de carte.
 - **Limite** : noms, adresses et téléphones étrangers passent ; un outil qui
   sortirait du texte sans déclarer le crochet n'est pas couvert. Voir
   [LIMITES.md](LIMITES.md) § 5.
+
+## Mise à jour 2026-11-12 — navigateur en lecture seule (veille du 6/11)
+
+`browser_navigate` était `high` : une confirmation à chaque page, si bien qu'une
+recherche sur trois pages demandait trois clics, et qu'on finissait par
+confirmer sans lire. Le risque réel d'ouvrir une page, c'est ce qu'elle peut
+**envoyer** (un formulaire soumis par un script injecté, une donnée glissée
+dans un POST).
+
+- **Lecture seule, active par défaut** (`lib/browserManager.ts`, seule source
+  de vérité) : `context.route('**/*')` refuse toute méthode autre que
+  GET/HEAD/OPTIONS, `routeWebSocket` ferme les WebSockets, `serviceWorkers:
+'block'` empêche un service worker de contourner la route. Les écritures
+  refusées vont dans un tampon (50) ; chaque outil dit ce que son action a
+  déclenché et qui a été refusé.
+- **Risque effectif** (`PermissionEngine.effectiveRisk`) : une fiche peut
+  déclarer `riskLevelWhenReadOnly`. Seul `browser_navigate` le fait (`medium`) ;
+  le risque déclaré reste `high`. Le moteur lit la lecture seule à chaque
+  décision : coupée, `browser_navigate` redemande à chaque fois, même après une
+  autorisation « pour la session ». Le mode sans danger le bloque toujours.
+- **Le réglage voyage avec `safeMode`** dans le même objet : store de l'UI
+  (toujours les deux), commande Rust `update_settings` (audit
+  `SETTINGS_UPDATE` avec les deux valeurs), mémoire du superviseur rejouée au
+  redémarrage de l'agent, `StdinBridge`.
+- **Testé sur un vrai navigateur** (serveur HTTP local, sauté sans navigateur) :
+  formulaire POST, `fetch` POST, `sendBeacon` et WebSocket refusés, rien
+  n'arrive au serveur ; lecture seule coupée, le POST passe.
+- **Limite** : une écriture par GET passe. Voir [LIMITES.md](LIMITES.md) § 4.

@@ -57,6 +57,8 @@ export interface StdinBridgeDeps {
   ) => void | Promise<void>;
   /** Publication immédiate de la revue de presse partagée (bouton admin). */
   runPressDigest?: () => void | Promise<void>;
+  /** Lecture seule du navigateur, réglée dans l'onglet Sécurité (voyage avec `safeMode`). */
+  setBrowserReadOnly?: (on: boolean) => void | Promise<void>;
   /** Journaux personnalisés locaux — absent si non câblé (tests). */
   localPress?: LocalPressControl;
   /**
@@ -189,10 +191,13 @@ export class StdinBridge {
           return;
 
         case RPC_METHODS.settingsUpdate: {
-          const params = request.params as { safeMode?: unknown };
+          const params = request.params as { safeMode?: unknown; browserReadOnly?: unknown };
           orchestrator.updatePermissions({
             ...(typeof params.safeMode === 'boolean' ? { safeMode: params.safeMode } : {}),
           });
+          if (typeof params.browserReadOnly === 'boolean') {
+            await this.deps.setBrowserReadOnly?.(params.browserReadOnly);
+          }
           this.sendResponse(request.id, { ok: true });
           return;
         }

@@ -177,6 +177,14 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   reported. Masking happens before the confirmation dialog, which shows what is really
   sent; the audit no longer stores these values in clear. On a 69-string French set:
   38/38 masked, 0 false mask on 30 ordinary numbers (orders, SIRET, timestamps, parcels).
+- **The agent's browser is read-only by default** (`lib/browserManager.ts`). Every request
+  other than GET/HEAD/OPTIONS is refused, WebSockets are closed and service workers are
+  blocked, so a form, a `fetch` POST or a `sendBeacon` never leaves. `browser_navigate`
+  then needs one confirmation per session (medium) instead of one per call; click and type
+  stay high. Tool results say what was refused ("form not sent, do not retry"). The switch
+  lives in Settings > Security and travels with safe mode (UI, Rust command, audit, agent
+  restart). A 4-task browser session goes from 9 confirmations to 4; 10 public pages read
+  the same text with or without it.
 
 ### Changed
 

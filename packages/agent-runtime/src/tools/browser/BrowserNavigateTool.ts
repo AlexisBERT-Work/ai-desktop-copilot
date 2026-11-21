@@ -3,6 +3,7 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { BrowserManager } from '../../lib/browserManager';
+import { blockedWritesReport } from './blockedWrites';
 
 const argsSchema = z.object({
   url: z.string().min(1).describe('URL to navigate to (must start with http:// or https://)'),
@@ -31,11 +32,11 @@ export class BrowserNavigateTool extends BaseTool<Args> {
     if (!/^https?:\/\//i.test(url)) return this.fail('url doit commencer par http:// ou https://');
 
     try {
-      const result = await BrowserManager.get().navigate(url.trim(), {
+      const { blockedWrites, ...result } = await BrowserManager.get().navigate(url.trim(), {
         ...(wait_until !== undefined ? { waitUntil: wait_until } : {}),
         ...(timeout_ms !== undefined ? { timeoutMs: timeout_ms } : {}),
       });
-      return this.ok(result);
+      return this.ok({ ...result, ...blockedWritesReport(blockedWrites, 'navigate') });
     } catch (err) {
       return this.fail(`Navigation échouée: ${err instanceof Error ? err.message : String(err)}`);
     }
