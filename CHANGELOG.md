@@ -157,6 +157,15 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   blocked, removals are logged, paths and URLs are left untouched. On a 20-text French set,
   10/10 hidden instructions are removed or exposed and no accent or word is lost (only VS16
   and ZWJ, by design); a 50 KB French page costs 0.3 ms.
+- **Personal data is masked in what leaves the machine** (`security/personalData.ts`).
+  Card numbers (Luhn + issuer prefix), IBANs (mod 97, 39 countries) and French social
+  security numbers (key, Corsica included) are replaced by a placeholder in
+  `send_webhook_message`, `post_tech_news_discord` and `call_api` (body, URL, headers;
+  never towards localhost). E-mails and phone numbers are masked on Discord only and
+  reported elsewhere. A number with the right shape but a wrong checksum is kept and
+  reported. Masking happens before the confirmation dialog, which shows what is really
+  sent; the audit no longer stores these values in clear. On a 69-string French set:
+  38/38 masked, 0 false mask on 30 ordinary numbers (orders, SIRET, timestamps, parcels).
 
 ### Changed
 

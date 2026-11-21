@@ -484,6 +484,9 @@ Tu as déjà : sandbox Rust, permissions risk-gated, audit. Il manque :
 2. **Post-execution scan** sur les outputs d'outils (le plus important — surtout pour la
    lecture web et l'OCR qui ingèrent du contenu non fiable).
 3. **Redaction PII/secrets** avant que tout output ne rentre dans le contexte.
+   🟡 Choix inverse pour les PII (2026-11-12) : le modèle étant local, on masque ce
+   qui **sort** (webhook, Discord, `call_api` — `security/personalData.ts`), pas ce
+   qu'il lit. Les secrets, eux, sont redactés à l'entrée (`sanitizeToolOutput`).
 4. **Isolation réseau** pour l'exécution de code généré (pas d'accès réseau par défaut).
 
 > Frameworks open-source à regarder pour t'inspirer : LLM-Guard (Protect AI), NeMo Guardrails
