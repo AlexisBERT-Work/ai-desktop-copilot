@@ -10,6 +10,7 @@ import type { SemanticCache } from './memory/SemanticCache';
 import type { FactExtractor } from './memory/FactExtractor';
 import { LlmScheduler } from './llm/LlmScheduler';
 import { toTags } from './security/invisibleChars.corpus';
+import { textTokens } from './llm/contextBudget';
 import type {
   AgentConfig,
   AgentStep,
@@ -95,6 +96,8 @@ function makeHarness(opts: HarnessOptions = {}) {
       ],
     execute: executeTool,
     filesystemTargets: () => [],
+    continuationHint: (name: string) =>
+      name === 'echo' ? 'Rappelle echo avec une partie plus précise.' : undefined,
     prepareOutboundArgs:
       opts.outbound ??
       ((_name: string, args: Record<string, unknown>): OutboundPreparation => ({ ok: true, args })),
@@ -827,5 +830,42 @@ describe("AgentOrchestrator — contrôles d'après réponse", () => {
     const h = makeHarness({ turns: [[token('Résumé.'), done(1200)]] });
     const steps = await collect(h.orchestrator.process('résume', 'conv-1', CONFIG));
     expect(steps.at(-1)).toEqual({ type: 'done', content: 'Résumé.' });
+  });
+});
+
+describe('AgentOrchestrator — budget des sorties d’outils', () => {
+  it('réduit une sortie trop longue avant le modèle, l’UI garde tout', async () => {
+    const text = `DÉBUT ${'paragraphe de rapport annuel '.repeat(4000)}FIN`;
+    const h = makeHarness({
+      toolResult: { success: true, data: { format: 'pdf', text, truncated: false } },
+      turns: [[nativeCall('echo', {})], [token('fini')]],
+    });
+    const steps = await collect(h.orchestrator.process('lis le rapport', 'conv-1', CONFIG));
+
+    const shown = steps.find(s => s.type === 'tool_result');
+    expect(shown?.type === 'tool_result' && shown.result.success && shown.result.data).toEqual({
+      format: 'pdf',
+      text,
+      truncated: false,
+    });
+
+    const toolMsg = (h.llmCalls[1]?.messages ?? []).find(m => m.role === 'tool');
+    const sent = JSON.parse(toolMsg?.content ?? '{}') as Record<string, string | boolean>;
+    expect(sent.sortieCoupee).toContain('Rappelle echo avec une partie plus précise.');
+    expect(sent.truncated).toBe(true);
+    expect(sent.format).toBe('pdf');
+    expect(String(sent.text).startsWith('DÉBUT')).toBe(true);
+    expect(sent.text).not.toContain('FIN');
+    expect(textTokens(toolMsg?.content ?? '')).toBeLessThan(8192 - 1024);
+  });
+
+  it('laisse intacte une sortie qui tient', async () => {
+    const h = makeHarness({
+      toolResult: { success: true, data: { text: 'court' } },
+      turns: [[nativeCall('echo', {})], [token('fini')]],
+    });
+    await collect(h.orchestrator.process('lis', 'conv-1', CONFIG));
+    const toolMsg = (h.llmCalls[1]?.messages ?? []).find(m => m.role === 'tool');
+    expect(toolMsg?.content).toBe(JSON.stringify({ text: 'court' }));
   });
 });

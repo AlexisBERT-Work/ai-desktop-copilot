@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CHARS_PER_TOKEN,
   contextUsage,
+  cutToTokens,
   messagesTokens,
+  MIN_TOOL_TOKENS,
   overflowNotice,
   textTokens,
+  toolOutputBudget,
 } from './contextBudget';
 
 describe('estimation', () => {
@@ -82,6 +85,40 @@ describe('contextUsage', () => {
       overflow: true,
     });
     expect(contextUsage({ estimated: 5000, numCtx: 8192 }).overflow).toBe(false);
+  });
+});
+
+describe('cutToTokens', () => {
+  it('rend un début qui tient dans le budget, coupé sur un blanc', () => {
+    const text = 'lorem ipsum dolor sit amet '.repeat(200);
+    const cut = cutToTokens(text, 100);
+    expect(textTokens(cut)).toBeLessThanOrEqual(100);
+    expect(textTokens(cut)).toBeGreaterThan(90);
+    expect(text.startsWith(cut)).toBe(true);
+    expect(text.charAt(cut.length)).toBe(' ');
+  });
+
+  it('rend le texte entier quand il tient, et ne coupe jamais un émoji en deux', () => {
+    expect(cutToTokens('court', 100)).toBe('court');
+    const emojis = '😀'.repeat(400);
+    const cut = cutToTokens(emojis, 50);
+    expect(cut.length % 2).toBe(0);
+  });
+});
+
+describe('toolOutputBudget', () => {
+  it('donne la place qui reste avant la réponse, partagée entre les appels', () => {
+    const one = toolOutputBudget({ used: 2000, numCtx: 8192, maxTokens: 1024, remainingCalls: 1 });
+    const two = toolOutputBudget({ used: 2000, numCtx: 8192, maxTokens: 1024, remainingCalls: 2 });
+    expect(one).toBeGreaterThan(4000);
+    expect(one + 2000).toBeLessThan(8192 - 1024);
+    expect(two).toBeLessThan(one / 2 + 10);
+  });
+
+  it('ne descend jamais sous le plancher, même fenêtre pleine', () => {
+    expect(toolOutputBudget({ used: 9000, numCtx: 8192, maxTokens: 1024, remainingCalls: 1 })).toBe(
+      MIN_TOOL_TOKENS,
+    );
   });
 });
 

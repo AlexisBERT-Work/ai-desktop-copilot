@@ -33,16 +33,40 @@ export const CHARS_PER_TOKEN = 2.7;
 /** Balises du gabarit de chat autour de chaque message (rôle, début, fin). */
 const MESSAGE_OVERHEAD = 5;
 
+const isDigit = (c: number): boolean => c >= 48 && c <= 57;
+const isBlank = (c: number): boolean =>
+  c === 32 || (c >= 9 && c <= 13) || c === 0xa0 || c === 0x202f;
+
 /** Tokens estimés d'un texte (prose, sortie d'outil ou schémas JSON). */
 export function textTokens(text: string): number {
   let digits = 0;
   let blanks = 0;
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
-    if (c >= 48 && c <= 57) digits++;
-    else if (c === 32 || (c >= 9 && c <= 13) || c === 0xa0 || c === 0x202f) blanks++;
+    if (isDigit(c)) digits++;
+    else if (isBlank(c)) blanks++;
   }
   return Math.ceil(digits + (text.length - digits - blanks) / CHARS_PER_TOKEN);
+}
+
+/**
+ * Début de `text` estimé à `maxTokens` au plus (même barème que `textTokens`),
+ * coupé sur un blanc proche plutôt qu'au milieu d'un mot.
+ */
+export function cutToTokens(text: string, maxTokens: number): string {
+  let cost = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    cost += isDigit(c) ? 1 : isBlank(c) ? 0 : 1 / CHARS_PER_TOKEN;
+    if (cost <= maxTokens) continue;
+    const blank = text.lastIndexOf(' ', i);
+    let end = blank > 0 && blank > i - 40 ? blank : i;
+    // Jamais la moitié d'une paire de substitution (émoji, idéogramme rare).
+    const prev = text.charCodeAt(end - 1);
+    if (prev >= 0xd800 && prev <= 0xdbff) end--;
+    return text.slice(0, end);
+  }
+  return text;
 }
 
 /** Tokens d'un historique tel qu'il part à Ollama (contenu + tool calls rejoués). */
@@ -86,6 +110,31 @@ export function contextUsage(opts: {
     return { tokens: estimated, overflow: true };
   }
   return { tokens: counted, overflow: false };
+}
+
+/**
+ * Part de la fenêtre laissée au prompt : la réponse (`num_predict`) doit tenir
+ * derrière, et l'estimation peut sous-compter un JSON très chiffré (0,86).
+ */
+const PROMPT_SHARE = 0.95;
+/** Sortie d'outil jamais réduite sous ce plancher : le débordement sera signalé. */
+export const MIN_TOOL_TOKENS = 300;
+
+/**
+ * Tokens qu'une sortie d'outil peut occuper pour que le prompt suivant tienne
+ * dans `num_ctx` : la place restante, partagée entre les appels de l'étape qui
+ * n'ont pas encore répondu.
+ */
+export function toolOutputBudget(opts: {
+  /** Prompt déjà engagé : prompt système, schémas, historique du run. */
+  used: number;
+  numCtx: number;
+  maxTokens: number;
+  remainingCalls: number;
+}): number {
+  const room = Math.floor(PROMPT_SHARE * (opts.numCtx - opts.maxTokens)) - opts.used;
+  const share = Math.floor(room / Math.max(1, opts.remainingCalls)) - MESSAGE_OVERHEAD;
+  return Math.max(MIN_TOOL_TOKENS, share);
 }
 
 /** Mention ajoutée à la réponse quand un appel du run a débordé. */

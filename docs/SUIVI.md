@@ -26,8 +26,9 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20).
+**Contrôles d'après réponse** (`feat/garde-fous-reponse`, entrée du
+2026-11-20) : dans `dev` depuis le 2026-11-21 (#43). **En PR vers `dev`** :
+`feat/budget-sorties-outils` (#46, sorties d'outils à la taille de la fenêtre).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -52,6 +53,36 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-21 — Sorties d'outils à la taille de la fenêtre
+
+Plan B de l'analyse de la veille, sur `feat/budget-sorties-outils`, coupée de
+`feat/garde-fous-reponse` (il lui faut l'estimation de `llm/contextBudget.ts`).
+Le Plan A **prévenait** d'un prompt trop long ; celui-ci l'**évite** : chaque
+sortie d'outil est réduite à la place qui reste avant d'entrer dans le prompt
+(`llm/fitToBudget.ts`, détail dans [CAPACITES.md](CAPACITES.md) § 9), et
+`parse_document` prend un `start_page` pour lire la suite d'un PDF.
+
+`read_webpage` envoyait jusqu'à 20 000 caractères (~7 400 tokens, presque toute
+la fenêtre), `parse_document` jusqu'à 50 pages sans plafond.
+
+| Long PDF, 30 pages (~12 000 tokens), `qwen3:14b`, température 0 | Sans réduction        | Avec réduction                               |
+| --------------------------------------------------------------- | --------------------- | -------------------------------------------- |
+| Prompt envoyé                                                   | ~15 000 tokens, coupé | 5 849 tokens comptés, il tient               |
+| Réponse                                                         | aucune (délai, 131 s) | code de la page 1, la suite dite « non lue » |
+
+Premier essai : le modèle a conclu que les pages coupées « ne mentionnent pas
+de code », sur la foi des champs `lastPage: 30` et `truncated: false` de
+l'outil. Le mot qui accompagne la coupe dit désormais que tout ce qui suit la
+marque n'a pas été lu, même si d'autres champs disent le contraire, et
+`truncated` est remis à vrai. Deux tâches ajoutées au banc (`doc-long-codes`,
+`h-doc-long-tout`) : 2/2, plus les 3 tâches de documents existantes : 3/3.
+Banc complet et `latency-bench` non rejoués : rien n'entre dans le prompt
+système, et une sortie qui tient n'est pas touchée.
+
+**Compression des sorties JSON (veille du 14/11) : écartée.** Mesurée sur 18
+vraies sorties d'outils, elle ne retire que 12,4 % des tokens réels (seuil fixé :
+30 %), et rien sur la prose. Détail dans [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 
 ## 2026-11-20 — Garde-fous de réponse
 

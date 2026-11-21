@@ -54,6 +54,56 @@ const LOCAL_FILES = [
   },
 ];
 
+/**
+ * Un long PDF (30 pages, ~17 000 tokens : deux fois la fenêtre de qwen3) avec
+ * trois codes, au début, au milieu et à la fin. Sans réduction des sorties,
+ * Ollama coupait le prompt sans prévenir et le modèle citait trois codes faux
+ * (mesuré le 2026-11-20). `start_page` est respecté, comme le vrai outil.
+ */
+export const LONG_PDF_CODES = { 1: 'AX-7319', 15: 'BK-2864', 30: 'CQ-5021' } as const;
+const LONG_PDF_PAGES = 30;
+
+function longPdfPage(n: number): string {
+  const code = LONG_PDF_CODES[n as keyof typeof LONG_PDF_CODES];
+  const filler =
+    `Section ${n}. Le comité a examiné les comptes de l'exercice, les contrats ` +
+    `fournisseurs et les procédures internes. Aucune anomalie significative n'a ` +
+    `été relevée sur les ${n * 37} pièces contrôlées ce mois-ci. `;
+  return (
+    `--- Page ${n} ---\n` +
+    (code ? `Code de vérification de la page ${n} : ${code}.\n` : '') +
+    filler.repeat(6)
+  );
+}
+
+const parseDocument: SimulatedResponse = args => {
+  const path = String(args['path'] ?? '');
+  if (!/audit/i.test(path)) {
+    return {
+      success: true,
+      data: {
+        pages: 4,
+        text: 'Le rapport conclut à une hausse de 12 % des ventes, portée par le marché allemand.',
+      },
+    };
+  }
+  const first = Math.max(1, Number(args['start_page'] ?? 1) || 1);
+  const last = Math.min(LONG_PDF_PAGES, first + (Number(args['max_pages'] ?? 50) || 50) - 1);
+  const pages: string[] = [];
+  for (let n = first; n <= last; n++) pages.push(longPdfPage(n));
+  return {
+    success: true,
+    data: {
+      format: 'pdf',
+      text: pages.join('\n\n'),
+      totalPages: LONG_PDF_PAGES,
+      firstPage: first,
+      lastPage: last,
+      truncated: last < LONG_PDF_PAGES,
+    },
+  };
+};
+
 const searchLocalFiles: SimulatedResponse = args => {
   const query = fold(String(args['query'] ?? ''));
   const hits = LOCAL_FILES.filter(f => f.words.some(w => query.includes(w)));
@@ -155,10 +205,7 @@ export function simulatedWorld(now: Date): SimulatedWorld {
     }),
     ocr_region: ok({ text: 'Total TTC : 1 284,50 €', confidence: 0.86 }),
     capture_screen: ok({ path: 'C:/Users/moi/AppData/Local/Temp/capture.png', width: 2560 }),
-    parse_document: ok({
-      pages: 4,
-      text: 'Le rapport conclut à une hausse de 12 % des ventes, portée par le marché allemand.',
-    }),
+    parse_document: parseDocument,
     analyze_data: ok({
       rows: 120,
       columns: ['produit', 'prix', 'quantite'],

@@ -40,6 +40,9 @@ export abstract class BaseTool<A = unknown> implements RegisteredTool {
    */
   readonly pathArgs: readonly string[] = [];
 
+  /** Voir `RegisteredTool.continuationHint`. */
+  readonly continuationHint?: string;
+
   abstract execute(args: A): Promise<ToolResult>;
 
   /** Valeurs des `pathArgs` présentes dans des arguments bruts (avant validation). */

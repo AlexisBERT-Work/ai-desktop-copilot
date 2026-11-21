@@ -292,9 +292,29 @@ rien à faire au milieu d'un journal.
     texte envoyé : un token par chiffre, les blancs gratuits, le reste à 2,7
     caractères par token. Calibré sur 14 textes, il tombe entre 0,86 et 1,5
     fois le réel. Un compteur bien en dessous de l'estimation trahit la coupe.
-    **Suite** (Plan B de la veille) : découper `parse_document`,
-    `read_webpage` et `search_dailies` sur ce budget, avant d'envoyer le
-    prompt, plutôt que prévenir après.
+    **Suite traitée** sur `feat/budget-sorties-outils` (Plan B, 2026-11-21) :
+    chaque sortie d'outil est réduite à la place qui reste **avant** d'envoyer
+    le prompt (`llm/fitToBudget.ts`), avec un mot qui dit ce qui manque, et
+    `parse_document` prend un `start_page`. Banc, long PDF de 30 pages
+    (~12 000 tokens) : sans réduction, prompt coupé par Ollama et aucune réponse
+    (délai dépassé après 131 s) ; avec, le prompt tient (5 849 tokens comptés),
+    le modèle donne le code de la page 1 et dit que la suite n'a pas été lue. Il
+    ne relit pas tout seul, il propose : chaque relecture repartirait d'un
+    historique déjà plein. Reste : un `start_page` exact (il propose « page 2 »
+    alors qu'il en a lu 7), et `parse_document` qui renvoie un CSV deux fois,
+    en `rows` et en `text`.
+  - ⬜ **Sorties JSON compressées** (veille du 14/11, idée de SmartCrusher de
+    headroom) : **écartée** le 2026-11-21, mesure à l'appui. Compression sans
+    perte (listes d'objets en colonnes, valeurs vides retirées, lignes répétées
+    regroupées) sur 18 vraies sorties (`list_directory`, `summarize_git_log`,
+    `fetch_tech_news`, `get_market`, `search_dailies`) : **12,4 %** de tokens
+    réels en moins (médiane 13,6 %, au mieux 16 %, compté par
+    `prompt_eval_count`), 0 % sur la prose de `read_webpage`. Le seuil fixé par
+    la veille était 30 %. Chez qwen3, une clé JSON courante ne coûte qu'un token,
+    et la répéter coûte donc peu. Limites : pas de `read_email` ni d'`analyze_data`
+    dans le jeu (identifiants, sidecar), et les dailys étaient vides (aucune
+    publiée depuis le 2026-08-31). À rouvrir seulement sur une sortie mesurée
+    comme lourde, outil par outil, comme `slimSearch`.
   - **Tâches planifiées fiables** : `CronScheduler` tourne en premier plan, sans
     heure fixe ni notification.
   - **Brief du matin à la voix**. Prérequis : `read_calendar` exige un chemin
