@@ -135,6 +135,15 @@ def dispatch(method: str, params: dict) -> Any:
         case "files.parse_csv":
             return parse_csv(params)
 
+        case "files.parse_pptx":
+            return parse_office(params, "pptx")
+
+        case "files.parse_xlsx":
+            return parse_office(params, "xlsx")
+
+        case "files.parse_odf":
+            return parse_office(params, "odf")
+
         case "files.analyze_data":
             return analyze_data(params)
 
@@ -220,6 +229,18 @@ def parse_docx(params: dict) -> dict:
 def parse_csv(params: dict) -> dict:
     from files.csv_parser import parse_csv_file
     return parse_csv_file(params["path"], max_rows=params.get("maxRows", 1000))
+
+
+def parse_office(params: dict, kind: str) -> dict:
+    from files import office_parser as office
+
+    max_chars = int(params.get("maxChars", office.DEFAULT_MAX_CHARS))
+    max_rows = int(params.get("maxRows", office.DEFAULT_MAX_ROWS))
+    if kind == "pptx":
+        return office.parse_pptx_file(params["path"], max_chars=max_chars)
+    if kind == "xlsx":
+        return office.parse_xlsx_file(params["path"], max_chars=max_chars, max_rows=max_rows)
+    return office.parse_odf_file(params["path"], max_chars=max_chars, max_rows=max_rows)
 
 
 def analyze_data(params: dict) -> dict:

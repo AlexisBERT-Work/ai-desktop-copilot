@@ -604,3 +604,20 @@ que Parakeet a entendu, pour la bulle comme pour la dictée
   est récrit partout avec sa majuscule, y compris dans une dictée tapée
   ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
   sans effacer le fichier.
+
+## Mise à jour 2026-11-21 — PowerPoint, Excel et OpenDocument (veille du 17/11)
+
+`parse_document` ouvre désormais des archives zip de XML venues d'ailleurs
+(`.pptx`, `.xlsx`, `.odt`, `.ods`, `.odp`, `ocr-vision/files/office_parser.py`).
+Le chemin passe par la liste blanche comme avant (`pathArgs`).
+
+- **Bombe zip** : chaque membre XML est refusé au-delà de 30 Mo décompressés,
+  taille lue dans l'index de l'archive puis bornée à la lecture. Excel passe
+  par openpyxl en lecture seule (flux) et 200 lignes par feuille.
+- **XML** : ElementTree ne résout pas les entités externes (pas de XXE) ;
+  l'expat de Python 3.12 borne l'expansion d'entités internes. Aucune macro
+  n'est lue ni exécutée (`.xlsm` : valeurs seulement).
+- **Sortie** : 12 000 caractères au plus, puis `sanitizeToolOutput` comme toute
+  sortie d'outil (une consigne cachée dans une diapo est cadrée).
+- **Aucune dépendance ajoutée** : OpenDocKit, dépôt de 10 jours à un seul
+  auteur, aurait fait entrer 12 paquets dans l'installeur.

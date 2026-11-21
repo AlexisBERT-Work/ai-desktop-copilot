@@ -1,6 +1,6 @@
 # CE QUE CATDESK NE SAIT PAS (ENCORE) FAIRE
 
-> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-08-31**.
+> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-11-21**.
 > Liste honnête des bornes actuelles, pour ne pas survendre l'outil.
 
 ---
@@ -112,6 +112,13 @@ aujourd'hui classé `critical`.
   (moins précis). La mémoire hiérarchique **warm est implémentée** (WarmMemoryStore
   - FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
     _episodic_ structurée reste à faire.
+- **`parse_document` et les formats Office** : PPTX, XLSX et OpenDocument sont
+  lus sans leurs images (ni OCR, ni description) ni leurs graphiques. Une
+  formule Excel rend la valeur enregistrée par le tableur : un classeur
+  produit par un programme qui ne calcule pas les formules rend des cases
+  vides. Les cellules fusionnées ne sont pas
+  répétées. Les anciens formats binaires (`.ppt`, `.xls`, `.doc`), RTF et EPUB
+  ne sont pas lus.
 - **Sélecteur HTML de `read_webpage`** : naïf (le sélecteur `#id` s'arrête au
   premier `</`). Suffisant pour du texte simple, pas pour du parsing fin.
 - **Vision écran** : dépend de `minicpm-v` ; sans lui, `describe_screen` tombe en

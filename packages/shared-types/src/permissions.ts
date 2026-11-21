@@ -386,7 +386,7 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
     parse_document: {
       name: 'parse_document',
       description:
-        "Extrait le texte et les métadonnées d'un document local PDF/Word/CSV (100% local, sans cloud)",
+        "Extrait le texte et les métadonnées d'un document local PDF/Word/PowerPoint/Excel/OpenDocument/CSV (100% local, sans cloud)",
       riskLevel: 'low',
       enabled: true,
       requiresConfirmation: false,

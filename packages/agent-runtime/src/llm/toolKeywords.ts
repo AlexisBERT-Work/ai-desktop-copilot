@@ -169,7 +169,21 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   describe_screen: ['écran', 'fenêtre', 'que vois', 'tu vois', 'interface', 'est affiché'],
 
   // Documents
-  parse_document: ['pdf', 'docx', 'word', 'document', 'rapport', 'contrat'],
+  parse_document: [
+    'pdf',
+    'docx',
+    'word',
+    'document',
+    'rapport',
+    'contrat',
+    'powerpoint',
+    'pptx',
+    'présentation',
+    'diapo',
+    'diaporama',
+    'odt',
+    'libreoffice',
+  ],
   analyze_data: [
     'excel',
     'xlsx',

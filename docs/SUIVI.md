@@ -26,8 +26,10 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20).
+**En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
+point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (#49),
+`feat/recherche-web` (#51), `feat/parse-document-formats` (#52) ; voir les entrées
+du 2026-11-21. `feat/garde-fous-reponse` est entrée dans `dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -52,6 +54,28 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-21 — PowerPoint, Excel et OpenDocument (Plan E, point 4)
+
+Veille du 17/11, sur `feat/parse-document-formats`, coupée de `dev`. Aucun outil
+ajouté : `parse_document` lit aussi `.pptx`, `.xlsx`/`.xlsm`, `.odt`, `.ods` et
+`.odp`, voir [CAPACITES.md](CAPACITES.md) § 1. La veille proposait OpenDocKit :
+écarté (dépôt de 10 jours, un seul auteur, 17 versions en 10 jours, 12
+dépendances), raison détaillée dans [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+À la place, `files/office_parser.py` : bibliothèque standard pour PPTX et ODF,
+openpyxl, déjà présent, pour XLSX. Aucune dépendance ajoutée à l'installeur.
+
+- Repris de la veille : l'extraction **s'arrête** au plafond (12 000
+  caractères, 200 lignes par feuille) au lieu de couper après coup ; un repère
+  par diapo ou feuille pour citer ; `warnings` pour ce qui a été sauté.
+- Archive hostile : 30 Mo décompressés au plus par membre XML (bombe zip),
+  entités externes jamais résolues ; un fichier chiffré est signalé comme tel.
+- Tests : 9 tests Python (fichiers construits à la volée : ordre des diapos
+  déplacées, notes, diapo et feuille masquées, colonnes répétées d'ODS, bombe
+  zip, fichier chiffré), `detectFormat` côté agent. Banc de sélection : 2
+  tâches `dev` et 1 `holdout` ; `dev` 46/46 sans raté, `holdout` 37/43 (86 %).
+- **Non essayé** sur des fichiers produits par PowerPoint ou LibreOffice, ni
+  le banc complet avec `qwen3:14b`.
 
 ## 2026-11-20 — Garde-fous de réponse
 
