@@ -8,23 +8,23 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-11-06.
+> Dernière mise à jour : 2026-11-21.
 
 ---
 
-## État actuel — 2026-10-30
+## État actuel — 2026-11-21
 
-**Branche de travail : `refactor/audit-complet`** (depuis `dev`, tout est
-poussé) — audit complet du 2026-10-07, latence du 2026-10-08, tests dans l'app
-réelle du 2026-10-09. [PR #26](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/26)
-vers `dev`, à relire et fusionner ([AMELIORATIONS.md](AMELIORATIONS.md) § 0).
-Pour reprendre sur un autre poste : `git switch refactor/audit-complet`, puis
-la liste de ce que git ne transporte pas dans
+**Branche de travail : `dev`.** Le 2026-11-21, les douze PR empilées depuis
+le 29/10 y sont entrées, chacune mise à jour avec `dev` et vérifiée (types,
+lint, tests, `eval --selection`, CI) : #26 (audit, latence), #30 (sélection
+d'outils, banc), puis les pistes de la veille et leurs suites : #34, #35, #31,
+#32, #36, #38, #39, #33, #37, #40. Seule exception : #37 est entrée avec
+`format:check` rouge (deux lignes trop longues dans `scripts/dictation-wer.mjs`,
+la branche n'avait jamais eu de CI), corrigé dans #40. Le détail est dans les
+entrées datées ci-dessous ; ce qui reste de chaque piste, dans
+[AMELIORATIONS.md](AMELIORATIONS.md) § 4. Pour reprendre sur un autre poste :
+`git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
-
-**Branche en cours : `feat/selection-outils-banc`**, coupée de la précédente
-(mots-clés de sélection, seuil et banc de qualité, voir l'entrée du 2026-11-05).
-**`feat/load-skill`** en est coupée à son tour (skills, entrée du 2026-11-06).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -42,11 +42,11 @@ figée à 0.1.3 sur `catdesk-releases`, et rien n'est publié tant que
 La prochaine est la **0.2.0 elle-même** : rien à coder, tout bloque sur toi
 (§ 0).
 
-**Portes** (branche) : type-check 3/3, lint 0, `format:check`, 756 tests agent,
-54 desktop, 38 Rust (+ 4 de fumée ignorés en CI), 14 Python, `clippy -D
-warnings`, `fmt --check`. Sur `master` : **CI verte** depuis la PR #24 (elle était rouge sur `master`
+**Portes** (`dev`, 2026-11-21) : type-check 3/3, lint 0, 1 299 tests agent
+(+3 sautés), 72 desktop, `eval --selection` sans raté sur le jeu `dev` (holdout
+85 %) ; Rust, Python, `clippy` et `fmt` verts en CI. Sur `master` : **CI verte** depuis la PR #24 (elle était rouge sur `master`
 depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
-(zod 4, vitest 4, overrides ciblés), fusionnée dans cette branche le
+(zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
 
