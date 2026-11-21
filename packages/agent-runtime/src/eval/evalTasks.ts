@@ -175,6 +175,21 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     args: /rapport\.pdf/,
     answer: /12\s?%/,
   }),
+  // Ce qu'un fichier révèle avant d'être partagé (Plan E, 2026-11-21).
+  dev(
+    'documents',
+    'fuite-devis',
+    'je peux envoyer C:/docs/devis.docx sans risque ?',
+    ['inspect_file_leaks'],
+    { args: /devis\.docx/, answer: /paul|commentaire|modification/i },
+  ),
+  dev(
+    'documents',
+    'fuite-photo',
+    'est-ce que la photo C:/photos/plage.jpg contient ma position GPS ?',
+    ['inspect_file_leaks'],
+    { args: /plage\.jpg/ },
+  ),
   dev('documents', 'data-excel', 'analyse le fichier excel ventes.xlsx', ['analyze_data'], {
     args: /ventes\.xlsx/,
   }),
@@ -390,6 +405,13 @@ export const EVAL_TASKS: readonly EvalTask[] = [
     'que dit le contrat.docx dans mes documents ?',
     ['parse_document'],
     { args: /contrat\.docx/ },
+  ),
+  holdout(
+    'documents',
+    'fuite-pdf',
+    'quelles métadonnées traînent dans C:/docs/rapport.pdf avant que je le partage ?',
+    ['inspect_file_leaks'],
+    { args: /rapport\.pdf/ },
   ),
   holdout(
     'documents',

@@ -170,6 +170,23 @@ export const TOOL_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
 
   // Documents
   parse_document: ['pdf', 'docx', 'word', 'document', 'rapport', 'contrat'],
+  inspect_file_leaks: [
+    'métadonnées',
+    'metadata',
+    'exif',
+    'gps',
+    'sans risque',
+    'avant de l envoyer',
+    'avant de le partager',
+    'avant de la partager',
+    'avant de partager',
+    'fuite',
+    'fuites',
+    'révèle',
+    'informations cachées',
+    'données cachées',
+    'suivi des modifications',
+  ],
   analyze_data: [
     'excel',
     'xlsx',

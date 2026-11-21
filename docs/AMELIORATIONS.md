@@ -366,6 +366,22 @@ rien à faire au milieu d'un journal.
     système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
     Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
     (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
+- **Plan E — capacités tirées de la veille du 13 au 19/11** (2026-11-21) : une
+  branche et une PR vers `dev` par point, aucune fusionnée sans toi.
+  - ✅ **`inspect_file_leaks` : ce qu'un fichier révèle avant partage** (veille
+    du 16/11, `feat/inspect-file-leaks`, 2026-11-22), voir
+    [CAPACITES.md](CAPACITES.md) § 1. unredact.tools n'a pas de licence : rien
+    n'en est repris, seulement la liste de ce qu'il cherche ; aucune
+    dépendance ajoutée (Pillow, pypdf, bibliothèque standard). Mesure de la
+    veille faite : 10 fichiers piégés sur 10 repérés (6 produits par Word,
+    Excel et PowerPoint), aucune alerte moyenne ou élevée sur 2 fichiers
+    propres. Restent : la **copie nettoyée** (outil 🟡, original intact, copie scannée à nouveau et
+    ce qui reste listé, seuil de la veille : 0 fuite restante) ; le scan
+    noirci dans l'image (OCR Tesseract, déjà là) ; le suivi des modifications
+    d'un ODT écrit par LibreOffice, testé seulement sur un fichier construit
+    (Word applique le suivi quand il enregistre en ODT) ; l'essai de
+    `qwen3:14b` sur « je peux envoyer ce fichier sans risque ? » (le banc de
+    sélection le propose, le banc complet n'a pas tourné).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :

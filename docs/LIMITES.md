@@ -1,6 +1,6 @@
 # CE QUE CATDESK NE SAIT PAS (ENCORE) FAIRE
 
-> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-08-31**.
+> Pendant de [CAPACITES.md](CAPACITES.md). À jour au **2026-11-22**.
 > Liste honnête des bornes actuelles, pour ne pas survendre l'outil.
 
 ---
@@ -112,6 +112,13 @@ aujourd'hui classé `critical`.
   (moins précis). La mémoire hiérarchique **warm est implémentée** (WarmMemoryStore
   - FactExtractor + MemoryConsolidator, câblés dans `index.ts`) ; la couche
     _episodic_ structurée reste à faire.
+- **`inspect_file_leaks` repère, il ne nettoie pas** : la copie nettoyée
+  proposée par la veille (outil 🟡, original intact, copie scannée à nouveau)
+  n'est pas faite. Le rectangle noir n'est cherché que dans les tracés d'un
+  PDF : un scan noirci dans l'image, un rectangle blanc ou un texte de la
+  couleur du fond passent. Pas lus : les anciens `.doc`, `.xls` et `.ppt`,
+  les archives zip, vidéos, sons et e-mails (`.eml`, `.msg`), et au-delà de
+  300 pages (100 pour le rectangle noir).
 - **Sélecteur HTML de `read_webpage`** : naïf (le sélecteur `#id` s'arrête au
   premier `</`). Suffisant pour du texte simple, pas pour du parsing fin.
 - **Vision écran** : dépend de `minicpm-v` ; sans lui, `describe_screen` tombe en

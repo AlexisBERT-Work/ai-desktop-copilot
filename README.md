@@ -75,7 +75,7 @@ machine, but a few features deliberately reach the network — see [Security](#s
 
 ### Security first
 
-- 71 tools, each with a risk level: auto, once per session, or confirm every time
+- 72 tools, each with a risk level: auto, once per session, or confirm every time
 - Command blocklist and path confinement enforced in Rust
 - Every tool call and every side-effectful command is audited
 - Safe mode: one toggle blocks every medium-or-above tool
@@ -172,7 +172,7 @@ ai-desktop-copilot/
 │
 ├── packages/
 │   ├── agent-runtime/src/
-│   │   ├── tools/        # the 71 tools, one folder per category
+│   │   ├── tools/        # the 72 tools, one folder per category
 │   │   ├── news/         # press-review domain: sources, parsing, aggregation, digests
 │   │   ├── llm/          # Ollama client, completion, planner, model router
 │   │   ├── memory/       # conversations, vectors, warm facts, semantic cache
@@ -238,7 +238,7 @@ Press `Ctrl+Space` anywhere.
 
 ## Agent tools
 
-**71 tools** are registered, covering perception, web, connectors, code and git, system,
+**72 tools** are registered, covering perception, web, connectors, code and git, system,
 browser, markets, skills and automation. The catalogue — names, arguments and risk levels — is
 maintained in **[docs/CAPACITES.md](docs/CAPACITES.md)** (single source of truth, in
 French); current limits are in [docs/LIMITES.md](docs/LIMITES.md).
@@ -253,7 +253,7 @@ not exposed to the chat, leaving 44. Set `CATDESK_TOOL_PROFILE=full` to expose a
 ### Shipped
 
 - Chat overlay, global hotkey, streaming, conversation history
-- ReAct agent loop, 71 tools, risk-gated permission engine, audit trail
+- ReAct agent loop, 72 tools, risk-gated permission engine, audit trail
 - Screen capture, OCR and vision description; audio transcription
 - Headless browser automation (Playwright), sub-agents, cron scheduling
 - Dashboard platform: free-placement widget canvas, printable guide

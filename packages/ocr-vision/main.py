@@ -135,6 +135,10 @@ def dispatch(method: str, params: dict) -> Any:
         case "files.parse_csv":
             return parse_csv(params)
 
+        case "files.inspect_leaks":
+            from files.leak_inspector import inspect_file_leaks
+            return inspect_file_leaks(params["path"])
+
         case "files.analyze_data":
             return analyze_data(params)
 
