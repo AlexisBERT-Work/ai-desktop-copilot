@@ -120,6 +120,11 @@ export function simulatedWorld(now: Date): SimulatedWorld {
       exitCode: 0,
       stdout: 'Adresse IPv4 : 192.168.1.42\nC: libre 214 Go\nWindows 11 Pro 26300',
     }),
+    load_skill: ok({
+      name: 'revue-comparee',
+      source: 'bundled',
+      instructions: 'Regroupe les résultats de search_dailies par journal et relève les angles.',
+    }),
     search_dailies: ok({
       dailies: [
         {

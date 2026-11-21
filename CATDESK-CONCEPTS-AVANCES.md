@@ -16,14 +16,14 @@
 
 ## Sommaire
 
-1. [Le harness : le vrai cœur de CatDesk](#1-le-harness) — 🟡 (boucle + outils + audit oui ; skills non)
+1. [Le harness : le vrai cœur de CatDesk](#1-le-harness) — 🟡 (boucle + outils + audit oui ; skills à la demande via `load_skill`, sans index dans le prompt)
 2. [Context engineering : pourquoi plus de tokens = pire](#2-context-engineering) — 🟡 (ContextManager, selectTools, Compactor)
 3. [Mémoire hiérarchique multi-couches](#3-mémoire-hiérarchique) — ✅ warm (WarmMemoryStore + FactExtractor + MemoryConsolidator + SemanticCache) ; ⬜ episodic
 4. [RAG local moderne : hybrid search + reranking + GraphRAG](#4-rag-local-moderne) — 🟡 hybride dense+BM25 (VectorStore) ; ⬜ reranking, GraphRAG
 5. [Optimisation d'inférence : 2-3x de vitesse gratuite](#5-optimisation-dinférence) — 🟡 (keep_alive, num_ctx, IdleUnloader, routeur de modèles)
 6. [Architecture multi-agents : orchestrateur + sous-agents](#6-multi-agents) — ✅ (SubAgentRunner, run_subagent, run_parallel_agents)
 7. [Sécurité défense en profondeur](#7-sécurité) — 🟡 post-scan sorties (sanitizeToolOutput : secrets + spotlighting) ; ⬜ pre-check inputs, PII, isolation réseau
-8. [Auto-amélioration : l'agent qui apprend de ses traces](#8-auto-amélioration) — ✅ (PlaybookStore + EvolutionDaemon, propositions human-in-the-loop) ; ⬜ skills
+8. [Auto-amélioration : l'agent qui apprend de ses traces](#8-auto-amélioration) — ✅ (PlaybookStore + EvolutionDaemon, propositions human-in-the-loop) ; ✅ brouillons de skills relus par `SkillStore`
 9. [Roadmap d'intégration suggérée](#9-roadmap)
 
 ---
@@ -478,9 +478,15 @@ masque les PII/secrets avant que le LLM ne les voie, et bloque les tentatives d'
 Tu as déjà : sandbox Rust, permissions risk-gated, audit. Il manque :
 
 1. **Pre-check déterministe** sur les inputs (regex patterns d'injection connus).
+   🟡 En partie fait (2026-11-12) : les caractères invisibles sont retirés du texte
+   saisi, des sorties d'outils et de la presse (`security/invisibleChars.ts`) ; les
+   motifs d'injection ne portent encore que sur la sortie des outils.
 2. **Post-execution scan** sur les outputs d'outils (le plus important — surtout pour la
    lecture web et l'OCR qui ingèrent du contenu non fiable).
 3. **Redaction PII/secrets** avant que tout output ne rentre dans le contexte.
+   🟡 Choix inverse pour les PII (2026-11-12) : le modèle étant local, on masque ce
+   qui **sort** (webhook, Discord, `call_api` — `security/personalData.ts`), pas ce
+   qu'il lit. Les secrets, eux, sont redactés à l'entrée (`sanitizeToolOutput`).
 4. **Isolation réseau** pour l'exécution de code généré (pas d'accès réseau par défaut).
 
 > Frameworks open-source à regarder pour t'inspirer : LLM-Guard (Protect AI), NeMo Guardrails

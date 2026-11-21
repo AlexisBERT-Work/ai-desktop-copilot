@@ -9,6 +9,7 @@
 
 // Premier import : charge le .env local puis fige la config du runtime.
 import { CONFIG } from './config';
+import { join } from 'path';
 import { RPC_NOTIFICATIONS } from '@catdesk/shared-types';
 import { createLogger } from './logger';
 import { Lifecycle } from './lifecycle';
@@ -49,6 +50,7 @@ import { SharedDailyReader } from './news/SharedDailyReader';
 import { LocalPressScheduler } from './news/LocalPressScheduler';
 import { BrowserManager } from './lib/browserManager';
 import { OcrSidecarClient } from './lib/ocrSidecar';
+import { SkillStore } from './skills/SkillStore';
 
 const log = createLogger('runtime:main');
 
@@ -136,6 +138,9 @@ async function main(): Promise<void> {
       llm,
       vectorStore,
       market,
+      // `../skills` vaut packages/agent-runtime/skills en dev (src/..) et
+      // resources/agent/skills une fois installé (dist/.., voir build-release.ps1).
+      skills: new SkillStore(CONFIG.dataDir, join(__dirname, '..', 'skills')),
       localDailies,
       sharedDailies,
       defaultModel: CONFIG.model,

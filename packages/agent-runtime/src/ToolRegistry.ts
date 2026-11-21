@@ -11,6 +11,27 @@ export interface RegisteredTool extends ToolDefinition {
   toOllamaSchema(): OllamaToolSchema;
   /** Chemins du disque visés par ces arguments (voir BaseTool.pathArgs). */
   filesystemTargets(args: Record<string, unknown>): string[];
+  /**
+   * Outils qui envoient du texte HORS du poste (webhook, Discord, API) :
+   * masque les données personnelles des arguments bruts (security/personalData).
+   * Pur et idempotent : appelé avant le dialogue de confirmation, puis de
+   * nouveau par `execute`, qui ne laisse ainsi rien partir en clair.
+   */
+  prepareOutboundArgs?(args: Record<string, unknown>): OutboundArgs;
+}
+
+/** Arguments prêts à sortir, et ce qu'il faut en dire à l'utilisateur. */
+export interface OutboundArgs {
+  args: Record<string, unknown>;
+  /** Ce qui a été masqué, est à vérifier ou part tel quel (dialogue et résultat). */
+  notice?: string;
+}
+
+/** Le masquage a planté : on n'envoie rien plutôt que d'envoyer en clair. */
+export type OutboundPreparation = (OutboundArgs & { ok: true }) | { ok: false; error: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export class ToolRegistry {
@@ -40,17 +61,41 @@ export class ToolRegistry {
     return this.tools.get(name)?.filesystemTargets(args) ?? [];
   }
 
+  /**
+   * Arguments de `name` une fois les données personnelles masquées. Un outil
+   * sans crochet (tout ce qui ne sort pas du poste) les rend tels quels.
+   */
+  prepareOutboundArgs(name: string, args: Record<string, unknown>): OutboundPreparation {
+    const tool = this.tools.get(name);
+    if (!tool?.prepareOutboundArgs) return { ok: true, args };
+    try {
+      return { ok: true, ...tool.prepareOutboundArgs(args) };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      log.error('Outbound masking failed', { name, error });
+      return { ok: false, error: `Masquage des données personnelles impossible : ${error}` };
+    }
+  }
+
   async execute(name: string, args: unknown): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) {
       return { success: false, error: `Tool not found: ${name}` };
     }
 
+    // Filet : quel que soit l'appelant, rien ne sort sans être passé au masque.
+    let runArgs = args;
+    if (isRecord(args)) {
+      const prepared = this.prepareOutboundArgs(name, args);
+      if (!prepared.ok) return { success: false, error: prepared.error };
+      runArgs = prepared.args;
+    }
+
     const startMs = Date.now();
-    log.debug('Executing tool', { name, args });
+    log.debug('Executing tool', { name, args: runArgs });
 
     try {
-      const result = await tool.run(args);
+      const result = await tool.run(runArgs);
       const durationMs = Date.now() - startMs;
       log.debug('Tool complete', { name, success: result.success, durationMs });
       return { ...result, metadata: { ...result.metadata, durationMs } };

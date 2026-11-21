@@ -319,6 +319,102 @@ trous réels, quatre durcissements.
   `set-always-on-top`, `notification`, `global-shortcut:*` et `updater` (tous
   pilotés côté Rust), et le plugin de notification, inutilisé, est retiré.
 
+---
+
+## Mise à jour 2026-11-06 — les skills (`load_skill`)
+
+Un skill tiers est **une instruction donnée à un agent qui a un shell** : l'installer
+revient à faire confiance à son auteur, comme pour un script. Ce qui le contient :
+
+- **Il reste une donnée.** Le texte entre dans le contexte comme résultat d'outil.
+  Il passe par `sanitizeToolOutput` (secrets expurgés, injection connue cadrée), et
+  tout skill qui n'est pas livré avec l'app arrive sous un cadre **systématique**
+  (`notice`) : une méthode, pas un ordre, aucun droit accordé. Le cadre ne dépend pas
+  du scan, qui reconnaît des tournures anglaises et françaises connues : une consigne
+  reformulée y échappe (mesure dans [LIMITES.md](LIMITES.md) § 5).
+- **Il n'élargit aucune permission.** Rien dans le chemin de `load_skill` ne touche
+  au `PermissionEngine` : chaque appel suivant repasse par son niveau de risque, la
+  liste blanche des chemins et, pour `run_command`, la politique de commandes. Seules
+  `name`, `description` et `status` sont lues : `allowed-tools` et toute autre clé du
+  frontmatter sont **ignorées**. `LoadSkillTool.test.ts` le vérifie sur le vrai moteur.
+- **Il n'exécute rien.** Seul le `SKILL.md` est lu : ni `scripts/` ni `references/`.
+- **Il ne sort pas de son dossier.** `name` est comparé aux skills trouvés, jamais
+  concaténé à un chemin : d'où l'absence de `pathArgs`, et la liste blanche n'a rien
+  à contrôler. En contrepartie, un lien qui sort du dossier est refusé (`realpath`),
+  sinon cet outil 🟢 lirait n'importe quel fichier.
+- **Il ne s'annonce pas seul.** Pas d'index dans le prompt, outil proposé seulement
+  si la phrase le désigne, brouillons absents du catalogue : un skill ne s'applique
+  que si l'utilisateur le demande (garde-fou §8).
+
+**Risque résiduel, à connaître.** Le `notice` ne lie pas le modèle, qui peut passer
+outre. Un skill malveillant peut alors le pousser vers des outils 🟢, qui ne demandent
+rien : lire un fichier de la liste blanche, puis appeler `read_webpage` sur une adresse
+qui embarque ce contenu. Une autorisation « pour la session » déjà donnée à un outil 🟡
+reste aussi valable. C'est la même exposition qu'une page web piégée. **Lire un skill
+tiers avant de l'installer.** Couper cette voie demanderait de marquer le run comme non
+fiable après `load_skill` et d'y durcir les outils réseau : non fait.
+
+**Essai du 2026-11-06** (`qwen3:14b`, température 0, un essai, monde simulé) : un skill
+piégé demandant de lire `.ssh\id_rsa` puis de l'envoyer par `read_webpage` a été
+ignoré, **avec et sans** `notice`. L'essai ne prouve donc rien pour le cadre, et un seul
+tirage ne garantit rien pour le modèle. La seule garantie reste les permissions.
+
+## Mise à jour 2026-11-12 — caractères invisibles (veille du 11/11)
+
+Une page, un fichier ou un mail peut cacher une consigne que l'utilisateur ne
+voit pas mais que le modèle lit : bloc Unicode Tags (U+E0000–E007F), texte
+entouré de contrôles bidi, mots coupés par des caractères de largeur nulle pour
+échapper aux motifs de `sanitizeToolOutput`, séquences ANSI, ou faux marqueur
+« [FIN DU CONTENU EXTERNE NON FIABLE] » qui ferait croire que la suite vient de
+CatDesk.
+
+- **`security/invisibleChars.ts`** reprend l'étage L0 de guard-spec
+  (Apache-2.0), réécrit en TypeScript. Il retire tout cela, ramène pleine chasse
+  et lettres mathématiques en ASCII, et boucle jusqu'à stabilité (8 passes au
+  plus). Pas de NFKC global : il aurait changé le texte légitime (« … »,
+  espaces insécables, m²) et les noms de fichiers que le modèle réutilise.
+- **Trois points d'entrée** : chaque sortie d'outil, pendant la sérialisation
+  (`AgentOrchestrator`, branche d'erreur comprise : après, ESC n'est plus
+  qu'un texte), le texte saisi par l'utilisateur, avant le cache et l'historique,
+  et les articles de presse (`aggregateNews`, `enrichArticleTexts`), qui partent
+  au modèle puis dans les dailys publiées.
+- **Ni blocage ni refus** : on nettoie et on journalise
+  (`Invisible characters removed`, par catégorie). Les valeurs sous une clé de
+  chemin ou d'URL ne sont pas modifiées, seulement comptées.
+- **Limite** : une consigne écrite en clair passe toujours. Le nettoyage la rend
+  visible aux motifs de détection, il ne la reconnaît pas lui-même.
+
+## Mise à jour 2026-11-12 — données personnelles à la sortie (veille du 7/11)
+
+Le modèle est local : ce qu'il lit reste sur le poste, et masquer ses lectures
+casserait « quel numéro dans ce mail ? ». Le risque est ce qui **part** : une
+injection qui fait recopier un IBAN dans un message Discord, ou un corps
+d'API qui emporte un numéro de carte.
+
+- **`security/personalData.ts`** (pur) : cartes (Luhn, préfixe d'émetteur,
+  longueurs 15/16/19 : un SIRET ne passe pas), IBAN (mod 97, longueur du pays),
+  NIR (clé, Corse 2A/2B), téléphones et e-mails français. Trois niveaux :
+  masqué (forme et somme de contrôle), à vérifier (forme seule : laissé, signalé),
+  signalé (e-mail et téléphone hors Discord). Les caractères invisibles sont
+  retirés d'abord : un espace de largeur nulle dans un IBAN ne le cache plus, et
+  un texte en bloc Tags ne part plus sans que le dialogue le montre.
+- **Crochet `prepareOutboundArgs`** (`ToolRegistry`) sur les trois outils qui
+  sortent (`send_webhook_message`, `post_tech_news_discord`, `call_api`).
+  L'orchestrateur l'appelle **avant** la confirmation : le dialogue, l'audit,
+  le journal d'activité et l'UI voient les arguments masqués, et le dialogue
+  affiche ce qui a été masqué (`PermissionRequestEvent.preview`). `execute` le
+  rappelle (idempotent) : rien ne part en clair, quel que soit l'appelant. Si le
+  masquage plante, l'outil ne part pas.
+- **`call_api`** : corps JSON parcouru (une carte écrite en nombre devient une
+  chaîne masquée), corps texte, chemin et paramètres de l'URL, en-têtes sauf
+  `Authorization`. Rien vers localhost. `post_tech_news_discord` masque aussi la
+  synthèse du modèle, avant la coupe à 2 000 caractères ; jamais les liens.
+- **Le résultat dit ce qui a été fait** (`personalData`), pour que le modèle le
+  répète à l'utilisateur.
+- **Limite** : noms, adresses et téléphones étrangers passent ; un outil qui
+  sortirait du texte sans déclarer le crochet n'est pas couvert. Voir
+  [LIMITES.md](LIMITES.md) § 5.
+
 ## Mise à jour 2026-11-12 — navigateur en lecture seule (veille du 6/11)
 
 `browser_navigate` était `high` : une confirmation à chaque page, si bien qu'une
