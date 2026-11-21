@@ -17,8 +17,26 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 `refactor/audit-complet`). Details and the remaining items: `docs/SUIVI.md` (2026-10-07 and
 2026-10-08) and `docs/AMELIORATIONS.md`.
 
+### Added
+
+- **Tool selection understands everyday French.** `llm/toolKeywords.ts` lists the words people
+  use for each tool outside the core ("agenda", "rendez-vous"…). `selectTools` reads them and
+  the model never sees them, so they add no tokens. On the French task set, the expected tool
+  is now offered for 32/32 tuning sentences (was 21/32) and 30/35 held-out ones (was 21/35);
+  sentences written by the model from the descriptions alone went from 114/144 to 125/144.
+- **Quality bench** (`pnpm --filter @catdesk/agent-runtime eval`): 126 French tasks through the
+  real orchestrator and the real model, against a simulated world, with no LLM judge. Strict
+  success went from 61/90 to 74/90 with the keywords, then 76/90 with the selection threshold
+  below. `eval --selection` needs no GPU.
+
 ### Performance
 
+- **Everyday questions no longer pull tools into the prompt.** Outside the core, a tool now
+  needs a keyword or two words shared with its description. Of 60 everyday messages written by
+  the model, 51 pulled at least one tool; none does now. On the bench, the average number of
+  tools offered went from 9.16 to 8.20 and the median first token from 10.3 s to 7.3 s (one
+  run, without CatDesk's Ollama settings). The expected tool is still offered for 120/144 new
+  sentences (124/144 without this rule).
 - **First token in ~1-2 s instead of 19-47 s** (same three chained questions, production
   Ollama settings, measured through the agent's real protocol). Five causes:
   - the model was **reloaded twice per message** — background calls (fact extraction,

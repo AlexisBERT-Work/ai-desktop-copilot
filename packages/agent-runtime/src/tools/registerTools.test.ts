@@ -8,6 +8,8 @@ import {
   type ToolProfile,
 } from './registerTools';
 import { OllamaClient } from '../llm/OllamaClient';
+import { coreTools } from '../llm/selectTools';
+import { TOOL_KEYWORDS } from '../llm/toolKeywords';
 import { VectorStore } from '../memory/VectorStore';
 import { MarketService } from '../market/MarketService';
 import type { SubAgentRunner } from '../SubAgentRunner';
@@ -133,5 +135,28 @@ describe("profil 'research' (bot articles + recherche)", () => {
 
   it('compte : catalogue complet moins les exclusions', () => {
     expect(names.size).toBe(68 - RESEARCH_EXCLUDED.size);
+  });
+});
+
+/**
+ * Hors noyau, un outil n'est proposé au modèle que si la phrase le désigne. Sans
+ * mots-clés, il dépend de la description, écrite pour le modèle et non pour les
+ * mots de l'utilisateur : c'est ainsi que read_calendar restait injoignable.
+ */
+describe('cohérence outils ↔ mots-clés de sélection', () => {
+  it('chaque entrée de TOOL_KEYWORDS désigne un outil réel', () => {
+    const names = new Set(
+      buildRegistry('full')
+        .getEnabled()
+        .map(t => t.name),
+    );
+    expect(Object.keys(TOOL_KEYWORDS).filter(name => !names.has(name))).toEqual([]);
+  });
+
+  it('chaque outil hors noyau a des mots-clés, profil full compris', () => {
+    const tools = buildRegistry('full').getEnabled();
+    const core = new Set(coreTools(tools, 1).map(t => t.name));
+    const bare = tools.map(t => t.name).filter(n => !core.has(n) && !TOOL_KEYWORDS[n]?.length);
+    expect(bare).toEqual([]);
   });
 });

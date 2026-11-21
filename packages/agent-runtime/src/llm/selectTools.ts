@@ -6,9 +6,12 @@
  * dominates latency on local models (prompt eval is O(prompt size)) and hurts
  * tool-choice accuracy. We instead send a small, query-relevant subset:
  *   - a fixed essential core (always available for basic ops),
- *   - plus tools whose name/description/category match the user's query,
+ *   - plus tools the query designates: a word of `TOOL_KEYWORDS`, or at least two
+ *     words shared with their name/description/category (see `MIN_SCORE`),
  * capped at `limit`. Set limit to 0 (or tools.length ≤ limit) to send them all.
  */
+
+import { TOOL_KEYWORDS } from './toolKeywords';
 
 export interface SelectableTool {
   name: string;
@@ -56,7 +59,11 @@ const STOPWORDS = new Set(
     'elle nous vous ils elles aux pas plus moins tout tous toute toutes comme mais',
     'donc car peux peut veux etre avoir fait faire dit aussi tres bien celle celui',
     'ceux meme quand ou the and for with from this that what which are was its into',
+    // « comment » devient « comm », préfixe de « command » ; « puis », « pui ».
+    'comment pourquoi combien puis',
     'your you',
+    // « donne-moi… » : collait à « données » dans les descriptions.
+    'donne donner donnez',
     // Consignes de forme de la réponse.
     'reponds repond reponse repondre seul seule phrase phrases court courte bref',
     'breve format formats',
@@ -65,12 +72,16 @@ const STOPWORDS = new Set(
     .split(' '),
 );
 
-/** Light stem so "dailies"/"daily", "tâches"/"tache", "planifiées"/"planifie" overlap. */
+/**
+ * Light stem so "dailies"/"daily", "tâches"/"tache", "planifiées"/"planifie" overlap.
+ * La longueur se vérifie APRÈS la racine : « IDs » donnait « id », préfixe de « idée ».
+ */
 function tokens(s: string): string[] {
   return normalize(s)
     .split(' ')
-    .filter(w => w.length >= 3 && !STOPWORDS.has(w))
-    .map(w => w.replace(/(s|es|ees|er|ent)$/u, ''));
+    .filter(w => !STOPWORDS.has(w))
+    .map(w => w.replace(/(s|es|ees|er|ent)$/u, ''))
+    .filter(w => w.length >= 3);
 }
 
 /**
@@ -84,14 +95,40 @@ export function coreTools<T extends SelectableTool>(tools: T[], limit = 14): T[]
 }
 
 /**
+ * Une expression de `TOOL_KEYWORDS` dit l'intention de l'utilisateur, un mot
+ * commun avec la description peut n'être qu'une coïncidence : elle doit passer
+ * devant, car il ne reste que quelques places une fois le noyau servi.
+ */
+const KEYWORD_SCORE = 3;
+
+/**
+ * Score à atteindre pour qu'un outil soit ajouté au noyau. Un seul mot commun avec
+ * une description ne suffit pas : « nom », « résultat » ou « monde » sont partout,
+ * et 51 messages de tous les jours sur 60 tiraient ainsi un outil (~2 s chacun hors
+ * cache). Il faut un mot-clé, ou deux mots communs.
+ */
+const MIN_SCORE = 2;
+
+function keywordScore(paddedQuery: string, keywords: readonly string[] = []): number {
+  const hits = keywords.filter(k => paddedQuery.includes(` ${normalize(k).trim()}`));
+  return hits.length * KEYWORD_SCORE;
+}
+
+/**
  * Ordre du résultat (latence) : le noyau d'abord, puis les outils retenus pour
  * la requête, TOUS dans l'ordre d'enregistrement — pas par score. Ollama ne
  * relit le prompt qu'à partir du premier écart : deux requêtes qui retiennent
  * les mêmes outils produisent ainsi exactement le même prompt.
  */
-export function selectTools<T extends SelectableTool>(tools: T[], query: string, limit = 14): T[] {
+export function selectTools<T extends SelectableTool>(
+  tools: T[],
+  query: string,
+  limit = 14,
+  keywords: Readonly<Record<string, readonly string[]>> = TOOL_KEYWORDS,
+): T[] {
   if (limit <= 0 || tools.length <= limit) return tools;
 
+  const paddedQuery = ` ${normalize(query)} `;
   const qWords = new Set(tokens(query));
   // A couple of intent synonyms that rarely appear verbatim in tool text.
   if (/\bdail(y|ies)\b|quotidien|chaque jour/i.test(query)) {
@@ -102,7 +139,7 @@ export function selectTools<T extends SelectableTool>(tools: T[], query: string,
 
   const score = (t: T): number => {
     const hayTokens = new Set(tokens(`${t.name} ${t.description} ${t.category}`));
-    let s = 0;
+    let s = keywordScore(paddedQuery, keywords[t.name]);
     for (const w of qWords) {
       for (const h of hayTokens) {
         if (h === w || h.startsWith(w) || w.startsWith(h)) {
@@ -121,7 +158,7 @@ export function selectTools<T extends SelectableTool>(tools: T[], query: string,
   const ranked = tools
     .filter(t => !picked.has(t.name))
     .map(t => ({ t, s: score(t) }))
-    .filter(x => x.s > 0)
+    .filter(x => x.s >= MIN_SCORE)
     .sort((a, b) => b.s - a.s);
 
   for (const { t } of ranked) {

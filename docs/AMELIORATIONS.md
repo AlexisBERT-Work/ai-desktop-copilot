@@ -244,6 +244,45 @@ Le premier token est passé de 19-47 s à 1-2,5 s (mesures dans
 Reprises de l'ancienne section « Prochaines pistes » de `SUIVI.md`, qui n'avait
 rien à faire au milieu d'un journal.
 
+- **Trouvé par le banc de qualité** (2026-11-05), par ordre de gêne :
+  - **Réponses vides** : 1 à 2 tâches sur 90. Ollama renvoie `content` vide et
+    aucun `tool_calls` alors que le modèle a généré des tokens (41 sur
+    `rech-dailys`, `done_reason: stop`) : probablement un appel d'outil mal formé,
+    avalé par son analyseur. L'orchestrateur le prend pour une réponse finale,
+    et l'utilisateur ne voit rien. À température 0, relancer à l'identique
+    redonne la même chose, il faut au moins un message d'échec.
+  - **`store_memory` promis mais pas appelé** : sur « souviens-toi que… », le modèle
+    répond « D'accord, je me souviens » sans rien enregistrer. Faux, et
+    invisible pour l'utilisateur.
+  - **`search_dailies` sur des questions de culture générale** : 4 des 14 tâches
+    sans outil échouent, dont 3 ainsi (« qui a peint la Joconde ? »). La réponse
+    arrive quand même, un aller-retour plus tard.
+- **Pistes issues de la comparaison avec OpenJarvis** (2026-11-05). Les deux
+  premières sont faites : mots-clés de sélection et banc de qualité (voir
+  [SUIVI.md](SUIVI.md)). Restent, par ordre de gain attendu :
+  - **Un vrai signal de succès** : le playbook compte 29 succès pour 0 échec
+    alors que l'audit montre `describe_screen` en échec 3 fois sur 4. « Réussi »
+    y veut dire « terminé ». Il manque le résultat réel des outils et un 👍/👎
+    dans le chat. `evolution-proposals.json` n'a par ailleurs aucun lecteur.
+  - **Tâches planifiées fiables** : `CronScheduler` tourne en premier plan, sans
+    heure fixe ni notification.
+  - **Brief du matin à la voix**. Prérequis : `read_calendar` exige un chemin
+    `.ics` absolu et n'a aucun défaut, donc « qu'est-ce que j'ai demain ? » ne
+    peut pas aboutir, même bien sélectionné. Il faut un chemin d'agenda dans les
+    réglages. Le banc garde ces tâches en rouge exprès.
+  - **Recherche web et recherche approfondie** : aucun outil ne cherche sur le
+    web, `read_webpage` exige une URL.
+  - **Client MCP** : brancher des outils tiers sans les écrire (rejoint le
+    système de plugins ci-dessous).
+  - **Format `SKILL.md`** pour `load_skill` (#17), au lieu d'un format maison.
+  - **Réglage guidé**, à la OpenJarvis : diagnostic, plan, essai, validation par
+    `claude -p`, une modification n'étant gardée que si le jeu `holdout` du banc
+    ne baisse pas. Possible maintenant que le banc existe.
+  - **Essai d'autres modèles** avec `eval --model` : `ministral-3:8b`,
+    `gemma4:12b`, `qwen3.5:9b`. Pour les Qwen3.5 hybrides, vérifier d'abord la
+    réutilisation du cache de préfixe sous Ollama (`scripts/latency-bench.mjs`) :
+    les rapports se contredisent selon les versions, et tout le gain de latence
+    du 2026-10-08 en dépend.
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :

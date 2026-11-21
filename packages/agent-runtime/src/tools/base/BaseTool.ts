@@ -8,7 +8,7 @@ import type { RiskLevel } from '@catdesk/shared-types';
 import type { z } from 'zod';
 import type { RegisteredTool } from '../../ToolRegistry';
 
-function formatZodError(error: z.ZodError): string {
+export function formatZodError(error: z.ZodError): string {
   return error.issues
     .map(i => (i.path.length > 0 ? `${i.path.join('.')}: ${i.message}` : i.message))
     .join(' ; ');

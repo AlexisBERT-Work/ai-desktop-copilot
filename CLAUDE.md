@@ -21,6 +21,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | Sortir une version (bump, tag, publication)    | `docs/DISTRIBUTION.md` § 4                                               |
 | Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                               |
 | Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                        |
+| Mesurer la qualité de l'agent (banc de tâches) | `packages/agent-runtime/src/eval/` + `CONTRIBUTING.md`                   |
 | Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                       |
 | Installeur offline + auto-update               | `docs/DISTRIBUTION.md`                                                   |
 | Techniques d'architecture agent (✅/🟡/⬜)     | `CATDESK-CONCEPTS-AVANCES.md` (référencé par le code : ne pas renommer)  |
@@ -77,7 +78,11 @@ Latence — **le problème n°1 du produit** (2026-10-08 : premier token passé 
 - **Tout appel LLM de fond** passe `complete({ background: true })` ou
   `scheduler.schedule()` : il attend le calme et cède le GPU à l'utilisateur.
 - **Outils** : noyau en tête, ordre d'enregistrement ; un mot qui ne désigne
-  aucun outil va dans `STOPWORDS` (`llm/selectTools.ts`).
+  aucun outil va dans `STOPWORDS` (`llm/selectTools.ts`), un mot d'utilisateur
+  qui en désigne un va dans `llm/toolKeywords.ts`, **pas dans la description** :
+  la table ne coûte aucun token, la description si. Hors noyau, un outil n'est
+  proposé que sur un mot-clé ou deux mots communs avec sa description
+  (`MIN_SCORE`) : un seul mot commun tirait un outil sur presque toute question.
 - **Mesurer** avant/après : `node scripts/latency-bench.mjs` (proxy qui
   chronomètre chaque appel à Ollama, par le vrai protocole de l'agent).
 
@@ -134,6 +139,8 @@ pnpm dev              # Start full dev environment (Tauri + sidecars)
 pnpm type-check       # TypeScript check all packages
 pnpm lint             # Lint all packages
 pnpm test             # Run all tests
+pnpm --filter @catdesk/agent-runtime eval --selection  # Sélection d'outils, sans GPU
+pnpm --filter @catdesk/agent-runtime eval --temperature 0  # Banc complet (~40 min), comme SUIVI
 .\scripts\setup.ps1   # First-time dev setup
 ```
 
@@ -163,11 +170,13 @@ Node.js agent → stdout NDJSON → Rust bridge → Tauri emit() → React
 3. Add permission config in `packages/shared-types/src/permissions.ts`
 4. Register in `packages/agent-runtime/src/tools/registerTools.ts` (dev/infra tools
    also go in `RESEARCH_EXCLUDED` there)
-5. Document it in `docs/CAPACITES.md`
+5. Add the words people use for it to `packages/agent-runtime/src/llm/toolKeywords.ts`
+   (read by `selectTools` only, never sent to the model: no latency cost)
+6. Document it in `docs/CAPACITES.md`
 
 `registerTools.test.ts` asserts registrations and permission entries match exactly,
 and fails on a path-like argument (`path`, `dir`, `file`, `vault`…) not declared
-in `pathArgs`.
+in `pathArgs`, or on a tool outside the core with no keywords.
 Full procedure: `CONTRIBUTING.md`.
 
 ## TypeScript Conventions

@@ -36,7 +36,8 @@ export class DescribeScreenTool extends BaseTool<Args> {
   name = 'describe_screen';
   description =
     "Capture l'écran (ou une région / la fenêtre active) et le décrit visuellement " +
-    "via un modèle de vision. Utiliser pour 'que vois-tu', analyser une UI, un graphique, une image.";
+    "via un modèle de vision. Utiliser pour 'que vois-tu', analyser une UI, un graphique, une image. " +
+    'Pour lire un texte, préférer ocr_region.';
   category = 'screen' as const;
   riskLevel = 'low' as const;
   requiresConfirmation = false;

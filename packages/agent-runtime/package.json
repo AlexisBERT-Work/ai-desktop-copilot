@@ -9,7 +9,8 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval": "tsx src/eval/cli.ts"
   },
   "dependencies": {
     "@catdesk/shared-types": "workspace:*",
