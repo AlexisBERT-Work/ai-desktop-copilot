@@ -391,6 +391,15 @@ export const DEFAULT_PERMISSION_CONFIG: PermissionConfig = {
       enabled: true,
       requiresConfirmation: false,
     },
+    // Lecture seule et locale (veille du 16/11) : rien n'est modifié ni envoyé.
+    inspect_file_leaks: {
+      name: 'inspect_file_leaks',
+      description:
+        "Lister ce qu'un fichier révèle avant d'être partagé (GPS, auteurs, commentaires, révisions)",
+      riskLevel: 'low',
+      enabled: true,
+      requiresConfirmation: false,
+    },
     analyze_data: {
       name: 'analyze_data',
       description:

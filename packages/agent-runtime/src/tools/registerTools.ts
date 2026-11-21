@@ -64,6 +64,7 @@ import { OcrRegionTool } from './screen/OcrRegionTool';
 import { DescribeScreenTool } from './screen/DescribeScreenTool';
 import { TranscribeAudioTool } from './audio/TranscribeAudioTool';
 import { ParseDocumentTool } from './files/ParseDocumentTool';
+import { InspectFileLeaksTool } from './files/InspectFileLeaksTool';
 import { AnalyzeDataTool } from './files/AnalyzeDataTool';
 import { ExportDocumentTool } from './files/ExportDocumentTool';
 import { ReadCalendarTool } from './files/ReadCalendarTool';
@@ -231,6 +232,7 @@ export function registerCoreTools(
   register(new DescribeScreenTool(llm, visionModel));
   register(new TranscribeAudioTool());
   register(new ParseDocumentTool());
+  register(new InspectFileLeaksTool());
   register(new AnalyzeDataTool());
   register(new ExportDocumentTool());
   register(new ReadCalendarTool());

@@ -1,7 +1,7 @@
 # CE QUE CATDESK SAIT FAIRE
 
 > Document unique de référence sur les capacités de CatDesk.
-> À jour au **2026-11-08**. Inventaire basé sur les **71 outils du catalogue**
+> À jour au **2026-11-22**. Inventaire basé sur les **72 outils du catalogue**
 > enregistrés via
 > [registerTools.ts](../packages/agent-runtime/src/tools/registerTools.ts) et leurs
 > niveaux de risque dans
@@ -40,7 +40,7 @@ cloud.
 
 ```
 React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
-   → agent Node (boucle ReAct + 71 outils) → Ollama (LLM local) + sidecar Python (OCR)
+   → agent Node (boucle ReAct + 72 outils) → Ollama (LLM local) + sidecar Python (OCR)
 ```
 
 ---
@@ -77,6 +77,27 @@ React (UI) → Tauri IPC → cœur Rust (sandbox + permissions + audit)
 OCR testé en réel : lit le texte de l'écran à ~80 % de confiance (FR+EN).
 Les quatre outils « documents » passent par le sidecar Python (`files/`), lancé
 à la demande.
+
+| Avant d'envoyer un fichier                                     | Outil(s)             | Risque |
+| -------------------------------------------------------------- | -------------------- | :----: |
+| **Voir ce qu'un fichier révèle** (GPS, auteurs, commentaires…) | `inspect_file_leaks` |   🟢   |
+
+**Ce qu'un fichier révèle** (veille du 16/11, Plan E point 5, 2026-11-22) :
+`inspect_file_leaks` liste ce qui voyage avec une photo, un PDF ou un document
+Office sans se voir à l'écran (`files/leak_inspector.py`) : position GPS et
+appareil d'une photo, invite d'une image générée ; auteur, révisions
+incrémentales (l'ancienne version reste sous la nouvelle), **texte sous un
+rectangle noir**, caviardage laissé en annotation, commentaires, pièces
+jointes et champs remplis d'un PDF ; auteurs, société, modèle et chemins du
+poste, commentaires, suivi des modifications, texte masqué, feuilles et
+diapos masquées, notes de l'orateur, objets et photos incorporés d'un fichier
+Word, Excel, PowerPoint ou OpenDocument. Chaque constat a un niveau (élevé,
+moyen, info) ; la sortie donne des noms et des nombres, pas le contenu des
+commentaires (30 constats au plus). Lecture seule : rien n'est modifié,
+aucune copie n'est écrite. Mesure de la veille : 10 fichiers piégés sur 10
+repérés, dont 6 produits par Word, Excel et PowerPoint, et aucune alerte
+moyenne ou élevée sur 2 fichiers propres. Non vus : un scan noirci dans
+l'image (il faudrait l'OCR) et le contenu visible des pages.
 
 ### 1 bis. Lui parler, l'entendre répondre (mode « Jarvis », 2026-09-11)
 

@@ -604,3 +604,24 @@ que Parakeet a entendu, pour la bulle comme pour la dictée
   est récrit partout avec sa majuscule, y compris dans une dictée tapée
   ailleurs. L'aide de la carte le dit, et l'interrupteur coupe la correction
   sans effacer le fichier.
+
+## Mise à jour 2026-11-22 — ce qu'un fichier révèle (veille du 16/11)
+
+`inspect_file_leaks` (🟢, lecture seule) ouvre des fichiers venus d'ailleurs :
+photos, PDF, archives zip de XML (Office, OpenDocument)
+(`ocr-vision/files/leak_inspector.py`). Le chemin passe par la liste blanche
+(`pathArgs`). Rien n'est écrit, rien ne sort du poste.
+
+- **Fichier hostile** : 30 Mo décompressés au plus par membre XML (bombe zip),
+  20 photos incorporées lues au plus, 300 pages de PDF (100 pour le rectangle
+  noir), 200 Mo parcourus pour compter les révisions. ElementTree ne résout pas
+  les entités externes (pas de XXE). Aucune macro lue ni exécutée : la
+  présence de `vbaProject.bin` est seulement signalée.
+- **Sortie** : 30 constats de 200 caractères au plus ; des noms et des nombres,
+  ni le texte des commentaires d'un document ni le texte caché (seul le
+  commentaire d'une photo est cité, tronqué). Elle contient des
+  données personnelles (noms d'auteurs, position GPS) : c'est son but, et
+  elle ne va qu'au modèle local, après `sanitizeToolOutput`.
+- **Fausse assurance** : « rien de caché » ne vaut que pour ce qui est
+  inspecté ; le résultat dit ce qui ne l'est pas (`nonVerifie` : contenu
+  visible des pages, scans noircis dans l'image).

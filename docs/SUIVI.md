@@ -8,7 +8,7 @@
 >
 > Journal **antéchronologique**. Le détail est gardé sur les deux derniers mois ;
 > avant, une ligne par étape (`git log` a le reste).
-> Dernière mise à jour : 2026-11-21.
+> Dernière mise à jour : 2026-11-22.
 
 ---
 
@@ -26,8 +26,11 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 `git switch dev`, puis la liste de ce que git ne transporte pas dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
-**En PR vers `dev`** : `feat/garde-fous-reponse` (contrôles d'après
-réponse, voir l'entrée du 2026-11-20).
+**En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
+point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (#49),
+`feat/recherche-web` (#51), `feat/parse-document-formats` (#52),
+`feat/inspect-file-leaks` (#53) ; voir les entrées des 21 et 22/11.
+`feat/garde-fous-reponse` est entrée dans `dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
 session anonyme, tables, RPC `publish_daily_if_missing`). Dernière daily
@@ -52,6 +55,35 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 (zod 4, vitest 4, overrides ciblés), fusionnée dans `refactor/audit-complet` le
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
+
+## 2026-11-22 — Ce qu'un fichier révèle (Plan E, point 5)
+
+Veille du 16/11, sur `feat/inspect-file-leaks`, coupée de `dev`. Nouvel outil
+🟢 `inspect_file_leaks` (72 outils sur cette branche) : avant d'envoyer une
+photo, un PDF ou un document Office, il liste ce qui voyage avec sans se voir,
+voir [CAPACITES.md](CAPACITES.md) § 1. Python dans `files/leak_inspector.py`,
+à côté de `parse_document` ; aucune dépendance ajoutée. unredact.tools, cité
+par la veille, n'a pas de licence : seule sa liste de fuites a servi.
+
+- **Mesure de la veille** : 10 fichiers piégés sur 10 repérés, dont 6 produits
+  par Word, Excel et PowerPoint (suivi des modifications et commentaire,
+  surligneur noir et forme noire posés sur du texte dans un PDF exporté,
+  photo GPS insérée dans un DOCX, feuille masquée, diapo masquée et notes,
+  ODT) ; aucune alerte moyenne ou élevée sur 2 fichiers propres ; 12 fichiers
+  lus en 0,7 s.
+- **Le rectangle noir** est cherché dans les tracés du PDF : texte sous un
+  rectangle sombre peint après lui, ou texte sombre sur fond sombre ; un en-tête
+  de tableau en blanc sur noir ne compte pas. L'essai sur le PDF de Word a
+  aussi montré une fausse révision incrémentale : Word ajoute une section vide
+  derrière chaque export (référence hybride). Seule une mise à jour qui ajoute
+  des objets compte désormais.
+- Tests : 14 tests Python (fichiers construits à la volée, dont un en
+  processus neuf : il a trouvé un import de Pillow cassé), 4 côté agent.
+  Banc de sélection : 2 tâches `dev` et 1 `holdout` ; `dev` 46/46 sans raté,
+  `holdout` 37/43 (86 %, contre 36/42 sur `dev`).
+- **Pas faits** : la copie nettoyée (outil 🟡) et le scan noirci dans l'image,
+  voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4 ; ni le banc complet avec
+  `qwen3:14b`.
 
 ## 2026-11-20 — Garde-fous de réponse
 

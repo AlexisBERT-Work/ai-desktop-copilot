@@ -159,6 +159,20 @@ export function simulatedWorld(now: Date): SimulatedWorld {
       pages: 4,
       text: 'Le rapport conclut à une hausse de 12 % des ventes, portée par le marché allemand.',
     }),
+    inspect_file_leaks: ok({
+      fichier: 'devis.docx',
+      format: 'docx',
+      resume: '3 point(s) à vérifier, dont 2 élevé(s).',
+      constats: [
+        {
+          niveau: 'élevé',
+          quoi: 'Suivi des modifications',
+          detail: '4 modification(s) non acceptée(s) de Paul Durand',
+        },
+        { niveau: 'élevé', quoi: 'Commentaires', detail: '2 de Paul Durand' },
+        { niveau: 'moyen', quoi: 'Auteurs', detail: 'Claire Martin' },
+      ],
+    }),
     analyze_data: ok({
       rows: 120,
       columns: ['produit', 'prix', 'quantite'],
