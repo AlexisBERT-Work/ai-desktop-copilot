@@ -42,6 +42,15 @@ export abstract class BaseTool<A = unknown> implements RegisteredTool {
 
   abstract execute(args: A): Promise<ToolResult>;
 
+  /**
+   * Page web que cet appel vise (URL), lue AVANT l'exécution sur les arguments
+   * bruts : le moteur de permissions en tire le site de l'accord « pour ce
+   * site » (`siteGrantWhenReadOnly`). `undefined` : l'appel ne vise aucun site.
+   */
+  targetUrl(_args: Record<string, unknown>): string | undefined {
+    return undefined;
+  }
+
   /** Valeurs des `pathArgs` présentes dans des arguments bruts (avant validation). */
   filesystemTargets(args: Record<string, unknown>): string[] {
     const targets: string[] = [];

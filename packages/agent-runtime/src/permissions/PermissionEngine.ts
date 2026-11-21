@@ -1,4 +1,5 @@
 import type {
+  GrantScope,
   PermissionRequest,
   PermissionResult,
   PermissionConfig,
@@ -12,17 +13,34 @@ import {
   RPC_NOTIFICATIONS,
 } from '@catdesk/shared-types';
 import { stdoutNotifier, type NotifyFn } from '../ipc/Notifier';
+import { registrableDomain } from '../lib/registrableDomain';
 import { createLogger } from '../logger';
 import { createPathGuard } from './realPath';
 
 const log = createLogger('security:permissions');
 
+/** Réponse brute de l'UI, avant de la confronter aux portées proposées. */
+interface UserAnswer {
+  granted: boolean;
+  scope?: GrantScope;
+}
+
+/**
+ * Clé d'un accord de session : l'outil seul (portée `session`), ou l'outil et
+ * le site (portée `site`). Un `@` ne peut figurer ni dans un nom d'outil ni
+ * dans un nom d'hôte : les deux familles de clés ne se recouvrent pas.
+ */
+export function grantKey(tool: string, site?: string): string {
+  return site === undefined ? tool : `${tool}@${site}`;
+}
+
 export class PermissionEngine {
+  /** Accords valables jusqu'à la fin de la session, par `grantKey`. */
   private sessionGrants = new Map<string, PermissionGrant>();
   private config: PermissionConfig = DEFAULT_PERMISSION_CONFIG;
 
   /** Demandes de confirmation en attente d'une réponse de l'UI, par requestId. */
-  private pendingRequests = new Map<string, (result: PermissionResult) => void>();
+  private pendingRequests = new Map<string, (answer: UserAnswer) => void>();
 
   /**
    * @param browserReadOnly lit la lecture seule du navigateur (BrowserManager,
@@ -38,6 +56,17 @@ export class PermissionEngine {
   effectiveRisk(toolConfig: ToolPermissionConfig): RiskLevel {
     const lowered = toolConfig.riskLevelWhenReadOnly;
     return lowered !== undefined && this.browserReadOnly() ? lowered : toolConfig.riskLevel;
+  }
+
+  /**
+   * Site de l'accord « pour ce site », s'il s'applique maintenant : l'outil le
+   * prévoit, le navigateur est en lecture seule et la page visée a un site.
+   * Lecture seule coupée : `undefined`, les accords par site déjà donnés
+   * dorment (ils reviennent avec la lecture seule).
+   */
+  siteFor(request: PermissionRequest, toolConfig: ToolPermissionConfig): string | undefined {
+    if (toolConfig.siteGrantWhenReadOnly !== true || !this.browserReadOnly()) return undefined;
+    return request.url === undefined ? undefined : registrableDomain(request.url);
   }
 
   updateConfig(config: Partial<PermissionConfig>): void {
@@ -99,46 +128,69 @@ export class PermissionEngine {
       return { granted: true, reason: 'Auto-approuvé (risque faible)' };
     }
 
+    // Accord « pour ce site » déjà donné : vaut pour cet outil sur ce site,
+    // quel que soit son risque, mais seulement en lecture seule (`siteFor`).
+    const site = this.siteFor(request, toolConfig);
+    if (site !== undefined && this.sessionGrants.get(grantKey(request.tool, site))?.granted) {
+      return { granted: true, reason: `Autorisé pour ${site} (session)`, scope: 'site', site };
+    }
+
     // MEDIUM risk: check session cache. Une autorisation donnée en lecture
     // seule ne vaut que tant que le risque est `medium` : lecture seule coupée,
     // `browser_navigate` redevient `high` et redemande à chaque fois.
-    if (risk === 'medium' && this.sessionGrants.get(request.tool)?.granted) {
-      return { granted: true, reason: 'Autorisé (session)' };
+    if (risk === 'medium' && this.sessionGrants.get(grantKey(request.tool))?.granted) {
+      return { granted: true, reason: 'Autorisé (session)', scope: 'session' };
     }
 
     if (!toolConfig.requiresConfirmation) {
       return { granted: true, reason: 'Autorisé (aucune confirmation requise)' };
     }
 
-    // Request user confirmation via UI
-    const result = await this.requestUserConfirmation(
-      request,
-      risk,
-      toolConfig.description,
-      signal,
-    );
+    // Portées proposées : le site s'il s'applique, la session pour `medium`
+    // seulement — `high` redemande à chaque fois partout ailleurs.
+    const scopes: GrantScope[] = ['once'];
+    if (site !== undefined) scopes.push('site');
+    if (risk === 'medium') scopes.push('session');
 
-    if (result.granted && risk === 'medium' && result.remember) {
-      this.sessionGrants.set(request.tool, { granted: true, timestamp: Date.now() });
+    const result = await this.requestUserConfirmation(request, {
+      riskLevel: risk,
+      description: toolConfig.description,
+      scopes,
+      site,
+      signal,
+    });
+
+    if (result.granted && result.scope === 'site' && site !== undefined) {
+      this.sessionGrants.set(grantKey(request.tool, site), {
+        granted: true,
+        timestamp: Date.now(),
+      });
+    } else if (result.granted && result.scope === 'session') {
+      this.sessionGrants.set(grantKey(request.tool), { granted: true, timestamp: Date.now() });
     }
 
     return result;
   }
 
-  /** Réponse de l'utilisateur au dialogue de permission (relayée par le bridge). */
-  resolvePermissionRequest(requestId: string, granted: boolean, remember?: boolean): void {
-    this.pendingRequests.get(requestId)?.({
-      granted,
-      ...(remember !== undefined ? { remember } : {}),
-    });
+  /**
+   * Réponse de l'utilisateur au dialogue de permission (relayée par le
+   * bridge). Une portée que la demande ne proposait pas vaut `once`.
+   */
+  resolvePermissionRequest(requestId: string, granted: boolean, scope?: GrantScope): void {
+    this.pendingRequests.get(requestId)?.({ granted, ...(scope !== undefined ? { scope } : {}) });
   }
 
   private requestUserConfirmation(
     request: PermissionRequest,
-    riskLevel: RiskLevel,
-    description: string,
-    signal: AbortSignal | undefined,
+    offer: {
+      riskLevel: RiskLevel;
+      description: string;
+      scopes: GrantScope[];
+      site: string | undefined;
+      signal: AbortSignal | undefined;
+    },
   ): Promise<PermissionResult> {
+    const { signal, site, scopes } = offer;
     if (signal?.aborted) return Promise.resolve({ granted: false, reason: 'Run interrompu' });
 
     return new Promise(resolve => {
@@ -156,16 +208,32 @@ export class PermissionEngine {
         () => settle({ granted: false, reason: 'Pas de réponse au dialogue de permission' }),
         this.timeoutMs,
       );
-      this.pendingRequests.set(requestId, settle);
+      this.pendingRequests.set(requestId, answer => {
+        if (!answer.granted) {
+          settle({ granted: false, reason: "Refusé par l'utilisateur", requestId });
+          return;
+        }
+        const scope =
+          answer.scope !== undefined && scopes.includes(answer.scope) ? answer.scope : 'once';
+        settle({
+          granted: true,
+          reason: "Autorisé par l'utilisateur",
+          scope,
+          requestId,
+          ...(site !== undefined ? { site } : {}),
+        });
+      });
       signal?.addEventListener('abort', onAbort, { once: true });
 
       // Le bridge Rust relaie la notification à l'UI (dialogue de permission).
       this.notify(RPC_NOTIFICATIONS.permissionRequest, {
         requestId,
         tool: request.tool,
-        description,
+        description: offer.description,
         args: request.args,
-        riskLevel,
+        riskLevel: offer.riskLevel,
+        scopes,
+        ...(site !== undefined ? { site } : {}),
         ...(request.preview !== undefined ? { preview: request.preview } : {}),
       });
     });

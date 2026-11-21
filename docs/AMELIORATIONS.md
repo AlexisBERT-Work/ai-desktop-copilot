@@ -162,11 +162,15 @@ chemin déclaré — la traversée est testée dans `PermissionEngine` à traver
 outils réels), le parseur NDJSON d'`OllamaClient` (`parseChatLine`, pur), `AuditLogger`
 (expurgation, fichier du jour), `run_sqlite`, `semantic_search`. Reste :
 
-| Module                    | Pourquoi c'est gênant                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------- |
-| `lib/ocrSidecar` (202 l.) | Cycle de vie d'un sous-processus + cadrage JSON à travers la frontière Python.        |
-| Familles entières         | `browser/` (6 outils), `automation/` (5), `market/` (5), `screen/` (3), `audio/` (1). |
-| `ipc/bridge.rs`           | Le superviseur (relance, délais, run perdu) n'est vérifié qu'à la lecture.            |
+| Module                    | Pourquoi c'est gênant                                                           |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `lib/ocrSidecar` (202 l.) | Cycle de vie d'un sous-processus + cadrage JSON à travers la frontière Python.  |
+| Familles entières         | `automation/` (5), `market/` (5), `screen/` (3), `audio/` (1).                  |
+| `browser/` (en partie)    | Restent `get_text`, `screenshot`, `close` (le reste est couvert, voir dessous). |
+| `ipc/bridge.rs`           | Le superviseur (relance, délais, run perdu) n'est vérifié qu'à la lecture.      |
+
+`browser/` couvert le 2026-11-21 : navigate, clic, saisie, lecture seule, accord
+par site et « à toi de jouer », dont un vrai navigateur sur un serveur local.
 
 ### 2.2 Configuration de test fragile — ✅ fait (2026-10-07)
 
@@ -371,10 +375,19 @@ rien à faire au milieu d'un journal.
   par Supabase Studio (Authentication → Users). Chantier à part.
 - **Système de plugins** — la voie est ouverte (`BaseTool` + `registerTools` +
   `DEFAULT_PERMISSION_CONFIG`), mais rien ne charge de tool tiers à l'exécution.
-- ✅ **Friction de `browser_navigate`** — tranchée le 2026-11-12 par la
-  lecture seule du navigateur (veille du 6/11, PR #36) : `medium` tant que rien ne peut partir,
-  `high` sinon. Clic et saisie restent `high`. Suite possible : l'arbre
-  d'accessibilité avec `ref` cliquables (🟡 de la veille).
+- ✅ **Friction du navigateur de l'agent** — tranchée en deux temps.
+  Le 2026-11-12, la lecture seule (veille du 6/11, PR #36) :
+  `browser_navigate` est `medium` tant que rien ne peut partir, `high` sinon.
+  Le 2026-11-21 (branche `feat/navigateur-par-site`) : **accord par site** pour navigate, clic et
+  saisie (veille du 20/11) — clé outil + domaine enregistrable, valable pour la
+  session et seulement en lecture seule, portée notée dans l'audit — et
+  **« à toi de jouer »** (veille du 15/11) : CAPTCHA, code à usage unique et
+  paiement rendent la main au lieu d'agir. Choix faits : clic et saisie restent
+  `high` (l'accord par site ne change pas le risque, il évite de redemander) ;
+  lecture seule coupée, tout redemande. Détail : [SECURITE.md](SECURITE.md).
+  Suites possibles : l'arbre d'accessibilité avec `ref` cliquables (🟡 de la
+  veille du 6/11), rendre aussi la main sur un champ mot de passe, et le même
+  relevé après `browser_navigate` pour prévenir le modèle dès l'arrivée.
 - **Linux / macOS** — `sandbox.rs`, les scripts PowerShell et les outils
   presse-papiers/OpenApp sont écrits pour Windows.
 

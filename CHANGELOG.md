@@ -247,6 +247,18 @@ Full audit and refactor of the whole repository, then a latency pass (branch
   `list_directory`, `write_file`… through. Whitelist roots count as written and as resolved (a
   redirected Documents stays allowed), and a path outside the whitelist never reaches the disk
   (no SMB connection for `\\host\share`).
+- **Per-site approval for the agent's browser** (`PermissionEngine`, `lib/registrableDomain.ts`).
+  While the browser is read-only, the confirmation card of `browser_navigate`, `browser_click`
+  and `browser_type` offers "Allow for this site": that tool, on that registrable domain
+  (eTLD+1, public suffix list via `tldts`, private section included so `alice.github.io` and
+  `bob.github.io` stay apart), until the end of the session. Click and type stay high; with
+  read-only off, every action asks again. The grant scope (once / site / session) travels
+  UI → Rust (enum, unknown values refused) → agent, and is written to the audit log, including
+  when a site grant is reused without asking.
+- **"Your turn" handoff** (`lib/browserHandoff.ts`): before clicking or typing, the agent checks
+  the page and its visible iframes for a CAPTCHA, a one-time code (2FA) or a payment form or
+  iframe (card number, CVC, Stripe, PayPal, Adyen…). If found, it does nothing and returns a
+  "your turn" message for the user instead.
 
 ### Changed
 

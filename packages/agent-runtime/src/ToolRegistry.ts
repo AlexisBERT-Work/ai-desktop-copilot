@@ -18,6 +18,8 @@ export interface RegisteredTool extends ToolDefinition {
    * nouveau par `execute`, qui ne laisse ainsi rien partir en clair.
    */
   prepareOutboundArgs?(args: Record<string, unknown>): OutboundArgs;
+  /** Page web visée par cet appel, pour l'accord par site (voir BaseTool.targetUrl). */
+  targetUrl?(args: Record<string, unknown>): string | undefined;
 }
 
 /** Arguments prêts à sortir, et ce qu'il faut en dire à l'utilisateur. */
@@ -59,6 +61,11 @@ export class ToolRegistry {
   /** Chemins à vérifier contre la liste blanche avant d'exécuter `name`. */
   filesystemTargets(name: string, args: Record<string, unknown>): string[] {
     return this.tools.get(name)?.filesystemTargets(args) ?? [];
+  }
+
+  /** Page web que `name` vise avec ces arguments, s'il en vise une. */
+  targetUrl(name: string, args: Record<string, unknown>): string | undefined {
+    return this.tools.get(name)?.targetUrl?.(args);
   }
 
   /**

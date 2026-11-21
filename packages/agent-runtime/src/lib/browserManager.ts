@@ -2,8 +2,20 @@ import { existsSync } from 'fs';
 import { chromium } from 'playwright-core';
 import type { Browser, BrowserContext, Page, Route, WebSocketRoute } from 'playwright-core';
 import { createLogger } from '../logger';
+import {
+  COLLECT_SIGNALS_SCRIPT,
+  detectHandoff,
+  mergeSignals,
+  type Handoff,
+  type PageSignals,
+} from './browserHandoff';
 
 const log = createLogger('runtime:browser');
+
+/** Cadres relevés au plus (le principal, puis les iframes visibles). */
+const MAX_HANDOFF_FRAMES = 12;
+/** Délai par cadre : un cadre bloqué ne doit pas figer le clic. */
+const HANDOFF_FRAME_TIMEOUT_MS = 1_500;
 
 const BROWSER_PATHS_WINDOWS = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -50,6 +62,15 @@ export interface BlockedWrite {
   url: string;
   /** Type Playwright : `document` (formulaire), `fetch`, `xhr`, `ping` (sendBeacon), `websocket`… */
   resourceType: string;
+}
+
+/** `promise`, ou un rejet passé `ms` ; le minuteur est toujours libéré. */
+function collectWithin<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`délai de ${ms} ms dépassé`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** Toute méthode autre que GET, HEAD et OPTIONS est une écriture. Pur, exporté pour les tests. */
@@ -304,6 +325,55 @@ export class BrowserManager {
     }
     await locator.fill(text, { timeout: opts.timeoutMs ?? 10_000 });
     return this.settle(page, mark);
+  }
+
+  /**
+   * La page demande-t-elle l'utilisateur (CAPTCHA, code à usage unique,
+   * paiement) ? Relevé dans le cadre principal et les iframes VISIBLES — un
+   * champ de carte vit souvent dans l'iframe d'un prestataire. Un cadre
+   * illisible (fermé, en navigation, trop lent) est sauté : le relevé ne doit
+   * pas empêcher d'agir sur une page ordinaire.
+   */
+  async detectHandoff(): Promise<Handoff | null> {
+    if (!this.isOpen() || this.page === null) return null;
+    const page = this.page;
+    const mainFrame = page.mainFrame();
+    // Cadre principal illisible : au moins l'URL de la page (paiement hébergé).
+    let main: PageSignals = {
+      url: page.url(),
+      title: '',
+      fields: [],
+      frames: [],
+      challengeElements: [],
+    };
+    const others: PageSignals[] = [];
+    for (const frame of page.frames().slice(0, MAX_HANDOFF_FRAMES)) {
+      try {
+        if (frame !== mainFrame) {
+          const element = await frame.frameElement();
+          const shown = await element.isVisible();
+          await element.dispose();
+          if (!shown) continue;
+        }
+        const signals = await collectWithin(
+          frame.evaluate(COLLECT_SIGNALS_SCRIPT) as Promise<PageSignals>,
+          HANDOFF_FRAME_TIMEOUT_MS,
+        );
+        if (frame === mainFrame) main = signals;
+        else others.push(signals);
+      } catch (err) {
+        log.debug('Handoff: frame skipped', { url: frame.url().slice(0, 120), error: String(err) });
+      }
+    }
+    const handoff = detectHandoff(mergeSignals([main, ...others]));
+    if (handoff !== null) {
+      log.info('Browser handoff to user', {
+        kind: handoff.kind,
+        evidence: handoff.evidence,
+        url: page.url().slice(0, 200),
+      });
+    }
+    return handoff;
   }
 
   getCurrentUrl(): string {

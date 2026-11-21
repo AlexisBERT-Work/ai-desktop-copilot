@@ -25,6 +25,12 @@ export class BrowserNavigateTool extends BaseTool<Args> {
   override readonly argsSchema = argsSchema;
   readonly schema = jsonSchemaFrom(argsSchema);
 
+  /** Site de l'accord « pour ce site » : celui de l'URL demandée. */
+  override targetUrl(args: Record<string, unknown>): string | undefined {
+    const url = args['url'];
+    return typeof url === 'string' ? url : undefined;
+  }
+
   async execute(rawArgs: Args): Promise<ToolResult> {
     const { url, wait_until, timeout_ms } = rawArgs;
 

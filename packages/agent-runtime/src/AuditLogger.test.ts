@@ -87,6 +87,71 @@ describe('AuditLogger', () => {
     expect(JSON.stringify(lines)).not.toContain('hunter2');
   });
 
+  it('PERMISSION note la portée de l’accord (cette fois / ce site) et le site', () => {
+    const audit = new AuditLogger(() => new Date('2026-11-21T10:00:00Z'));
+    audit.logPermission('run-1', 'browser_click', {
+      granted: true,
+      reason: "Autorisé par l'utilisateur",
+      scope: 'site',
+      site: 'exemple.fr',
+      requestId: 'req-1',
+    });
+    audit.logPermission('run-1', 'browser_click', {
+      granted: true,
+      reason: 'Autorisé pour exemple.fr (session)',
+      scope: 'site',
+      site: 'exemple.fr',
+    });
+    audit.logPermission('run-1', 'run_command', {
+      granted: true,
+      scope: 'once',
+      requestId: 'req-2',
+    });
+    audit.logPermission('run-1', 'run_command', { granted: false, reason: 'refusé' });
+
+    const lines = readFileSync(join(dir, 'audit', 'audit-2026-11-21.log'), 'utf8')
+      .trim()
+      .split('\n')
+      .map(l => JSON.parse(l) as Record<string, unknown>);
+    expect(lines.map(({ ts: _ts, ...rest }) => rest)).toEqual([
+      {
+        event: 'PERMISSION',
+        runId: 'run-1',
+        tool: 'browser_click',
+        granted: true,
+        scope: 'site',
+        site: 'exemple.fr',
+        requestId: 'req-1',
+        reason: "Autorisé par l'utilisateur",
+      },
+      // Accord « ce site » réutilisé : sans requestId, c'est sa seule trace.
+      {
+        event: 'PERMISSION',
+        runId: 'run-1',
+        tool: 'browser_click',
+        granted: true,
+        scope: 'site',
+        site: 'exemple.fr',
+        reason: 'Autorisé pour exemple.fr (session)',
+      },
+      {
+        event: 'PERMISSION',
+        runId: 'run-1',
+        tool: 'run_command',
+        granted: true,
+        scope: 'once',
+        requestId: 'req-2',
+      },
+      {
+        event: 'PERMISSION',
+        runId: 'run-1',
+        tool: 'run_command',
+        granted: false,
+        reason: 'refusé',
+      },
+    ]);
+  });
+
   it('change de fichier après minuit sans redémarrage', () => {
     let now = new Date('2026-10-07T23:59:59Z');
     const audit = new AuditLogger(() => now);

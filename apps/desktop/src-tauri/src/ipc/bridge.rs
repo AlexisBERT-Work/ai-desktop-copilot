@@ -463,14 +463,14 @@ pub async fn send_to_agent(payload: Value) -> Result<()> {
 pub async fn send_permission_response(
     request_id: &str,
     granted: bool,
-    remember: bool,
+    scope: protocol::GrantScope,
 ) -> Result<()> {
     let payload = protocol::rpc_notification(
         protocol::RPC_PERMISSION_RESPONSE,
         serde_json::json!({
             "requestId": request_id,
             "granted": granted,
-            "remember": remember
+            "scope": scope
         }),
     );
     send_to_agent(payload).await

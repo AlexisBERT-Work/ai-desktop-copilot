@@ -2,6 +2,7 @@ import type {
   AgentConfig,
   AgentStep,
   ToolCall,
+  GrantScope,
   PermissionConfig,
   OllamaMessage,
   StreamChunk,
@@ -221,8 +222,8 @@ export class AgentOrchestrator {
    * permission). Débloque le `requestUserConfirmation()` en attente — sans
    * cela, tout outil à risque `high` reste bloqué jusqu'à son délai.
    */
-  resolvePermission(requestId: string, granted: boolean, remember?: boolean): void {
-    this.deps.permissions.resolvePermissionRequest(requestId, granted, remember);
+  resolvePermission(requestId: string, granted: boolean, scope?: GrantScope): void {
+    this.deps.permissions.resolvePermissionRequest(requestId, granted, scope);
   }
 
   /**
@@ -671,12 +672,14 @@ export class AgentOrchestrator {
     try {
       // Permission gate. Les chemins à vérifier sont ceux que l'OUTIL déclare
       // (pathArgs), pas une liste de clés devinée ici.
+      const url = tools.targetUrl(toolCall.name, args);
       const permission = await permissions.check(
         {
           tool: toolCall.name,
           args,
           paths: tools.filesystemTargets(toolCall.name, args),
           ...(notice !== undefined ? { preview: notice } : {}),
+          ...(url !== undefined ? { url } : {}),
           context: {
             conversationId: opts.conversationId,
             ...(opts.activeWindow !== undefined ? { activeWindow: opts.activeWindow } : {}),
@@ -684,6 +687,11 @@ export class AgentOrchestrator {
         },
         opts.signal,
       );
+      // Décision de l'utilisateur (avec sa portée : une fois, ce site, la
+      // session) ou refus ; un accord automatique est déjà tracé par TOOL_CALL.
+      if (!permission.granted || permission.scope !== undefined) {
+        audit.logPermission(opts.runId, toolCall.name, permission);
+      }
 
       if (!permission.granted) {
         const reason = permission.reason ?? 'refusé';

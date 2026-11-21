@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import type { PermissionRequestEvent } from '@catdesk/shared-types';
+import type { GrantScope, PermissionRequestEvent } from '@catdesk/shared-types';
 import { PERMISSION_TIMEOUT_MS, TAURI_EVENTS } from '@catdesk/shared-types';
 import { respondToPermission } from '../../shared/api/permissions';
+import { offeredScopes } from './permissionScopes';
 
 const RISK_CONFIG = {
   low: {
@@ -62,10 +63,10 @@ export function PermissionPrompt() {
     return () => clearTimeout(timer);
   }, [request]);
 
-  const respond = async (granted: boolean, remember = false) => {
+  const respond = async (granted: boolean, scope: GrantScope = 'once') => {
     if (!request) return;
     try {
-      await respondToPermission(request.requestId, granted, remember);
+      await respondToPermission(request.requestId, granted, scope);
     } catch {
       // Agent injoignable : la demande expirera côté agent (refus). Le
       // dialogue, lui, ne doit pas rester bloqué à l'écran.
@@ -73,6 +74,11 @@ export function PermissionPrompt() {
       dismiss(request.requestId);
     }
   };
+
+  const scopes = request ? offeredScopes(request) : [];
+  const site = request?.site;
+  const offersSite = site !== undefined && scopes.includes('site');
+  const offersSession = scopes.includes('session');
 
   return (
     <AnimatePresence>
@@ -95,8 +101,10 @@ export function PermissionPrompt() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
             <div
-              className="w-full max-w-md rounded-2xl border border-white/10
-                            bg-gray-950/98 shadow-2xl overflow-hidden"
+              role="dialog"
+              aria-label={`Autorisation requise — ${request.tool}`}
+              className={`w-full ${offersSite ? 'max-w-lg' : 'max-w-md'} rounded-2xl border border-white/10
+                            bg-gray-950/98 shadow-2xl overflow-hidden`}
             >
               {/* Risk header */}
               <PermissionHeader riskLevel={request.riskLevel} tool={request.tool} />
@@ -105,6 +113,11 @@ export function PermissionPrompt() {
               <div className="px-5 py-4 space-y-3">
                 {request.description && (
                   <p className="text-sm text-white/70">{request.description}</p>
+                )}
+                {site !== undefined && (
+                  <p className="text-sm text-white/70">
+                    Site : <span className="font-mono text-white/90">{site}</span>
+                  </p>
                 )}
                 {queue.length > 1 && (
                   <p className="text-xs text-white/40">
@@ -141,19 +154,38 @@ export function PermissionPrompt() {
                     Refuser
                   </button>
                   <button
-                    onClick={() => respond(true)}
+                    onClick={() => respond(true, 'once')}
                     className="flex-1 py-2.5 rounded-xl bg-brand-600 text-sm
                                text-white hover:bg-brand-500 transition-colors font-medium"
                   >
-                    Autoriser
+                    {offersSite ? 'Autoriser une fois' : 'Autoriser'}
                   </button>
+                  {offersSite && (
+                    <button
+                      onClick={() => respond(true, 'site')}
+                      className="flex-[1.4] py-2.5 px-3 rounded-xl border border-brand-500/60 text-sm
+                                 text-white hover:bg-brand-500/15 transition-colors font-medium whitespace-nowrap"
+                    >
+                      Autoriser pour ce site
+                    </button>
+                  )}
                 </div>
-                {request.riskLevel === 'medium' && (
+                {offersSite && (
+                  <p className="text-xs text-white/40">
+                    « Pour ce site » vaut pour <span className="font-mono">{site}</span> et ses
+                    sous-domaines, pour cet outil, jusqu&apos;à la fin de la session — tant que le
+                    navigateur reste en lecture seule. CAPTCHA, code à usage unique et paiement te
+                    reviennent quand même.
+                  </p>
+                )}
+                {offersSession && (
                   <button
-                    onClick={() => respond(true, true)}
+                    onClick={() => respond(true, 'session')}
                     className="w-full py-2 text-xs text-white/30 hover:text-white/60 transition-colors"
                   >
-                    Autoriser pour cette session
+                    {offersSite
+                      ? 'Autoriser sur tous les sites pour cette session'
+                      : 'Autoriser pour cette session'}
                   </button>
                 )}
               </div>

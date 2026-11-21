@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'path';
-import { PermissionEngine } from './PermissionEngine';
-import { DEFAULT_PERMISSION_CONFIG } from '@catdesk/shared-types';
+import { PermissionEngine, grantKey } from './PermissionEngine';
+import { DEFAULT_PERMISSION_CONFIG, type GrantScope } from '@catdesk/shared-types';
 import { ParseDocumentTool } from '../tools/files/ParseDocumentTool';
 import { RunSqliteTool } from '../tools/infra/RunSqliteTool';
 import { ObsidianNotesTool } from '../tools/connectors/ObsidianNotesTool';
@@ -283,57 +283,77 @@ describe('PermissionEngine — confirmation utilisateur', () => {
   });
 });
 
+// ─── Navigateur : lecture seule et accord par site ─────────────────────────
+
+interface Answer {
+  granted: boolean;
+  scope?: GrantScope;
+}
+
+/**
+ * Moteur dont la lecture seule se pilote, et qui répond lui-même au dialogue
+ * (`answer`, modifiable entre deux appels). `asked` garde chaque demande
+ * envoyée à l'UI.
+ */
+function browserEngine(readOnly: { on: boolean }, answer: Answer = { granted: true }) {
+  const asked: Array<Record<string, unknown>> = [];
+  const engine: PermissionEngine = new PermissionEngine(
+    (_m, params) => {
+      const p = params as Record<string, unknown>;
+      asked.push(p);
+      queueMicrotask(() =>
+        engine.resolvePermissionRequest(String(p['requestId']), answer.granted, answer.scope),
+      );
+    },
+    60_000,
+    () => readOnly.on,
+  );
+  return { engine, asked, answer };
+}
+
+const navigateTo = (url: string) => ({ tool: 'browser_navigate', args: { url }, url });
+const clickOn = (url: string) => ({ tool: 'browser_click', args: { selector: '#ok' }, url });
+const typeOn = (url: string) => ({
+  tool: 'browser_type',
+  args: { selector: '#q', text: 'x' },
+  url,
+});
+
 describe('PermissionEngine — navigateur en lecture seule', () => {
-  const navigate = { tool: 'browser_navigate', args: { url: 'https://exemple.fr' } };
-  const click = { tool: 'browser_click', args: { selector: '#ok' } };
-
-  /** Moteur dont la lecture seule se pilote, et qui répond lui-même au dialogue. */
-  function engineWith(readOnly: { on: boolean }, answer = { granted: true, remember: true }) {
-    const asked: Array<Record<string, unknown>> = [];
-    const engine: PermissionEngine = new PermissionEngine(
-      (_m, params) => {
-        const p = params as Record<string, unknown>;
-        asked.push(p);
-        queueMicrotask(() =>
-          engine.resolvePermissionRequest(String(p['requestId']), answer.granted, answer.remember),
-        );
-      },
-      60_000,
-      () => readOnly.on,
-    );
-    return { engine, asked };
-  }
-
-  it('lecture seule : browser_navigate passe à moyen, une confirmation par session', async () => {
-    const { engine, asked } = engineWith({ on: true });
-    expect((await engine.check(navigate)).granted).toBe(true);
-    expect(asked[0]?.['riskLevel']).toBe('medium');
-    const second = await engine.check(navigate);
-    expect(second).toEqual({ granted: true, reason: 'Autorisé (session)' });
+  it('lecture seule : browser_navigate passe à moyen, « session » le retient partout', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'session' });
+    expect((await engine.check(navigateTo('https://exemple.fr'))).granted).toBe(true);
+    expect(asked[0]).toMatchObject({ riskLevel: 'medium', scopes: ['once', 'site', 'session'] });
+    const second = await engine.check(navigateTo('https://autre.fr'));
+    expect(second).toEqual({ granted: true, reason: 'Autorisé (session)', scope: 'session' });
     expect(asked).toHaveLength(1);
   });
 
   it('lecture seule coupée : élevé, confirmation à chaque fois malgré la session', async () => {
     const readOnly = { on: true };
-    const { engine, asked } = engineWith(readOnly);
-    await engine.check(navigate); // autorisé « pour la session » en lecture seule
+    const { engine, asked } = browserEngine(readOnly, { granted: true, scope: 'session' });
+    await engine.check(navigateTo('https://exemple.fr')); // « session » en lecture seule
     readOnly.on = false;
-    await engine.check(navigate);
-    await engine.check(navigate);
+    await engine.check(navigateTo('https://exemple.fr'));
+    await engine.check(navigateTo('https://exemple.fr'));
     expect(asked.map(a => a['riskLevel'])).toEqual(['medium', 'high', 'high']);
+    // Plus que « une fois » : ni site, ni session pour un risque élevé.
+    expect(asked[1]?.['scopes']).toEqual(['once']);
+    expect(asked[1]).not.toHaveProperty('site');
   });
 
-  it('clic et saisie restent élevés, même en lecture seule', async () => {
-    const { engine, asked } = engineWith({ on: true });
-    await engine.check(click);
-    await engine.check(click);
+  it('clic et saisie restent élevés, même en lecture seule ; pas de « session »', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'session' });
+    await engine.check(clickOn('https://exemple.fr/'));
+    await engine.check(clickOn('https://exemple.fr/'));
     expect(asked.map(a => a['riskLevel'])).toEqual(['high', 'high']);
+    expect(asked[0]?.['scopes']).toEqual(['once', 'site']);
   });
 
   it('le mode sans danger bloque toujours browser_navigate (moyen n’est pas faible)', async () => {
-    const { engine } = engineWith({ on: true });
+    const { engine } = browserEngine({ on: true });
     engine.updateConfig({ safeMode: true });
-    expect((await engine.check(navigate)).granted).toBe(false);
+    expect((await engine.check(navigateTo('https://exemple.fr'))).granted).toBe(false);
   });
 
   it('sans lecteur de lecture seule : le risque déclaré s’applique', () => {
@@ -341,5 +361,120 @@ describe('PermissionEngine — navigateur en lecture seule', () => {
     const config = DEFAULT_PERMISSION_CONFIG.tools['browser_navigate'];
     expect(config?.riskLevelWhenReadOnly).toBe('medium');
     expect(config && engine.effectiveRisk(config)).toBe('high');
+  });
+});
+
+describe('PermissionEngine — accord « pour ce site »', () => {
+  it('trois étapes sur un même site : une confirmation par outil et par site', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    const r1 = await engine.check(clickOn('https://www.exemple.fr/recherche'));
+    expect(r1).toMatchObject({ granted: true, scope: 'site', site: 'exemple.fr' });
+    expect(asked[0]).toMatchObject({ site: 'exemple.fr', scopes: ['once', 'site'] });
+
+    // Sous-domaine : suit l'accord du domaine enregistrable.
+    const r2 = await engine.check(clickOn('https://m.exemple.fr/resultat/2'));
+    expect(r2).toEqual({
+      granted: true,
+      reason: 'Autorisé pour exemple.fr (session)',
+      scope: 'site',
+      site: 'exemple.fr',
+    });
+    expect(asked).toHaveLength(1);
+
+    // Un autre outil ne profite pas de l'accord : la clé est outil + site.
+    await engine.check(typeOn('https://exemple.fr/'));
+    expect(asked).toHaveLength(2);
+  });
+
+  it('« une fois » ne retient rien', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'once' });
+    const r = await engine.check(clickOn('https://exemple.fr/'));
+    expect(r).toMatchObject({ granted: true, scope: 'once', site: 'exemple.fr' });
+    await engine.check(clickOn('https://exemple.fr/'));
+    expect(asked).toHaveLength(2);
+  });
+
+  it('un autre site (ou une redirection vers un autre domaine) redemande', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    await engine.check(clickOn('https://exemple.fr/'));
+    // Page redirigée : le clic suivant vise la page courante, sur un autre domaine.
+    await engine.check(clickOn('https://exemple-paiement.com/'));
+    expect(asked.map(a => a['site'])).toEqual(['exemple.fr', 'exemple-paiement.com']);
+  });
+
+  it('un suffixe partagé ne s’étend pas à ses voisins (github.io, co.uk)', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    await engine.check(clickOn('https://alice.github.io/'));
+    await engine.check(clickOn('https://bob.github.io/'));
+    await engine.check(clickOn('https://exemple.co.uk/'));
+    await engine.check(clickOn('https://autre.co.uk/'));
+    expect(asked.map(a => a['site'])).toEqual([
+      'alice.github.io',
+      'bob.github.io',
+      'exemple.co.uk',
+      'autre.co.uk',
+    ]);
+  });
+
+  it('lecture seule coupée : l’accord par site dort, puis revient avec elle', async () => {
+    const readOnly = { on: true };
+    const { engine, asked } = browserEngine(readOnly, { granted: true, scope: 'site' });
+    await engine.check(clickOn('https://exemple.fr/'));
+    readOnly.on = false;
+    const r = await engine.check(clickOn('https://exemple.fr/'));
+    expect(r.scope).toBe('once'); // « site » répondu mais plus proposé → une fois
+    expect(asked[1]).toMatchObject({ riskLevel: 'high', scopes: ['once'] });
+    readOnly.on = true;
+    expect((await engine.check(clickOn('https://exemple.fr/'))).reason).toContain('exemple.fr');
+    expect(asked).toHaveLength(2);
+  });
+
+  it('une portée non proposée vaut « une fois » (outil sans site, réponse forgée)', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    const r = await engine.check({ tool: 'run_command', args: { command: 'dir' } });
+    expect(r).toMatchObject({ granted: true, scope: 'once' });
+    expect(r).not.toHaveProperty('site');
+    expect(asked[0]?.['scopes']).toEqual(['once']);
+    await engine.check({ tool: 'run_command', args: { command: 'dir' } });
+    expect(asked).toHaveLength(2);
+  });
+
+  it('page sans site (about:blank, URL absente) : pas d’accord par site proposé', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    await engine.check(clickOn('about:blank'));
+    await engine.check({ tool: 'browser_click', args: { selector: '#ok' } });
+    expect(asked.map(a => a['scopes'])).toEqual([['once'], ['once']]);
+  });
+
+  it('un refus ne retient rien, et dit qu’il vient de l’utilisateur', async () => {
+    const { engine, asked, answer } = browserEngine(
+      { on: true },
+      { granted: false, scope: 'site' },
+    );
+    const r = await engine.check(clickOn('https://exemple.fr/'));
+    expect(r).toMatchObject({ granted: false, reason: "Refusé par l'utilisateur" });
+    answer.granted = true;
+    await engine.check(clickOn('https://exemple.fr/'));
+    expect(asked).toHaveLength(2);
+  });
+
+  it('le mode sans danger l’emporte sur un accord par site déjà donné', async () => {
+    const { engine } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    await engine.check(clickOn('https://exemple.fr/'));
+    engine.updateConfig({ safeMode: true });
+    expect((await engine.check(clickOn('https://exemple.fr/'))).granted).toBe(false);
+  });
+
+  it('clearSessionGrants oublie aussi les accords par site', async () => {
+    const { engine, asked } = browserEngine({ on: true }, { granted: true, scope: 'site' });
+    await engine.check(clickOn('https://exemple.fr/'));
+    engine.clearSessionGrants();
+    await engine.check(clickOn('https://exemple.fr/'));
+    expect(asked).toHaveLength(2);
+  });
+
+  it('les clés outil et outil@site ne se recouvrent pas', () => {
+    expect(grantKey('browser_navigate')).toBe('browser_navigate');
+    expect(grantKey('browser_navigate', 'exemple.fr')).toBe('browser_navigate@exemple.fr');
   });
 });

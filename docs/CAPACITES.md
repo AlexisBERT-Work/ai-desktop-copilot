@@ -136,8 +136,8 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
 | Naviguer une page JS/SPA (Playwright, Chrome/Edge système)                                                       | `browser_navigate`   | 🟠 → 🟡 |
 | Extraire le texte visible d'une page                                                                             | `browser_get_text`   |   🟢    |
 | Capture d'écran de la page                                                                                       | `browser_screenshot` |   🟢    |
-| Cliquer sur un élément                                                                                           | `browser_click`      |   🟠    |
-| Saisir du texte dans un champ                                                                                    | `browser_type`       |   🟠    |
+| Cliquer sur un élément (rend la main : CAPTCHA, code à usage unique, paiement)                                   | `browser_click`      |   🟠    |
+| Saisir du texte dans un champ (rend la main : idem)                                                              | `browser_type`       |   🟠    |
 | Fermer le navigateur                                                                                             | `browser_close`      |   🟢    |
 | Agréger l'actu tech (HN, The Verge, TechCrunch, DEV.to…)                                                         | `fetch_tech_news`    |   🟢    |
 | **Chercher/lire les dailys** (revues de presse locales + partagées) pour répondre aux questions sur les articles | `search_dailies`     |   🟢    |
@@ -148,9 +148,26 @@ automatiquement l'agent vers `browser_navigate` + `browser_get_text`.
 **Navigateur en lecture seule** (par défaut, Réglages › Sécurité) : le navigateur
 de l'agent lit mais n'envoie rien — toute requête autre que GET/HEAD/OPTIONS est
 refusée, les WebSockets fermées, les service workers bloqués. `browser_navigate`
-passe alors de 🟠 à 🟡 (une confirmation par session) ; clic et saisie restent 🟠.
+passe alors de 🟠 à 🟡 ; clic et saisie restent 🟠.
 Un formulaire refusé est signalé dans le résultat (« formulaire non envoyé »).
 Pour remplir un formulaire en ligne, couper la lecture seule.
+
+**Accord par site** (lecture seule active) : la carte de confirmation de
+`browser_navigate`, `browser_click` et `browser_type` propose « Autoriser une
+fois » et **« Autoriser pour ce site »** — cet outil, sur ce site, jusqu'à la
+fin de la session. Pour `browser_navigate` (🟡) s'y ajoute « tous les sites pour
+cette session ». Le site est le domaine enregistrable (eTLD+1) de l'URL visée,
+ou de la page courante pour le clic et la saisie : `www.` et `m.exemple.fr`
+suivent `exemple.fr`, mais `alice.github.io` et `bob.github.io` sont deux sites.
+Naviguer, taper une recherche puis cliquer un résultat sur un même site : trois
+confirmations la première fois, aucune ensuite. Lecture seule coupée, chaque
+action redemande (un formulaire pourrait partir).
+
+**À toi de jouer** : avant de cliquer ou de saisir, l'agent regarde si la page
+(et ses iframes visibles) demande un CAPTCHA, un code à usage unique (2FA) ou un
+paiement (champ de carte, cryptogramme, iframe Stripe, PayPal, Adyen…). Si oui,
+il n'agit pas, accord par site ou non, et répond « À toi de jouer : ouvre la
+page dans ton navigateur et fais cette étape toi-même ».
 
 ## 3. Connecteurs externes
 

@@ -98,8 +98,10 @@ export function SecurityTab() {
           <p className="text-sm font-medium text-white/90">Navigateur en lecture seule</p>
           <p className="text-xs text-white/45 mt-0.5">
             Le navigateur de l&apos;agent lit les pages mais n&apos;envoie rien : ni formulaire, ni
-            requête d&apos;écriture, ni WebSocket. Ouvrir une page ne demande alors qu&apos;une
-            confirmation par session. Coupe-le pour remplir un formulaire en ligne.
+            requête d&apos;écriture, ni WebSocket. Ouvrir une page passe alors au risque moyen, et
+            ouvrir, cliquer ou saisir peut s&apos;autoriser site par site pour la session. Coupe-le
+            pour remplir un formulaire en ligne : chaque action redemande. CAPTCHA, code à usage
+            unique et paiement te reviennent toujours.
           </p>
         </div>
         <SecuritySwitch
@@ -159,6 +161,14 @@ export function SecurityTab() {
                               title="Risque appliqué tant que le navigateur est en lecture seule"
                             >
                               → {RISK_LABEL[lowered]} en lecture seule
+                            </span>
+                          )}
+                          {browserReadOnly && tool.siteGrantWhenReadOnly === true && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-white/8 text-white/55"
+                              title="« Autoriser pour ce site » proposé tant que le navigateur est en lecture seule"
+                            >
+                              par site
                             </span>
                           )}
                           <span className="text-xs text-white/30 truncate">{tool.description}</span>
