@@ -94,8 +94,9 @@ rien n'entre dans le prompt, une seule relance au plus par tour.
 ## 2026-11-06 — Skills : `load_skill` (#17)
 
 Report à la main de `8c72f82` (tag `archive/feat-veille`), sur `feat/load-skill`,
-coupée de `feat/selection-outils-banc` : il faut `pathArgs`, `toolKeywords.ts` et le
-banc, absents de `dev` tant que #26 et #30 ne sont pas fusionnées.
+coupée de `feat/selection-outils-banc` pour avoir `pathArgs`, `toolKeywords.ts` et le
+banc avant la fusion de #26 et #30, puis remise à jour avec `dev` une fois celles-ci
+fusionnées ([PR #31](https://github.com/AlexisBERT-Work/ai-desktop-copilot/pull/31)).
 
 - **69ᵉ outil** : ajouter une procédure en déposant un `SKILL.md`, sans écrire de
   TypeScript. Deux skills livrés, et les brouillons de `proposeSkills` sont enfin
