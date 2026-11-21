@@ -32,7 +32,7 @@ export interface ProposeSkillsOptions {
 /** Pseudo-approach recorded when a run answered directly without tools. */
 const DIRECT_ANSWER = '(réponse directe)';
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')

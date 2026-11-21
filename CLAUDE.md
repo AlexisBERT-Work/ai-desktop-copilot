@@ -19,7 +19,7 @@ Local-first AI desktop copilot. Tauri 2 (Rust) + React 19 + Node.js agent runtim
 | **Que reste-t-il à faire ?**                   | `docs/AMELIORATIONS.md` (§ 0 = ce qui bloque sur l'utilisateur)          |
 | **Que contient la prochaine version ?**        | `docs/AMELIORATIONS.md` § 0 bis « Feuille de route » + Milestones GitHub |
 | Sortir une version (bump, tag, publication)    | `docs/DISTRIBUTION.md` § 4                                               |
-| Que sait faire l'agent ? (68 outils + risques) | `docs/CAPACITES.md` — **référence unique**                               |
+| Que sait faire l'agent ? (69 outils + risques) | `docs/CAPACITES.md` — **référence unique**                               |
 | Que ne sait-il pas faire ? Bornes matériel     | `docs/LIMITES.md`                                                        |
 | Mesurer la qualité de l'agent (banc de tâches) | `packages/agent-runtime/src/eval/` + `CONTRIBUTING.md`                   |
 | Sécurité (sandbox, permissions, audit)         | `docs/SECURITE.md`                                                       |

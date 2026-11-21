@@ -2,6 +2,7 @@ import type { NewsItem } from './newsItem';
 import { httpGet } from '../lib/http';
 import { extractReadableText, looksLikeProse, startsMidSentence } from '../lib/readableText';
 import { cutAtSentence, toExcerpt } from './newsText';
+import { cleanInvisible } from '../security/invisibleChars';
 
 /**
  * Best-effort: fetch the linked page for items missing an excerpt (e.g. Hacker
@@ -14,7 +15,7 @@ export async function enrichExcerpts(items: NewsItem[]): Promise<NewsItem[]> {
       if (item.excerpt && item.excerpt.length > 0) return;
       try {
         const html = await httpGet(item.url, 8_000);
-        const text = extractReadableText(html);
+        const text = cleanInvisible(extractReadableText(html)).text;
         if (text.length > 80) item.excerpt = toExcerpt(text, 500);
       } catch {
         /* leave without excerpt */
@@ -38,7 +39,7 @@ export async function enrichArticleTexts(items: NewsItem[], maxChars = 1500): Pr
     items.map(async item => {
       try {
         const html = await httpGet(item.url, 8_000);
-        const text = extractReadableText(html);
+        const text = cleanInvisible(extractReadableText(html)).text;
         // Sous ~200 caractères, on est face à un paywall, un mur de cookies ou
         // une page sans prose : l'extrait RSS fait alors meilleure matière.
         if (text.length < 200) return;

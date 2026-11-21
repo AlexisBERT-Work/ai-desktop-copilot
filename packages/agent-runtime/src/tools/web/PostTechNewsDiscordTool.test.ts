@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildDiscordEmbeds, relativeAge } from '../../news/discordEmbeds';
 import type { NewsItem } from '../../news/newsItem';
+import type { OllamaClient } from '../../llm/OllamaClient';
+import { PostTechNewsDiscordTool } from './PostTechNewsDiscordTool';
 
 describe('relativeAge', () => {
   const now = Date.parse('2025-06-10T12:00:00Z');
@@ -75,5 +77,25 @@ describe('buildDiscordEmbeds', () => {
     const [embed] = buildDiscordEmbeds(items, [], now);
     expect(embed!.description).toBeUndefined();
     expect(embed!.timestamp).toBeUndefined();
+  });
+});
+
+describe('PostTechNewsDiscordTool — données personnelles', () => {
+  const tool = new PostTechNewsDiscordTool({} as unknown as OllamaClient, 'qwen3:14b');
+
+  it('intro et nom d’affichage masqués, URL et sources intactes', () => {
+    const args = {
+      intro: 'Revue du jour — écrivez à jean@exemple.fr',
+      username: 'Veille 06 12 34 56 78',
+      webhook_url: 'https://discord.com/api/webhooks/123/abc',
+      sources: ['hn'],
+    };
+    const out = tool.prepareOutboundArgs(args);
+    expect(out.args).toEqual({
+      ...args,
+      intro: 'Revue du jour — écrivez à [e-mail masqué]',
+      username: 'Veille [téléphone masqué]',
+    });
+    expect(out.notice).toBe('Masqué avant envoi : 1 e-mail, 1 téléphone.');
   });
 });

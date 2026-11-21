@@ -62,7 +62,7 @@ et chaque morceau est reporté dans le jalon ci-dessus. `git show <commit>` suff
 à le retrouver.
 
 **Hors jalon, à trancher d'abord** : Supabase depuis le webview (§ 1.2),
-friction `browser_navigate`, système de plugins, Linux/macOS, Pocket TTS (§ 4).
+système de plugins, Linux/macOS, Pocket TTS (§ 4).
 
 ---
 
@@ -283,7 +283,10 @@ rien à faire au milieu d'un journal.
     web, `read_webpage` exige une URL.
   - **Client MCP** : brancher des outils tiers sans les écrire (rejoint le
     système de plugins ci-dessous).
-  - **Format `SKILL.md`** pour `load_skill` (#17), au lieu d'un format maison.
+  - **`load_skill` proposé sur le nom d'un skill installé** : la phrase doit dire
+    « skill » ou « compétence » ([LIMITES.md](LIMITES.md) § 4 bis). Passer les noms
+    installés à `selectTools` lèverait ça sans coûter de token, mais il faut d'abord
+    voir si la limite gêne à l'usage.
   - **Réglage guidé**, à la OpenJarvis : diagnostic, plan, essai, validation par
     `claude -p`, une modification n'étant gardée que si le jeu `holdout` du banc
     ne baisse pas. Possible maintenant que le banc existe.
@@ -292,6 +295,26 @@ rien à faire au milieu d'un journal.
     réutilisation du cache de préfixe sous Ollama (`scripts/latency-bench.mjs`) :
     les rapports se contredisent selon les versions, et tout le gain de latence
     du 2026-10-08 en dépend.
+- **Pistes de la veille GitHub** (rapports du 6 au 12/11, workflow `ai-veille.yml`).
+  Les cinq « 🟢 À faire ensemble » sont développées une par une, une branche et
+  une PR chacune, validées à chaque étape :
+  - ✅ **Caractères invisibles retirés avant le modèle** (11/11, d'après guard-spec) :
+    branche `feat/nettoyage-unicode`. Voir [LIMITES.md](LIMITES.md) § 5.
+  - ✅ **Données personnelles masquées à la sortie** (7/11) : branche
+    `feat/masquage-donnees-perso`. Reste : noms et adresses, téléphones
+    étrangers. Voir [LIMITES.md](LIMITES.md) § 5.
+  - **Navigateur en lecture seule imposée** (6/11) : tranche la friction de
+    `browser_navigate` (plus bas).
+  - **Dictée dans le champ actif de n'importe quelle appli** (8/11) : raccourci
+    appuyer-pour-parler, frappe Unicode, 100 % CPU.
+  - **Kensaku comme moteur de `semantic_search`** (6/11) : PDF, DOCX et captures,
+    sans outil ajouté ; binaire épinglé, installé par l'utilisateur.
+  - À garder (🟡), sans date : arbre d'accessibilité avec `ref` cliquables (après
+    la lecture seule), reclassement des passages (lifeboat), citations vérifiées
+    d'un compte rendu (tingo), leçons tirées des corrections, capture du son
+    système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
+    Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
+    (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :
@@ -326,10 +349,11 @@ rien à faire au milieu d'un journal.
   par Supabase Studio (Authentication → Users). Chantier à part.
 - **Système de plugins** — la voie est ouverte (`BaseTool` + `registerTools` +
   `DEFAULT_PERMISSION_CONFIG`), mais rien ne charge de tool tiers à l'exécution.
-- **Friction de `browser_navigate`** — classé `high`, donc confirmation à chaque
-  appel, ce qui casse un enchaînement navigateur en plusieurs étapes. Reclasser
-  en `medium` (une fois par session) serait cohérent avec `browser_click` /
-  `browser_type`… qui sont eux aussi `high`. À trancher ensemble.
+- ✅ **Friction de `browser_navigate`** — tranchée le 2026-11-12 par la
+  lecture seule du navigateur (veille du 6/11, branche
+  `feat/navigateur-lecture-seule`) : `medium` tant que rien ne peut partir,
+  `high` sinon. Clic et saisie restent `high`. Suite possible : l'arbre
+  d'accessibilité avec `ref` cliquables (🟡 de la veille).
 - **Linux / macOS** — `sandbox.rs`, les scripts PowerShell et les outils
   presse-papiers/OpenApp sont écrits pour Windows.
 

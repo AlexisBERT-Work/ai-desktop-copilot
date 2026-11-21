@@ -48,8 +48,7 @@ aujourd'hui classé `critical`.
 - Les **poids du modèle sont figés** : il ne « s'améliore » pas seul. Seul le
   système autour apprend — mémoire warm, playbook et EvolutionDaemon sont
   **câblés** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §3, §8),
-  mais les propositions d'évolution restent à valider par l'humain et le
-  système de _skills_ n'existe pas encore.
+  mais les propositions d'évolution restent à valider par l'humain.
 - **La voix tourne sur CPU, pas sur GPU** — par nécessité (pas de CUDA sur
   AMD, VRAM déjà prise par `qwen3:14b`). Conséquence mesurée le 2026-09-11 sur
   le Ryzen 5 5500 : les synthèses récentes de meilleure qualité (**Pocket TTS
@@ -103,6 +102,43 @@ aujourd'hui classé `critical`.
   nouvelle version de Kensaku demande une mise à jour de CatDesk (empreinte
   épinglée), sinon c'est l'ancien moteur qui répond.
 
+- **Navigateur en lecture seule** (par défaut) : il ne bloque que les
+  **méthodes** d'écriture. Un site qui écrit par un simple GET (lien « se
+  désabonner », vieux formulaires en GET) n'est pas arrêté. À l'inverse, les
+  recherches envoyées en POST sont refusées : couper la lecture seule pour
+  elles. Les visites répétées perdent le cache HTTP (la route l'interdit) :
+  ≈ 520 ms au lieu de ≈ 265 ms en médiane sur 10 pages ; la première visite
+  ne change pas. Seul le navigateur de l'agent est concerné, pas ceux de
+  l'utilisateur.
+
+## 4 bis. Skills (`load_skill`)
+
+- **L'agent ne découvre pas les skills seul : il faut les lui demander.** Les lister
+  dans le prompt système est **mesuré nuisible** sur `qwen3:14b` (2026-08-16,
+  `think:false`, quatre formulations) : le modèle produit un appel d'outil malformé
+  qu'Ollama jette, et la réponse sort vide sur 2 à 5 requêtes sur 6, y compris sans
+  rapport avec les skills. À réessayer seulement si le modèle du bundle change, et
+  en mesurant.
+- **La phrase doit dire « skill » ou « compétence ».** `load_skill` est hors du
+  noyau, proposé sur ses mots-clés : c'est ce qui le rend gratuit pour les autres
+  tours, mais « applique revue-comparee » seul ne le fait pas proposer.
+- **Le texte seul.** Les fichiers voisins du `SKILL.md` (`scripts/`, `references/`)
+  ne sont ni lus ni exécutés, et les autres clés du frontmatter (`allowed-tools`…)
+  sont ignorées. Un skill conçu autour de ses scripts ne fonctionnera pas ici.
+- **Taille bornée** par la fenêtre de contexte (8 192 tokens) : le corps est coupé à
+  6 000 caractères (signalé par `truncated`), le catalogue à 30 skills, la
+  description à 200 caractères. Un fichier de plus de 128 Ko est ignoré.
+- **Un seul niveau de dossier** : `skills/<nom>/SKILL.md`. Un dépôt cloné tel quel
+  dans `skills/` n'est pas exploré en profondeur. Un fichier sans `description`
+  n'est pas un skill, et un lien qui sort du dossier est refusé (y compris une
+  jonction posée exprès).
+- **Pas d'outils nouveaux.** Un skill s'appuie sur ceux du profil courant : en
+  profil `research`, une procédure qui cite `github_list_issues` échouera. Les
+  outils proposés au modèle sont choisis sur la phrase de l'utilisateur, pas sur le
+  skill : celui-ci peut citer un outil dont le modèle n'a pas le schéma sous les yeux.
+
+---
+
 ## 5. Sécurité — défenses encore manquantes
 
 Présent : sandbox Rust, permissions risk-gated, audit, safe mode, et
@@ -112,10 +148,33 @@ tokens, clés privées…) + détection d'injection avec cadrage « untrusted da
 (spotlighting).
 **Manquent** (voir [Concepts avancés](../CATDESK-CONCEPTS-AVANCES.md) §7) :
 
-- **Pre-check déterministe** des inputs (patterns d'injection connus) — seule la
-  sortie des outils est scannée, pas l'entrée utilisateur/fichier.
-- **Redaction PII** (emails, téléphones, noms) — seuls les secrets techniques
-  sont redactés aujourd'hui.
+- **Pre-check déterministe** des inputs — **en partie fait** : les caractères
+  invisibles sont retirés du texte saisi, des sorties d'outils et de la presse
+  (`security/invisibleChars.ts`), mais une consigne écrite **en clair** passe
+  toujours. Les motifs d'injection ne s'appliquent qu'à la sortie des outils, et
+  ils reconnaissent des tournures, pas une intention. Effets assumés du
+  nettoyage : emojis composés (famille, drapeaux régionaux) décomposés, style
+  emoji (VS16) perdu. Un chemin ou une URL contenant un caractère invisible est
+  transmis tel quel (sinon `read_file` ne trouverait plus le fichier) : il est
+  seulement compté dans le journal.
+- **Redaction PII** — **en partie fait**, et seulement pour ce qui **sort**
+  (`security/personalData.ts`) : cartes, IBAN, numéros de sécurité sociale,
+  e-mails et téléphones français, dans trois outils (webhook, Discord,
+  `call_api`). Pas couverts : noms, adresses postales, dates de naissance,
+  téléphones étrangers, RIB sans IBAN, IBAN hors des 39 pays connus, et tout
+  autre outil qui sortirait du texte. E-mails et téléphones ne sont masqués que
+  sur Discord. Un `call_api` qui masque re-sérialise son corps JSON : un entier
+  au-delà de 2^53 y perd sa précision (un corps sans rien à masquer part à
+  l'octet près). Ce que le modèle lit n'est pas masqué, par choix.
+- **Injection reformulée** : les motifs de `sanitizeToolOutput` couvrent l'anglais
+  et le français, mais ils reconnaissent des tournures, pas une intention. Sur
+  30 attaques françaises écrites sans les regarder (2026-11-06), **9 sont cadrées** :
+  une paraphrase passe (« fais fi de tes consignes », « garde cette action secrète »),
+  comme toute autre langue. Les motifs sont réglés pour ne pas cadrer un mode d'emploi
+  (aucun déclenchement sur 650 Ko de presse et 600 Ko d'aide et de tutoriels :
+  Ubuntu-fr, Framasoft, aide Google, Wikilivres), et ce choix coûte du rappel. Le cadre
+  n'est donc pas une garantie : ce qui protège reste le `PermissionEngine`, et les
+  skills gardent leur propre cadre systématique (voir [SECURITE.md](SECURITE.md)).
 - **Isolation réseau** pour l'exécution de code généré.
 
 ## 6. Tests & qualité

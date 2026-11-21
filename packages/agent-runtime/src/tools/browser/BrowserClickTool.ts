@@ -3,6 +3,7 @@ import type { ToolResult } from '@catdesk/shared-types';
 import { BaseTool } from '../base/BaseTool';
 import { jsonSchemaFrom } from '../base/zodSchema';
 import { BrowserManager } from '../../lib/browserManager';
+import { blockedWritesReport } from './blockedWrites';
 
 const argsSchema = z.object({
   selector: z.string().min(1).describe('CSS selector or text locator of the element to click'),
@@ -29,10 +30,11 @@ export class BrowserClickTool extends BaseTool<Args> {
     }
 
     try {
-      await BrowserManager.get().click(selector.trim(), timeout_ms);
+      const blocked = await BrowserManager.get().click(selector.trim(), timeout_ms);
       return this.ok({
         clicked: selector,
         url: BrowserManager.get().getCurrentUrl(),
+        ...blockedWritesReport(blocked, 'interact'),
       });
     } catch (err) {
       return this.fail(
