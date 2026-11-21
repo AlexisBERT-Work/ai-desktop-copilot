@@ -27,8 +27,8 @@ entrées datées ci-dessous ; ce qui reste de chaque piste, dans
 [CONTRIBUTING.md](../CONTRIBUTING.md#a-second-machine).
 
 **En PR vers `dev`** : le Plan E (capacités tirées de la veille), une PR par
-point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (voir
-l'entrée du 2026-11-21 ci-dessous). `feat/garde-fous-reponse` est entrée dans
+point, coupée de `dev` : `feat/client-mcp` (#44), `feat/fenetres-uia` (#49) ;
+voir les entrées du 2026-11-21. `feat/garde-fous-reponse` est entrée dans
 `dev` (#43).
 
 **Supabase est rétabli** (coupé le 2026-10-08, vérifié le 2026-10-09 :
