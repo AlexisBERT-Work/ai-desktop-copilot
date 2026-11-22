@@ -10,6 +10,7 @@ import type { SemanticCache } from './memory/SemanticCache';
 import type { FactExtractor } from './memory/FactExtractor';
 import { LlmScheduler } from './llm/LlmScheduler';
 import { toTags } from './security/invisibleChars.corpus';
+import { VOICE_MODE_RULES } from './prompts/systemPrompt';
 import type {
   AgentConfig,
   AgentStep,
@@ -250,6 +251,20 @@ describe('AgentOrchestrator — cache sémantique', () => {
     const h = makeHarness({ withCache: true, turns: [[token('quatre')]] });
     await collect(h.orchestrator.process('2+2 ?', 'conv-1', CONFIG));
     expect(h.cachePut).toHaveBeenCalledWith('2+2 ?', 'quatre');
+  });
+
+  it('mode oral : ni consulté ni rempli (une réponse écrite serait lue en liste)', async () => {
+    const h = makeHarness({
+      withCache: true,
+      cacheHit: '- Paris\n- Rome', // un lookup répondrait — il ne doit pas avoir lieu
+      turns: [[token('Paris est la capitale.')]],
+    });
+    const steps = await collect(
+      h.orchestrator.process('capitale de la France ?', 'conv-1', { ...CONFIG, voiceMode: true }),
+    );
+    expect(steps.at(-1)).toEqual({ type: 'done', content: 'Paris est la capitale.' });
+    expect(h.llmCalls).toHaveLength(1);
+    expect(h.cachePut).not.toHaveBeenCalled();
   });
 
   it('ne consulte ni ne remplit le cache pour une question de suivi', async () => {
@@ -606,6 +621,22 @@ describe('AgentOrchestrator — latence', () => {
     expect(first?.system).toContain('préfère les sources françaises');
     expect(first?.system).not.toContain('souvenir du tour');
     expect(first?.messages.at(-1)?.content).toContain('souvenir du tour');
+  });
+
+  it('mode oral : mêmes prompt système et outils, règles dans le seul dernier message', async () => {
+    const h = makeHarness({ turns: [[token('a')], [token('b')]] });
+    await collect(h.orchestrator.process('écrit', 'conv-1', CONFIG));
+    await collect(h.orchestrator.process('oral', 'conv-1', { ...CONFIG, voiceMode: true }));
+
+    const [written, spoken] = h.llmCalls;
+    expect(spoken?.system).toBe(written?.system);
+    expect(spoken?.tools).toEqual(written?.tools);
+    expect(spoken?.system).not.toContain(VOICE_MODE_RULES);
+    expect(written?.messages.at(-1)?.content).not.toContain(VOICE_MODE_RULES);
+    const last = spoken?.messages.at(-1)?.content ?? '';
+    expect(last).toContain(`${VOICE_MODE_RULES}\n\n[Message de l'utilisateur]\noral`);
+    // L'historique garde la question telle quelle, sans les règles.
+    expect(h.recordTurn).toHaveBeenLastCalledWith('conv-1', 'qwen3:14b', 'oral', 'b');
   });
 
   it("l'extraction de faits est DIFFÉRÉE au premier silence, pas lancée après la réponse", async () => {

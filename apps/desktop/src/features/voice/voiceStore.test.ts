@@ -23,6 +23,13 @@ vi.mock('../../shared/api/voice', () => ({
   voiceWarmup: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../shared/api/chat', () => ({
+  chatSend: vi.fn(() => Promise.resolve()),
+  chatCancel: vi.fn(() => Promise.resolve()),
+  chatWarmup: vi.fn(() => Promise.resolve()),
+}));
+
+import { chatSend } from '../../shared/api/chat';
 import { voiceSetDictation, voiceSetVocabularyEnabled } from '../../shared/api/voice';
 import { useVoiceStore } from './voiceStore';
 
@@ -110,5 +117,29 @@ describe('voiceStore — vocabulaire', () => {
     useVoiceStore.setState({ vocabulary: false });
     await useVoiceStore.getState().init();
     expect(setVocabularyEnabled).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('voiceStore — mode oral (#20)', () => {
+  const send = vi.mocked(chatSend);
+
+  beforeEach(() => {
+    send.mockClear();
+    useVoiceStore.setState({ enabled: true, readAloud: true, status: STATUS, hint: null });
+  });
+
+  it('une question au micro dont la réponse sera lue part en mode oral', async () => {
+    await useVoiceStore.getState().onTranscript(' Quelle heure est-il ? ');
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      message: 'Quelle heure est-il ?',
+      voiceMode: true,
+    });
+  });
+
+  it('lecture à voix haute coupée : réponse écrite, sans mode oral', async () => {
+    useVoiceStore.setState({ readAloud: false });
+    await useVoiceStore.getState().onTranscript('Quelle heure est-il ?');
+    expect(send.mock.calls[0]?.[0]).not.toHaveProperty('voiceMode');
   });
 });

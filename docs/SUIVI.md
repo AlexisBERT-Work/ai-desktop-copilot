@@ -53,6 +53,43 @@ depuis juillet), sauf **Security Audit** (#25) : vert sur `dev` depuis la PR #28
 2026-10-30 avec #27 et #29 (publication des dailys durcie). Sur la PR #26, le
 job Rust échouait sur un cache sherpa-onnx incomplet : corrigé le 2026-10-12.
 
+## 2026-11-22 — Mode oral (Plan D, point 3) et mesures voix (point 4)
+
+Branche `feat/mode-oral`, coupée de `dev`, PR vers `dev` (#20, veille du
+11/11). Une question posée au micro, quand la réponse sera lue, part avec
+`voiceMode` : l'agent ajoute en fin de contexte du tour, dans le dernier
+message, la consigne `VOICE_MODE_RULES` (27 tokens). Doc :
+[CAPACITES.md](CAPACITES.md) § 1 bis, [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+
+- **Choix par défaut** (notés dans la PR) : seulement si la question vient du
+  micro **et** que la lecture à voix haute est active ; une question tapée
+  garde une réponse écrite. Le cache sémantique est contourné à l'oral (il ne
+  garde que des réponses écrites).
+- **Mesuré** (`scripts/oral-bench.mjs`, nouveau, 12 questions, réglages de
+  prod) : 11/12 réponses orales en 3 phrases au plus (5/12 à l'écrit),
+  Markdown 2/12 (4/12), aucun emoji ni URL, l'outil appelé chaque fois qu'il
+  en faut un, réponse complète médiane 7,8 s contre 14,1 s.
+- **Le premier token bouge à l'oral, pas à l'écrit** : +0,2 à 0,4 s par tour
+  oral (`latency-bench.mjs --voice`), le prix des 27 tokens relus à chaque
+  tour. Une consigne de 50 tokens coûtait +0,25 à 0,7 s pour la même forme.
+  L'écrit garde le même prompt système et les mêmes outils (test).
+- **Reste** : après un gros résultat d'outil (`fetch_tech_news`), la réponse
+  orale est encore une liste numérotée.
+- **Point 4, rien d'adopté** (conclusions chiffrées dans
+  [AMELIORATIONS.md](AMELIORATIONS.md) § 4) : Pocket TTS français 6 couches
+  tient le RTF (0,40) mais rend son premier son vers 1 s, Piper reste ;
+  `sonora` (AEC3 en Rust pur, BSD-3) est la bonne brique pour le barge-in
+  (< 1 % CPU, 29 à 44 dB d'écho retirés, zéro faux départ et 9 sur 10 dans la
+  pièce favorable), pas les haut-parleurs forts ou saturés : essai réel à
+  faire avant de l'intégrer.
+
+| Portes (branche)             | Résultat                               |
+| ---------------------------- | -------------------------------------- |
+| Agent : tests, types, lint   | 1 356 (+3 sautés), 0, 0                |
+| Desktop : tests, types, lint | 82, 0, 0                               |
+| Rust : tests, clippy, fmt    | 64 (+11 ignorés), 0, propre            |
+| `eval --selection`           | `dev` 44/44, holdout 86 %, noyau 46/46 |
+
 ## 2026-11-20 — Garde-fous de réponse
 
 Plan A de l'analyse des rapports de veille du 6 au 20/11, sur la branche

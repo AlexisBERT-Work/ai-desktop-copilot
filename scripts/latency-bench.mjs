@@ -6,11 +6,13 @@
 // Ollama : chargement du modèle, lecture du prompt, génération. C'est l'outil
 // qui a trouvé les causes de la passe du 2026-10-08 (docs/SUIVI.md).
 //
-//   node scripts/latency-bench.mjs [--cold] [--no-warmup] [--model qwen3:14b]
+//   node scripts/latency-bench.mjs [--cold] [--no-warmup] [--voice] [--model qwen3:14b]
 //                                  [--ollama http://127.0.0.1:11434]
 //
 // --cold       décharge le modèle avant de commencer (lancement de CatDesk)
 // --no-warmup  n'envoie pas agent.warmup (ce que ferait l'ouverture du chat)
+// --voice      questions posées au micro (mode oral, #20 : règles de forme
+//              ajoutées au dernier message)
 //
 // Prérequis : Ollama lancé, idéalement avec les réglages de prod
 // (OLLAMA_KV_CACHE_TYPE=q4_0 et OLLAMA_FLASH_ATTENTION=1, voir core/ollama.rs) —
@@ -181,7 +183,12 @@ for (const input of QUESTIONS) {
     input,
     conversationId,
     messageId: `m-${nextId}`,
-    config: { model: MODEL, temperature: 0.2, maxIterations: 4 },
+    config: {
+      model: MODEL,
+      temperature: 0.2,
+      maxIterations: 4,
+      ...(flag('--voice') ? { voiceMode: true } : {}),
+    },
   });
   const r = current;
   current = null;

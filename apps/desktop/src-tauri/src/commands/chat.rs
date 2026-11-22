@@ -33,6 +33,10 @@ pub struct ChatSendArgs {
     /// Active la phase de planification.
     #[serde(default)]
     pub use_planning: Option<bool>,
+    /// Question posée au micro et réponse lue à voix haute : l'agent répond
+    /// en phrases courtes, sans Markdown (mode oral, #20).
+    #[serde(default)]
+    pub voice_mode: Option<bool>,
 }
 
 /// Config d'un run telle que l'agent l'attend (`AgentConfig`). Seuls les
@@ -57,6 +61,10 @@ fn agent_config(args: &ChatSendArgs) -> serde_json::Value {
     }
     if let Some(planning) = args.use_planning {
         config["usePlanning"] = serde_json::json!(planning);
+    }
+    // Absent = mode écrit : seul `true` est transmis.
+    if args.voice_mode == Some(true) {
+        config["voiceMode"] = serde_json::json!(true);
     }
     config
 }
@@ -176,6 +184,25 @@ mod tests {
         assert_eq!(config["modelMode"], "auto");
         assert!(config.get("temperature").is_none());
         assert!(config.get("maxIterations").is_none());
+        assert!(config.get("voiceMode").is_none());
+    }
+
+    #[test]
+    fn le_mode_oral_n_est_transmis_que_s_il_est_demande() {
+        let mut a = args();
+        a.voice_mode = Some(false);
+        assert!(agent_config(&a).get("voiceMode").is_none());
+        a.voice_mode = Some(true);
+        assert_eq!(agent_config(&a)["voiceMode"], true);
+        let from_ui: ChatSendArgs = serde_json::from_value(serde_json::json!({
+            "conversationId": "c",
+            "message": "salut",
+            "messageId": "m",
+            "modelId": "qwen3:14b",
+            "voiceMode": true,
+        }))
+        .expect("voiceMode accepté depuis l'UI");
+        assert_eq!(from_ui.voice_mode, Some(true));
     }
 
     #[test]

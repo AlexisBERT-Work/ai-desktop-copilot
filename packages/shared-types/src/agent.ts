@@ -26,6 +26,12 @@ export interface AgentConfig {
   lightModel?: string;
   /** Modèle de code/heavy (mode 'code' et borne haute de 'auto'). */
   codeModel?: string;
+  /**
+   * Mode oral (#20) : la question vient du micro et la réponse sera lue à
+   * voix haute. Des règles de phrases courtes, sans Markdown, sont ajoutées
+   * au DERNIER message (jamais au prompt système, qui doit rester stable).
+   */
+  voiceMode?: boolean;
 }
 
 // ─── Agent Execution Steps ─────────────────────────────────────

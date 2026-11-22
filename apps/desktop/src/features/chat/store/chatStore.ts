@@ -38,7 +38,15 @@ interface ChatState {
   vramBytes: number | null;
 
   // Actions
-  sendMessage: (content: string, conversationId: string) => Promise<void>;
+  /**
+   * `voiceMode` : la question vient du micro et la réponse sera lue à voix
+   * haute → l'agent répond en phrases courtes, sans Markdown (#20).
+   */
+  sendMessage: (
+    content: string,
+    conversationId: string,
+    options?: { voiceMode?: boolean },
+  ) => Promise<void>;
   newConversation: () => void;
   selectConversation: (id: string) => void;
   /**
@@ -105,7 +113,7 @@ export const useChatStore = create<ChatState>()(
     modelSizes: {},
     vramBytes: null,
 
-    sendMessage: async (content, conversationId) => {
+    sendMessage: async (content, conversationId, options) => {
       const { selectedModel } = get();
       const { temperature, maxIterations } = useSettingsStore.getState();
       const userMessageId = crypto.randomUUID();
@@ -151,6 +159,7 @@ export const useChatStore = create<ChatState>()(
           modelId: selectedModel,
           temperature,
           maxIterations,
+          ...(options?.voiceMode ? { voiceMode: true } : {}),
         });
       } catch (err) {
         set(s => {

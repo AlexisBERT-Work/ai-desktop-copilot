@@ -98,6 +98,11 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
   chat aussi.
 - Le Markdown est retiré avant lecture (puces, gras, liens → texte ; un bloc
   de code devient « Bloc de code omis »).
+- **Mode oral** (#20) : une question posée au micro, quand la réponse sera
+  lue, obtient une réponse faite pour l'oreille — 1 à 3 phrases courtes, sans
+  Markdown, liste, emoji ni URL. La consigne s'ajoute au dernier message du
+  tour, jamais au prompt système. Une question tapée garde une réponse écrite,
+  même lue à voix haute. Mesures : [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 - Option « réécouter après une réponse orale » : enchaîner sans raccourci.
 - **Dictée** (désactivée par défaut, Paramètres › Voix) : tant que
   `Ctrl+Alt+Espace` est tenu, le micro enregistre ; au relâchement, le texte
@@ -125,8 +130,8 @@ Rust (`core/voice/`) et réglée dans **Paramètres › Voix** :
   `scripts/fetch-voice-models.ps1` en dev, ou déposés dans
   `%APPDATA%\CatDesk\data\voice`. Absents → micro grisé, voix Windows.
 - Pas encore : mot d'activation mains libres (« Hey Jarvis »), coupure de la
-  voix en parlant par-dessus (barge-in), réponses volontairement orales du
-  modèle — voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+  voix en parlant par-dessus (barge-in), phrases de transition pendant les
+  outils — voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
 
 ## 2. Web & navigateur
 

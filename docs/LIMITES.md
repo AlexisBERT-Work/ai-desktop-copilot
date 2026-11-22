@@ -53,13 +53,22 @@ aujourd'hui classé `critical`.
   AMD, VRAM déjà prise par `qwen3:14b`). Conséquence mesurée le 2026-09-11 sur
   le Ryzen 5 5500 : les synthèses récentes de meilleure qualité (**Pocket TTS
   français 24 couches, Kokoro**) sont **plus lentes que le temps réel**
-  (RTF 1,3–1,4) et bégaieraient ; seul Piper tient (RTF 0,05). Même verdict
+  (RTF 1,3–1,4) et bégaieraient ; seul Piper tient (RTF 0,05). Remesuré le
+  2026-11-22 : le Pocket français 6 couches passe sous le temps réel (RTF
+  0,4), mais son premier son arrive après ~1 s, contre 0,25 s pour Piper
+  ([AMELIORATIONS.md](AMELIORATIONS.md) § 4). Même verdict
   côté reconnaissance pour Kyutai STT / Voxtral (GPU obligatoire). Sur une
   machine à GPU NVIDIA, ces choix seraient à rouvrir.
 - **La voix n'a pas de mot d'activation** : il faut `Ctrl+Espace` ou le bouton
   micro. Et CatDesk ne se laisse pas encore couper en parlant par-dessus
   (barge-in) — le haut-parleur repasserait dans le micro sans annulation
   d'écho. Voir [AMELIORATIONS.md](AMELIORATIONS.md) § 4.
+- **Le mode oral a ses bornes** (2026-11-22) : il ne vaut que pour une
+  question posée au micro avec la lecture active ; une question tapée reçoit
+  une réponse écrite, même lue à voix haute. Après un gros résultat d'outil
+  (actus tech), la réponse reste souvent une liste, lue sans ses puces mais
+  longue. Chaque tour oral coûte 0,2 à 0,4 s de plus au premier token (la
+  consigne est relue), et ne profite pas du cache des réponses.
 - **La dictée ne tape pas partout** :
   - pas dans une application lancée **en administrateur** : Windows y bloque la
     frappe (UIPI). La pastille le dit. Même chose pour le bureau sécurisé

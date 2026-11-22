@@ -209,7 +209,11 @@ export const useVoiceStore = create<VoiceStore>()(
         const overlay = useOverlayStore.getState();
         if (overlay.mode === 'mini') overlay.setMode('chat');
         const chat = useChatStore.getState();
-        await chat.sendMessage(clean, chat.activeConversationId);
+        // Mode oral (#20) : seulement si la réponse sera lue. Une question
+        // tapée garde une réponse écrite, même lue à voix haute.
+        await chat.sendMessage(clean, chat.activeConversationId, {
+          voiceMode: get().readAloud,
+        });
       },
 
       onToken: (messageId, token) => {
