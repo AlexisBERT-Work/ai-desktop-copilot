@@ -52,7 +52,7 @@ voix.
 | **[0.2.1](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/2)** | Mises à jour légères, fiabilité  | Semer les modèles voix, § 4 (#11) · retry des dailys, `a7ffebb` (#12) · ✅ `vitest.config.ts`, § 2.2 (#13) · ✅ tests `RunCommandTool`/`ReadFileTool`/`ListDirTool`, § 2.1 (#14) · ✅ constantes modèle et URL Ollama, § 3 (#15) · ✅ dépendances vulnérables, `pnpm audit` (#25, PR #28 : zod 4, vitest 4, overrides) · ✅ audit complet du 2026-10-07 (PR #26, dans `dev` le 2026-11-21) | L'artefact de mise à jour **suivant** (0.2.2) ne contient plus `voice/` et `pnpm audit` est vert |
 | **[0.3.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/3)** | Apparence                        | Thème, palettes, réglages d'affichage — report de `515abec` (#16)                                                                                                                                                                                                                                                                                                                          | Le rendu est validé à l'œil                                                                      |
 | **[0.4.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/4)** | Skills et veille                 | ✅ `load_skill`, 69ᵉ outil (#17, PR #31) · coupe-circuit par source (#18) · extraction trafilatura (#19)                                                                                                                                                                                                                                                                                   | `registerTools.test.ts` vert, `CAPACITES.md` et `LIMITES.md` à jour                              |
-| **[0.5.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/5)** | Voix phase 2 : « sonner Jarvis » | Mode oral côté agent (#20) · phrases de transition (#21) · barge-in (#22) — § 4                                                                                                                                                                                                                                                                                                            | Une question orale obtient une réponse courte, sans Markdown, sans silence                       |
+| **[0.5.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/5)** | Voix phase 2 : « sonner Jarvis » | ✅ Mode oral côté agent (#20, `feat/mode-oral`) · phrases de transition (#21) · barge-in (#22) — § 4                                                                                                                                                                                                                                                                                       | Une question orale obtient une réponse courte, sans Markdown, sans silence                       |
 | **[0.6.0](https://github.com/AlexisBERT-Work/ai-desktop-copilot/milestone/6)** | Mains libres                     | Wake word « Hey Jarvis », désactivé par défaut (#23) — § 4                                                                                                                                                                                                                                                                                                                                 | Détection fiable au calme, indicateur visible quand le micro écoute                              |
 
 **Le travail d'août mis de côté.** Les PR #5 (apparence) et #3 (skills,
@@ -364,15 +364,47 @@ rien à faire au milieu d'un journal.
     la lecture seule), reclassement des passages (lifeboat), citations vérifiées
     d'un compte rendu (tingo), leçons tirées des corrections, capture du son
     système, OCR natif Windows, `watch_page`, approbation par classifieur, Home
-    Assistant (attend le client MCP), moteur Kinetic, réponses orales courtes
-    (attend le mode oral), Pocket TTS via sherpa-onnx (une mesure).
+    Assistant (attend le client MCP), moteur Kinetic. Réponses orales
+    courtes : faites le 2026-11-22 par le mode oral (plus bas). Pocket TTS
+    par sherpa-onnx : mesuré le 2026-11-22, pas adopté (plus bas).
 - **Voix — phases 2 et 3** (la phase 1, parler/écouter par `Ctrl+Espace`, est
   livrée le 2026-09-11 ; voir [CAPACITES.md](CAPACITES.md) § 1 bis). Ce qui
   reste pour que ça « sonne » Jarvis :
-  - **Mode oral côté agent** : `chat.send` gagnerait un `voiceMode` →
-    instruction système « 1 à 3 phrases, pas de Markdown, chiffres en toutes
-    lettres ». Aujourd'hui le modèle répond comme à l'écrit, et la voix lit
-    des listes.
+  - ✅ **Mode oral côté agent** (#20, Plan D point 3, 2026-11-22, branche
+    `feat/mode-oral`) : une question posée au micro, quand la réponse sera
+    lue, part avec `voiceMode` (`chat.send` → Rust → `AgentConfig`).
+    L'agent ajoute en fin de contexte du tour, dans le **dernier message**,
+    `VOICE_MODE_RULES` : « 1 à 3 phrases courtes, sans Markdown, liste,
+    emoji ni URL » (27 tokens). Jamais dans le prompt système : passer de
+    l'écrit à l'oral ne relit pas ses ~2 600 tokens (test d'orchestrateur :
+    même prompt système, mêmes outils). Une question tapée garde une
+    réponse écrite, même lue ; le cache sémantique est contourné à l'oral.
+    Banc `scripts/oral-bench.mjs` (12 questions dites à voix haute, dont 3
+    qui demandent un outil, un agent neuf par mode, réglages de prod) :
+
+    | `qwen3:14b`                      | Écrit  | Oral      |
+    | -------------------------------- | ------ | --------- |
+    | Réponses en 3 phrases au plus    | 5/12   | **11/12** |
+    | Phrases par réponse (moyenne)    | 4,3    | 2,4       |
+    | Mots par phrase (moyenne)        | 19,2   | 17,3      |
+    | Avec Markdown / emoji ou URL     | 4 / 1  | 2 / 0     |
+    | Outil appelé quand il en faut un | 3/3    | 3/3       |
+    | Réponse complète (médiane)       | 14,1 s | **7,8 s** |
+
+    **Le prix** : la consigne est relue à chaque tour oral. Lecture du
+    prompt (`latency-bench.mjs --voice`, 3 tours, deux passes) : 1,0 / 1,2
+    / 1,7–1,8 s à l'écrit, 1,2–1,3 / 1,4–1,6 / 1,9–2,1 s à l'oral, soit
+    **+0,2 à 0,4 s au premier token** ; l'écrit ne bouge pas. Une version de
+    50 tokens (une idée par phrase, voix active, nombres arrondis, pas de
+    formule finale) coûtait +0,25 à 0,7 s pour la même forme : écartée.
+    **Reste** : après un résultat d'outil chargé (`fetch_tech_news`), la
+    réponse reste une liste numérotée de 6 phrases dans les deux modes ; le
+    Markdown est retiré avant lecture, mais c'est long à écouter. Piste :
+    répéter la consigne après le dernier résultat d'outil en mode oral
+    (même prix ; à mesurer au même banc). L'écart d'appels d'outils (7
+    contre 6) vient de `search_memory` sur des questions générales, pas
+    d'un outil manqué.
+
   - **Phrases de transition** pendant les outils (« Je regarde… ») sur
     `agent:tool_call`, pour couvrir les secondes de silence.
   - **Semer les modèles voix** dans le dossier persistant, comme
@@ -381,21 +413,71 @@ rien à faire au milieu d'un journal.
     mise à jour, faute de garantie que `{app}\voice` survive à une
     réinstallation NSIS. Les copier une fois dans `%APPDATA%\CatDesk\data\voice`
     (déjà sondé par `models.rs`) ramènerait les updates à 50–300 Mo.
-  - **Barge-in** (couper CatDesk en parlant) : le VAD est prêt, mais sans
-    annulation d'écho le haut-parleur se réentend dans le micro. Piste : seuil
-    VAD plus haut pendant `speaking`, ou un casque comme prérequis affiché.
+  - **Barge-in** (couper CatDesk en parlant, #22) : le VAD est prêt, mais
+    sans annulation d'écho le haut-parleur se réentend dans le micro.
+    **Mesuré le 2026-11-22 (Plan D, point 4), pas encore adopté.** La
+    bibliothèque de boubou (veille du 13/11) est
+    [`sonora`](https://github.com/dignifiedquire/sonora) : WebRTC AEC3
+    porté en **Rust pur**, BSD-3-Clause, 100 % CPU, testée sous Windows en
+    CI, branchée sur `cpal` comme `core/voice/` (le flux joué sert de
+    référence). Elle compile ici sans retouche. Banc hors ligne : CatDesk
+    parle 59 s (Piper miro-high), l'écho passe par une pièce simulée,
+    l'utilisateur (Piper siwis) intervient 10 fois. On compte les
+    déclenchements du VAD de CatDesk, sur trois passages :
+
+    | Pièce simulée                      | Sans AEC    | Avec `sonora` : faux départs, interventions vues | Écho retiré | CPU   |
+    | ---------------------------------- | ----------- | ------------------------------------------------ | ----------- | ----- |
+    | Favorable (40 ms, écho = voix)     | 1-2/10 vues | **0**, **9/10**                                  | 38-41 dB    | < 1 % |
+    | Portable saturé (+6 dB, 120 ms)    | 2/10        | 1-2, 4-6/10                                      | 40-44 dB    | < 1 % |
+    | Idem + dérive d'horloge de 100 ppm | 1-2/10      | 2-3, 7-8/10                                      | 29-40 dB    | < 1 % |
+    | Très fort (+12 dB, 250 ms)         | 1/10        | 1, 4-5/10                                        | 32-38 dB    | < 1 % |
+
+    Sans AEC, le barge-in est impossible : le VAD reste occupé par la voix de
+    CatDesk. Avec `sonora`, le cas favorable tient le but de la veille (zéro
+    faux départ, 9 sur 10), sans délai ajouté : 530 à 690 ms, contre 650 ms
+    sur la voix seule, silence de tête de la synthèse compris. Un haut-parleur
+    de portable fort ou saturé ne le tient pas. Pendant que l'utilisateur
+    parle par-dessus, sa voix perd 5 à 7 dB. **Suite** : intégrer `sonora`
+    en option expérimentale dans `core/voice/`, puis l'essai réel prévu par
+    la veille (réponse de 30 s sur les haut-parleurs, « stop » à 1 m, 9 sur
+    10 en moins de 500 ms, aucun faux départ). La simulation ne couvre ni la
+    gigue des tampons Windows ni un vrai haut-parleur. Pour les cas durs, deux
+    garde-fous à essayer : relever le seuil du VAD pendant que CatDesk parle,
+    et confirmer par Parakeet un mot d'arrêt (« stop », « attends »,
+    « arrête ») avant de couper.
+
   - **Mains libres** : `sherpa_onnx::KeywordSpotter` (zipformer 3,3M, anglais,
     mots-clés par tokens, « HEY JARVIS » convient) — micro permanent ~1 % CPU,
     STT lancé seulement après détection. Repli : openWakeWord `hey_jarvis`
     (Python). **Off par défaut**, indicateur visible obligatoire.
-  - **Choix ouvert — Pocket TTS** (Kyutai, meilleure voix française
-    entendue au test d'écoute) est **plus lent que le temps réel sur le
-    Ryzen 5 5500** (RTF 1,24–1,31, 24 couches obligatoires en français, ni
-    int8 ni 6 threads n'y changent rien : autorégressif). Deux issues non
-    testées : le crate Rust/Candle `pocket-tts` (annonce ×3,1 vs Python →
-    RTF ~0,4) et `PocketTTS.cpp`. Support français à confirmer avant tout.
+  - **Pocket TTS** (Kyutai, meilleure voix française entendue au test
+    d'écoute) : **pas adopté, mesure du 2026-11-22** (Plan D, point 4).
+    Sherpa-onnx 1.13, déjà embarqué, sait le charger
+    (`OfflineTtsPocketModelConfig`) : plus besoin de Python ni de Candle.
+    Exports français int8 de la communauté au format sherpa-onnx (poids
+    CC-BY-4.0, Kyutai), mêmes 10 phrases que Piper, Ryzen 5 5500 au calme :
+
+    | Modèle                                  | RTF (2 / 4 / 6 threads) | Premier son médian | Taille  |
+    | --------------------------------------- | ----------------------- | ------------------ | ------- |
+    | Piper `fr_FR-miro-high` (actuel)        | 0,11 (2 threads)        | 0,25 s             | 61 Mo   |
+    | Pocket `french` 6 couches (zephxs)      | 0,42 / 0,44 / **0,40**  | **0,95–1,0 s**     | ~175 Mo |
+    | Pocket `french_24l` 24 couches (zephxs) | 1,23 / 1,21 / 1,02      | 2,8–3,1 s          | ~380 Mo |
+
+    Le 6 couches (absent du test de septembre) est le premier Pocket
+    français plus rapide que le temps réel ici, et tient le seuil de RTF
+    (≤ 0,5). Mais sa pire phrase monte à 0,58, et surtout le premier son
+    arrive vers 1 s, contre 300 ms visés : sherpa-onnx rend chaque phrase
+    entière avant de la livrer. Et il serait mesuré machine calme, alors
+    qu'en usage `qwen3:14b` occupe aussi le processeur. **Piper reste.** À
+    rouvrir si sherpa-onnx livre l'audio de Pocket par morceaux pendant la
+    génération, ou si un test d'écoute à l'aveugle le justifie (les 10
+    phrases du banc, Piper contre Pocket 6 couches). Normaliser les
+    nombres en lettres avant Pocket (il hallucine sur les chiffres, d'après
+    l'export).
+
   - Sur une machine à GPU NVIDIA : Kyutai STT (VAD sémantique, sait quand
     l'utilisateur a fini) remplacerait avantageusement VAD + Parakeet.
+
 - **Annuaire d'uid pour les news ciblées** — cibler un poste précis passe encore
   par Supabase Studio (Authentication → Users). Chantier à part.
 - **Système de plugins** — la voie est ouverte (`BaseTool` + `registerTools` +

@@ -22,6 +22,8 @@ export interface ChatSendPayload {
   lightModel?: string | undefined;
   codeModel?: string | undefined;
   usePlanning?: boolean | undefined;
+  /** Question posée au micro, réponse lue à voix haute : mode oral (#20). */
+  voiceMode?: boolean | undefined;
 }
 
 export interface Attachment {

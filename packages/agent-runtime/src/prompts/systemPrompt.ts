@@ -22,6 +22,8 @@ export interface TurnContext {
   relevantMemories?: string[];
   conversationSummary?: string;
   playbookHint?: string;
+  /** Question posée au micro, réponse lue à voix haute (mode oral, #20). */
+  voiceMode?: boolean;
 }
 
 const IDENTITY = [
@@ -54,6 +56,19 @@ const RULES = [
   `- Réponds TOUJOURS en français sauf instruction contraire`,
   `- Sois concis et précis`,
 ];
+
+/**
+ * Règles du mode oral (veille du 11/11, d'après ste80-humanizer, MIT) : la
+ * réponse sera lue à voix haute, phrase par phrase. Elles vont dans le DERNIER
+ * message, en fin de contexte, et JAMAIS dans le prompt système : basculer
+ * entre écrit et oral ne doit pas faire relire ses ~2 600 tokens. Le prix est
+ * payé à chaque tour oral : 27 tokens, +0,2 à 0,4 s de lecture du prompt sur
+ * la RX 6700. Une version de 50 tokens (une idée par phrase, voix active,
+ * nombres arrondis, pas de formule finale) n'obtenait pas une meilleure forme
+ * au banc (`scripts/oral-bench.mjs`) et coûtait le double.
+ */
+export const VOICE_MODE_RULES =
+  'Réponse lue à voix haute : 1 à 3 phrases courtes, sans Markdown, liste, emoji ni URL.';
 
 /**
  * Prompt système STABLE. `warmFacts` (mémoire long terme) n'évolue qu'en tâche
@@ -89,6 +104,8 @@ export function buildTurnContext(ctx: TurnContext, plan: string[] = [], now = ne
       `Plan à suivre pour accomplir la tâche :\n${numbered}\n(Suis ce plan étape par étape, en utilisant les outils au besoin.)`,
     );
   }
+  // En dernier : la consigne de forme est la plus proche de la demande.
+  if (ctx.voiceMode) parts.push(VOICE_MODE_RULES);
   return parts.join('\n');
 }
 

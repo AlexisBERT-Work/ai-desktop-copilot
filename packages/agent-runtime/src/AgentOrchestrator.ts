@@ -371,7 +371,10 @@ export class AgentOrchestrator {
     // A query is "standalone" when the conversation has no prior turns: its
     // answer can't depend on earlier context, so it's safe to serve/store in the
     // semantic cache (§E). Context-dependent follow-ups bypass the cache.
-    const standalone = ctx.messages.length === 0;
+    // Mode oral (#20) : le cache ne garde que des réponses écrites — une
+    // réponse en liste resservie à une question orale serait lue telle quelle.
+    const voiceMode = config.voiceMode === true;
+    const standalone = ctx.messages.length === 0 && !voiceMode;
 
     // ─── Semantic cache consult ──────────────────────────────
     // On a hit we skip the LLM entirely (big latency win on slow first-token
@@ -444,7 +447,7 @@ export class AgentOrchestrator {
       // tour à l'autre) ; tout ce qui varie part dans le dernier message.
       const systemPrompt = buildSystemPrompt(ctx.warmFacts);
       const turnContext = buildTurnContext(
-        { ...ctx, ...(playbookHint ? { playbookHint } : {}) },
+        { ...ctx, ...(playbookHint ? { playbookHint } : {}), ...(voiceMode ? { voiceMode } : {}) },
         plan,
       );
       const messages: OllamaMessage[] = [

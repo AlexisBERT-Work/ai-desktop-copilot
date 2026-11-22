@@ -19,6 +19,13 @@ Full audit and refactor of the whole repository, then a latency pass (branch
 
 ### Added
 
+- **Spoken answers to spoken questions** (#20). A question asked at the microphone, when the
+  answer will be read aloud, now gets an answer written for the ear: one to three short
+  sentences, no Markdown, list, emoji or URL. The rule rides in the last message of the turn,
+  never in the system prompt, so switching between typed and spoken questions does not make
+  Ollama re-read the whole prompt. Typed questions keep written answers, even when read aloud,
+  and spoken questions skip the answer cache (it only holds written answers). Measured with
+  the new `scripts/oral-bench.mjs`; `scripts/latency-bench.mjs --voice` times a spoken turn.
 - **Skills: add a procedure by dropping a file** (`load_skill`, tool 69). Reads the standard
   `SKILL.md` format, as `<dataDir>/skills/<name>/SKILL.md` or `<name>.md`; two skills ship with
   the app. Without a name the tool returns the catalogue. Drafts written by the evolution daemon

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, buildTurnContext, withTurnContext } from './systemPrompt';
+import {
+  VOICE_MODE_RULES,
+  buildSystemPrompt,
+  buildTurnContext,
+  withTurnContext,
+} from './systemPrompt';
 
 describe('buildSystemPrompt', () => {
   it("contient l'identité, les règles et le guidage d'outils", () => {
@@ -69,6 +74,29 @@ describe('buildTurnContext', () => {
     const c = buildTurnContext({ screenText: 'x'.repeat(5000) }, [], now);
     const section = c.split("Contenu visible à l'écran :\n")[1]?.split('\n')[0] ?? '';
     expect(section.length).toBe(1500);
+  });
+
+  it('mode oral : les règles ferment le contexte, et seulement en mode oral', () => {
+    const oral = buildTurnContext({ voiceMode: true, activeWindow: 'Edge' }, ['étape'], now);
+    expect(oral.endsWith(VOICE_MODE_RULES)).toBe(true);
+    expect(buildTurnContext({ activeWindow: 'Edge' }, ['étape'], now)).not.toContain(
+      VOICE_MODE_RULES,
+    );
+    // Le reste du contexte est inchangé : le mode oral ne fait qu'ajouter.
+    expect(oral.startsWith(buildTurnContext({ activeWindow: 'Edge' }, ['étape'], now))).toBe(true);
+  });
+
+  it('mode oral : jamais dans le prompt système (basculer ne vide pas le cache)', () => {
+    expect(buildSystemPrompt()).not.toContain('voix haute');
+  });
+
+  it('mode oral : règles serrées, relues à chaque tour oral', () => {
+    // 27 tokens qwen3 mesurés pour 85 caractères. Une version de 50 tokens
+    // n'obtenait pas une meilleure forme au banc (`scripts/oral-bench.mjs`) et
+    // coûtait le double au premier token : ne pas la rallonger sans mesurer.
+    expect(VOICE_MODE_RULES.length).toBeLessThanOrEqual(120);
+    expect(VOICE_MODE_RULES).toMatch(/1 à 3 phrases/);
+    expect(VOICE_MODE_RULES).toMatch(/Markdown/);
   });
 
   it('withTurnContext met le contexte avant la demande, la demande intacte', () => {
